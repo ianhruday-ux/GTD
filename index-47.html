@@ -5,28 +5,6 @@
   This app works completely on its own — it stores everything in this
   browser's local storage, needs no setup, and you can hand this single file
   to anyone and it'll just work.
-
-  Google Tasks sync is OPTIONAL and off by default. If you want it:
-
-  1. Go to https://console.cloud.google.com/ and create (or pick) a project.
-  2. Enable the "Google Tasks API" for that project (APIs & Services > Library).
-  3. Configure the OAuth consent screen (APIs & Services > OAuth consent screen).
-     - External is fine for personal use; add yourself as a test user.
-     - Internal is fine too if you're on a Google Workspace account.
-  4. Create credentials (APIs & Services > Credentials > Create Credentials >
-     OAuth client ID) of type "Web application".
-     - Under "Authorized JavaScript origins" add the address you'll load this
-       file from, e.g. http://localhost:8000
-  5. Copy the generated Client ID (NOT the Client Secret — this app doesn't
-     need it) and paste it into CONFIG.CLIENT_ID below.
-  6. Serve this file over http(s) (e.g. python3 -m http.server 8000) — Google
-     sign-in won't work on a bare file:// URL.
-
-  Once CONFIG.CLIENT_ID is set, a "Connect Google Tasks" button appears in
-  the header. Clicking it signs you in and switches the app over to reading
-  and writing your real Google Tasks lists. Clicking it again disconnects
-  and switches back to your local data. The two data sets are kept separate
-  — connecting does not merge your local sample data into Google Tasks.
 -->
 <html lang="en">
 <head>
@@ -35,7 +13,6 @@
 <title>GTD Console</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
-<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
   :root{
     --desk:#171513;
@@ -98,33 +75,6 @@
   .btn-ghost{background:transparent; color:var(--text-primary); border:1px solid rgba(237,231,218,0.3);}
   .btn-ghost:hover{background:rgba(237,231,218,0.08);}
   .btn-small{padding:5px 10px; font-size:12px; border-radius:5px;}
-  .btn-google-connected{background:var(--moss); color:var(--dark-on-accent); border:none;}
-
-  .scoreboard{ display:flex; align-items:center; gap:8px; position:relative; }
-  .scoreboard .label{
-    font-family:var(--font-mono); font-size:10px; letter-spacing:0.14em;
-    color:var(--text-soft); text-transform:uppercase;
-  }
-  .digits{
-    display:flex; gap:3px; background:var(--bezel); padding:6px 8px; border-radius:6px;
-    box-shadow:inset 0 0 0 1px rgba(198,138,62,0.25), 0 3px 8px rgba(0,0,0,0.4);
-  }
-  .digit{
-    font-family:var(--font-mono); font-weight:600; font-size:18px; color:var(--brass);
-    width:16px; text-align:center; display:inline-block;
-  }
-  .digit.flip{ animation:flipDigit .38s ease; }
-  @keyframes flipDigit{
-    0%{transform:scaleY(1); opacity:1;} 45%{transform:scaleY(0.15); opacity:0.4;} 100%{transform:scaleY(1); opacity:1;}
-  }
-  .score-toast{
-    position:absolute; top:-6px; right:6px; font-family:var(--font-mono); font-weight:600;
-    font-size:13px; color:var(--moss); pointer-events:none; animation:toastFloat 1.3s ease forwards;
-  }
-  @keyframes toastFloat{
-    0%{opacity:0; transform:translateY(6px);} 15%{opacity:1; transform:translateY(0);}
-    75%{opacity:1; transform:translateY(-14px);} 100%{opacity:0; transform:translateY(-22px);}
-  }
 
   .lane-switcher{
     display:flex; gap:8px; padding:14px 16px 0 16px; overflow-x:auto;
@@ -424,8 +374,6 @@
 
   footer{ text-align:center; color:var(--text-soft); font-size:11.5px; padding:30px 10px 20px 10px; }
 
-  @media (prefers-reduced-motion: reduce){ .digit.flip, .score-toast{animation:none;} }
-
   /* =========================================================
      FULL-SCREEN EDIT/CREATE NAVIGATION
   ========================================================= */
@@ -708,16 +656,11 @@
 <header>
   <div class="brand">
     <span class="mark">GTD Console</span>
-    <span class="sub">Runs on its own — Google Tasks optional</span>
+    <span class="sub">Runs on its own</span>
   </div>
   <div class="header-right">
-    <div class="scoreboard" id="scoreboard">
-      <span class="label">Points</span>
-      <div class="digits" id="digits"></div>
-    </div>
     <button class="btn btn-ghost btn-small" id="reset-btn">Reset local data</button>
     <button class="btn btn-ghost btn-small" id="qa-day-btn" title="Dev QA aid: advances the app's day boundary by one day and re-runs habit boundary processing, so multi-day habit logic (stumbles, misses, run-ending, badges) can be tested without waiting">QA: +1 Day</button>
-    <button class="btn btn-ghost btn-small" id="google-btn">Connect Google Tasks</button>
   </div>
 </header>
 
@@ -733,7 +676,7 @@
   <div class="lanes" id="lanes"></div>
 </main>
 
-<footer id="footer-note">Data lives in this browser's local storage. Connecting Google Tasks is optional.</footer>
+<footer id="footer-note">Data lives in this browser's local storage.</footer>
 
 <div id="screen-root"></div>
 <div id="dialog-root"></div>
@@ -742,16 +685,6 @@
 <script>
 (function(){
   "use strict";
-
-  // =========================================================
-  // CONFIG — set your own OAuth Client ID to enable the
-  // optional "Connect Google Tasks" button. Leave the
-  // placeholder as-is to run purely on local storage.
-  // =========================================================
-  const CONFIG = {
-    CLIENT_ID: "YOUR_CLIENT_ID_HERE.apps.googleusercontent.com",
-    SCOPES: "https://www.googleapis.com/auth/tasks"
-  };
 
   const LIST_TITLES = {
     next: "Next Actions", waiting: "Waiting On", current: "Current Projects",
@@ -767,7 +700,6 @@
   const KINDS = ["next", "waiting", "current", "future", "habit"];
   const PROJECT_KINDS = ["current", "future"];
   const MOVE_MAP = { waiting: "next", future: "current" };
-  const API_BASE = "https://www.googleapis.com/tasks/v1";
   const NEW_ITEM_LABEL = {
     next: "+ New Action", waiting: "+ New Waiting Item",
     current: "+ New Project", future: "+ New Project", habit: "+ New Habit"
@@ -783,13 +715,8 @@
   };
 
   const state = {
-    mode: "local", // "local" or "google"
-    tokenClient: null,
-    accessToken: null,
-    lists: {},
     tasks: {next: [], waiting: [], current: [], future: [], habit: []},
     completed: {next: [], waiting: [], current: [], future: []}, // permanent Completed archive per lane (habits use their own daily habitDone-based grouping instead — see habitCompletedTodayHtml)
-    points: 0,
     activeKind: "next",
     collapsed: {},
     habitDone: {},
@@ -808,7 +735,6 @@
       return ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c];
     });
   }
-  function randInt(min, max){ return Math.floor(Math.random() * (max - min + 1)) + min; }
   // Single 4:00 AM day boundary, app-wide (habits, events, deadlines — one
   // clock, one rule, per the edge-case rulings). "Today" doesn't roll over
   // until 4am, so a late night doesn't cost you a habit day.
@@ -823,108 +749,6 @@
   function dateToStr(d){ return d.toLocaleDateString("en-CA"); }
   function addDaysToDate(d, n){ const copy = new Date(d); copy.setDate(copy.getDate() + n); return copy; }
   function genId(){ return "local-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8); }
-
-  const LINK_MARKER_RE = /\n?<!--gtdlink:([^>]+)-->/;
-  const GROUP_MARKER_RE = /\n?<!--gtdgroup-->/;
-  const HOOK_MARKER_RE = /\n?<!--gtdhook:([^:]+):([^>]*)-->/;
-  const WHEN_MARKER_RE = /\n?<!--gtdwhen:([^>]*)-->/;
-  const BUNDLE_MARKER_RE = /\n?<!--gtdbundle:([^>]*)-->/;
-  const DEADLINE_MARKER_RE = /\n?<!--gtddeadline:([^|>]*)\|([^|>]*)\|([^>]*)-->/;
-  // Waiting-condition marker — like the habit hook marker, but also carries
-  // which lane the target currently lives in ("next" or "waiting"), since a
-  // Waiting condition (unlike a habit hook) can point at either.
-  const COND_MARKER_RE = /\n?<!--gtdcond:([^:]+):([^:]*):([^>]*)-->/;
-  function parseNotes(notes){
-    let clean = notes || "";
-    let linkedProjectId = null;
-    const linkMatch = clean.match(LINK_MARKER_RE);
-    if (linkMatch){ linkedProjectId = linkMatch[1]; clean = clean.replace(LINK_MARKER_RE, ""); }
-    let hooks = [];
-    let hookMatch;
-    while ((hookMatch = clean.match(HOOK_MARKER_RE))){
-      hooks.push({ id: decodeURIComponent(hookMatch[1]), label: decodeURIComponent(hookMatch[2] || "") });
-      clean = clean.replace(HOOK_MARKER_RE, "");
-    }
-    let conditionId = null, conditionKind = null, conditionLabel = null;
-    const condMatch = clean.match(COND_MARKER_RE);
-    if (condMatch){
-      conditionId = decodeURIComponent(condMatch[1]);
-      conditionKind = decodeURIComponent(condMatch[2] || "") || null;
-      conditionLabel = decodeURIComponent(condMatch[3] || "");
-      clean = clean.replace(COND_MARKER_RE, "");
-    }
-    let bundleText = null;
-    const bundleMatch = clean.match(BUNDLE_MARKER_RE);
-    if (bundleMatch){
-      bundleText = decodeURIComponent(bundleMatch[1] || "");
-      clean = clean.replace(BUNDLE_MARKER_RE, "");
-    }
-    let whenTexts = [];
-    let whenMatch;
-    while ((whenMatch = clean.match(WHEN_MARKER_RE))){
-      whenTexts.push(decodeURIComponent(whenMatch[1] || ""));
-      clean = clean.replace(WHEN_MARKER_RE, "");
-    }
-    // Habits read the whole list (one gtdwhen per text cue row); every
-    // other kind only ever writes one, so whenText stays the single value
-    // Waiting items expect. Legacy single-marker habit notes read back as
-    // a list of one — no migration, same trick as the gtdhook list.
-    const whenText = whenTexts.length ? whenTexts[0] : null;
-    let isGroup = false;
-    if (GROUP_MARKER_RE.test(clean)){ isGroup = true; clean = clean.replace(GROUP_MARKER_RE, ""); }
-    // Deadline marker only ever appears on Next/Waiting/Current/Future items —
-    // new in this chunk, kept in the same HTML-comment style as the others.
-    let deadline = null;
-    const deadlineMatch = clean.match(DEADLINE_MARKER_RE);
-    if (deadlineMatch){
-      clean = clean.replace(DEADLINE_MARKER_RE, "");
-      if (deadlineMatch[1]) deadline = { date: deadlineMatch[1], time: deadlineMatch[2] || null, recurrence: deadlineMatch[3] || "none" };
-    }
-    return {
-      clean: clean.trim(), linkedProjectId: linkedProjectId, isGroup: isGroup,
-      whenText: whenText, whenTexts: whenTexts, hooks: hooks, bundleText: bundleText, deadline: deadline,
-      conditionId: conditionId, conditionKind: conditionKind, conditionLabel: conditionLabel
-    };
-  }
-  function buildLinkNotes(cleanNotes, projectId){
-    const base = (cleanNotes || "").trim();
-    return projectId ? base + "\n<!--gtdlink:" + projectId + "-->" : base;
-  }
-  function buildGroupNotes(cleanNotes){
-    const base = (cleanNotes || "").trim();
-    return base + "\n<!--gtdgroup-->";
-  }
-  function buildHabitNotes(cleanNotes, whenTexts, hooks, bundleText){
-    // Hooks and text cues coexist freely (11.2, revised in the QA round
-    // to a cue-ROW model): every hook gets a gtdhook marker, and every
-    // text cue row gets its own gtdwhen marker.
-    let base = (cleanNotes || "").trim();
-    (hooks || []).forEach(function(hk){
-      base += "\n<!--gtdhook:" + encodeURIComponent(hk.id) + ":" + encodeURIComponent(hk.label || "") + "-->";
-    });
-    (whenTexts || []).forEach(function(w){
-      if (w) base += "\n<!--gtdwhen:" + encodeURIComponent(w) + "-->";
-    });
-    if (bundleText){ base += "\n<!--gtdbundle:" + encodeURIComponent(bundleText) + "-->"; }
-    return base;
-  }
-  // Notes builder for Next/Waiting/Current/Future — link + deadline markers,
-  // plus (Waiting only) the "waiting for" cue: free text, or a condition
-  // link to a Next/Waiting item. The three are mutually exclusive, same
-  // rule as the habit when/hook cue.
-  function buildActionNotes(cleanNotes, projectId, deadline, whenText, conditionId, conditionKind, conditionLabel, bundleText){
-    let base = buildLinkNotes(cleanNotes, projectId);
-    if (deadline && deadline.date){
-      base += "\n<!--gtddeadline:" + deadline.date + "|" + (deadline.time || "") + "|" + (deadline.recurrence || "none") + "-->";
-    }
-    if (conditionId){
-      base += "\n<!--gtdcond:" + encodeURIComponent(conditionId) + ":" + encodeURIComponent(conditionKind || "") + ":" + encodeURIComponent(conditionLabel || "") + "-->";
-    } else if (whenText){
-      base += "\n<!--gtdwhen:" + encodeURIComponent(whenText) + "-->";
-    }
-    if (bundleText){ base += "\n<!--gtdbundle:" + encodeURIComponent(bundleText) + "-->"; }
-    return base;
-  }
 
   // How many habits (other than excludeId) currently hook onto targetId.
   function habitIncomingHookCount(targetId, excludeId){
@@ -1147,41 +971,7 @@
   }
 
   // =========================================================
-  // POINTS
-  // =========================================================
-  function loadPoints(){
-    const stored = window.localStorage.getItem("gtd_points");
-    state.points = stored ? parseInt(stored, 10) || 0 : 0;
-  }
-  function savePoints(){ window.localStorage.setItem("gtd_points", String(state.points)); }
-  function renderDigits(animateChangedOnly){
-    const digitsEl = qs("#digits");
-    const str = String(state.points).padStart(3, "0");
-    const prev = digitsEl.dataset.prev || "";
-    digitsEl.innerHTML = "";
-    for (let i = 0; i < str.length; i++){
-      const span = document.createElement("span");
-      span.className = "digit";
-      span.textContent = str[i];
-      if (animateChangedOnly && prev[i] !== str[i]) span.classList.add("flip");
-      digitsEl.appendChild(span);
-    }
-    digitsEl.dataset.prev = str;
-  }
-  function awardPoints(amount){
-    state.points += amount;
-    savePoints();
-    renderDigits(true);
-    const board = qs("#scoreboard");
-    const toast = document.createElement("span");
-    toast.className = "score-toast";
-    toast.textContent = "+" + amount;
-    board.appendChild(toast);
-    setTimeout(function(){ toast.remove(); }, 1300);
-  }
-
-  // =========================================================
-  // HABITS (always local, regardless of mode) — chunk 3
+  // HABITS
   // =========================================================
   // habitDone: {habitId: "YYYY-MM-DD"} — the most recent date the user
   // tapped the checkbox for. Only ever meaningfully compared against
@@ -1351,7 +1141,6 @@
     } else {
       state.habitDone[taskId] = today;
       state.habitDoneOrder.unshift(taskId);
-      awardPoints(randInt(2, 5));
     }
     saveHabitDone();
     saveHabitDoneOrder();
@@ -1421,7 +1210,7 @@
       cursor[k] = cursor[k] || 0;
       return byParent[k][cursor[k]++];
     });
-    if (state.mode === "local") saveTasksLocal("habit");
+    saveTasksLocal("habit");
     renderLane("habit");
   }
   // Small dot on the Habits tab (both the top switcher and the in-lane
@@ -1455,122 +1244,9 @@
   }
 
   // =========================================================
-  // GOOGLE TASKS BACKEND (optional peripheral)
-  // =========================================================
-  function api(path, options){
-    options = options || {};
-    const headers = Object.assign({
-      "Authorization": "Bearer " + state.accessToken,
-      "Content-Type": "application/json"
-    }, options.headers || {});
-    return fetch(API_BASE + path, Object.assign({}, options, { headers: headers }))
-      .then(function(res){
-        if (res.status === 401){ signInGoogle(); throw new Error("Token expired, re-authenticating"); }
-        if (res.status === 204) return null;
-        return res.json().then(function(json){
-          if (!res.ok){ throw new Error(JSON.stringify(json)); }
-          return json;
-        });
-      });
-  }
-  function ensureLists(){
-    return api("/users/@me/lists?maxResults=100").then(function(data){
-      const existing = data.items || [];
-      const found = {};
-      existing.forEach(function(l){ found[l.title] = l; });
-      const toCreate = KINDS.filter(function(k){ return !found[LIST_TITLES[k]]; });
-      let chain = Promise.resolve();
-      toCreate.forEach(function(k){
-        chain = chain.then(function(){
-          return api("/users/@me/lists", { method: "POST", body: JSON.stringify({ title: LIST_TITLES[k] }) })
-            .then(function(created){ found[LIST_TITLES[k]] = created; });
-        });
-      });
-      return chain.then(function(){
-        KINDS.forEach(function(k){ state.lists[k] = { id: found[LIST_TITLES[k]].id, title: LIST_TITLES[k] }; });
-      });
-    });
-  }
-  function fetchTasksForKind(k){
-    return api("/lists/" + state.lists[k].id + "/tasks?showCompleted=false&showHidden=false&maxResults=100")
-      .then(function(data){
-        state.tasks[k] = (data.items || []).map(function(t){
-          const parsed = parseNotes(t.notes);
-          return {
-            id: t.id, title: t.title, notesClean: parsed.clean, linkedProjectId: parsed.linkedProjectId,
-            isGroup: parsed.isGroup, parent: t.parent || null,
-            whenText: parsed.whenText, whenTexts: parsed.whenTexts, hooks: parsed.hooks, bundleText: parsed.bundleText,
-            deadline: parsed.deadline || null,
-            conditionId: parsed.conditionId || null, conditionKind: parsed.conditionKind || null, conditionLabel: parsed.conditionLabel || null
-          };
-        });
-      });
-  }
-  function fetchAllTasks(){ return Promise.all(KINDS.map(fetchTasksForKind)); }
-
-  function initAuth(){
-    if (!CONFIG.CLIENT_ID || CONFIG.CLIENT_ID.indexOf("YOUR_CLIENT_ID") === 0) return;
-    state.tokenClient = google.accounts.oauth2.initTokenClient({
-      client_id: CONFIG.CLIENT_ID,
-      scope: CONFIG.SCOPES,
-      callback: function(resp){
-        if (resp.error){ console.error("Auth error:", resp); return; }
-        state.accessToken = resp.access_token;
-        onGoogleSignedIn();
-      }
-    });
-  }
-  function signInGoogle(){
-    if (!state.tokenClient) return;
-    state.tokenClient.requestAccessToken({ prompt: state.accessToken ? "" : "consent" });
-  }
-  function onGoogleSignedIn(){
-    ensureLists().then(fetchAllTasks).then(function(){
-      state.mode = "google";
-      updateModeUI();
-      KINDS.forEach(renderLane);
-      updateLaneVisibility();
-    }).catch(function(err){ console.error(err); window.alert("Couldn't load Google Tasks. Check the console for details."); });
-  }
-  function disconnectGoogle(){
-    if (state.accessToken){ google.accounts.oauth2.revoke(state.accessToken, function(){}); }
-    state.accessToken = null;
-    state.mode = "local";
-    initLocalData();
-    updateModeUI();
-    KINDS.forEach(renderLane);
-    updateLaneVisibility();
-  }
-  function updateModeUI(){
-    const btn = qs("#google-btn");
-    const resetBtn = qs("#reset-btn");
-    const footer = qs("#footer-note");
-    if (state.mode === "google"){
-      btn.textContent = "Connected \u2014 Disconnect";
-      btn.classList.add("btn-google-connected");
-      resetBtn.style.display = "none";
-      footer.textContent = "Synced with your Google Tasks account.";
-    } else {
-      btn.textContent = "Connect Google Tasks";
-      btn.classList.remove("btn-google-connected");
-      resetBtn.style.display = "inline-block";
-      footer.textContent = "Data lives in this browser's local storage. Connecting Google Tasks is optional.";
-    }
-  }
-
-  // =========================================================
-  // TASK OPERATIONS (branch on state.mode)
+  // TASK OPERATIONS
   // =========================================================
   function addTask(kind, title, parentId){
-    if (state.mode === "google"){
-      const qsStr = parentId ? ("?parent=" + encodeURIComponent(parentId)) : "";
-      return api("/lists/" + state.lists[kind].id + "/tasks" + qsStr, {
-        method: "POST", body: JSON.stringify({ title: title })
-      }).then(function(created){
-        state.tasks[kind].push({ id: created.id, title: created.title, notesClean: "", linkedProjectId: null, isGroup: false, parent: created.parent || null, whenText: null, hooks: [] });
-        renderLane(kind);
-      });
-    }
     state.tasks[kind].push({ id: genId(), title: title, notesClean: "", linkedProjectId: null, isGroup: false, parent: parentId || null, whenText: null, hooks: [] });
     saveTasksLocal(kind);
     renderLane(kind);
@@ -1580,15 +1256,6 @@
     // the end, which put them at the bottom of the lane — easy to miss
     // right after creating one, since it's the opposite end from the
     // "+ New list" button the user just tapped).
-    if (state.mode === "google"){
-      return api("/lists/" + state.lists[kind].id + "/tasks", {
-        method: "POST", body: JSON.stringify({ title: title, notes: buildGroupNotes("") })
-      }).then(function(created){
-        state.tasks[kind].unshift({ id: created.id, title: created.title, notesClean: "", linkedProjectId: null, isGroup: true, parent: null });
-        if (!state.collapsed[kind]) state.collapsed[kind] = loadCollapsed(kind);
-        renderLane(kind);
-      });
-    }
     const id = genId();
     state.tasks[kind].unshift({ id: id, title: title, notesClean: "", linkedProjectId: null, isGroup: true, parent: null });
     if (!state.collapsed[kind]) state.collapsed[kind] = loadCollapsed(kind);
@@ -1601,16 +1268,6 @@
     const finalWhens = (whenTexts || []).map(function(w){ return (w || "").trim(); }).filter(Boolean);
     const finalHooks = (hooks || []).slice();
     const finalBundle = (bundleText || "").trim() || null;
-    if (state.mode === "google"){
-      const notes = buildHabitNotes(notesClean, finalWhens, finalHooks, finalBundle);
-      return api("/lists/" + state.lists.habit.id + "/tasks", {
-        method: "POST", body: JSON.stringify({ title: title, notes: notes })
-      }).then(function(created){
-        state.tasks.habit.push({ id: created.id, title: created.title, notesClean: notesClean || "", linkedProjectId: null, isGroup: false, parent: created.parent || null, whenTexts: finalWhens, hooks: finalHooks, bundleText: finalBundle });
-        renderLane("habit");
-        return created.id;
-      });
-    }
     const id = genId();
     state.tasks.habit.push({ id: id, title: title, notesClean: notesClean || "", linkedProjectId: null, isGroup: false, parent: null, whenTexts: finalWhens, hooks: finalHooks, bundleText: finalBundle });
     saveTasksLocal("habit");
@@ -1626,12 +1283,6 @@
     task.whenTexts = (whenTexts || []).map(function(w){ return (w || "").trim(); }).filter(Boolean);
     task.hooks = (hooks || []).slice();
     task.bundleText = (bundleText || "").trim() || null;
-    if (state.mode === "google"){
-      const notes = buildHabitNotes(task.notesClean, task.whenTexts, task.hooks, task.bundleText);
-      return api("/lists/" + state.lists.habit.id + "/tasks/" + taskId, {
-        method: "PATCH", body: JSON.stringify({ notes: notes })
-      }).then(function(){ renderLane("habit"); });
-    }
     saveTasksLocal("habit");
     renderLane("habit");
   }
@@ -1639,16 +1290,10 @@
     const task = state.tasks[kind].find(function(t){ return t.id === taskId; });
     if (!task) return;
     task.title = newTitle;
-    if (state.mode === "google"){
-      return api("/lists/" + state.lists[kind].id + "/tasks/" + taskId, {
-        method: "PATCH", body: JSON.stringify({ title: newTitle })
-      }).then(function(){ renderLane(kind); });
-    }
     saveTasksLocal(kind);
     renderLane(kind);
   }
   function completeTask(kind, taskId){
-    const isProject = (kind === "current" || kind === "future");
     // Promotion rule (4.2): completing a Next Action auto-promotes any
     // Waiting items whose condition points at it. Free-text/date "waiting
     // for" items have no conditionId, so they never match here — manual
@@ -1659,11 +1304,8 @@
       : [];
     function promoteDependents(){ dependents.forEach(function(dep){ moveItem("waiting", "next", dep.id, false); }); }
     // New Completed archive: the finished item moves to the top of
-    // state.completed[kind] rather than disappearing for good. Always
-    // local bookkeeping, same pattern as gtd_archived_waiting — Google
-    // mode still marks the task completed via the API (so it also drops
-    // out of the real Google Tasks list), but the archive copy shown in
-    // this app's own Completed section lives here regardless of mode.
+    // state.completed[kind] rather than disappearing for good — kept
+    // forever per the retention ruling (§4.12b).
     function archiveCompleted(){
       const task = state.tasks[kind].find(function(t){ return t.id === taskId; });
       if (task){
@@ -1671,24 +1313,11 @@
         saveCompletedLocal(kind);
       }
     }
-    if (state.mode === "google"){
-      return api("/lists/" + state.lists[kind].id + "/tasks/" + taskId, {
-        method: "PATCH", body: JSON.stringify({ status: "completed" })
-      }).then(function(){
-        archiveCompleted();
-        state.tasks[kind] = state.tasks[kind].filter(function(t){ return t.id !== taskId; });
-        renderLane(kind);
-        refreshProjectFlags(kind);
-        awardPoints(isProject ? randInt(10, 25) : randInt(3, 7));
-        promoteDependents();
-      });
-    }
     archiveCompleted();
     state.tasks[kind] = state.tasks[kind].filter(function(t){ return t.id !== taskId; });
     saveTasksLocal(kind);
     renderLane(kind);
     refreshProjectFlags(kind);
-    awardPoints(isProject ? randInt(10, 25) : randInt(3, 7));
     promoteDependents();
   }
   // The Current lane's "⚠ no linked actions" flag (4.3b) is DERIVED state:
@@ -1709,7 +1338,6 @@
     // If this is a habit that other habits are hooked onto, freeze their
     // cue label at whatever this habit was last called, rather than
     // leaving them pointing at nothing.
-    let habitPatchChain = Promise.resolve();
     if (kind === "habit"){
       const deletedHabit = state.tasks.habit.find(function(h){ return h.id === taskId; });
       if (deletedHabit){
@@ -1719,52 +1347,20 @@
         dependents.forEach(function(h){
           h.hooks.forEach(function(hk){ if (hk.id === taskId) hk.label = deletedHabit.title; });
         });
-        if (state.mode === "google" && dependents.length){
-          dependents.forEach(function(h){
-            habitPatchChain = habitPatchChain.then(function(){
-              const notes = buildHabitNotes(h.notesClean, h.whenTexts, h.hooks, h.bundleText);
-              return api("/lists/" + state.lists.habit.id + "/tasks/" + h.id, {
-                method: "PATCH", body: JSON.stringify({ notes: notes })
-              });
-            });
-          });
-        }
       }
     }
     // Condition action deleted -> dependent keeps an orphaned pill (habit-
     // style): freeze the label now, before the target disappears, so the
     // card can still show meaningful text with the dashed warning outline.
-    let condPatchChain = Promise.resolve();
     if (kind === "next" || kind === "waiting"){
       const deletedTask = state.tasks[kind].find(function(t){ return t.id === taskId; });
       if (deletedTask){
         const dependents = state.tasks.waiting.filter(function(t){ return t.conditionId === taskId; });
         if (dependents.length){
           dependents.forEach(function(t){ t.conditionLabel = deletedTask.title; });
-          if (state.mode === "google"){
-            dependents.forEach(function(t){
-              condPatchChain = condPatchChain.then(function(){
-                const notes = buildActionNotes(t.notesClean, t.linkedProjectId, t.deadline, t.whenText, t.conditionId, t.conditionKind, t.conditionLabel, t.bundleText);
-                return api("/lists/" + state.lists.waiting.id + "/tasks/" + t.id, { method: "PATCH", body: JSON.stringify({ notes: notes }) });
-              });
-            });
-          } else {
-            saveTasksLocal("waiting");
-          }
+          saveTasksLocal("waiting");
         }
       }
-    }
-    const preDeleteChain = habitPatchChain.then(function(){ return condPatchChain; });
-    if (state.mode === "google"){
-      return preDeleteChain.then(function(){
-        return api("/lists/" + state.lists[kind].id + "/tasks/" + taskId, { method: "DELETE" });
-      }).then(function(){
-        state.tasks[kind] = state.tasks[kind].filter(function(t){ return t.id !== taskId && t.parent !== taskId; });
-        if (kind === "habit" && state.habitRuns[taskId]){ delete state.habitRuns[taskId]; saveHabitRuns(); }
-        renderLane(kind);
-        if (kind !== "waiting") renderLane("waiting");
-        refreshProjectFlags(kind);
-      });
     }
     state.tasks[kind] = state.tasks[kind].filter(function(t){ return t.id !== taskId && t.parent !== taskId; });
     if (kind === "habit" && state.habitRuns[taskId]){ delete state.habitRuns[taskId]; saveHabitRuns(); }
@@ -1786,17 +1382,6 @@
       conditionKind: data.conditionKind || null, conditionLabel: data.conditionLabel || null,
       bundleText: data.bundleText || null
     };
-    if (state.mode === "google"){
-      const notes = buildActionNotes(base.notesClean, base.linkedProjectId, base.deadline, base.whenText, base.conditionId, base.conditionKind, base.conditionLabel, base.bundleText);
-      return api("/lists/" + state.lists[kind].id + "/tasks", {
-        method: "POST", body: JSON.stringify({ title: data.title, notes: notes })
-      }).then(function(created){
-        state.tasks[kind].unshift(Object.assign({ id: created.id, title: created.title, isGroup: false, parent: null }, base));
-        renderLane(kind);
-        refreshProjectFlags(kind);
-        return state.tasks[kind][0];
-      });
-    }
     const task = Object.assign({ id: genId(), title: data.title, isGroup: false, parent: null }, base);
     state.tasks[kind].unshift(task);
     saveTasksLocal(kind);
@@ -1818,89 +1403,44 @@
     task.conditionKind = data.conditionKind || null;
     task.conditionLabel = data.conditionLabel || null;
     task.bundleText = data.bundleText || null;
-    if (state.mode === "google"){
-      const notes = buildActionNotes(task.notesClean, task.linkedProjectId, task.deadline, task.whenText, task.conditionId, task.conditionKind, task.conditionLabel, task.bundleText);
-      return api("/lists/" + state.lists[kind].id + "/tasks/" + taskId, {
-        method: "PATCH", body: JSON.stringify({ title: task.title, notes: notes })
-      }).then(function(){ renderLane(kind); refreshProjectFlags(kind); return task; });
-    }
     saveTasksLocal(kind);
     renderLane(kind);
     refreshProjectFlags(kind);
     return Promise.resolve(task);
   }
 
-  // After a Next or Waiting task gets a brand-new id (which both
-  // changeKind and moveItem cause, since Google Tasks can't move a task
-  // across lists while preserving its id — a delete+recreate is the only
-  // option), relink any Waiting items whose condition pointed at the old
-  // id so the chain doesn't silently break. Matches the ruling: "if W1's
-  // condition is W2 ... and W2 later gets promoted to Next Actions, the
-  // link persists." Harmless no-op when nothing depended on the old id.
-  function relinkConditionDependents(oldTaskId, newTaskId, newKind){
-    const dependents = state.tasks.waiting.filter(function(t){ return t.conditionId === oldTaskId; });
-    if (!dependents.length) return Promise.resolve();
-    dependents.forEach(function(t){ t.conditionId = newTaskId; t.conditionKind = newKind; });
-    if (state.mode === "google"){
-      let chain = Promise.resolve();
-      dependents.forEach(function(t){
-        chain = chain.then(function(){
-          const notes = buildActionNotes(t.notesClean, t.linkedProjectId, t.deadline, t.whenText, t.conditionId, t.conditionKind, t.conditionLabel, t.bundleText);
-          return api("/lists/" + state.lists.waiting.id + "/tasks/" + t.id, { method: "PATCH", body: JSON.stringify({ notes: notes }) });
-        });
-      });
-      return chain.then(function(){ renderLane("waiting"); });
-    }
-    saveTasksLocal("waiting");
-    renderLane("waiting");
-    return Promise.resolve();
-  }
   // Moves a single leaf task to a different lane (Make Waiting / Make Next /
   // Make Current / Make Future). It exits any mini-list it belonged to —
-  // simplest option, since mini-list membership is lane-specific.
+  // simplest option, since mini-list membership is lane-specific. The task
+  // keeps its id across the move (no backend forces a delete+recreate any
+  // more), so anything conditioned on it — a Waiting item's "waiting for"
+  // — keeps pointing at the right task with no relinking step needed.
   function changeKind(fromKind, toKind, taskId){
     const list = state.tasks[fromKind];
     const idx = list.findIndex(function(t){ return t.id === taskId; });
     if (idx === -1) return Promise.resolve(null);
-    const task = list[idx];
-    const data = {
-      title: task.title, notesClean: task.notesClean,
-      linkedProjectId: (toKind === "current" || toKind === "future") ? null : task.linkedProjectId,
-      deadline: task.deadline,
-      // "Waiting for" only makes sense on the Waiting lane itself — Next
-      // Actions can't have conditions (4.2), and Projects don't have this
-      // field at all.
-      whenText: toKind === "waiting" ? task.whenText : null,
-      conditionId: toKind === "waiting" ? task.conditionId : null,
-      conditionKind: toKind === "waiting" ? task.conditionKind : null,
-      conditionLabel: toKind === "waiting" ? task.conditionLabel : null
-    };
-    if (state.mode === "google"){
-      return api("/lists/" + state.lists[fromKind].id + "/tasks/" + taskId, { method: "DELETE" }).then(function(){
-        state.tasks[fromKind] = state.tasks[fromKind].filter(function(t){ return t.id !== taskId; });
-        renderLane(fromKind);
-        return createTask(toKind, data);
-      }).then(function(newTask){
-        return relinkConditionDependents(taskId, newTask.id, toKind).then(function(){ return newTask; });
-      });
-    }
-    state.tasks[fromKind] = list.filter(function(t){ return t.id !== taskId; });
+    const task = list.splice(idx, 1)[0];
+    task.parent = null;
+    task.linkedProjectId = (toKind === "current" || toKind === "future") ? null : task.linkedProjectId;
+    // "Waiting for" only makes sense on the Waiting lane itself — Next
+    // Actions can't have conditions (4.2), and Projects don't have this
+    // field at all.
+    task.whenText = toKind === "waiting" ? task.whenText : null;
+    task.conditionId = toKind === "waiting" ? task.conditionId : null;
+    task.conditionKind = toKind === "waiting" ? task.conditionKind : null;
+    task.conditionLabel = toKind === "waiting" ? task.conditionLabel : null;
+    state.tasks[toKind].unshift(task);
     saveTasksLocal(fromKind);
+    saveTasksLocal(toKind);
     renderLane(fromKind);
-    return Promise.resolve(createTask(toKind, data)).then(function(newTask){
-      return relinkConditionDependents(taskId, newTask.id, toKind).then(function(){ return newTask; });
-    });
+    renderLane(toKind);
+    refreshProjectFlags(toKind);
+    return Promise.resolve(task);
   }
 
   function setLink(kind, taskId, projectId){
     const task = state.tasks[kind].find(function(t){ return t.id === taskId; });
     if (!task) return;
-    if (state.mode === "google"){
-      const newNotes = buildLinkNotes(task.notesClean, projectId);
-      return api("/lists/" + state.lists[kind].id + "/tasks/" + taskId, {
-        method: "PATCH", body: JSON.stringify({ notes: newNotes })
-      }).then(function(){ task.linkedProjectId = projectId || null; renderLane(kind); refreshProjectFlags(kind); });
-    }
     task.linkedProjectId = projectId || null;
     saveTasksLocal(kind);
     renderLane(kind);
@@ -1910,85 +1450,50 @@
   // auto-promotion cascade both funnel through here. Deadline carries over
   // since Next/Waiting/Current/Future all support it; "waiting for"
   // (whenText/condition) is intentionally dropped once something leaves
-  // the Waiting lane — the destination kinds don't have that field.
+  // the Waiting lane — the destination kinds don't have that field. Ids
+  // are preserved across the move (no backend forces a delete+recreate),
+  // so anything conditioned on this task's id keeps pointing at it.
   function moveItem(sourceKind, destKind, taskId, isGroupItem){
     const list = state.tasks[sourceKind];
     const root = list.find(function(t){ return t.id === taskId; });
     if (!root) return;
     const children = isGroupItem ? list.filter(function(t){ return t.parent === taskId; }) : [];
 
-    if (state.mode === "google"){
-      const rootNotes = root.isGroup ? buildGroupNotes(root.notesClean) : buildActionNotes(root.notesClean, root.linkedProjectId, root.deadline, null, null, null, null, root.bundleText);
-      return api("/lists/" + state.lists[destKind].id + "/tasks", {
-        method: "POST", body: JSON.stringify({ title: root.title, notes: rootNotes })
-      }).then(function(newRoot){
-        let chain = Promise.resolve();
-        const newChildren = [];
-        children.forEach(function(c){
-          chain = chain.then(function(){
-            const cNotes = buildActionNotes(c.notesClean, c.linkedProjectId, c.deadline, null, null, null, null, c.bundleText);
-            return api("/lists/" + state.lists[destKind].id + "/tasks?parent=" + encodeURIComponent(newRoot.id), {
-              method: "POST", body: JSON.stringify({ title: c.title, notes: cNotes })
-            }).then(function(newChild){
-              newChildren.push({ id: newChild.id, title: newChild.title, notesClean: c.notesClean, linkedProjectId: c.linkedProjectId, isGroup: false, parent: newRoot.id, deadline: c.deadline || null });
-            });
-          });
-        });
-        return chain.then(function(){
-          return api("/lists/" + state.lists[sourceKind].id + "/tasks/" + taskId, { method: "DELETE" });
-        }).then(function(){
-          state.tasks[sourceKind] = state.tasks[sourceKind].filter(function(t){ return t.id !== taskId && t.parent !== taskId; });
-          const newRootObj = { id: newRoot.id, title: newRoot.title, notesClean: root.notesClean, linkedProjectId: root.isGroup ? null : root.linkedProjectId, isGroup: root.isGroup, parent: null, deadline: root.isGroup ? null : (root.deadline || null) };
-          // Promotions into Next Actions surface at the very top so the
-          // newly-actionable item is impossible to miss (overnight notes);
-          // Google-mode note: the Tasks API's own ordering isn't rewritten
-          // here, only the local view. Other destinations keep appending.
-          if (destKind === "next"){
-            state.tasks[destKind].unshift(newRootObj);
-            let after = 0;
-            newChildren.forEach(function(nc){ state.tasks[destKind].splice(++after, 0, nc); });
-          } else {
-            state.tasks[destKind].push(newRootObj);
-            newChildren.forEach(function(nc){ state.tasks[destKind].push(nc); });
-          }
-          renderLane(sourceKind);
-          renderLane(destKind);
-          return relinkConditionDependents(taskId, newRoot.id, destKind);
-        });
-      });
-    }
-
-    const newRootId = genId();
     state.tasks[sourceKind] = list.filter(function(t){ return t.id !== taskId && t.parent !== taskId; });
-    const localRootObj = { id: newRootId, title: root.title, notesClean: root.notesClean, linkedProjectId: root.isGroup ? null : root.linkedProjectId, isGroup: root.isGroup, parent: null, deadline: root.isGroup ? null : (root.deadline || null) };
-    const localChildren = children.map(function(c){
-      return { id: genId(), title: c.title, notesClean: c.notesClean, linkedProjectId: c.linkedProjectId, isGroup: false, parent: newRootId, deadline: c.deadline || null };
+    root.parent = null;
+    root.linkedProjectId = root.isGroup ? null : root.linkedProjectId;
+    root.deadline = root.isGroup ? null : (root.deadline || null);
+    root.whenText = null;
+    root.conditionId = null;
+    root.conditionKind = null;
+    root.conditionLabel = null;
+    root.bundleText = null;
+    children.forEach(function(c){
+      c.deadline = c.deadline || null;
+      c.whenText = null;
+      c.conditionId = null;
+      c.conditionKind = null;
+      c.conditionLabel = null;
+      c.bundleText = null;
     });
-    // Same top-of-Next rule as the google branch above.
+    // Promotions into Next Actions surface at the very top so the newly-
+    // actionable item is impossible to miss (overnight notes); other
+    // destinations keep appending.
     if (destKind === "next"){
-      state.tasks[destKind].unshift(localRootObj);
+      state.tasks[destKind].unshift(root);
       let after = 0;
-      localChildren.forEach(function(lc){ state.tasks[destKind].splice(++after, 0, lc); });
+      children.forEach(function(c){ state.tasks[destKind].splice(++after, 0, c); });
     } else {
-      state.tasks[destKind].push(localRootObj);
-      localChildren.forEach(function(lc){ state.tasks[destKind].push(lc); });
+      state.tasks[destKind].push(root);
+      children.forEach(function(c){ state.tasks[destKind].push(c); });
     }
     saveTasksLocal(sourceKind);
     saveTasksLocal(destKind);
     renderLane(sourceKind);
     renderLane(destKind);
-    return relinkConditionDependents(taskId, newRootId, destKind);
+    return Promise.resolve(root);
   }
   function moveWithinList(kind, taskId, parentId, previousId){
-    if (state.mode === "google"){
-      const params = [];
-      if (parentId) params.push("parent=" + encodeURIComponent(parentId));
-      if (previousId) params.push("previous=" + encodeURIComponent(previousId));
-      const qsStr = params.length ? ("?" + params.join("&")) : "";
-      return api("/lists/" + state.lists[kind].id + "/tasks/" + taskId + "/move" + qsStr, { method: "POST" })
-        .then(function(){ return fetchTasksForKind(kind); })
-        .then(function(){ renderLane(kind); });
-    }
     const list = state.tasks[kind];
     const idx = list.findIndex(function(t){ return t.id === taskId; });
     if (idx === -1) return;
@@ -2569,7 +2074,6 @@
             if (wantDone){
               state.habitDone[s.taskId] = todayStr();
               state.habitDoneOrder.unshift(s.taskId);
-              awardPoints(randInt(2, 5));
             } else {
               delete state.habitDone[s.taskId];
               state.habitDoneOrder = state.habitDoneOrder.filter(function(id){ return id !== s.taskId; });
@@ -3570,7 +3074,6 @@
       openConfirmDialog("Clear all local data and start fresh?", [
         { label: "Clear data", style: "primary", action: function(){
           KINDS.forEach(function(k){ window.localStorage.removeItem("gtd_tasks_" + k); window.localStorage.removeItem("gtd_collapsed:" + k); });
-          window.localStorage.removeItem("gtd_points");
           window.localStorage.removeItem("gtd_habit_done");
           window.localStorage.removeItem("gtd_habit_runs");
           window.localStorage.removeItem("gtd_archived_waiting");
@@ -3598,19 +3101,6 @@
       updateHabitBadge();
       const btn = qs("#qa-day-btn");
       btn.textContent = "QA: +1 Day (" + todayStr() + ")";
-    });
-
-    qs("#google-btn").addEventListener("click", function(){
-      if (state.mode === "google"){ disconnectGoogle(); return; }
-      if (!CONFIG.CLIENT_ID || CONFIG.CLIENT_ID.indexOf("YOUR_CLIENT_ID") === 0){
-        window.alert("To enable Google Tasks sync, open this file and set CONFIG.CLIENT_ID near the top of the <script> section. See the comment at the very top of the file for full setup steps.");
-        return;
-      }
-      if (!state.tokenClient){
-        window.alert("Still loading Google's sign-in library — try again in a second.");
-        return;
-      }
-      signInGoogle();
     });
 
     qs("#lane-switcher").addEventListener("click", function(e){
@@ -4256,7 +3746,7 @@
   // off to chunk 3.
   // =========================================================
   function injectQAChecklist(){
-    const FLAG = "gtd_qa_checklist_chunkA2";
+    const FLAG = "gtd_qa_checklist_chunk0a";
     if (window.localStorage.getItem(FLAG)) return;
     window.localStorage.setItem(FLAG, "1");
 
@@ -4287,16 +3777,12 @@
       });
     }
 
-    addGroupWithItems("\u2705 QA \u2014 Chunk A round 2: exclusion + two bugfixes", [
-      { title: "Complete and Convert are mutually exclusive (new ruling)", notes: "Arm a convert button \u2192 the Complete pill goes grey and inert (tooltip: \u2018Disarm the convert to complete\u2019); tapping it does nothing. Disarm the convert \u2192 Complete works again. Now the reverse: arm Complete \u2192 all convert buttons go grey and inert (tooltip: \u2018Disarm Complete to convert\u2019); disarm Complete \u2192 they revive. It should be impossible to have both armed at once." },
-      { title: "Convert still works end to end", notes: "Arm a convert alone and Save \u2014 the item moves lanes, same-draft edits intact. \u2715 discards an armed convert. Double-tap disarms. Unchanged from round 1." },
-      { title: "Linked-actions dialog fires exactly once, at Save (clarified)", notes: "On a Current Project WITH linked actions: arm Make Future / Someday \u2014 no dialog yet. \u2190 Save \u2014 the \u2018unlink or delete?\u2019 dialog appears ONCE. That dialog is the only popup you should ever see in a convert flow; there is never an additional generic \u2018are you sure you want to convert?\u2019 on top of it, and arming alone never shows anything." },
-      { title: "BUGFIX: project flag updates from outside the project", notes: "Empty Current Project shows \u2018\u26A0 no linked actions\u2019 on its lane card. From the NEXT ACTIONS side, open an action and link it to that project, save. Switch to the Projects lane \u2014 the flag is GONE immediately, without ever opening the project page. Delete that action \u2014 the flag comes BACK immediately. Also try: complete the only linked action (flag returns), and quick-add an action from the project page then \u2715 out (flag stays gone \u2014 quick-adds commit instantly, so cancel doesn't undo them; that's Chunk B's territory)." },
-      { title: "BUGFIX: unpausing revives Complete in place", notes: "Open a paused habit \u2014 badge reads \u23F8 Paused, inert. Tap Pause to unpause IN THE DRAFT \u2014 the Complete badge revives immediately, no exit-and-reenter needed. Complete it in the same draft and Save \u2014 both the unpause and the completion land. \u2715 instead \u2014 both discard; the habit is still paused. Toggling pause back ON in a draft deadens the badge again just as immediately." }
-    ]);
-    addGroupWithItems("\u2705 QA \u2014 Recheck: Chunk A round 1 basics", [
-      { title: "Convert buttons still edit-only", notes: "No Make-X buttons on any create page (+ FAB from any lane)." },
-      { title: "Draft isolation basics still hold", notes: "Habit Complete/Pause and action/project Complete are all still draft-only: \u2715 discards, \u2190 Save commits." }
+    addGroupWithItems("\u2705 QA \u2014 Chunk 0a: Google + points removed", [
+      { title: "No Google Tasks UI anywhere", notes: "Header has no \u2018Connect Google Tasks\u2019 button. Reset local data is always visible (nothing hides it). Footer just says data lives in local storage. View page source \u2014 no accounts.google.com script tag, no CONFIG/CLIENT_ID." },
+      { title: "No points/scoreboard anywhere", notes: "Header has no Points digits. Completing a Next/Waiting/Current/Future item or checking off a habit shows no \u2018+N\u2019 toast. localStorage has no gtd_points key after a fresh boot, and Reset doesn't try to clear one." },
+      { title: "Waiting \u2192 Next promotion keeps the condition link working", notes: "Create a Next Action A. Create a Waiting item conditioned on A (\u2018waiting for\u2019 \u2192 A). Complete A \u2014 the Waiting item auto-promotes to Next Actions. Confirm it landed correctly and nothing broke (this now works by NOT changing A's or the Waiting item's id, instead of the old delete+recreate)." },
+      { title: "Manual Make-X convert preserves everything else", notes: "On a Next Action with a description and a linked project, tap Make Waiting, then Make Next again. Title, description, and any other fields survive both hops \u2014 nothing resets or clears itself along the way." },
+      { title: "Reset local data still works end to end", notes: "Tap Reset local data \u2192 confirm \u2192 app reloads to the seeded sample data, no leftover items in any lane, no console errors." }
     ]);
 
     saveTasksLocal("next");
@@ -4311,21 +3797,12 @@
     initLocalData();
     initCompletedData();
     injectQAChecklist();
-    loadPoints();
     state.habitDone = loadHabitDone();
     state.habitDoneOrder = loadHabitDoneOrder();
     state.habitRuns = loadHabitRuns();
     processHabitBoundaries();
-    renderDigits(false);
-    updateModeUI();
     KINDS.forEach(renderLane);
     updateLaneVisibility();
-    awardPoints(randInt(1, 10));
-
-    (function waitForGis(){
-      if (window.google && google.accounts && google.accounts.oauth2){ initAuth(); }
-      else { setTimeout(waitForGis, 100); }
-    })();
   }
 
   document.addEventListener("DOMContentLoaded", boot);
