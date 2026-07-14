@@ -1,0 +1,366 @@
+--- orig/spec.md	2026-07-14 02:54:00.000000000 +0000
++++ pkg/spec.md	2026-07-14 06:35:04.500413608 +0000
+@@ -96,18 +96,18 @@
+ 
+ | # | Chunk | Notes |
+ |---|-------|-------|
+-| **0a** | **Remove Google integration + delete the points layer** | First Claude Code session. Delete the API layer, both code paths in every mutation function, the connect/disconnect UI, the GSI script tag. Simplify `moveItem`/`changeKind` to **preserve task IDs** now that nothing forces delete-and-recreate; delete `relinkConditionDependents` if it becomes unnecessary. Retire the notes-marker encoding for plain fields. **Also delete the points layer outright** — see the ruling below: `gtd_points`, `state.points`, `addPoints`, the header counter, and every call site. **No migration needed** (§1). Harness must stay green *except* where a suite asserts a points value — those assertions are deleted with the feature, and that is the one permitted expectation change in this chunk. |
++| **0a** | **Remove Google integration + delete the points layer** | First Claude Code session. Delete the API layer, both code paths in every mutation function, the connect/disconnect UI, the GSI script tag. Simplify `moveItem`/`changeKind` to **preserve task IDs** now that nothing forces delete-and-recreate; delete `relinkConditionDependents` if it becomes unnecessary. Retire the notes-marker encoding for plain fields. **Also delete the points layer outright** — see the ruling below: `gtd_points`, `state.points`, `awardPoints`, `loadPoints`, `savePoints`, the header counter, and every call site. *(Corrected this round: this list used to name `addPoints`, **which does not exist in the code** — a first-session grep for it finds nothing.)* **No migration needed** (§1). Harness must stay green *except* where a suite asserts a points value — those assertions are deleted with the feature, and that is the one permitted expectation change in this chunk. |
+ | **0b** | **Restructure + storage adapter + hosting + manifest** | The stapler: `src/` modules, `build.py` → `dist/index.html`. **Zero behavior change**, certified by the Playwright suites — if a test's *expectation* needs changing, the refactor exceeded its mandate. All `localStorage` access moves behind `src/storage.js` (with `QuotaExceededError` caught and surfaced — see §3). Turn on GitHub Pages. Ship a **web manifest + icons**: name **"GTD Console"**, theme color **`#171513`** (the desk), `display: standalone`, **portrait-locked** (single-column mobile layout — landscape would need design work there is no time for). **Do NOT add a service worker yet — see the sequencing note below.** |
+ | **0c** | **Dev tools: snapshot & restore** (§12.3) | Cheap, and it pays for itself across every remaining chunk. One button to capture state before destructive testing, one to roll back. Do it *before* the heavy chunks, not after. |
+ | **1** | **Navigation stack** | Replace the single `state.returnScreen` slot with a real screen stack (§3, known issue 1). **In plain terms:** the app currently remembers *one* place to go back to, so any flow that goes two screens deep (lane → project → linked action → back) has nowhere to put the second breadcrumb and lands you in the wrong place. A stack remembers the whole path, so ← always means "back one screen." Small, and it unblocks **two** later chunks (5 and 6) that would otherwise each hack around the limitation independently. **⚑ Wording flagged (user, this round): the original one-line description was too terse to be understood by anyone not already holding `state.returnScreen` in their head** — the plain-terms sentence above is the fix; check the same failure mode in the other rows before the build sessions start. |
+-| **2** | **Main UI visual redesign** | §4.7b layout cleanup + §4.10b floating nav tabs. Build with `env(safe-area-inset-*)` from day one. Implement the **freeze-tab-collapse-during-drag** ruling (§3, known issue 2). Comes before any new surface exists, so nothing gets built in the old visual language and reworked. **Build the new creation affordance (§4.3e — RULED):** delete the "+ New list" button, give the + badge a two-option pop-up menu (no menu on Habits), second option opens an inline naming row. On the action lanes that option still calls the existing group path — chunk 3 swaps the handler underneath it. |
+-| **3** | **Contexts rework + retire the old date model** | §4.3d. A `gtd_contexts` registry, **shared Next↔Waiting, and nowhere else** — **RULED: the project lanes keep plain lists and Habits have no grouping at all** (§4.3d). Contexts are an action-lane feature; do not build a second registry for Current Projects. Touches the same card/lane rendering chunk 2 just reworked. **No migration needed** (§1). Includes the **duplicate-title check on quick-add rows** (below). Creation UI already exists from chunk 2 — this chunk swaps *one handler*: *New context* stops creating a lane-local group and starts writing to the registry (§4.3e). Project-lane lists are **not** touched; they stay plain groups. **Also, and purely subtractive — retire the old date model (§4.13a):** delete the *date* option from a Waiting action's "waiting for", delete date-based auto-promotion, delete the **recurrence `<select>` from the deadline picker** on the Next / Waiting / Project pages, and delete the *"make this a habit?"* bubble that currently hangs off a **deadline's** recurrence (it returns in chunk 7, on the event page). **Why here and not in chunk 7:** §9's case table is chunk 5's build reference and it no longer contains the date rows — so the code must stop containing them *before* chunk 5, or the riskiest chunk on the board gets built against a spec that doesn't describe it. The app has no events at all between this chunk and chunk 7; that is correct and costs nothing (§1). **⚑ Judgment call — flagged, overrule if you'd rather carry the dead code to chunk 7.** |
++| **2** | **Main UI visual redesign** | §4.7b layout cleanup + §4.10b floating nav tabs. **Builds the deadline progress bar — §4.4b, §4.4c, and the two DEADLINE rows of §4.4d (assigned this round; §4.4 previously had no owner in this table and the bar has never existed in the code).** The two EVENT rows of §4.4d extend the same renderer in chunk 7 — so **the renderer must TAKE its window's origin, not assume the item's creation date** (§4.4d, §4.14c: an event's bar opens at its 4 AM appearance, and measuring it from creation puts it 98% full and red at birth). One parameter now; a rewrite in chunk 7 if it is hard-coded. Build with `env(safe-area-inset-*)` from day one. Implement the **freeze-tab-collapse-during-drag** ruling (§3, known issue 2). Comes before any new surface exists, so nothing gets built in the old visual language and reworked. **Build the new creation affordance (§4.3e — RULED):** delete the "+ New list" button, give the + badge a two-option pop-up menu (no menu on Habits), second option opens an inline naming row. On the action lanes that option still calls the existing group path — chunk 3 swaps the handler underneath it. |
++| **3** | **Contexts rework + retire the old date model** | §4.3d. A `gtd_contexts` registry, **shared Next↔Waiting, and no second registry anywhere** — **RULED: the project lanes keep plain lists and Habits have no grouping at all** (§4.3d). Contexts are an action-lane feature; do not build a second registry for Current Projects. *(This is a statement about **registries**, not a ban on anything else touching the one registry: from chunk 7 the pseudo-action takes a context too, because it lives in the Next Actions lane — §4.3d, §4.14.)* Touches the same card/lane rendering chunk 2 just reworked. **No migration needed** (§1). Includes the **duplicate-title check on quick-add rows** (below). Creation UI already exists from chunk 2 — this chunk swaps *one handler*: *New context* stops creating a lane-local group and starts writing to the registry (§4.3e). Project-lane lists are **not** touched; they stay plain groups. **Also, and purely subtractive — retire the old date model (§4.13a):** delete the *date* option from a Waiting action's "waiting for", delete date-based auto-promotion, delete the **recurrence `<select>` from the deadline picker** on the Next / Waiting / Project pages, and delete the *"make this a habit?"* bubble that currently hangs off a **deadline's** recurrence (it returns in chunk 7, on the event page). **Why here and not in chunk 7:** §9's case table is chunk 5's build reference and it no longer contains the date rows — so the code must stop containing them *before* chunk 5, or the riskiest chunk on the board gets built against a spec that doesn't describe it. The app has no events at all between this chunk and chunk 7; that is correct and costs nothing (§1). **⚑ Judgment call — flagged, overrule if you'd rather carry the dead code to chunk 7.** |
+ | **4** | **Completed-items overhaul** | §12.2. Spec'd, self-contained, ready to build as written (minus its Google clauses). |
+ | **5** | **Chunk B — staged child actions** | §12.1. **Unblocked — the staged-edits-vs-timer question is RULED in §9.** Build to that ruling exactly; do not re-derive it, and mind the by-ID staged-delete trap. Riskiest chunk on the board: it moves the storage boundary for a whole class of edits. Better done with weeks of recovery time left than days. Depends on chunk 1. **Promotion has exactly ONE trigger — a completed condition** (chunk 3 deleted the other). Do not build staging support for date-based promotion; do not re-add the rows chunk 3 removed. |
+ | **6** | **Tray drawer + Notes + header + settings surface** | §4.8a (**the capture drawer — a left drawer, not a full-screen tray**), §4.9, §4.10, §4.3c. **The review (§4.8b) is NOT in this chunk** — see 6b. Depends on chunk 1. **The settings surface arrives here** — it owns **Clear all app data** (today's Reset) and, from chunk 8, **Export/Import**. **The Completed trash can does NOT move into it (RULED, user, this round):** it is lane-scoped — *clear **this lane's** archive* — and it stays in the Completed section header where chunk 4 puts it (§4.12b). Two destructive controls, two scopes, one never-accidental ruling — and it is satisfied **inside the sprint**, not hung on the wrapper stretch goal. |
+-| **6b** | **The review (open loops)** | §4.8b. Split out of chunk 6 on purpose — daily review is the highest design-surface part of GTD, and chunk 6 is already full. Derived queue over four open-loop types, redaction-as-state, decision menus, session-scoped "Not now", empty-vs-N-deferred end states. **Depends on chunk 1** (returns to the review after a tap-through). **Mind the fence at the end of §4.8b** — this is where scope dies. **Two of its four surfaces do not exist yet and are deferred to chunk 7 (RULED, this round):** the **past-due open-loop kind** is now *only* a pseudo-action (§4.14), and pseudo-actions arrive with the calendar; and the **Calendar sort chip** has nowhere to send a capture. So 6b builds **three** open-loop kinds and **five** sort chips; chunk 7 adds the fourth kind, the chip, and the "it moved" banner (§4.15e). Build the queue so a fourth kind slots in — do not hard-code three. |
+-| **7** | **Calendar + events + recurrence + seeded sample habits** | **MERGED (was 7 + 8) — calendar planning round.** Under the new model recurrence is *calendar machinery*: it operates on events, and events do not exist until the calendar does, so a standalone recurrence chunk scheduled first would have nothing to operate on. Contents: the calendar (month/day, marks, creation row) · events/appointments as an entity with their own store · the **pseudo-action** (§4.14) · recurrence (roll-forward, projection, skip / delete-series, pause) · completed-series collapse · **`seriesId`** (now internal to this chunk, not a cross-chunk dependency) · the review's past-due kind + Calendar chip carried over from 6b · seeded sample habits (§4.16). §4.13–§4.15. **Unambiguously the largest chunk on the board** — it already was; the merge is honest about it. **Core, not stretch:** it is the **floor** for real use — the author will not switch over before it ships, and probably not until export/import (chunk 8) and a wrapper exist (§1). *(Stated as a floor, not a start date: §1 requires export/import to exist **before** the first real day, and chunk 8 lands after this one.)* Everything it depends on is settled. |
+-| **8** | **Export / import** | *(was 9.)* Late now that there is no data to protect and no early testers. Lands in the settings surface from chunk 6. **The backup must serialize events and series too** — they are a new top-level entity as of chunk 7, and the export format is where new entities get silently forgotten. **Import REPLACES, it does not merge** — behind a confirm reading "This will replace everything currently in the app." Merge is a conflict engine in disguise (§10); replace makes the file an honest snapshot. Foundation for the sync design (§10). |
++| **6b** | **The review (open loops)** | §4.8b. Split out of chunk 6 on purpose — daily review is the highest design-surface part of GTD, and chunk 6 is already full. Derived queue over four open-loop types, redaction-as-state, decision menus, session-scoped "Not now", empty-vs-N-deferred end states. **Depends on chunk 1** (returns to the review after a tap-through). **Mind the fence at the end of §4.8b** — this is where scope dies. **⚠ RESEQUENCED THIS ROUND — 6b now builds ALL FOUR kinds.** The previous ruling deferred the past-due kind to chunk 7 because it was "only a pseudo-action"; **that premise died when past-due deadlines became open loops (§4.8b, user ruling this round)** — and deadlines exist today. So 6b builds **four open-loop kinds** (past-due in its **deadline** shape — the *push the date / complete / delete / Not now* menu — plus stalled projects, orphaned waitings, and captures) and **five** sort chips. **Chunk 7 extends the past-due kind to its second shape** (the pseudo-action, which gets a checkbox, not the menu), adds the sixth chip, and the "it moved" banner (§4.15e). Build the past-due kind so a second **shape** slots in — do not hard-code the deadline case. |
++| **7** | **Calendar + events + recurrence + seeded sample habits** | **MERGED (was 7 + 8) — calendar planning round.** Under the new model recurrence is *calendar machinery*: it operates on events, and events do not exist until the calendar does, so a standalone recurrence chunk scheduled first would have nothing to operate on. Contents: the calendar (month/day, marks, creation row) · events/appointments as an entity with their own store · the **pseudo-action** (§4.14) · recurrence (roll-forward, projection, skip / delete-series, pause) · completed-series collapse · **`seriesId`** (now internal to this chunk, not a cross-chunk dependency) · **the pseudo-action SHAPE of the review's past-due kind** (the checkbox variant — 6b already built the kind, in its deadline shape) + the Calendar chip · **the two EVENT rows of §4.4d** (the appointment window, §4.14c; the untimed event's born-full bar), extending the renderer chunk 2 built · seeded sample habits (§4.16). §4.13–§4.15. **⚠ ONE-LINE REQUIREMENT WITH A LONG SHADOW: the pseudo-action's task ID is minted WHEN THE EVENT IS CREATED, not when the row first appears at 4 AM (§4.14a).** The ID's home is the event record. This costs nothing here — §4.14a already requires the ID to be *stable* across every roll, and allocating it at creation is the simplest way to make it so — but getting it wrong makes **chunk 8's advance-conditioning cheap and re-allocates every condition reference in the app**, at exactly the moment migrations stop being optional (§1). Mint at creation. **Unambiguously the largest chunk on the board** — it already was; the merge is honest about it. **Core, not stretch:** it is the **floor** for real use — the author will not switch over before it ships, and probably not until export/import (chunk 8) and a wrapper exist (§1). *(Stated as a floor, not a start date: §1 requires export/import to exist **before** the first real day, and chunk 8 lands after this one.)* Everything it depends on is settled. |
++| **8** | **Export / import** | *(was 9.)* Late now that there is no data to protect and no early testers. Lands in the settings surface from chunk 6. **The backup must serialize events and series too** — they are a new top-level entity as of chunk 7, and the export format is where new entities get silently forgotten. **Import REPLACES, it does not merge** — behind a confirm reading "This will replace everything currently in the app." Merge is a conflict engine in disguise (§10); replace makes the file an honest snapshot. Foundation for the sync design (§10). **⚠ ALSO IN THIS CHUNK, and thematically it does not belong here — it is here because it is cheap and this is the only chunk with room (user ruling, this round): CONDITIONING A WAITING ACTION ON A NOT-YET-LIVE EVENT** (§10 — re-costed this round from five subsystems down to two). **Two pieces only:** (1) the condition picker gains a section for **pending events**, filtered to live occurrences only; (2) **condition resolution stops treating a pending pseudo-action as an orphan** — today a lookup searches live lanes only, so a hook to Tuesday's event would wear the dashed orphan pill until Tuesday 4 AM. That is the one place that has to learn `gtd_events` exists. **Everything else is free *only if chunk 7 minted the ID at event creation*** — if it did not, stop and fix that first; do not re-allocate IDs here, in the chunk that ships the export format, on the far side of §1's migration boundary. **Order within the chunk: build the feature first, then the serializer** — a serializer written against a data model that changes underneath it in the same session is exactly how the export format silently forgets an entity. |
+ | **9** | **Service worker + offline + install polish** | *(was 10.)* **Deliberately last.** The app has stopped changing, so caching becomes a feature instead of a debugging tax. |
+ | — | **Stretch: native wrappers** | Android → Windows/Linux → macOS. iPhone never. See below. |
+ 
+@@ -133,8 +133,9 @@
+ 
+ ### RULING — the points layer is DELETED (user, this round)
+ 
+-**Points are removed from the app entirely, in chunk 0a.** `gtd_points`, `state.points`, `addPoints`,
+-the header counter, and every call site go. Nothing replaces them.
++**Points are removed from the app entirely, in chunk 0a.** `gtd_points`, `state.points`,
++`awardPoints`, `loadPoints`, `savePoints`, the header counter, and every call site go. Nothing
++replaces them. *(Symbol names corrected this round — there is no `addPoints` in the code.)*
+ 
+ **Why:** points were never a feature in their own right — they were the **substrate for the parked
+ gamification layer** (the adventurer / Six Paths concept), and that layer is not being built in this
+@@ -408,11 +409,19 @@
+ - **Renamed "Context" throughout the UI.**
+ - **Default seeded contexts: Computer, Calls, Errands.** Users add their own; the defaults are a
+   starting point, not a taxonomy.
+-- **Where they apply: Next Actions and Waiting Actions. That is the whole list. RULED (user, this
++- **Where they apply: Next Actions and Waiting Actions — the two action lanes. RULED (user, this
+   round).** **Not** the project lanes — **neither Current nor Future**. **Not** Habits — removed
+   entirely (context-batching doesn't transfer to habits; each runs on its own schedule, and the
+   hook-chain system already encodes real behavioral sequence, which is a better grouping than an
+   arbitrary label).
++  - **⚠ EVENTS ARE NOT AN EXCEPTION TO THIS, AND THEY ARE NOT ABSENT FROM IT.** A **pseudo-action
++    lives in the Next Actions lane** (§4.14), so it takes a context like anything else there: it is
++    **droppable into one**, it **stores** it (§4.14a), it **inherits** it across a series roll
++    (§4.15b), and the event page carries a **Context field, edit-only** (§4.1, §4.15a — it is not on
++    the calendar's fast-capture row). **This is the action-lane registry doing its job, not a second
++    set.** *(Stated because "the two action lanes" and the chunk 3 row's "nowhere else" are lists of
++    **lanes**, and the event **page's** field is not a lane. A chunk-7 session reading "nowhere
++    else" as a mandate to delete that field would break four other sections.)*
+ - **A "Context" is not the same thing as a "list" (user ruling — see §4.3e).** Both project lanes,
+   **Current and Future**, keep **plain lists**: a grouping header you file projects under, lane-local,
+   no registry, no shared set, no membership surviving a move. That is all a project list ever is, and
+@@ -450,8 +459,9 @@
+     *"No contexts yet — create them with + on the lane."*
+ - **Next and Waiting share one Context set** — the same underlying definitions, which is what
+   makes "a promoted Waiting item lands in the identically-named Context automatically" possible.
+-  **It is the only Context set in the app.** (Projects don't participate in the promotion cycle, and
+-  they don't participate in contexts either — they have lists.)
++  **It is the only Context set in the app** — the one the pseudo-action files itself into as well
++  (§4.14). (Projects don't participate in the promotion cycle, and they don't participate in contexts
++  either — they have lists.)
+ - **Info text:** "Group actions by where or how you'll do them — Calls, Computer, Errands. Handy
+   for batching similar tasks together."
+ - **Deleting a Context that still holds items → UNLINK (user ruling).** The Context is deleted, the
+@@ -493,10 +503,11 @@
+ 
+ - **No menu on Habits.** Habits have neither contexts nor lists (§4.3d); a menu with one live
+   option is a menu with a dead option in it.
+-- **The second option opens an inline text row with an add button — not a create page, not a
+-  dialog.** Same affordance the "+ New list" button expands into today (native `prompt` is banned,
+-  §3); it simply now hangs off the badge. Name, tap +, done. This is true of **both** *New context*
+-  and *New list*.
++- **On the action and project lanes, the second option opens an inline text row with an add button —
++  not a create page, not a dialog.** Same affordance the "+ New list" button expands into today
++  (native `prompt` is banned, §3); it simply now hangs off the badge. Name, tap +, done. True of
++  **both** *New context* and *New list*. **Notes is the one exception and the table says so:** *New
++  tag* **navigates to the Tags page** (§4.9b), because the tag surface is a page, not a row.
+ - **Project lists stay plain lists.** *New list* on Current/Future creates a lane-local grouping
+   header and nothing more — no registry, no shared set, no promotion mechanics. See §4.3d.
+ 
+@@ -509,9 +520,12 @@
+ default and ships; revisit after the author has lived with it on the phone for a week.
+ 
+ **Build split (deliberate, and it is one touch each):**
+-- **Chunk 2** builds the whole thing: badge menu, the label table above, the inline naming row,
+-  removal of "+ New list". On the action lanes, *New context* calls the **existing group-creation
+-  path** (`addGroup`) — the contexts registry does not exist yet.
++- **Chunk 2** builds the machinery and **the five lanes that exist at the time**: badge menu, the
++  inline naming row, removal of "+ New list", and the Next / Waiting / Current / Future / Habits rows
++  of the label table. On the action lanes, *New context* calls the **existing group-creation path**
++  (`addGroup`) — the contexts registry does not exist yet. *(It cannot build the whole table: **Notes
++  is chunk 6** and **Calendar has no badge at all**. Chunk 6 adds the Notes row when the lane
++  arrives.)*
+ - **Chunk 3** swaps *only* the action-lane handler: *New context* stops creating a lane-local group
+   and starts writing to the `gtd_contexts` registry. The menu, the labels, and the inline row are
+   untouched. Project lanes are untouched entirely — their lists never leave the group path.
+@@ -534,6 +548,15 @@
+ supersedes §4.1's old "Time — events only" row**, which was written when the calendar patch landed
+ and was never reconciled with §4.4 and §4.13.
+ 
++**⚠ WHO BUILDS THIS (added this round — §4.4 had NO owner in the chunk map).** The bar has never
++existed in the code (the screen-refactor comment defers it to a *"chunk 6"* from the pre-resequence
++numbering, which no longer means anything), and no chunk row cited §4.4. **Ruled: chunk 2 builds
++§4.4b, §4.4c, and the two DEADLINE rows of §4.4d** — it is card rendering, it is visual, and chunk 2
++exists precisely so nothing gets built in the old visual language and reworked. **Chunk 7 adds the
++two EVENT rows to the same renderer** (§4.14c's appointment window, and the untimed event's
++born-full bar). One display language, one renderer, extended once. *(The optional **time** input on a
++deadline already ships — it is in the code today; it was §4.1 that was wrong about it, not the app.)*
++
+ **4.4b Progress-bar scaling.** The bar is not a neutral time-elapsed gauge; it exists to counter
+ procrastination on long-horizon items while staying honest in the final stretch.
+ - **Measured from creation to due date** — 0% at creation, 100% at the deadline, always.
+@@ -554,6 +577,7 @@
+ a radial/ring icon — reads less immediately as progress.)*
+ 
+ **4.4d Every dated thing gets a bar, and the passed state is a chip — RULED (user, this round).**
++**Built in chunk 2 (the two deadline rows) and chunk 7 (the two event rows) — see §2.**
+ *This is one display language for four things* — a timed deadline, an untimed deadline, an
+ appointment, an untimed event — *and it is stated once, here, so the four don't drift apart.* It
+ replaces the old "untimed things have no bar, and show their date in red instead" rule, which gave
+@@ -567,6 +591,21 @@
+ | **Appointment** (event with a time) | §4.14c's window: 4 AM → the time | reaches 100% at the time |
+ | **Event with no time** | *(exists only on its day)* | **full, from the 4 AM boundary** |
+ 
++- **⚠ THE BAR'S ORIGIN IS PER-TYPE, AND IT IS NOT THE ROW'S CREATION (user, this round — stated here
++  because CHUNK 2 BUILDS THE RENDERER and would otherwise have no reason to know).** A deadline's bar
++  runs from **the item's creation** (§4.4b). **An event's bar does not.** A pseudo-action's window
++  opens at the **4 AM boundary of the app-day containing the event's timestamp** — the moment the row
++  appears — and closes at the time (§4.14c), which is ~20–28 hours, *not* the weeks since the event
++  was coined in the calendar. Measure an event's bar from its creation and it is **98% full and red at
++  birth**, which is the exact failure §4.14c exists to prevent. **The origin needs no stored field:**
++  it is derivable from the event's own timestamp (4 AM of its app-day — mind §4.14b, where an event
++  between midnight and 4 AM belongs to the *previous* civil day's app-day). Build the renderer to take
++  an origin, not to assume one.
++- **⚠ And the ID is not the row.** The pseudo-action's task **ID** is minted when the event is created
++  (§4.14a, so a condition can hook to it in advance — §10, chunk 8). The **row** is still minted at 4
++  AM, unchanged. Nothing is rendered, sorted, counted, duplicate-checked, or **measured** before the
++  boundary; an event that exists is not an item in a lane. *(Recorded because "the ID exists early"
++  reads as "the row exists early," and a row that exists early is a row something will measure from.)*
+ - **Full ≠ late.** A full bar says "today"; the chip says "gone." An untimed thing sits at a full
+   brass bar all day, which is honest: the day is the resolution of the deadline, so the whole day is
+   the final moment.
+@@ -575,9 +614,19 @@
+   **"passed" chip renders at the end of the bar.** It stays in place. **Nothing auto-expires, ever.**
+ - **Same chip, same place, on all four.** The chip is what a user reads, so it must not be
+   type-specific — an untimed event is not a lesser citizen of the Next Actions lane than a deadline.
+-- **The review (§4.8b) still catches it** as a past-due open loop, exactly as before. The chip is the
+-  in-lane statement; the review is the queue. Two surfaces, one fact — *not* two nags (§9's orphan
+-  ruling settles the general principle).
++- **The review (§4.8b) catches it** as a past-due open loop — **all four of them, deadlines
++  included.** *(Corrected: this line used to say "exactly as before," which was false — §4.8b
++  previously excluded deadlines from the review outright, on the strength of the very asymmetry this
++  section deletes. The exclusion is **reversed** in §4.8b, this round, and the two sections now say
++  one thing. A deadline's shape in the queue is a **decision menu** — push the date / complete /
++  delete — not the pseudo-action's checkbox; see §4.8b.)* The chip is the in-lane statement; the
++  review is the queue. Two surfaces, one fact — *not* two nags (§9's orphan ruling settles the general
++  principle).
++- **A deadline created *for today* has no window, and renders FULL.** *(Stated because §4.4b defines
++  the window as creation → due, which for a same-day deadline is zero or negative — a build session
++  will divide by zero here.)* Zero window, full bar, no red-shift arithmetic: it is due today, which
++  is what a full bar says. It takes the passed chip on the usual schedule (its time, or the 4 AM
++  boundary that ends the day).
+ - **The red shift keys off the WINDOW, not the time.** An untimed **deadline** still has a long
+   window (creation → its day), so §4.4b's final-15% red applies to it normally — a deadline three
+   days out is late-stage whether or not you named an hour. An untimed **event** is the only thing
+@@ -622,7 +671,9 @@
+   routes through the **same warning Chunk B specifies** whenever anything is staged, so nothing is
+   lost silently. Resolution order: **Back closes an open dialog → then an open drawer → then an open
+   page (as cancel) → and at the root, it exits the app** (standard Android behavior; ignoring it
+-  strands people).
++  strands people). *(On the one page with no ✕ — the completed-item page (§4.12b) — Back simply
++  closes: there is nothing editable, so cancel and close are the same gesture. Noted so the mapping
++  doesn't read as broken.)*
+ - **Feedback conventions:** blocked saves show a **dashed outline** on the offending field,
+   cleared on next input — no popups. **Validation never fires against a state the item is leaving**
+   — see §9: an armed Complete or Convert suppresses the waiting-for requirement entirely. Buttons play a soft navigation tick (the two-tone chime stays
+@@ -700,7 +751,7 @@
+ 
+ | Kind | Lives where | Affordance when revealed |
+ |---|---|---|
+-| **Past-due dated item** — i.e. a **pseudo-action** (§4.14) whose appointment time has passed, or whose untimed event's app-day has ended, still unchecked. **⚠ Chunk 7, not 6b — it cannot exist before the calendar does** | Next Actions | **A checkbox.** See the exception below. Also **tappable** — a rescheduled appointment gets edited, not just ticked |
++| **Past-due dated item** — *any* dated thing whose moment has passed uncompleted (§4.4d): a **deadline** (its day, or its time), or a **pseudo-action** (§4.14) whose appointment time has passed or whose untimed event's app-day has ended. **Both shapes; see the split below** | Next Actions / Current Projects | **Depends on which** — a pseudo-action gets **a checkbox** (and is tappable: a rescheduled appointment gets edited, not just ticked); a past-due **deadline** gets a **decision menu** (below) |
+ | **Capture** (typed into the tray; an *uncategorised* open loop) | The tray itself | The sort chips: **Next / Waiting / Project / Future / Note / Calendar** *(the **Calendar chip is chunk 7** — it has nowhere to send a capture until the calendar exists; the other five ship in 6b)* |
+ | **Stalled project** (zero linked actions) | Current Projects | Decision menu (below) |
+ | **Orphaned waiting action** (its condition target was deleted) | Waiting | Decision menu (below) |
+@@ -711,15 +762,27 @@
+ - **Past-due items sort to the top and are revealed first.** They are mostly things you did and
+   forgot to tick — so the review opens with something you can close in one tap, which is the right
+   way to start a chore. Completing one right there just removes it; no tap-through needed.
+-- **Overdue *deadlines* are NOT open loops.** They are late, not unresolved, and their red bar is
+-  already shouting. Out of scope.
+-- **⚠ SEQUENCING (RULED, calendar round).** The past-due kind and the Calendar chip both depend on
+-  the calendar, which now ships in chunk 7 — *after* this chunk. So **6b builds three open-loop kinds
+-  and five sort chips**; chunk 7 adds the fourth kind, the sixth chip, and the "it moved" banner
+-  (§4.15e). Build the derived queue so a fourth kind slots in without restructuring — **do not
+-  hard-code three.** *(The alternative — moving the calendar ahead of 6b — was rejected: the calendar
+-  is the largest chunk on the board and the review is the one that needs the navigation stack settled
+-  around it.)*
++- **⚠ Overdue deadlines ARE open loops — RULED (user, this round). This REVERSES the previous
++  ruling, and the reversal is forced.** This section used to read: *"Overdue deadlines are NOT open
++  loops. They are late, not unresolved, and their red bar is already shouting. Out of scope."* That
++  argument was load-bearing on an asymmetry **§4.4d has now deleted**: under the old model a deadline
++  had a bar and an untimed event had **none** (it showed its date in red), so the review had to catch
++  events — nothing else surfaced them — and did not have to catch deadlines. **One display language
++  means one rule.** If a full red bar plus a passed chip discharges the app's duty to surface a
++  past-due item, it discharges it for the pseudo-action too and the past-due kind should not exist at
++  all; if it does not, it does not discharge it for a deadline either. The in-lane chip states the
++  fact; the review is the queue that makes you *decide* about it. Two surfaces, one fact — **not two
++  nags**, exactly as §9's orphan ruling settles the identical question for the orphan pill.
++- **⚠ SEQUENCING — REVISED (this round, following the ruling above).** The old sequencing said the
++  past-due kind was *only* a pseudo-action and therefore had to wait for the calendar. **That premise
++  died with the ruling: deadlines exist today, so past-due open loops exist in 6b.** So:
++  **6b builds all four kinds** — past-due (the **deadline** shape: the decision menu) plus the three
++  derived kinds — **and five sort chips.** **Chunk 7 extends the past-due kind to the pseudo-action
++  shape** (the checkbox variant), and adds the sixth chip and the "it moved" banner (§4.15e). Build
++  the past-due kind so a **second shape** slots into it without restructuring — **do not hard-code the
++  deadline case**, exactly as the old note said not to hard-code three kinds. *(The alternative —
++  moving the calendar ahead of 6b — was rejected: the calendar is the largest chunk on the board and
++  the review is the one that needs the navigation stack settled around it.)*
+ - **What the Calendar chip does (chunk 7):** sorting a capture to Calendar **opens the calendar with
+   the capture's text prefilled into the creation row (§4.15a), today selected**, and fires the "it
+   moved" banner on save.
+@@ -736,10 +799,31 @@
+   card *is* the reward.
+ - **"Show all" toggle** stays as the second escape hatch. The discipline is a default, not a cage.
+ 
+-**The review offers decisions, not execution** — with **one deliberate exception:** the past-due
+-card gets a checkbox, because for *that* card, completion **is** the decision. The others ask "what
+-is this / what's the next step"; that one asks "did it happen?", and the answer is a tick. Written
+-as a ruling so a future session doesn't "fix" the inconsistency.
++**The review offers decisions, not execution** — with **one deliberate exception, and it is narrower
++than it used to be: the exception is the PSEUDO-ACTION, not the past-due kind.** A past-due
++pseudo-action gets a **checkbox**, because for *that* card completion **is** the decision: a past-due
++appointment is nearly always something that *happened* and you forgot to tick, so the question is
++"did it happen?" and the answer is a tick.
++
++**A past-due deadline is the opposite case and gets a decision menu (RULED, user, this round).** A
++late deadline is a thing you did **not** do; "did it happen?" is the wrong question and a checkbox is
++the wrong control. Its menu:
++
++> - **Push the date** — an **inline date field**, right there. ⚑ *(Judgment call, flagged: the fence
++>   says decisions, not execution — but the stalled project's menu already opens an inline quick-add,
++>   so an inline date is the established precedent rather than a breach of it. Overrule if you'd
++>   rather it tap through to the item's page.)*
++> - **Complete it** — it's actually done.
++> - **Delete it** — it's dead.
++> - **Not now.** ⚑ *(Judgment call, flagged: every other menu ends here, and the whole deferral
++>   architecture — no cap, no shame, the review simply never reaches empty — depends on "Not now"
++>   being universal. Omitting it would make this the only undodgeable menu in the app: a real design
++>   statement, and not one to make by omission. **Note the honest tension:** "Push the date" is
++>   arguably the deadline's true deferral, and it writes data instead of hiding a card. Overrule if
++>   you want this menu to have no exit.)*
++
++Written as a ruling so a future session doesn't "fix" the inconsistency between the two shapes: they
++are two questions, not one control applied unevenly.
+ 
+ **Decision menus (the escape-hatch ruling — the heart of this design).**
+ 
+@@ -1229,6 +1313,17 @@
+ user's drag position is silently lost at every 4 AM boundary.* Completing it writes back to the
+ event/series — it does not merely archive a card.
+ 
++- **⚠ THE ID IS MINTED WHEN THE EVENT IS CREATED, NOT WHEN THE ROW APPEARS (RULED, this round).**
++  The task ID is allocated on the **event record** at creation and the pseudo-action adopts it at 4
++  AM — **the ID is minted early; the ROW is not.** Nothing is rendered, sorted, counted, or
++  duplicate-checked before the boundary, and **nothing measures a progress bar from it** (§4.4d: an
++  event's bar opens at the 4 AM appearance, never at the event's creation). §3's enumeration of
++  `state.tasks.next` consumers is unaffected — there is no early row for them to see. **Why it is not
++  a detail:** it is what lets a Waiting action hook its condition to an event
++  *before its day* while storing **a plain task ID like any other condition** — which is the whole
++  reason event-conditioning collapsed from a five-subsystem job to a two-part one and got scheduled
++  (§10, chunk 8). Mint at first appearance instead and chunk 8 has to re-allocate the ID every
++  condition reference in the app points at, on the far side of §1's migration boundary.
+ - **⚠ THE ROW'S ID IS STABLE ACROSS A ROLL (RULED, this round).** When a recurring series rolls
+   (§4.15b) the pseudo-action is *replaced* — but the replacement **reuses the same task ID**. This is
+   not an optimisation. A Waiting action may hook its condition to a live pseudo-action (§10, the
+@@ -1535,18 +1630,18 @@
+ | UI-first vs backend-first | UI first — lock interaction patterns before deepening the data model |
+ | Page fields: labels | None. Placeholders carry the teaching |
+ | Help on edit pages | None. Exceptions: lane tabs and the intray get info buttons |
+-| Edit page exits | ← save+exit; ✕ cancel/discard; 🗑 delete (with confirm, immediate) |
++| Edit page exits | ← save+exit; ✕ cancel/discard; 🗑 delete (with confirm, immediate). **Two ruled exceptions:** the **Tags page** has no 🗑 (§4.9b — it is not an item; there is nothing to delete), and the **completed-item page** has no ✕ (§4.12b — nothing is editable, so ← and ✕ would be one gesture) |
+ | Complete / Convert | Both draft-only, armed, applied at Save; mutually exclusive in the UI |
+ | Validation feedback | Dashed outline on the field, cleared on next input. Never a popup |
+ | Native dialogs | Banned app-wide (silently blocked in sandboxed contexts). `openConfirmDialog` only |
+-| Waiting condition targets | Next Actions **or** other Waiting actions; branching allowed |
+-| Waiting promotion rule | Auto-move only when a **Next Action** condition is completed |
++| Waiting condition targets | Anything in the **Next Actions lane** — **pseudo-actions included** (§4.2, §4.14) — **or** another Waiting action; branching allowed. From chunk 8, also a **not-yet-live event** (§10) |
++| Waiting promotion rule | Auto-move when a condition **that lives in the Next Actions lane** is completed. **⚠ The qualifier is the LANE, not the type** (§4.2) — a literal `type === 'next'` check silently refuses to promote anything hooked to an event |
+ | Next Actions with conditions | Never — icon shown greyed as a teaching affordance |
+ | Waiting creation requirement | Must specify what it's waiting for — **free text or a hook. That is the whole list** (§4.2, §4.13a). *(A date was struck this round; it was the last one left in this table.)* |
+ | Habit metric | Personal best + lifetime total. **Current streak never displayed** |
+ | Habit streak-break rule | **Never miss twice** — one miss is a stumble; two consecutive end the run |
+ | Habit rollover | 4:00 AM — **and everything else in the app uses the same boundary** |
+-| Contexts | GTD contexts (Calls/Computer/Errands), **shared Next↔Waiting and nowhere else** (§4.3d). **The project lanes keep plain lists; Habits have no grouping.** One registry, one set |
++| Contexts | GTD contexts (Calls/Computer/Errands), **shared Next↔Waiting** (§4.3d). **The project lanes keep plain lists; Habits have no grouping.** **One registry, one set** — and the pseudo-action files into that same set, because it lives in the Next Actions lane (§4.14) |
+ | Project auto-lists | Removed |
+ | Completed items | Move to a Completed section; keep forever; manual delete behind a confirm |
+ | Completed-row restore | Filled checkbox un-completes (↻ removed) |
+@@ -1882,23 +1977,46 @@
+ - ~~**Un-completion reversal cascade is not implemented**~~ **CLOSED** — ruled in §9 (10-minute
+   `promotedBy`/`promotedAt` window, evaluated lazily in `restoreTask`).
+ 
+-- **Conditioning a Waiting action on an event/appointment — DEFERRED, costed, not incoherent.**
+-  *("Call the dentist after the appointment.")*
++- ~~**Conditioning a Waiting action on an event/appointment — DEFERRED**~~ **CLOSED — RE-COSTED AND
++  SCHEDULED (user ruling, this round). It ships in CHUNK 8.** *("Call the dentist after the
++  appointment.")* **The old five-subsystem estimate is dead. It was computed before the
++  pseudo-action had a structure, and the structure makes four of the five costs vanish.**
+   - **The cheap half already works, free:** on its day the event **is** a Next Action-shaped card
+     (§4.14), and the existing condition mechanics hook onto it with no new code. **This is why the
+     pseudo-action's task ID must be stable across a roll (§4.14a)** — otherwise the free half
+     silently orphans its dependents every cycle.
+-  - **What is cut is hooking onto it *in advance*** — before the pseudo-action exists. That requires
+-    the `condition` reference to become **two-kinded** (task *or* event/series), which touches five
+-    places: the picker (a new section, filtered to **live** occurrences only, never expired ones), the
+-    promotion evaluator, the orphan pill, §9's re-evaluation, and the archive.
+-  - **And it re-introduces date-driven promotion through a side door** — a waiting item that promotes
+-    because a *time passed* is precisely the mechanism §4.13a deletes, only with the date living on
+-    someone else's record.
++  - **What was cut is hooking onto it *in advance*** — before the pseudo-action exists. The old
++    estimate assumed that required the `condition` reference to become **two-kinded** (task *or*
++    event/series), touching five places: the picker, the promotion evaluator, the orphan pill, §9's
++    re-evaluation, and the archive.
++  - **⚠ THE TWO-KINDED REFERENCE IS UNNECESSARY. The ID can be minted early.** §4.14a already rules
++    the pseudo-action's task ID is **stable across every roll** — one series, one task ID, forever. If
++    the ID is stable, nothing requires it to be *allocated at first appearance*. **Allocate it when
++    the event is created** (chunk 7; its home is the event record). The row simply isn't in the lane
++    yet. A hook-in-advance then stores **a plain task ID, like every other condition** — and the
++    evaluator, the archive, and §9's re-evaluation **never learn events exist**, because they are
++    looking at a task ID and do not care what minted it.
++  - **What is genuinely left — two things, and they are chunk 8's whole scope for this:** (1) **the
++    picker gains a section** for not-yet-live events, filtered to **live** occurrences only, never
++    expired ones; (2) **condition resolution must stop reading a pending pseudo-action as an
++    orphan** — a lookup searches live lanes today, so a hook to Tuesday's event wears the dashed
++    orphan pill until Tuesday's 4 AM. Cosmetic (§9 already rules an orphaned condition satisfies the
++    waiting-for requirement, so nothing *breaks*) but visibly wrong, and it is the one place that has
++    to know `gtd_events` exists.
++  - **~~And it re-introduces date-driven promotion through a side door~~ — RETIRED, this round. It
++    does not.** Promotion fires when the pseudo-action is **completed** — a user tick, not a clock
++    event. No date drives anything. That objection would bite only if promotion fired on
++    *occurrence*, which nobody proposed. *(Recorded because it is the objection a future session will
++    re-derive and re-lose the feature to.)*
+   - **The undesigned corner, recorded so it isn't re-derived:** hooking to a *recurring* event means
+-    promoting on **the first occurrence after the hook is set** — coherent, but it must be said.
+-  - **Cut for the sprint** (§2: scope discipline beats completeness), not because it is wrong. It is
+-    the most natural feature request in the whole model.
++    promoting on **the first occurrence after the hook is set** — coherent, but it must be said, and
++    now it is.
++  - **Why chunk 8 and not chunk 7, where it thematically belongs:** chunk 7 is already the largest
++    chunk on the board and this is the first thing that would be cut from it. Chunk 8 is small, it is
++    strictly downstream of every dependency, and it is the only chunk with room. **The theme is
++    wrong; the schedule is right.** *(Not verified against the code: this assumes task IDs are
++    globally unique and that nothing enumerates `gtd_tasks_next` assuming every row renders. §1's
++    ID-preservation ruling implies the first; the second is a build-session check.)*
+ 
+ - **Run-history durability.** Habit runs, personal bests, and lifetime totals live only in
+   localStorage — evictable, clearable, stranded on a device switch. This is the irreplaceable
