@@ -121,6 +121,10 @@ served from GitHub Pages. Never hand-edit it — it is generated. Edit `src/` an
 - **Validation** shows a dashed outline on the offending field, cleared on next input. No popups.
 - **Every chunk ends by injecting a QA checklist into Next Actions** (`injectQAChecklist`,
   spec.md §8.1) — replace the previous chunk's content *and* its flag key; never accumulate.
+- **Every chunk also refreshes the chunk map** — one Current Project per chunk, seeded with a
+  plain-language description of what that chunk changes (`docs/spec.md` §8.2). Same
+  replace-don't-accumulate discipline as the QA checklist, its own flag key, and it must survive
+  Reset the same way.
 - **Commit as you go**, with real messages. The repo is the safety net that makes autonomous
   work acceptable; a chunk that can't be reverted is a chunk that shouldn't have been written.
 - **Flag every judgment call** in the handoff summary, inline, where the human can see it.
