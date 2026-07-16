@@ -864,7 +864,14 @@ function injectChunkMap(){
     habitRuns: {},
     audioCtx: null,
     screen: null, // { kind, taskId (null = new), draft: {...} }
-    returnScreen: null, // stashed screen to restore when a child screen closes (project-page drafting flow)
+    // chunk 1 (spec.md §3 known issue 1): a real stack, not a single slot.
+    // The single-slot version could only remember ONE screen to return to,
+    // so a flow two screens deep (project page -> a linked action's own
+    // page -> that page's own child) lost the middle breadcrumb the moment
+    // the second child opened, landing back at the lanes instead of the
+    // project page. Each entry is a full stashed screen (draft included);
+    // closeScreen() pops the top one, or exits to the lanes once it's empty.
+    screenStack: [],
     qaTimeOffset: 0 // dev-only: MINUTES added to boundaryNow() (chunk 0c: hour/minute granular, not just whole days — the midnight-4am window (§4.14b) can only be tested by landing the clock inside it) — see the QA time-jump buttons
   };
 
@@ -2103,14 +2110,15 @@ function injectChunkMap(){
     renderScreen();
   }
   function closeScreen(){
-    // If this screen was opened *from* another screen (drafting an action
-    // from a project page), fall back to that screen — with its unsaved
-    // draft intact — instead of all the way out to the lanes (overnight
-    // notes: creating an action from the project page returns you to the
-    // project page).
-    if (state.returnScreen){
-      state.screen = state.returnScreen;
-      state.returnScreen = null;
+    // Pop the stack (chunk 1): if this screen was opened *from* another
+    // screen (drafting an action from a project page, which itself may
+    // have been opened from yet another screen), fall back to the one
+    // directly underneath it — with its unsaved draft intact — instead of
+    // all the way out to the lanes (overnight notes: creating an action
+    // from the project page returns you to the project page). Works at
+    // any depth, not just one level.
+    if (state.screenStack.length){
+      state.screen = state.screenStack.pop();
       renderScreen();
       return;
     }
@@ -2119,10 +2127,11 @@ function injectChunkMap(){
     qs("#screen-root").innerHTML = "";
   }
   // Opens a screen "on top of" the current one — the current screen
-  // (draft included) is stashed and restored when the new one closes,
-  // whichever way it closes: save, cancel, Escape, delete, or complete.
+  // (draft included) is pushed onto the stack and restored when the new
+  // one closes, whichever way it closes: save, cancel, Escape, delete, or
+  // complete. Nests to any depth (chunk 1).
   function openChildScreen(kind, taskId, prefill){
-    state.returnScreen = state.screen;
+    state.screenStack.push(state.screen);
     state.screen = null;
     openScreen(kind, taskId, prefill);
   }
@@ -3942,7 +3951,7 @@ function injectChunkMap(){
   // off to chunk 3.
   // =========================================================
   function injectQAChecklist(){
-    const FLAG = "gtd_qa_checklist_chunk0c";
+    const FLAG = "gtd_qa_checklist_chunk1";
     if (Storage.get(FLAG)) return;
     Storage.set(FLAG, "1");
 
@@ -3973,16 +3982,16 @@ function injectChunkMap(){
       });
     }
 
-    addGroupWithItems("\u2705 QA \u2014 Chunk 0c: dev tools (time jump + snapshot/restore)", [
-      { title: "The three QA time buttons all move the clock", notes: "In the header, tap \u2018QA: +1 Day\u2019, then \u2018QA: +1 Hr\u2019, then \u2018QA: +15 Min\u2019. The small readout text next to them should advance each time and never go backward or reset on its own." },
-      { title: "Snapshot, then break something, then Restore brings it back", notes: "Tap Snapshot. Delete a task or complete a habit. Tap Restore \u2014 a dialog should ask to confirm, naming when the snapshot was saved. Confirm it, the app reloads, and the item you deleted/completed is back exactly as it was at Snapshot time." },
-      { title: "Restore refuses politely if you never snapshotted", notes: "Tap Reset local data first (fresh start, no snapshot yet), then tap Restore. It should tell you there's no snapshot yet, not silently do nothing or throw you into a broken state." },
-      { title: "A saved snapshot survives Reset local data", notes: "Tap Snapshot. Tap Reset local data and confirm. Tap Restore \u2014 it should still find and offer your snapshot from before the reset, not report \u2018no snapshot\u2019." }
+    addGroupWithItems("\u2705 QA \u2014 Chunk 1: back always means back one screen", [
+      { title: "Opening a linked action from a project, then Cancel, returns to the project (not the lane list)", notes: "Open the Kitchen remodel project. Tap its linked \u2018Contractor quote from Dana\u2019 row to open that action's own page. Tap \u2715 (Cancel). You should land back on the Kitchen remodel project page, not out at the Current Projects list." },
+      { title: "Same thing, but Save instead of Cancel", notes: "From the project page, open a linked action again, change its title, and tap \u2190 (Save). You should land back on the project page, and the linked action's new title should show correctly if you reopen it." },
+      { title: "The project page's own unsaved typing survives that round trip", notes: "Open a project, type something new into its description box (don't save yet), then open a linked action and Cancel back out. Your unsaved project description should still be sitting there, untouched." },
+      { title: "Creating a brand new action from a project (the pencil icon), then Cancel, returns to the project", notes: "Open a project, tap the pencil icon next to its quick-add row to open a full blank action page, then tap \u2715. You should land back on the project page, not the lane list, and nothing new should have been created." }
     ]);
 
-    addGroupWithItems("\u2705 QA \u2014 Recheck chunk 0b", [
-      { title: "Header still has no orphaned tagline, and the app still installs", notes: "Header shows just the GTD Console wordmark, nothing underneath it. If you have the hosted link, confirm \u2018Add to Home Screen\u2019 still works and opens the app in its own window." },
-      { title: "Reset local data still works end to end", notes: "Tap Reset local data \u2192 confirm \u2192 app reloads to the seeded sample data, no leftover items in any lane." }
+    addGroupWithItems("\u2705 QA \u2014 Recheck chunk 0c", [
+      { title: "Snapshot and Restore still work", notes: "Tap Snapshot, delete something, tap Restore and confirm \u2014 the deleted item should come back." },
+      { title: "The QA time buttons still move the clock", notes: "Tap \u2018QA: +1 Day\u2019 and confirm the small readout text next to it changes." }
     ]);
 
     saveTasksLocal("next");
