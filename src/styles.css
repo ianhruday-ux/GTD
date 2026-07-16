@@ -48,6 +48,7 @@
     letter-spacing:0.08em; text-transform:uppercase;
   }
   .header-right{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .qa-time-readout{ font-family:var(--font-mono); font-size:11px; color:var(--text-soft); }
 
   .btn{
     border:none; border-radius:6px; padding:9px 16px; font-size:13.5px;

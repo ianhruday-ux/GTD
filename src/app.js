@@ -39,7 +39,7 @@
     audioCtx: null,
     screen: null, // { kind, taskId (null = new), draft: {...} }
     returnScreen: null, // stashed screen to restore when a child screen closes (project-page drafting flow)
-    qaDayOffset: 0 // dev-only: days added to boundaryNow() so habit multi-day logic can be QA'd without waiting — see "QA: +1 Day" button
+    qaTimeOffset: 0 // dev-only: MINUTES added to boundaryNow() (chunk 0c: hour/minute granular, not just whole days — the midnight-4am window (§4.14b) can only be tested by landing the clock inside it) — see the QA time-jump buttons
   };
 
   function qs(sel, root){ return (root || document).querySelector(sel); }
@@ -54,8 +54,8 @@
   // until 4am, so a late night doesn't cost you a habit day.
   function boundaryNow(){
     const d = new Date();
+    d.setMinutes(d.getMinutes() + (state.qaTimeOffset || 0));
     d.setHours(d.getHours() - 4);
-    d.setDate(d.getDate() + (state.qaDayOffset || 0));
     return d;
   }
   function todayStr(){ return boundaryNow().toLocaleDateString("en-CA"); }
@@ -2379,6 +2379,63 @@
   }
 
   // =========================================================
+  // DEV TOOLS: QA time jump + state snapshot/restore (spec.md §12.3, chunk 0c)
+  // Dev tool only — stripped at the wrapper, same as the checklist and
+  // chunk-map injectors. Snapshot lets you capture the whole app state
+  // before destructive testing (deletes, time-jumps through the habit run
+  // engine) and get back to exactly that state afterward, repeatably.
+  // =========================================================
+  function updateQaTimeReadout(){
+    const el = qs("#qa-time-readout");
+    if (el) el.textContent = boundaryNow().toLocaleString();
+  }
+  function applyQaTimeJump(minutes){
+    state.qaTimeOffset = (state.qaTimeOffset || 0) + minutes;
+    processHabitBoundaries();
+    renderLane("habit");
+    updateHabitBadge();
+    updateQaTimeReadout();
+  }
+
+  const GTD_KEY_PREFIX = "gtd_"; // deliberately excludes gtddev_ (e.g. the snapshot key itself)
+  const SNAPSHOT_KEY = "gtddev_snapshot"; // gtddev_: must survive Reset, which only clears gtd_* keys
+
+  // Single slot, overwrites silently — this is a dev convenience, not the
+  // user-facing export/import (chunk 8, different feature, different
+  // audience), so it doesn't need its own confirm dialog to write.
+  function takeSnapshot(){
+    const data = {};
+    Storage.keys().forEach(function(k){
+      if (k.indexOf(GTD_KEY_PREFIX) === 0) data[k] = Storage.get(k);
+    });
+    Storage.setJSON(SNAPSHOT_KEY, { savedAt: new Date().toISOString(), data: data });
+  }
+  function restoreSnapshot(){
+    const snap = Storage.getJSON(SNAPSHOT_KEY, null);
+    if (!snap){
+      openConfirmDialog("No snapshot saved yet — tap Snapshot first.", [
+        { label: "OK", style: "primary", action: function(){} }
+      ]);
+      return;
+    }
+    openConfirmDialog(
+      "Restore the snapshot from " + new Date(snap.savedAt).toLocaleString() + "? Current data will be replaced.",
+      [
+        { label: "Restore", style: "danger", action: function(){
+          // A full reload sidesteps all re-render complexity by design —
+          // do not attempt in-place rehydration (spec.md §12.3).
+          Storage.keys().forEach(function(k){
+            if (k.indexOf(GTD_KEY_PREFIX) === 0) Storage.remove(k);
+          });
+          Object.keys(snap.data).forEach(function(k){ Storage.set(k, snap.data[k]); });
+          window.location.reload();
+        }},
+        { label: "Cancel", action: function(){} }
+      ]
+    );
+  }
+
+  // =========================================================
   // EVENTS
   // =========================================================
   function bindEvents(){
@@ -2402,18 +2459,19 @@
       ]);
     });
 
-    // Dev QA aid (not a real feature): jumps boundaryNow() forward a day and
+    // Dev QA aid (not a real feature): jumps boundaryNow() forward and
     // re-runs the same boundary sweep that normally only fires on boot, so
     // stumble/miss/run-ending/badge behavior can be exercised in seconds
-    // instead of waiting real days between checks.
-    qs("#qa-day-btn").addEventListener("click", function(){
-      state.qaDayOffset = (state.qaDayOffset || 0) + 1;
-      processHabitBoundaries();
-      renderLane("habit");
-      updateHabitBadge();
-      const btn = qs("#qa-day-btn");
-      btn.textContent = "QA: +1 Day (" + todayStr() + ")";
-    });
+    // instead of waiting real days between checks. Hour/minute granular
+    // (chunk 0c) so the midnight-4am window (§4.14b) — where the calendar
+    // date and the app's day boundary deliberately disagree — can actually
+    // be landed inside, not just jumped over a whole day at a time.
+    qs("#qa-day-btn").addEventListener("click", function(){ applyQaTimeJump(24 * 60); });
+    qs("#qa-hour-btn").addEventListener("click", function(){ applyQaTimeJump(60); });
+    qs("#qa-min-btn").addEventListener("click", function(){ applyQaTimeJump(15); });
+
+    qs("#qa-snapshot-btn").addEventListener("click", takeSnapshot);
+    qs("#qa-restore-btn").addEventListener("click", restoreSnapshot);
 
     qs("#lane-switcher").addEventListener("click", function(e){
       const btn = e.target.closest("button[data-kind]");
@@ -3058,7 +3116,7 @@
   // off to chunk 3.
   // =========================================================
   function injectQAChecklist(){
-    const FLAG = "gtd_qa_checklist_chunk0b";
+    const FLAG = "gtd_qa_checklist_chunk0c";
     if (Storage.get(FLAG)) return;
     Storage.set(FLAG, "1");
 
@@ -3089,17 +3147,16 @@
       });
     }
 
-    addGroupWithItems("\u2705 QA \u2014 Chunk 0b: restructure + storage adapter + manifest", [
-      { title: "Header reads correctly with no orphaned tagline", notes: "Header shows just the GTD Console wordmark \u2014 no \u2018Runs on its own\u2019 line underneath it, and no odd gap where it used to be." },
-      { title: "The app still works exactly like before", notes: "Click through all five lanes, create/edit/complete/delete an item in each, drag-reorder a card, tap Reset local data. Nothing should look, feel, or behave differently than before \u2014 this chunk only reorganizes files behind the scenes, it doesn't change what the app does." },
-      { title: "Installable as a standalone app (needs the app hosted online, not just the downloaded file)", notes: "Once the app is reachable at a real web address (not opened from a downloaded file): open it on your phone, use the browser menu's \u2018Add to Home Screen\u2019 or install option. Confirm it installs, opens in its own window with no browser address bar, and the icon uses the dark brown color." },
-      { title: "The app never freezes or goes blank", notes: "Create, edit, complete, and delete several items in a row, then Reset. If the app stays responsive the whole time with nothing freezing or showing a blank screen, this passes." },
-      { title: "No install-and-forget offline behavior yet", notes: "Reload the page after making a change on the live site \u2014 you should always see the latest version, never an old cached one. (That caching feature is intentionally being saved for the very last chunk of the sprint.)" }
+    addGroupWithItems("\u2705 QA \u2014 Chunk 0c: dev tools (time jump + snapshot/restore)", [
+      { title: "The three QA time buttons all move the clock", notes: "In the header, tap \u2018QA: +1 Day\u2019, then \u2018QA: +1 Hr\u2019, then \u2018QA: +15 Min\u2019. The small readout text next to them should advance each time and never go backward or reset on its own." },
+      { title: "Snapshot, then break something, then Restore brings it back", notes: "Tap Snapshot. Delete a task or complete a habit. Tap Restore \u2014 a dialog should ask to confirm, naming when the snapshot was saved. Confirm it, the app reloads, and the item you deleted/completed is back exactly as it was at Snapshot time." },
+      { title: "Restore refuses politely if you never snapshotted", notes: "Tap Reset local data first (fresh start, no snapshot yet), then tap Restore. It should tell you there's no snapshot yet, not silently do nothing or throw you into a broken state." },
+      { title: "A saved snapshot survives Reset local data", notes: "Tap Snapshot. Tap Reset local data and confirm. Tap Restore \u2014 it should still find and offer your snapshot from before the reset, not report \u2018no snapshot\u2019." }
     ]);
 
-    addGroupWithItems("\u2705 QA \u2014 Recheck chunk 0a", [
-      { title: "No Google Tasks UI or points/scoreboard anywhere", notes: "Header has no \u2018Connect Google Tasks\u2019 button and no points digits. Completing anything shows no \u2018+N\u2019 toast." },
-      { title: "Waiting\u2194Next id-preserving moves still hold", notes: "Promote a conditioned Waiting item to Next (via its condition completing) and manually Make Waiting \u2192 Make Next on another item \u2014 both still preserve the item's id and fields now that storage reads/writes route through the new adapter." }
+    addGroupWithItems("\u2705 QA \u2014 Recheck chunk 0b", [
+      { title: "Header still has no orphaned tagline, and the app still installs", notes: "Header shows just the GTD Console wordmark, nothing underneath it. If you have the hosted link, confirm \u2018Add to Home Screen\u2019 still works and opens the app in its own window." },
+      { title: "Reset local data still works end to end", notes: "Tap Reset local data \u2192 confirm \u2192 app reloads to the seeded sample data, no leftover items in any lane." }
     ]);
 
     saveTasksLocal("next");
@@ -3121,6 +3178,7 @@
     processHabitBoundaries();
     KINDS.forEach(renderLane);
     updateLaneVisibility();
+    updateQaTimeReadout();
   }
 
   document.addEventListener("DOMContentLoaded", boot);

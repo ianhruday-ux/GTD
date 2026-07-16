@@ -29,7 +29,12 @@
   </div>
   <div class="header-right">
     <button class="btn btn-ghost btn-small" id="reset-btn">Reset local data</button>
-    <button class="btn btn-ghost btn-small" id="qa-day-btn" title="Dev QA aid: advances the app's day boundary by one day and re-runs habit boundary processing, so multi-day habit logic (stumbles, misses, run-ending, badges) can be tested without waiting">QA: +1 Day</button>
+    <button class="btn btn-ghost btn-small" id="qa-day-btn" title="Dev QA aid: advances the app's clock by one day and re-runs habit boundary processing, so multi-day habit logic (stumbles, misses, run-ending, badges) can be tested without waiting">QA: +1 Day</button>
+    <button class="btn btn-ghost btn-small" id="qa-hour-btn" title="Dev QA aid: advances the app's clock by one hour and re-runs habit boundary processing">QA: +1 Hr</button>
+    <button class="btn btn-ghost btn-small" id="qa-min-btn" title="Dev QA aid: advances the app's clock by fifteen minutes and re-runs habit boundary processing — fine-grained enough to step through the midnight-4am window where the calendar date and the app's day boundary deliberately disagree">QA: +15 Min</button>
+    <span class="qa-time-readout" id="qa-time-readout" title="What the app currently thinks &lsquo;now&rsquo; is, after any QA time jumps"></span>
+    <button class="btn btn-ghost btn-small" id="qa-snapshot-btn" title="Dev QA aid: saves all current data to one snapshot slot (survives Reset), so you can try something destructive and get back to exactly this state">Snapshot</button>
+    <button class="btn btn-ghost btn-small" id="qa-restore-btn" title="Dev QA aid: replaces all current data with the last snapshot, then reloads">Restore</button>
   </div>
 </header>
 
