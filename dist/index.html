@@ -3910,11 +3910,11 @@ function injectChunkMap(){
     }
 
     addGroupWithItems("\u2705 QA \u2014 Chunk 0b: restructure + storage adapter + manifest", [
-      { title: "Header reads correctly with no orphaned tagline", notes: "Header shows the GTD Console wordmark, the intray, and the calendar icon \u2014 but no \u2018Runs on its own\u2019 line under the wordmark, and no gap where it used to be." },
-      { title: "App behaves identically to before the stapler move", notes: "Click through all five lanes, create/edit/complete/delete an item in each, drag-reorder a card. Nothing should look, feel, or behave differently than the pre-0b build \u2014 this chunk is a pure refactor (src/ + build.py \u2192 dist/index.html)." },
-      { title: "Installable as a standalone app", notes: "On a phone: browser menu \u2192 \u2018Add to Home Screen\u2019 (or the install prompt). Confirm it installs, launches in its own window with no browser chrome, opens in portrait, and the icon + splash use the desk brown (#171513)." },
-      { title: "No console errors during normal use", notes: "Open DevTools \u2192 Console while creating, editing, completing, and resetting. All localStorage access now runs through src/storage.js \u2014 there should be no uncaught exceptions, quota or otherwise." },
-      { title: "Still no service worker", notes: "DevTools \u2192 Application \u2192 Service Workers is empty, and reloading always fetches the live file (no stale-cache behavior). The service worker is chunk 9, not this one." }
+      { title: "Header reads correctly with no orphaned tagline", notes: "Header shows just the GTD Console wordmark \u2014 no \u2018Runs on its own\u2019 line underneath it, and no odd gap where it used to be." },
+      { title: "The app still works exactly like before", notes: "Click through all five lanes, create/edit/complete/delete an item in each, drag-reorder a card, tap Reset local data. Nothing should look, feel, or behave differently than before \u2014 this chunk only reorganizes files behind the scenes, it doesn't change what the app does." },
+      { title: "Installable as a standalone app (needs the app hosted online, not just the downloaded file)", notes: "Once the app is reachable at a real web address (not opened from a downloaded file): open it on your phone, use the browser menu's \u2018Add to Home Screen\u2019 or install option. Confirm it installs, opens in its own window with no browser address bar, and the icon uses the dark brown color." },
+      { title: "The app never freezes or goes blank", notes: "Create, edit, complete, and delete several items in a row, then Reset. If the app stays responsive the whole time with nothing freezing or showing a blank screen, this passes." },
+      { title: "No install-and-forget offline behavior yet", notes: "Reload the page after making a change on the live site \u2014 you should always see the latest version, never an old cached one. (That caching feature is intentionally being saved for the very last chunk of the sprint.)" }
     ]);
 
     addGroupWithItems("\u2705 QA \u2014 Recheck chunk 0a", [
