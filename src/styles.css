@@ -1,0 +1,635 @@
+  :root{
+    --desk:#171513;
+    --desk-grain:#1D1A17;
+    --paper:#262420;
+    --paper-2:#302D27;
+    --text-primary:#EDE7DA;
+    --text-soft:#A79E8C;
+    --brass:#C68A3E;
+    --brass-dark:#9C6B2C;
+    --red:#C24A3D;
+    --yellow:#D9A62C;
+    --moss:#6B9E6B;
+    --dusty:#6E90AC;
+    --purple:#8E6FB0;
+    --bezel:#0F0E0C;
+    --dark-on-accent:#1a1408;
+    --paper-shadow: 0 6px 14px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.03) inset;
+    --font-display:'Space Grotesk', sans-serif;
+    --font-body:'Inter', sans-serif;
+    --font-mono:'IBM Plex Mono', monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(ellipse at top left, rgba(255,255,255,0.02), transparent 60%),
+      repeating-linear-gradient(135deg, var(--desk) 0px, var(--desk) 2px, var(--desk-grain) 2px, var(--desk-grain) 4px);
+    background-color:var(--desk);
+    color:var(--text-primary);
+    font-family:var(--font-body);
+    min-height:100vh;
+  }
+  a{color:inherit;}
+  button{font-family:var(--font-body); cursor:pointer;}
+  input{font-family:var(--font-body);}
+
+  header{
+    display:flex; align-items:center; justify-content:space-between; gap:16px;
+    padding:18px 22px; border-bottom:1px solid rgba(237,231,218,0.12); flex-wrap:wrap;
+  }
+  .brand{ display:flex; align-items:baseline; gap:10px; }
+  .brand .mark{
+    font-family:var(--font-display); font-weight:700; font-size:20px;
+    letter-spacing:0.02em; color:var(--text-primary);
+  }
+  .brand .sub{
+    font-family:var(--font-mono); font-size:11px; color:var(--text-soft);
+    letter-spacing:0.08em; text-transform:uppercase;
+  }
+  .header-right{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+
+  .btn{
+    border:none; border-radius:6px; padding:9px 16px; font-size:13.5px;
+    font-weight:600; letter-spacing:0.01em; transition:transform .12s ease, filter .12s ease;
+  }
+  .btn:active{transform:translateY(1px);}
+  .btn-brass{background:var(--brass); color:var(--dark-on-accent);}
+  .btn-brass:hover{filter:brightness(1.08);}
+  .btn-ghost{background:transparent; color:var(--text-primary); border:1px solid rgba(237,231,218,0.3);}
+  .btn-ghost:hover{background:rgba(237,231,218,0.08);}
+  .btn-small{padding:5px 10px; font-size:12px; border-radius:5px;}
+
+  .lane-switcher{
+    display:flex; gap:8px; padding:14px 16px 0 16px; overflow-x:auto;
+    max-width:640px; margin:0 auto;
+  }
+  .lane-switcher button{
+    flex:0 0 auto; border:none; border-radius:7px 7px 0 0; padding:9px 14px;
+    font-family:var(--font-mono); font-size:11.5px; font-weight:600; letter-spacing:0.06em;
+    text-transform:uppercase; background:rgba(237,231,218,0.06); color:var(--text-primary); opacity:0.75;
+    position:relative;
+  }
+  .lane-switcher button.has-badge::after{
+    content:""; position:absolute; top:5px; right:6px; width:7px; height:7px;
+    border-radius:50%; background:var(--red); box-shadow:0 0 0 2px rgba(20,18,24,0.6);
+  }
+  .lane-switcher button.active{
+    opacity:1; background:var(--accent, var(--brass)); color:var(--dark-on-accent); font-weight:700;
+  }
+
+  /* On a phone held upright, stack the tabs into rows instead of making
+     them horizontally scrollable — much easier to reach every tab with a
+     thumb. Landscape/desktop keeps the single scrollable row. */
+  @media (orientation: portrait){
+    .lane-switcher{
+      flex-wrap:wrap;
+      overflow-x:visible;
+      row-gap:6px;
+    }
+    .lane-switcher button{
+      border-radius:6px;
+      padding:8px 11px;
+    }
+  }
+
+  main{ padding:0 20px 20px 20px; }
+  .lanes{ max-width:640px; margin:0 auto; }
+  .lane{ display:none; }
+  .lane.active-lane{ display:flex; }
+  .lane{
+    background:var(--paper); border-radius:4px 10px 10px 10px; box-shadow:var(--paper-shadow);
+    color:var(--text-primary); flex-direction:column; min-height:220px; width:100%; position:relative;
+  }
+  .lane-tab{
+    position:relative; background:var(--accent); color:var(--dark-on-accent);
+    font-family:var(--font-display); font-weight:700; font-size:13.5px; letter-spacing:0.02em;
+    padding:10px 14px; border-radius:4px 10px 0 0; display:flex; align-items:center; justify-content:space-between;
+  }
+  .lane-tab .count{
+    font-family:var(--font-mono); font-weight:600; font-size:11.5px;
+    background:rgba(0,0,0,0.18); padding:2px 7px; border-radius:10px;
+  }
+  .lane-tab-title{ display:inline-flex; align-items:center; }
+  .lane-tab-right{ display:inline-flex; align-items:center; gap:7px; }
+  .info-btn{
+    border:none; background:rgba(0,0,0,0.28); color:var(--dark-on-accent);
+    opacity:1; font-size:15px; font-weight:800; font-style:italic; font-family:Georgia, 'Times New Roman', serif;
+    line-height:1; width:22px; height:22px; border-radius:50%; padding:0; margin:0;
+    display:inline-flex; align-items:center; justify-content:center;
+  }
+  .info-btn:hover{ background:rgba(0,0,0,0.42); }
+  .lane-info{
+    display:none; padding:10px 14px; font-size:12px; line-height:1.55;
+    color:var(--text-soft); background:rgba(255,255,255,0.04);
+    border-bottom:1px solid rgba(255,255,255,0.08);
+  }
+  .lane-info.show{ display:block; }
+  .lane-body{ padding:12px; display:flex; flex-direction:column; gap:10px; flex:1; }
+  .add-row{ display:flex; gap:6px; }
+  .add-row input[type=text]{
+    flex:1; border:1px solid rgba(255,255,255,0.16); background:rgba(255,255,255,0.05);
+    border-radius:6px; padding:8px 10px; font-size:13.5px; color:var(--text-primary);
+  }
+  .add-row input[type=text]::placeholder{ color:var(--text-soft); }
+  .add-row input[type=text]:focus{ outline:2px solid var(--accent); outline-offset:1px; }
+  .add-row button{
+    border:none; background:var(--accent); color:var(--dark-on-accent); border-radius:6px;
+    padding:0 12px; font-weight:700; font-size:16px;
+  }
+  .new-list-btn{ align-self:flex-start; font-size:11.5px !important; }
+  .lane-actions-row{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .lane-actions-row .add-row.new-list-inline{ flex:1 1 auto; }
+  .tidy-btn{ font-size:11.5px !important; flex:0 0 auto; }
+
+  .cards-root{ display:flex; flex-direction:column; gap:8px; min-height:12px; }
+  .empty-note{ font-size:12.5px; color:var(--text-soft); font-style:italic; padding:6px 2px; }
+  .card{
+    background:var(--paper-2); border-radius:6px; padding:9px 10px;
+    box-shadow:0 1px 0 rgba(255,255,255,0.04) inset, 0 2px 6px rgba(0,0,0,0.35);
+  }
+  .card.dragging, .group.dragging{
+    opacity:0.35; touch-action:none; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
+  }
+  /* Long-press-to-drag needs press-and-hold on the card without the
+     browser's text-selection/callout UI stealing the gesture first. */
+  .card, .group{ -webkit-touch-callout:none; }
+  .card-top{ display:flex; align-items:flex-start; gap:8px; }
+  .check{
+    flex:0 0 auto; width:17px; height:17px; border-radius:4px; border:2px solid var(--accent);
+    background:transparent; margin-top:2px; padding:0; display:flex; align-items:center;
+    justify-content:center; font-size:11px; line-height:1; color:var(--dark-on-accent);
+  }
+  .check:hover{background:rgba(255,255,255,0.08);}
+  .check.checked{ background:var(--accent); }
+  /* Check-mark pop when a box gets ticked (overnight notes). Applied via
+     the .check-anim class so it replays on every check, not just first render. */
+  .check.check-anim{ animation:checkPop 0.28s ease; }
+  @keyframes checkPop{
+    0%{ transform:scale(0.7); }
+    55%{ transform:scale(1.25); }
+    100%{ transform:scale(1); }
+  }
+  /* Emphasized target inside a cue pill: the thing you're waiting on reads
+     at full title strength; the connective word ("After", "Waiting for")
+     stays soft (overnight notes). */
+  .pill-target{ color:var(--text-primary); }
+  /* Compact green project-link icon on Waiting cards — replaces the
+     project-title pill, which competed for space with the condition pill
+     (overnight notes). Tap = open the project's page. */
+  .project-jump{
+    display:inline-flex; align-items:center; justify-content:center; margin-top:6px; margin-left:6px;
+    width:22px; height:22px; border-radius:50%; border:1px solid var(--moss); color:var(--moss);
+    background:rgba(107,158,107,0.1); font-size:11px; padding:0;
+  }
+  .project-jump:hover{ background:rgba(107,158,107,0.25); }
+  /* Stalled-project flag on the Current Projects lane card (overnight
+     notes: the no-linked-actions indicator shows beneath the project). */
+  .card-project-flag{
+    margin-top:6px; font-family:var(--font-mono); font-size:10px; letter-spacing:0.05em;
+    color:var(--yellow); opacity:0.85;
+  }
+  /* Floating create button, bottom-right (overnight notes: replaces the
+     static create button at the top of each lane, Google-Tasks-style).
+     z-index below the screen overlay (200) so an open page covers it. */
+  #fab-create{
+    position:fixed; right:18px; bottom:18px; width:52px; height:52px; border-radius:50%;
+    border:none; background:var(--accent, var(--brass)); color:var(--dark-on-accent);
+    font-size:26px; line-height:1; z-index:150; box-shadow:0 4px 14px rgba(0,0,0,0.45);
+    display:flex; align-items:center; justify-content:center; padding:0 0 3px 0;
+  }
+  #fab-create:hover{ filter:brightness(1.1); }
+  /* Project-page quick-add rows and the linked-actions list (overnight
+     notes + doc 4.3): create actions without leaving the project page;
+     conditioned Waiting items indent under their condition. */
+  .quick-add-row{ display:flex; gap:6px; align-items:center; }
+  .quick-add-row input{
+    flex:1; font-size:12.5px; padding:7px 9px; border-radius:6px; min-width:0;
+    border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.06); color:var(--text-primary);
+  }
+  .quick-add-row button{
+    flex:0 0 auto; width:30px; height:30px; border-radius:6px; border:1px solid rgba(255,255,255,0.25);
+    background:transparent; color:var(--text-primary); font-size:15px; padding:0;
+  }
+  .quick-add-row button:hover{ background:rgba(255,255,255,0.1); }
+  .linked-actions-list{ display:flex; flex-direction:column; gap:5px; }
+  .linked-action-item{
+    text-align:left; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1);
+    color:var(--text-primary); padding:7px 10px; border-radius:6px; font-size:12.5px;
+    display:flex; align-items:center; gap:7px;
+  }
+  .linked-action-item:hover{ background:rgba(255,255,255,0.1); }
+  .linked-action-item.indented{ margin-left:22px; }
+  .linked-action-kind{ font-size:10px; font-family:var(--font-mono); color:var(--text-soft); flex:0 0 auto; }
+  /* Promote control on Waiting/Future cards — a visible left arrow, not a
+     checkbox. (Bugfix: the arrow glyph was invisible inside .check's
+     checkbox styling.) */
+  .promote-arrow{
+    flex:0 0 auto; width:20px; height:20px; border:none; background:transparent;
+    color:var(--accent); font-size:16px; line-height:1; padding:0; margin-top:1px;
+    cursor:pointer; display:flex; align-items:center; justify-content:center;
+  }
+  .promote-arrow:hover{ color:var(--text-primary); }
+  /* Blocked-save feedback: dashed outline on the offending field instead of
+     a popup (popups are also unreliable in embedded/sandboxed contexts). */
+  .field-invalid{ outline:2px dashed var(--red) !important; outline-offset:2px; border-radius:4px; }
+  .card-title{
+    flex:1; font-size:13.5px; line-height:1.4; word-break:break-word;
+    -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
+    /* pan-y, NOT none (QA, Chrome/Android): touch-action:none makes any
+       scroll swipe that happens to LAND on a title scroll-dead — and
+       titles cover most of the lane, hence "doesn't always recognize my
+       touch". pan-y lets vertical scrolling start natively; the long-press
+       drag still wins when it should, because a successful hold stays
+       inside the slop (no pan begins), and once active the non-passive
+       touchmove preventDefault blocks the pan from ever starting.
+       Selection suppression never needed this — user-select/callout above
+       do that job. */
+    touch-action:pan-y;
+  }
+  .card-title.done{ text-decoration:line-through; color:var(--text-soft); }
+  .card-actions{ display:flex; gap:4px; flex:0 0 auto; }
+  .icon-btn{
+    border:none; background:transparent; color:var(--text-soft); font-size:13px;
+    padding:2px 5px; border-radius:4px;
+  }
+  .icon-btn:hover{background:rgba(255,255,255,0.08); color:var(--text-primary);}
+  .link-pill{
+    display:inline-flex; align-items:center; gap:4px; margin-top:6px; font-family:var(--font-mono);
+    font-size:10.5px; letter-spacing:0.03em; background:rgba(255,255,255,0.07); color:var(--text-soft);
+    padding:3px 8px; border-radius:10px; border:none;
+  }
+  .link-pill:hover{background:rgba(255,255,255,0.13); color:var(--text-primary);}
+  .link-pill.cue-orphaned{
+    background:rgba(217,166,44,0.12); color:var(--yellow);
+    border:1px dashed var(--yellow); padding:2px 7px;
+  }
+  .link-pill.cue-empty{ opacity:0.7; font-style:italic; }
+  .link-row{ margin-top:7px; display:flex; gap:6px; }
+  .link-row select{
+    flex:1; font-size:12px; padding:5px 6px; border-radius:5px;
+    border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.06); color:var(--text-primary);
+  }
+  .cue-edit-row{ flex-wrap:wrap; }
+  .cue-when-input{
+    flex:1; min-width:140px; font-size:12px; padding:5px 8px; border-radius:5px;
+    border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.06); color:var(--text-primary);
+  }
+
+  /* ---------- habit creation panel ---------- */
+  .habit-create-panel{ margin-top: 2px; }
+  .habit-panel-inner{
+    display:flex; flex-direction:column; gap:9px; background:rgba(255,255,255,0.03);
+    border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:12px;
+  }
+  .habit-panel-title{ font-family:var(--font-display); font-weight:700; font-size:13px; color:var(--text-primary); }
+  .habit-panel-inner input[type=text]{
+    width:100%; border:1px solid rgba(255,255,255,0.16); background:rgba(255,255,255,0.05);
+    border-radius:6px; padding:8px 10px; font-size:13.5px; color:var(--text-primary);
+  }
+  .habit-panel-inner input[type=text]::placeholder{ color:var(--text-soft); }
+  .habit-field-label{
+    font-family:var(--font-mono); font-size:10.5px; color:var(--text-soft);
+    text-transform:uppercase; letter-spacing:0.06em; margin-top:2px;
+  }
+  .when-field-row{ display:flex; gap:6px; align-items:center; }
+  .when-field-row input{ flex:1; }
+  .hook-icon-btn{
+    font-size:16px; padding:6px 9px; border-radius:6px; background:rgba(255,255,255,0.07);
+    flex:0 0 auto;
+  }
+  .hook-icon-btn:hover{ background:rgba(255,255,255,0.13); }
+  .hooked-pill-row{
+    display:flex; align-items:center; gap:8px; background:rgba(142,111,176,0.16);
+    border:1px solid rgba(142,111,176,0.45); border-radius:6px; padding:8px 10px;
+  }
+  .hooked-pill{ font-size:12.5px; color:var(--text-primary); flex:1; }
+  .habit-panel-actions{ display:flex; justify-content:flex-end; gap:8px; margin-top:2px; }
+  .habit-panel-actions .btn-brass:disabled{ opacity:0.4; cursor:not-allowed; }
+  .hook-pick-list{ display:flex; flex-direction:column; gap:6px; max-height:260px; overflow-y:auto; }
+  .hook-pick-item{
+    text-align:left; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.12);
+    color:var(--text-primary); padding:9px 11px; border-radius:6px; font-size:13px;
+  }
+  .hook-pick-item:hover{ background:rgba(255,255,255,0.11); }
+
+  .group{
+    background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08);
+    border-radius:7px; overflow:hidden;
+  }
+  .group-header{ display:flex; align-items:center; gap:7px; padding:8px 9px; cursor:pointer; }
+  .group-header .chevron{ font-size:10px; color:var(--accent); flex:0 0 auto; }
+  .group-title{
+    flex:1; font-size:12.5px; font-weight:600; color:var(--text-primary);
+    -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
+    touch-action:pan-y; /* same fix as .card-title — see comment there */
+  }
+  .group-header .count{
+    font-family:var(--font-mono); font-size:10.5px; color:var(--text-soft);
+    background:rgba(255,255,255,0.06); padding:1px 7px; border-radius:9px;
+  }
+  .group-actions{ display:flex; gap:2px; }
+  .group-body{ padding:0 9px 9px 9px; display:flex; flex-direction:column; gap:7px; }
+  .group-body .add-row-mini input{ font-size:12.5px; padding:6px 8px; }
+
+  /* Completed archive — visually quieter than an active .group (dashed
+     border, no fill) since it's a look-back list, not something you act on
+     day to day. Default-collapsed; see completedSectionHtml(). */
+  .completed-section{
+    border:1px dashed rgba(255,255,255,0.14); border-radius:7px; overflow:hidden; margin-top:4px;
+  }
+  .completed-section .group-header .chevron{ color:var(--text-soft); }
+  .completed-section .group-title{ color:var(--text-soft); }
+  .completed-list{ padding:0 9px 9px 9px; display:flex; flex-direction:column; gap:5px; }
+  .completed-item{
+    display:flex; align-items:center; gap:8px; padding:6px 2px;
+    border-bottom:1px solid rgba(255,255,255,0.06);
+  }
+  .completed-item:last-child{ border-bottom:none; }
+  .completed-item-title{
+    flex:1; font-size:13px; color:var(--text-soft); text-decoration:line-through; text-decoration-color:rgba(237,231,218,0.3);
+  }
+
+  .lane[data-kind="next"]    { --accent: var(--red); }
+  .lane[data-kind="waiting"] { --accent: var(--yellow); }
+  .lane[data-kind="current"] { --accent: var(--moss); }
+  .lane[data-kind="future"]  { --accent: var(--dusty); }
+  .lane[data-kind="habit"]   { --accent: var(--purple); }
+
+  footer{ text-align:center; color:var(--text-soft); font-size:11.5px; padding:30px 10px 20px 10px; }
+
+  /* =========================================================
+     FULL-SCREEN EDIT/CREATE NAVIGATION
+  ========================================================= */
+  .card-title{ cursor:pointer; }
+  .screen-overlay{
+    position:fixed; inset:0; background:var(--desk); z-index:200;
+    display:flex; flex-direction:column;
+    transform:translateX(100%); transition:transform .22s ease;
+  }
+  .screen-overlay.open{ transform:translateX(0); }
+  .screen-header{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:12px 18px; border-bottom:1px solid rgba(237,231,218,0.12); flex:0 0 auto;
+    position:relative;
+  }
+  .screen-chrome-btn{
+    border:none; background:transparent; color:var(--text-primary);
+    font-size:18px; padding:4px 6px; display:inline-flex;
+    align-items:center; justify-content:center; line-height:1;
+  }
+  .screen-chrome-btn:hover{ opacity:0.65; }
+  .screen-chrome-btn.danger{ font-size:15px; }
+  .screen-chrome-btn.danger:hover{ color:var(--red); opacity:1; }
+  .screen-header-right{ display:flex; align-items:center; gap:12px; }
+  .screen-kind-badge{
+    position:absolute; left:50%; top:50%; transform:translate(-50%, -50%);
+    font-family:var(--font-mono); font-size:10px; font-weight:700; letter-spacing:0.09em;
+    text-transform:uppercase; padding:5px 14px; border-radius:11px; white-space:nowrap;
+    background:var(--accent, var(--brass)); color:var(--dark-on-accent);
+  }
+  .screen-body{
+    flex:1 1 auto; overflow-y:auto; padding:16px 20px 96px 20px;
+    max-width:640px; margin:0 auto; width:100%; display:flex; flex-direction:column; gap:11px;
+    overscroll-behavior:contain;
+  }
+  /* Body-scroll lock while a page is open (QA round 2): without it, touch
+     scrolls with nothing to scroll inside the overlay chain through to the
+     document — mobile Chrome pans the layout viewport and the fixed
+     overlay rides along, exposing the lanes/FAB/footer beneath (see the
+     screenshot in the doc's QA log). position:fixed is the lock that holds
+     on both Android and iOS; the scroll position is saved/restored in JS. */
+  body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; }
+  .screen-field-title{
+    width:100%; border:1px solid rgba(255,255,255,0.16); background:rgba(255,255,255,0.05);
+    color:var(--text-primary); font-family:var(--font-body); font-weight:600; font-size:16px;
+    padding:11px 13px; border-radius:8px;
+  }
+  .screen-field-title:focus{ outline:2px solid var(--accent, var(--brass)); outline-offset:1px; }
+  .screen-field-title::placeholder{ color:var(--text-soft); font-weight:400; }
+  .screen-field-desc{
+    width:100%; min-height:34px; resize:none; overflow:hidden; border:1px solid rgba(255,255,255,0.14);
+    background:rgba(255,255,255,0.04); border-radius:8px; color:var(--text-primary);
+    font-family:var(--font-body); font-size:13.5px; line-height:1.5; padding:9px 11px;
+    /* .screen-body is a column flex container; without this, flex-shrink
+       overrides the JS-set height and the box never grows while typing. */
+    flex:0 0 auto;
+  }
+  .screen-field-desc::placeholder{ color:var(--text-soft); }
+  .screen-field-desc:focus{ outline:2px solid var(--accent, var(--brass)); outline-offset:1px; }
+  .screen-row{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  /* A single bordered "field" that hosts an icon + one or more plain,
+     borderless native controls — reads as one row like the mockups
+     (🔗 Link to project…, 📅 Deadline…) while staying fully functional. */
+  .screen-boxed-row{
+    display:flex; align-items:center; gap:6px; flex:1; min-width:180px;
+    border:1px solid rgba(255,255,255,0.14); background:rgba(255,255,255,0.04);
+    border-radius:8px; padding:0 10px; min-height:34px;
+  }
+  .screen-boxed-row .field-icon{ font-size:13px; flex:0 0 auto; opacity:0.8; }
+  .screen-boxed-row select, .screen-boxed-row input{
+    border:none; background:transparent; padding:8px 0; font-size:12.5px;
+    color:var(--text-primary); min-width:0;
+  }
+  .screen-boxed-row select:focus, .screen-boxed-row input:focus{ outline:none; }
+  .screen-boxed-row .screen-link-select{ flex:1; }
+  .screen-boxed-row .screen-date{ flex:1.1; }
+  .screen-boxed-row .screen-time{ flex:0.9; }
+  .screen-boxed-row .screen-recurrence{ flex:1.3; }
+  .screen-clear-x{
+    border:none; background:transparent; color:var(--text-soft); font-size:13px; padding:2px 2px 2px 4px;
+    flex:0 0 auto;
+  }
+  .screen-clear-x:hover{ color:var(--text-primary); }
+  .screen-icon-toggle{
+    flex:0 0 auto; border:1px solid rgba(255,255,255,0.14); background:rgba(255,255,255,0.04); color:var(--text-primary);
+    width:38px; height:34px; border-radius:8px; font-size:14px; display:inline-flex;
+    align-items:center; justify-content:center;
+  }
+  .screen-icon-toggle.active{ background:var(--accent, var(--brass)); border-color:transparent; color:var(--dark-on-accent); }
+  .screen-icon-toggle[disabled]{ opacity:0.35; cursor:not-allowed; border-style:dashed; }
+  .screen-overlay[data-kind="habit"] .screen-when-field-row .screen-icon-toggle{
+    border-color:var(--accent); background:rgba(142,111,176,0.12); color:var(--accent);
+  }
+  .suggestion-bubble{
+    display:flex; align-items:center; gap:8px; background:rgba(198,138,62,0.14);
+    border:1px solid rgba(198,138,62,0.35); border-radius:8px; padding:9px 11px; font-size:12.5px;
+  }
+  .suggestion-bubble button{
+    border:none; background:var(--brass); color:var(--dark-on-accent); font-weight:700;
+    font-size:11.5px; padding:5px 10px; border-radius:6px; flex:0 0 auto;
+  }
+  .screen-project-flag{
+    font-size:12px; color:var(--yellow); background:rgba(217,166,44,0.12);
+    border:1px solid rgba(217,166,44,0.3); border-radius:7px; padding:8px 10px;
+  }
+  /* .screen-spacer removed (QA round 2): the Complete pill is a floating
+     badge now, so nothing needs in-flow bottom spacing — .screen-body's
+     padding-bottom covers clearance. */
+  /* Outlined pill for Make Waiting / Make Next / Make Current / Make Future
+     — border+text tinted with the *destination* kind's accent color. */
+  .screen-make-kind-btn{
+    align-self:stretch; border:1px solid rgba(237,231,218,0.4); background:transparent;
+    border-radius:8px; padding:9px 12px; font-size:13px; font-weight:600; text-align:center;
+    color:var(--text-primary);
+  }
+  .screen-make-kind-btn:hover{ background:rgba(255,255,255,0.05); }
+  /* Armed state (§13.0 Chunk A): convert is now draft-only, like Complete.
+     Solid fill in the destination's own accent color signals "this will
+     happen on save" the same way the armed Complete badge does, but stays
+     in normal flow (not floating) since it sits among the other fields. */
+  .screen-make-kind-btn.armed{ font-weight:700; }
+  .screen-make-kind-btn.armed:hover{ filter:brightness(1.06); }
+  /* Mutual exclusion (user ruling): grey and inert while Complete is
+     armed — matches the Complete pill's own .paused-style deadening when
+     a convert is armed. Handler guard lives in screenMakeKind. */
+  .screen-make-kind-btn.disabled:hover{ background:transparent; }
+  /* Floating badge (QA round 2). Sits fixed at the bottom-right like the
+     + FAB — floating chrome tracking the viewport reads as normal, unlike
+     page content jumping. Note: .screen-overlay carries a transform, which
+     makes it the containing block for fixed descendants — so this pins to
+     the overlay's corner, exactly what we want. .screen-body carries
+     bottom padding so content scrolls clear of it. */
+  .screen-complete-pill{
+    position:fixed; right:18px; bottom:24px; z-index:5;
+    border:none; border-radius:19px; padding:11px 22px; font-size:14px;
+    font-weight:700; background:var(--accent, var(--moss)); color:var(--dark-on-accent);
+    box-shadow:0 4px 14px rgba(0,0,0,0.45);
+  }
+  .screen-complete-pill:hover{ filter:brightness(1.06); }
+  /* Habit completion is a toggle, not a one-way archive like the other
+     kinds — the "done" state swaps to an outline treatment (same
+     language as .habit-pause-btn.active) so it reads as "tap to
+     undo" rather than a second irreversible Complete. Solid desk
+     backdrop so the floating badge stays legible over content. */
+  .screen-complete-pill.done{
+    background:var(--desk); border:1px solid var(--accent, var(--moss)); color:var(--accent, var(--moss));
+  }
+  /* Paused habits can't be completed (design ruling) — the badge goes
+     inert-grey; the matching guard lives in screenComplete/toggleHabit. */
+  .screen-complete-pill.paused{
+    background:var(--desk); border:1px solid var(--paper-2); color:var(--text-soft);
+    cursor:default; box-shadow:none;
+  }
+  .screen-complete-pill.paused:hover{ filter:none; }
+  .check.check-paused{ opacity:0.35; cursor:default; }
+
+  /* habit "when/hook" field inside the full-screen habit page — same
+     visual language as the old in-lane panel, just re-hosted */
+  .screen-when-field-row{ display:flex; gap:6px; align-items:center; }
+  .screen-when-field-row .habit-when-input{ flex:1; }
+  .habit-when-input{
+    border:1px solid rgba(255,255,255,0.14); background:rgba(255,255,255,0.04); color:var(--text-primary);
+    border-radius:8px; padding:9px 11px; font-size:13px;
+  }
+  .screen-hooked-pill-row{
+    display:flex; align-items:center; gap:8px; background:rgba(142,111,176,0.16);
+    border:1px solid rgba(142,111,176,0.45); border-radius:6px; padding:8px 10px;
+  }
+  .screen-hooked-pill{ font-size:12.5px; color:var(--text-primary); flex:1; }
+  /* Deleted hook target: red, full-strength (a broken reference to repair,
+     not a merely-dormant cue). Only actual deletion triggers this —
+     completing a habit never removes it from the lane's task list. */
+  .screen-hooked-pill.cue-orphaned{ color:var(--red); }
+  /* Waiting's condition pill — same shape as the habit hook pill, but
+     tinted with the Waiting lane's yellow accent instead of habit purple,
+     matching the mockup. */
+  .screen-condition-pill-row{
+    display:flex; align-items:center; gap:8px; background:rgba(217,166,44,0.14);
+    border:1px solid rgba(217,166,44,0.5); border-radius:6px; padding:8px 10px;
+  }
+  /* Mutual-exclusion made visible (4.2): once a condition is hooked, the
+     "waiting for" text/date row greys out and goes dashed rather than
+     disappearing outright. */
+  .screen-row-disabled{ opacity:0.4; }
+  .screen-row-disabled input{ cursor:not-allowed; }
+  .screen-waitfor-input{ flex:1.4; min-width:110px; }
+  .screen-hook-pick-list{ display:flex; flex-direction:column; gap:6px; max-height:50vh; overflow-y:auto; }
+  .screen-hook-pick-item{
+    text-align:left; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.12);
+    color:var(--text-primary); padding:9px 11px; border-radius:6px; font-size:13px;
+  }
+  .screen-hook-pick-item:hover{ background:rgba(255,255,255,0.11); }
+  .screen-hook-pick-none{ color:var(--text-soft); font-style:italic; }
+
+  /* Habit overhaul (chunk 3): day-of-week schedule chips, pause toggle,
+     the run track (ghost + you), celebration banner, off-day note. */
+  .habit-day-row{ display:flex; gap:6px; }
+  .habit-day-row.field-invalid{ outline:1.5px dashed var(--red); outline-offset:4px; border-radius:8px; }
+  .habit-day-chip{
+    width:32px; height:32px; border-radius:50%; border:1px solid rgba(255,255,255,0.15);
+    background:rgba(255,255,255,0.04); color:var(--text-soft); font-family:var(--font-mono); font-size:12px;
+  }
+  .habit-day-chip.active{ background:var(--purple); border-color:var(--purple); color:var(--dark-on-accent); font-weight:700; }
+  .habit-pause-btn.active{ border-color:var(--yellow); color:var(--yellow); }
+  .cue-dim{ opacity:0.55; }
+  /* Advanced options dialog (doc §12) */
+  .adv-dialog{ text-align:left; max-width:420px; }
+  .adv-title{ font-weight:700; font-size:14px; margin-bottom:8px; }
+  .adv-tabs{ display:flex; gap:6px; margin-bottom:10px; }
+  .adv-tab{
+    border:1px solid rgba(255,255,255,0.14); background:transparent; color:var(--text-soft);
+    border-radius:14px; padding:4px 12px; font-size:12px;
+  }
+  .adv-tab.active{ border-color:var(--accent, var(--moss)); color:var(--text-primary); }
+  .adv-note{ font-size:12px; color:var(--text-soft); line-height:1.5; margin:0 0 10px; }
+  .adv-textarea{
+    width:100%; min-height:64px; resize:vertical; border-radius:6px;
+    background:var(--paper-2); border:1px solid rgba(255,255,255,0.12);
+    color:var(--text-primary); font-size:13px; padding:8px;
+  }
+  .adv-hook-row{ display:flex; align-items:center; justify-content:space-between; font-size:12.5px; padding:4px 0; }
+  .adv-content{ margin-bottom:10px; }
+  .screen-advanced-btn{ align-self:flex-start; }
+  .bundle-pill{ align-self:flex-start; }
+  .habit-track-block{ display:flex; flex-direction:column; gap:8px; margin-top:4px; }
+  .habit-track{
+    display:flex; flex-direction:column; gap:5px; background:rgba(255,255,255,0.04);
+    border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:10px 12px;
+  }
+  .habit-track-row{ display:flex; flex-wrap:wrap; gap:4px; }
+  .habit-dot{ width:11px; height:11px; border-radius:50%; background:rgba(255,255,255,0.12); flex:0 0 auto; }
+  .habit-dot-done{ background:var(--moss); }
+  .habit-dot-stumble{ background:var(--yellow); }
+  .habit-dot-miss{ background:var(--red); opacity:0.6; }
+  .habit-dot-pending{ background:transparent; border:1.5px dashed var(--text-soft); }
+  .habit-dot-empty{ background:transparent; }
+  .habit-dot-ghost{ opacity:0.35; }
+  .habit-track-ghost .habit-dot-done{ background:var(--purple); }
+  .habit-track-ghost .habit-dot-stumble{ background:var(--dusty); }
+  .habit-metrics{ display:flex; gap:16px; font-family:var(--font-mono); font-size:11px; color:var(--text-soft); }
+  .habit-metrics b{ color:var(--text-primary); font-size:13px; }
+  .habit-celebration{
+    border-radius:8px; padding:10px 12px; font-size:13px; text-align:center; font-weight:600;
+    animation:habitCelebrate 0.5s ease;
+  }
+  .habit-celebration-record{ background:rgba(163,141,224,0.18); color:var(--purple); border:1px solid var(--purple); }
+  .habit-celebration-tie{ background:rgba(212,175,110,0.16); color:var(--dusty); border:1px solid var(--dusty); }
+  .habit-celebration-restart{ background:rgba(255,255,255,0.05); color:var(--text-soft); border:1px solid rgba(255,255,255,0.12); font-weight:500; }
+  @keyframes habitCelebrate{ from{ transform:scale(0.94); opacity:0; } to{ transform:scale(1); opacity:1; } }
+  .habit-offday{
+    background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); border-radius:8px;
+    padding:10px 12px; font-size:12.5px; color:var(--text-soft); text-align:center;
+  }
+  .screen-hook-pick-label{
+    font-family:var(--font-mono); font-size:10.5px; letter-spacing:0.09em; text-transform:uppercase;
+    color:var(--text-soft); margin-bottom:-2px;
+  }
+
+  .choice-dialog-backdrop{
+    position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:300;
+    display:flex; align-items:center; justify-content:center; padding:20px;
+  }
+  .choice-dialog{
+    background:var(--paper); border-radius:10px; box-shadow:var(--paper-shadow);
+    max-width:360px; width:100%; padding:18px; display:flex; flex-direction:column; gap:12px;
+  }
+  .choice-dialog p{ margin:0; font-size:13.5px; line-height:1.5; }
+  .choice-dialog-btns{ display:flex; flex-direction:column; gap:8px; }
+  .choice-dialog-btns button{
+    border:none; border-radius:7px; padding:10px 12px; font-size:13px; font-weight:600;
+    background:rgba(255,255,255,0.08); color:var(--text-primary); text-align:left;
+  }
+  .choice-dialog-btns button:hover{ background:rgba(255,255,255,0.15); }
+  .choice-dialog-btns button.primary{ background:var(--brass); color:var(--dark-on-accent); }
+  .choice-dialog-btns button.danger{ background:var(--red); color:#fff; }

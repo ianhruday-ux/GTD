@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<!--
+  GTD CONSOLE
+  ===========
+  This app works completely on its own — it stores everything in this
+  browser's local storage, needs no setup, and you can hand this single file
+  to anyone and it'll just work.
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GTD Console</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#171513">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+<!--BUILD:STYLES-->
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <span class="mark">GTD Console</span>
+  </div>
+  <div class="header-right">
+    <button class="btn btn-ghost btn-small" id="reset-btn">Reset local data</button>
+    <button class="btn btn-ghost btn-small" id="qa-day-btn" title="Dev QA aid: advances the app's day boundary by one day and re-runs habit boundary processing, so multi-day habit logic (stumbles, misses, run-ending, badges) can be tested without waiting">QA: +1 Day</button>
+  </div>
+</header>
+
+<div class="lane-switcher" id="lane-switcher">
+  <button data-kind="next" class="active" style="--accent:var(--red)">Next Actions</button>
+  <button data-kind="waiting" style="--accent:var(--yellow)">Waiting On</button>
+  <button data-kind="current" style="--accent:var(--moss)">Current Projects</button>
+  <button data-kind="future" style="--accent:var(--dusty)">Future / Someday</button>
+  <button data-kind="habit" style="--accent:var(--purple)">Habits</button>
+</div>
+
+<main id="main">
+  <div class="lanes" id="lanes"></div>
+</main>
+
+<footer id="footer-note">Data lives in this browser's local storage.</footer>
+
+<div id="screen-root"></div>
+<div id="dialog-root"></div>
+<button id="fab-create" type="button" title="Create" data-action="open-create" data-kind="next">+</button>
+
+<script>
+<!--BUILD:SCRIPT-->
+</script>
+</body>
+</html>

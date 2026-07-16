@@ -11,6 +11,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GTD Console</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#171513">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <style>
@@ -656,7 +660,6 @@
 <header>
   <div class="brand">
     <span class="mark">GTD Console</span>
-    <span class="sub">Runs on its own</span>
   </div>
   <div class="header-right">
     <button class="btn btn-ghost btn-small" id="reset-btn">Reset local data</button>
@@ -684,6 +687,137 @@
 
 <script>
 (function(){
+"use strict";
+
+// =========================================================
+// STORAGE ADAPTER (spec.md §3, known issue 4)
+//
+// Every localStorage access in the app goes through this module — nothing
+// else calls window.localStorage directly. Three stores grow forever by
+// ruling (completed archives, habit run histories, archived Waiting sets),
+// so this app WILL eventually hit localStorage's ~5MB ceiling. Before this
+// adapter existed, every setItem was uncaught: a QuotaExceededError mid-save
+// could throw partway through a multi-store commit, leaving state
+// half-persisted with no user-visible error. This catches that and surfaces
+// it instead, via the app's own dialog (native alert/confirm/prompt are
+// banned app-wide — CLAUDE.md).
+// =========================================================
+const Storage = {
+  get: function(key){
+    try { return window.localStorage.getItem(key); }
+    catch (e){ return null; }
+  },
+  getJSON: function(key, fallback){
+    try {
+      const raw = window.localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : fallback;
+    } catch (e){ return fallback; }
+  },
+  set: function(key, value){
+    try {
+      window.localStorage.setItem(key, value);
+      return true;
+    } catch (e){
+      Storage._onWriteError(e);
+      return false;
+    }
+  },
+  setJSON: function(key, value){
+    return Storage.set(key, JSON.stringify(value));
+  },
+  remove: function(key){
+    try { window.localStorage.removeItem(key); }
+    catch (e){ /* removal failing isn't a quota issue; nothing to surface */ }
+  },
+  keys: function(){
+    try { return Object.keys(window.localStorage); }
+    catch (e){ return []; }
+  },
+  // Only QuotaExceededError gets a user-facing message — other storage
+  // failures here (disabled storage, privacy mode) are rarer and every
+  // read already has a safe fallback, so the app keeps working with
+  // whatever it had in memory.
+  _onWriteError: function(e){
+    if (e && e.name === "QuotaExceededError"){
+      openConfirmDialog(
+        "Storage is full — the last change couldn't be saved. Free up space " +
+        "(clear old completed items, or Reset local data) and try again.",
+        [{ label: "OK", style: "primary", action: function(){} }]
+      );
+    }
+  }
+};
+
+// =========================================================
+// CHUNK MAP (spec.md §8.2) — its own src/ module per that section's
+// "from chunk 0b it must land in src/ as its own module, or the stapler
+// will drop it." First build of this convention: no prior single-file
+// version existed to migrate out of (grepping index-47.html before this
+// chunk found nothing).
+//
+// Injects one Current Project per sprint chunk (§2), grouped under a
+// single "Sprint chunks" project so the plan is visible from inside the
+// app while testing. Every entry is deliberately unlinked — each shows
+// the lane's own "no linked actions" flag, which is expected and useful
+// here (it's a plan, not a real project).
+//
+// Same conventions as injectQAChecklist: guarded by a flag so it only
+// runs once per version, replaces rather than accumulates on every
+// version bump, and is swept + re-injected by Reset local data so it
+// survives a fresh seed. Self-contained; safe to delete wholesale
+// (this file + its boot() call) if the convention is ever retired.
+// =========================================================
+function injectChunkMap(){
+  const FLAG = "gtd_chunk_map_v1";
+  if (Storage.get(FLAG)) return;
+  Storage.set(FLAG, "1");
+
+  // Replace, don't accumulate (8.2, mirroring 8.1): sweep any previous
+  // chunk-map group (tagged via devContext, not a title match, since the
+  // map's own title text is free to change) out of Current Projects.
+  const staleGroupIds = new Set(state.tasks.current
+    .filter(function(t){ return t.isGroup && t.devContext === "chunk-map"; })
+    .map(function(t){ return t.id; }));
+  if (staleGroupIds.size){
+    state.tasks.current = state.tasks.current.filter(function(t){
+      return !staleGroupIds.has(t.id) && !staleGroupIds.has(t.parent);
+    });
+  }
+
+  // Regenerated from spec.md §2 each time this file is touched — this is a
+  // derived view of the plan, not a document of record. If §2 changes,
+  // this list is what's stale.
+  const CHUNKS = [
+    { title: "0a — Remove Google + points", notes: "Disconnects the app from Google Tasks entirely and removes the points/score counter. The app is now fully local-only, with nothing to score." },
+    { title: "0b — Restructure + storage + install", notes: "No visible change to how the app behaves. Under the hood the code is reorganized into maintainable pieces, local storage now fails safely instead of crashing if your device runs low on space, and the app becomes installable to your home screen with its own icon and window." },
+    { title: "0c — Dev tools: snapshot & restore", notes: "A developer-only safety net: one button to snapshot all your data before risky testing, one to roll it back. Nothing you'll notice day to day." },
+    { title: "1 — Navigation stack", notes: "Fixes Back so it always returns you to the right previous screen, even several screens deep (lane → project → linked action). No new screens — just correct backing-out behavior." },
+    { title: "2 — Main UI redesign", notes: "A visual overhaul: a floating tab bar that collapses as you scroll, a progress bar on deadlines, a new + button for creating lists and actions, and layout tuned for a phone's notch and gesture bar." },
+    { title: "3 — Contexts + retire old dates", notes: "Adds shared contexts (like @home, @errands) you can tag Next/Waiting actions with, and removes the old date-based waiting/recurrence options the calendar (chunk 7) will replace properly." },
+    { title: "4 — Completed items overhaul", notes: "Reworks how finished items are archived and shown, so your completed history is easier to browse — and to undo a mistaken completion from." },
+    { title: "5 — Staged child actions", notes: "On a project page, actions you create while editing are staged as drafts and only really created once you save the project — matching the app's ‘nothing commits until Save’ rule everywhere else." },
+    { title: "6 — Tray, Notes, header, settings", notes: "Adds a slide-out capture drawer for quick notes on the go, a Notes tab, and a settings menu (behind the header's ⋯) that holds Reset and, later, Export/Import." },
+    { title: "6b — The daily review", notes: "A guided daily review: one queue that walks you through anything stalled, overdue, or waiting on someone, one at a time, with clear next-step choices." },
+    { title: "7 — Calendar + events + recurrence", notes: "The biggest chunk: a real calendar with events, appointments, and repeating items. Events are new and separate from your task lanes — a due event shows up as a linked action right when it's time." },
+    { title: "8 — Export / import", notes: "Adds Export to save all your data to a file, and Import to restore from one, replacing whatever's currently in the app. This is what makes it safe to move to a new device or a native wrapper." },
+    { title: "9 — Service worker + offline + install polish", notes: "The app can be used with no internet connection at all, and installs/updates behave like a proper app. Deliberately last — caching an in-progress app makes testing painful." }
+  ];
+
+  const groupId = genId();
+  state.tasks.current.push({
+    id: groupId, title: "🗺 Sprint chunks", notesClean: "", linkedProjectId: null,
+    isGroup: true, parent: null, devContext: "chunk-map"
+  });
+  CHUNKS.forEach(function(chunk){
+    state.tasks.current.push({
+      id: genId(), title: chunk.title, notesClean: chunk.notes, linkedProjectId: null,
+      isGroup: false, parent: groupId
+    });
+  });
+
+  saveTasksLocal("current");
+}
+
   "use strict";
 
   const LIST_TITLES = {
@@ -879,11 +1013,10 @@
   // LOCAL STORAGE BACKEND (default, no setup required)
   // =========================================================
   function loadTasksLocal(kind){
-    const raw = window.localStorage.getItem("gtd_tasks_" + kind);
-    return raw ? JSON.parse(raw) : null;
+    return Storage.getJSON("gtd_tasks_" + kind, null);
   }
   function saveTasksLocal(kind){
-    window.localStorage.setItem("gtd_tasks_" + kind, JSON.stringify(state.tasks[kind]));
+    Storage.setJSON("gtd_tasks_" + kind, state.tasks[kind]);
   }
   // Completed archive (new): permanent per-lane list of finished Next/
   // Waiting/Current/Future items, most-recently-completed first. Always
@@ -891,11 +1024,10 @@
   // gtd_archived_waiting and habitRuns — kept forever per the retention
   // policy already settled in the doc (no clearing on a timer or count).
   function loadCompletedLocal(kind){
-    try { return JSON.parse(window.localStorage.getItem("gtd_completed_" + kind) || "[]"); }
-    catch (e) { return []; }
+    return Storage.getJSON("gtd_completed_" + kind, []);
   }
   function saveCompletedLocal(kind){
-    window.localStorage.setItem("gtd_completed_" + kind, JSON.stringify(state.completed[kind]));
+    Storage.setJSON("gtd_completed_" + kind, state.completed[kind]);
   }
   function initCompletedData(){
     ["next", "waiting", "current", "future"].forEach(function(k){ state.completed[k] = loadCompletedLocal(k); });
@@ -979,10 +1111,9 @@
   // scheduled day elapses, to decide that day's outcome, then it becomes
   // irrelevant history (superseded by habitRuns[id].history).
   function loadHabitDone(){
-    try{ return JSON.parse(window.localStorage.getItem("gtd_habit_done") || "{}"); }
-    catch(e){ return {}; }
+    return Storage.getJSON("gtd_habit_done", {});
   }
-  function saveHabitDone(){ window.localStorage.setItem("gtd_habit_done", JSON.stringify(state.habitDone)); }
+  function saveHabitDone(){ Storage.setJSON("gtd_habit_done", state.habitDone); }
   function habitDoneToday(taskId){ return state.habitDone[taskId] === todayStr(); }
   // Order habits were checked off today, most-recent-first — habitDone
   // itself only stores one date per habit, not a sequence, so this is what
@@ -990,14 +1121,12 @@
   // Scoped to "today" only: a stale date in storage means a fresh day
   // started since, so it's read as empty rather than carried over.
   function loadHabitDoneOrder(){
-    try {
-      const raw = JSON.parse(window.localStorage.getItem("gtd_habit_done_order") || "null");
-      if (raw && raw.date === todayStr()) return raw.order || [];
-    } catch (e){ /* fall through */ }
+    const raw = Storage.getJSON("gtd_habit_done_order", null);
+    if (raw && raw.date === todayStr()) return raw.order || [];
     return [];
   }
   function saveHabitDoneOrder(){
-    window.localStorage.setItem("gtd_habit_done_order", JSON.stringify({ date: todayStr(), order: state.habitDoneOrder }));
+    Storage.setJSON("gtd_habit_done_order", { date: todayStr(), order: state.habitDoneOrder });
   }
   function habitDoneOrderIndex(taskId){
     const idx = state.habitDoneOrder.indexOf(taskId);
@@ -1021,10 +1150,9 @@
   //   badge: true while a run-ending result hasn't been viewed yet
   // }}
   function loadHabitRuns(){
-    try{ return JSON.parse(window.localStorage.getItem("gtd_habit_runs") || "{}"); }
-    catch(e){ return {}; }
+    return Storage.getJSON("gtd_habit_runs", {});
   }
-  function saveHabitRuns(){ window.localStorage.setItem("gtd_habit_runs", JSON.stringify(state.habitRuns)); }
+  function saveHabitRuns(){ Storage.setJSON("gtd_habit_runs", state.habitRuns); }
   function defaultHabitRun(){
     return {
       schedule: [0, 1, 2, 3, 4, 5, 6], paused: false, history: [], currentRunStart: 0,
@@ -1225,11 +1353,10 @@
   // COLLAPSED GROUPS (always local)
   // =========================================================
   function loadCollapsed(kind){
-    try{ return new Set(JSON.parse(window.localStorage.getItem("gtd_collapsed:" + kind) || "[]")); }
-    catch(e){ return new Set(); }
+    return new Set(Storage.getJSON("gtd_collapsed:" + kind, []));
   }
   function saveCollapsed(kind){
-    window.localStorage.setItem("gtd_collapsed:" + kind, JSON.stringify(Array.from(state.collapsed[kind])));
+    Storage.setJSON("gtd_collapsed:" + kind, Array.from(state.collapsed[kind]));
   }
   function isCollapsed(kind, groupId){
     if (!state.collapsed[kind]) state.collapsed[kind] = loadCollapsed(kind);
@@ -1536,10 +1663,9 @@
   // is app-level bookkeeping on top of whatever backend holds the live
   // lists, same as collapsed-state or habit-done tracking.
   function loadArchivedWaiting(){
-    try { return JSON.parse(window.localStorage.getItem("gtd_archived_waiting") || "{}"); }
-    catch (e) { return {}; }
+    return Storage.getJSON("gtd_archived_waiting", {});
   }
-  function saveArchivedWaiting(obj){ window.localStorage.setItem("gtd_archived_waiting", JSON.stringify(obj)); }
+  function saveArchivedWaiting(obj){ Storage.setJSON("gtd_archived_waiting", obj); }
   function archiveWaitingForProject(projectId, tasks){
     const archived = loadArchivedWaiting();
     archived[projectId] = (archived[projectId] || []).concat(tasks.map(function(t){ return Object.assign({}, t); }));
@@ -1804,8 +1930,14 @@
       : "";
     const deleteTitle = children.length ? "Remove items inside first" : "Delete list";
     const childrenHtml = children.map(function(c){ return leafCardHtml(kind, c); }).join("");
+    // devContext is set only on the dev-injected QA-checklist / chunk-map
+    // groups (injectQAChecklist / injectChunkMap) — a plain data attribute
+    // with no visual or behavioral effect, so the certification suite can
+    // find and exclude that dev scaffolding without matching on its
+    // per-chunk title text (spec.md §8.1/§8.2 groups differ every chunk).
+    const contextAttr = group.devContext ? ' data-context="' + escapeHtml(group.devContext) + '"' : '';
     return (
-      '<div class="group" draggable="true" data-drag-id="' + group.id + '" data-drag-parent="" data-drag-group="1">' +
+      '<div class="group"' + contextAttr + ' draggable="true" data-drag-id="' + group.id + '" data-drag-parent="" data-drag-group="1">' +
         '<div class="group-header" data-action="toggle-group" data-id="' + group.id + '">' +
           '<span class="chevron">' + (collapsed ? "&#9656;" : "&#9662;") + '</span>' +
           '<span class="group-title" title="Tap to expand/collapse \u2014 press and hold to reorder">' + escapeHtml(group.title) + '</span>' +
@@ -3073,16 +3205,16 @@
     qs("#reset-btn").addEventListener("click", function(){
       openConfirmDialog("Clear all local data and start fresh?", [
         { label: "Clear data", style: "primary", action: function(){
-          KINDS.forEach(function(k){ window.localStorage.removeItem("gtd_tasks_" + k); window.localStorage.removeItem("gtd_collapsed:" + k); });
-          window.localStorage.removeItem("gtd_habit_done");
-          window.localStorage.removeItem("gtd_habit_runs");
-          window.localStorage.removeItem("gtd_archived_waiting");
-          // Also clear the QA-checklist injection flags: the reset wipes
-          // the checklist items with the rest of the data, so the flags
-          // must go too or the checklist would be gone for good — it
-          // should re-inject with the fresh data (doc 8.1).
-          Object.keys(window.localStorage).forEach(function(key){
-            if (key.indexOf("gtd_qa_checklist") === 0) window.localStorage.removeItem(key);
+          KINDS.forEach(function(k){ Storage.remove("gtd_tasks_" + k); Storage.remove("gtd_collapsed:" + k); });
+          Storage.remove("gtd_habit_done");
+          Storage.remove("gtd_habit_runs");
+          Storage.remove("gtd_archived_waiting");
+          // Also clear the QA-checklist and chunk-map injection flags: the
+          // reset wipes the injected items with the rest of the data, so the
+          // flags must go too or they'd be gone for good — both should
+          // re-inject with the fresh data (doc 8.1, 8.2).
+          Storage.keys().forEach(function(key){
+            if (key.indexOf("gtd_qa_checklist") === 0 || key.indexOf("gtd_chunk_map") === 0) Storage.remove(key);
           });
           window.location.reload();
         }},
@@ -3746,9 +3878,9 @@
   // off to chunk 3.
   // =========================================================
   function injectQAChecklist(){
-    const FLAG = "gtd_qa_checklist_chunk0a";
-    if (window.localStorage.getItem(FLAG)) return;
-    window.localStorage.setItem(FLAG, "1");
+    const FLAG = "gtd_qa_checklist_chunk0b";
+    if (Storage.get(FLAG)) return;
+    Storage.set(FLAG, "1");
 
     // Replace, don't accumulate (8.1) — and actually mean it this time.
     // Earlier rounds bumped the flag but left the previous rounds' groups
@@ -3768,7 +3900,7 @@
 
     function addGroupWithItems(title, items){
       const groupId = genId();
-      state.tasks.next.push({ id: groupId, title: title, notesClean: "", linkedProjectId: null, isGroup: true, parent: null });
+      state.tasks.next.push({ id: groupId, title: title, notesClean: "", linkedProjectId: null, isGroup: true, parent: null, devContext: "qa-checklist" });
       items.forEach(function(item){
         state.tasks.next.push({
           id: genId(), title: item.title, notesClean: item.notes || "", linkedProjectId: null,
@@ -3777,12 +3909,17 @@
       });
     }
 
-    addGroupWithItems("\u2705 QA \u2014 Chunk 0a: Google + points removed", [
-      { title: "No Google Tasks UI anywhere", notes: "Header has no \u2018Connect Google Tasks\u2019 button. Reset local data is always visible (nothing hides it). Footer just says data lives in local storage. View page source \u2014 no accounts.google.com script tag, no CONFIG/CLIENT_ID." },
-      { title: "No points/scoreboard anywhere", notes: "Header has no Points digits. Completing a Next/Waiting/Current/Future item or checking off a habit shows no \u2018+N\u2019 toast. localStorage has no gtd_points key after a fresh boot, and Reset doesn't try to clear one." },
-      { title: "Waiting \u2192 Next promotion keeps the condition link working", notes: "Create a Next Action A. Create a Waiting item conditioned on A (\u2018waiting for\u2019 \u2192 A). Complete A \u2014 the Waiting item auto-promotes to Next Actions. Confirm it landed correctly and nothing broke (this now works by NOT changing A's or the Waiting item's id, instead of the old delete+recreate)." },
-      { title: "Manual Make-X convert preserves everything else", notes: "On a Next Action with a description and a linked project, tap Make Waiting, then Make Next again. Title, description, and any other fields survive both hops \u2014 nothing resets or clears itself along the way." },
-      { title: "Reset local data still works end to end", notes: "Tap Reset local data \u2192 confirm \u2192 app reloads to the seeded sample data, no leftover items in any lane, no console errors." }
+    addGroupWithItems("\u2705 QA \u2014 Chunk 0b: restructure + storage adapter + manifest", [
+      { title: "Header reads correctly with no orphaned tagline", notes: "Header shows the GTD Console wordmark, the intray, and the calendar icon \u2014 but no \u2018Runs on its own\u2019 line under the wordmark, and no gap where it used to be." },
+      { title: "App behaves identically to before the stapler move", notes: "Click through all five lanes, create/edit/complete/delete an item in each, drag-reorder a card. Nothing should look, feel, or behave differently than the pre-0b build \u2014 this chunk is a pure refactor (src/ + build.py \u2192 dist/index.html)." },
+      { title: "Installable as a standalone app", notes: "On a phone: browser menu \u2192 \u2018Add to Home Screen\u2019 (or the install prompt). Confirm it installs, launches in its own window with no browser chrome, opens in portrait, and the icon + splash use the desk brown (#171513)." },
+      { title: "No console errors during normal use", notes: "Open DevTools \u2192 Console while creating, editing, completing, and resetting. All localStorage access now runs through src/storage.js \u2014 there should be no uncaught exceptions, quota or otherwise." },
+      { title: "Still no service worker", notes: "DevTools \u2192 Application \u2192 Service Workers is empty, and reloading always fetches the live file (no stale-cache behavior). The service worker is chunk 9, not this one." }
+    ]);
+
+    addGroupWithItems("\u2705 QA \u2014 Recheck chunk 0a", [
+      { title: "No Google Tasks UI or points/scoreboard anywhere", notes: "Header has no \u2018Connect Google Tasks\u2019 button and no points digits. Completing anything shows no \u2018+N\u2019 toast." },
+      { title: "Waiting\u2194Next id-preserving moves still hold", notes: "Promote a conditioned Waiting item to Next (via its condition completing) and manually Make Waiting \u2192 Make Next on another item \u2014 both still preserve the item's id and fields now that storage reads/writes route through the new adapter." }
     ]);
 
     saveTasksLocal("next");
@@ -3797,6 +3934,7 @@
     initLocalData();
     initCompletedData();
     injectQAChecklist();
+    injectChunkMap();
     state.habitDone = loadHabitDone();
     state.habitDoneOrder = loadHabitDoneOrder();
     state.habitRuns = loadHabitRuns();
@@ -3806,6 +3944,7 @@
   }
 
   document.addEventListener("DOMContentLoaded", boot);
+
 })();
 </script>
 </body>
