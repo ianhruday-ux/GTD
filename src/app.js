@@ -746,7 +746,7 @@
       notesClean: data.notesClean || "", linkedProjectId: data.linkedProjectId || null, deadline: data.deadline || null,
       whenText: data.whenText || null, conditionId: data.conditionId || null,
       conditionKind: data.conditionKind || null, conditionLabel: data.conditionLabel || null,
-      bundleText: data.bundleText || null, createdAt: Date.now() // deadline-bar origin (§4.4b)
+      bundleText: data.bundleText || null, contextId: data.contextId || null, createdAt: Date.now() // deadline-bar origin (§4.4b)
     };
     const task = Object.assign({ id: genId(), title: data.title, isGroup: false, parent: null }, base);
     state.tasks[kind].unshift(task);
@@ -769,6 +769,7 @@
     task.conditionKind = data.conditionKind || null;
     task.conditionLabel = data.conditionLabel || null;
     task.bundleText = data.bundleText || null;
+    if (isActionKind(kind)) task.contextId = data.contextId || null;
     saveTasksLocal(kind);
     renderLane(kind);
     refreshProjectFlags(kind);
@@ -1453,6 +1454,7 @@
       const task = state.tasks[kind].find(function(t){ return t.id === taskId; });
       if (!task) return;
       draft = { title: task.title, notesClean: task.notesClean || "", linkedProjectId: task.linkedProjectId || null, deadline: getDeadline(task), bundleText: task.bundleText || "" };
+      if (isActionKind(kind)) draft.contextId = task.contextId || null;
       if (kind === "waiting"){
         draft.whenText = task.whenText || "";
         draft.conditionId = task.conditionId || null;
@@ -1462,6 +1464,7 @@
       }
     } else {
       draft = { title: "", notesClean: "", linkedProjectId: null, deadline: null, bundleText: "" };
+      if (isActionKind(kind)) draft.contextId = (prefill && prefill.contextId) || null;
       if (kind === "waiting"){
         draft.whenText = ""; draft.conditionId = null; draft.conditionKind = null; draft.conditionLabel = null; draft.conditionPicker = false;
       }
@@ -1645,7 +1648,8 @@
       conditionId: s.kind === "waiting" ? s.draft.conditionId : null,
       conditionKind: s.kind === "waiting" ? s.draft.conditionKind : null,
       conditionLabel: s.kind === "waiting" ? s.draft.conditionLabel : null,
-      bundleText: (s.kind === "next" || s.kind === "waiting") ? ((s.draft.bundleText || "").trim() || null) : null
+      bundleText: (s.kind === "next" || s.kind === "waiting") ? ((s.draft.bundleText || "").trim() || null) : null,
+      contextId: isActionKind(s.kind) ? (s.draft.contextId || null) : null
     };
     const wasCreate = !s.taskId; // edits already land back focused on the item; only creates need the camera reset
     const taskId = s.taskId;
@@ -2042,6 +2046,37 @@
       '</div>'
     );
   }
+  // Context picker (chunk 3, §4.3d) — CHOOSE-ONLY, same select pattern as the
+  // project link. It never creates a context (creation is the + badge alone,
+  // §4.3e); when the registry is empty it names the way out rather than
+  // greying out, per the no-field-labels teaching convention.
+  function contextOptionsHtml(selectedId){
+    let html = '<option value="">No context</option>';
+    state.contexts.forEach(function(c){
+      html += '<option value="' + c.id + '"' + (c.id === selectedId ? " selected" : "") + '>' + escapeHtml(c.name) + '</option>';
+    });
+    return html;
+  }
+  function contextRowHtml(draft){
+    if (!state.contexts.length){
+      return (
+        '<div class="screen-row">' +
+          '<div class="screen-boxed-row screen-row-disabled">' +
+            '<span class="field-icon">&#128450;</span>' +
+            '<span style="font-size:12.5px;color:var(--text-soft);">No contexts yet — create them with + on the lane.</span>' +
+          '</div>' +
+        '</div>'
+      );
+    }
+    return (
+      '<div class="screen-row">' +
+        '<div class="screen-boxed-row">' +
+          '<span class="field-icon">&#128450;</span>' +
+          '<select class="screen-link-select" data-field="contextId">' + contextOptionsHtml(draft.contextId || "") + '</select>' +
+        '</div>' +
+      '</div>'
+    );
+  }
   // Condition pill — shown directly under the title once a Waiting action
   // is hooked to a condition (Next or Waiting item). Per 4.2, this is "the
   // second most important piece of information after the title."
@@ -2333,6 +2368,7 @@
     if (kind === "next"){
       fields += '<textarea class="screen-field-desc" data-field="notesClean" placeholder="Description (optional)\u2026">' + escapeHtml(draft.notesClean) + '</textarea>';
       fields += linkRowHtml(draft);
+      fields += contextRowHtml(draft);
       fields += deadlineFieldsHtml(draft, kind);
       if (s.taskId){
         // §4.13a (chunk 3): a dated thing does not wait. Disable "Make Waiting"
@@ -2351,6 +2387,7 @@
       if (draft.conditionId) fields += conditionPillHtml(draft);
       fields += '<textarea class="screen-field-desc" data-field="notesClean" placeholder="Description (optional)\u2026">' + escapeHtml(draft.notesClean) + '</textarea>';
       fields += linkRowHtml(draft);
+      fields += contextRowHtml(draft);
       fields += waitingForRowHtml(draft, s.invalidField === "waitingFor");
       if (s.taskId) fields += makeKindBtnHtml("next", "Make Next Action", "left", draft.convertTo === "next", !!draft.willComplete);
       fields += advancedRowHtml(draft);
@@ -3024,6 +3061,7 @@
         if (el.value.trim()) draft.deadline = null;
       }
       else if (field === "linkedProjectId"){ draft.linkedProjectId = el.value || null; }
+      else if (field === "contextId"){ draft.contextId = el.value || null; }
       else if (field === "deadline-date"){
         if (!el.value){ draft.deadline = null; }
         else { draft.deadline = draft.deadline || { date: "", time: "" }; draft.deadline.date = el.value; }
