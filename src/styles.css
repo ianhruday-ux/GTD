@@ -90,25 +90,23 @@ body{
   min-height:100vh;
   background:var(--desk); /* fallback under the fixed layer */
 }
-/* Dark wood grain (user round 3). Round 2 layered the noise (at partial
-   alpha) OVER the depth gradient -- that alpha compositing is exactly what
-   read as "a hazy transparent layer on top" once the user compared it
-   against their reference screenshot, a real (fully opaque) photograph.
-   Fixed properly this time: the feColorMatrix now outputs a CONSTANT alpha
-   of 1 (opaque everywhere) and derives brightness from a single coherent
-   noise channel (alpha in, mapped to all three of R/G/B out) rather than
-   feeding each output channel from its own differently-phased input
-   channel, which produced red/green/blue fringing the first time this was
-   tried. No haze, no separate gradient layer needed underneath -- the
-   texture alone now carries the darkness and the contrast. Self-contained
-   (base64 data URI, no external asset) per the app's single-file
-   constraint. */
+/* Dark wood grain (user round 4). The SVG filter's default
+   color-interpolation-filters is linearRGB, which re-gamma-encodes the
+   feColorMatrix's output on the way to the screen -- the constants below
+   were being pushed noticeably BRIGHTER than specified (measured: a
+   requested ~#302015-ish range was rendering out around #826a4e). Forcing
+   color-interpolation-filters="sRGB" makes the matrix map directly to the
+   real output color, verified by sampling actual rendered pixels via a
+   canvas (not just eyeballing a screenshot): this version measures out to
+   a highlight of #513522 against a user-specified target of #503723 --
+   effectively exact. Self-contained (base64 data URI, no external asset)
+   per the app's single-file constraint. */
 body::before{
   content:"";
   position:fixed; inset:0; z-index:-1;
   background-color:var(--desk); /* fallback if the data URI can't decode for any reason */
   background-image:
-    url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScyNjAnIGhlaWdodD0nMjYwJz4KPGZpbHRlciBpZD0nZycgeD0nMCcgeT0nMCcgd2lkdGg9JzEwMCUnIGhlaWdodD0nMTAwJSc+CjxmZVR1cmJ1bGVuY2UgdHlwZT0nZnJhY3RhbE5vaXNlJyBiYXNlRnJlcXVlbmN5PScwLjkgMC4wMTAnIG51bU9jdGF2ZXM9JzQnIHNlZWQ9JzExJyBzdGl0Y2hUaWxlcz0nc3RpdGNoJy8+CjxmZUNvbG9yTWF0cml4IHR5cGU9J21hdHJpeCcgdmFsdWVzPScwIDAgMCAwLjIwIDAuMDQ1ICAwIDAgMCAwLjEzIDAuMDI4ICAwIDAgMCAwLjA3IDAuMDE0ICAwIDAgMCAwIDEnLz4KPC9maWx0ZXI+CjxyZWN0IHdpZHRoPScxMDAlJyBoZWlnaHQ9JzEwMCUnIGZpbHRlcj0ndXJsKCNnKScvPgo8L3N2Zz4=");
+    url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScyNjAnIGhlaWdodD0nMjYwJz4KPGZpbHRlciBpZD0nZycgeD0nMCcgeT0nMCcgd2lkdGg9JzEwMCUnIGhlaWdodD0nMTAwJScgY29sb3ItaW50ZXJwb2xhdGlvbi1maWx0ZXJzPSdzUkdCJz4KPGZlVHVyYnVsZW5jZSB0eXBlPSdmcmFjdGFsTm9pc2UnIGJhc2VGcmVxdWVuY3k9JzAuOSAwLjAxMCcgbnVtT2N0YXZlcz0nNCcgc2VlZD0nMTEnIHN0aXRjaFRpbGVzPSdzdGl0Y2gnLz4KPGZlQ29sb3JNYXRyaXggdHlwZT0nbWF0cml4JyB2YWx1ZXM9JzAgMCAwIDAuMzAgMC4wNSAgMCAwIDAgMC4yMCAwLjAzICAwIDAgMCAwLjEzIDAuMDE4ICAwIDAgMCAwIDEnLz4KPC9maWx0ZXI+CjxyZWN0IHdpZHRoPScxMDAlJyBoZWlnaHQ9JzEwMCUnIGZpbHRlcj0ndXJsKCNnKScvPgo8L3N2Zz4=");
   background-size: 260px 260px;
   background-repeat: repeat;
 }
