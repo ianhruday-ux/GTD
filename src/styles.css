@@ -830,6 +830,8 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 .screen-hook-pick-item:hover{ background:rgba(255,255,255,0.11); }
 .screen-hook-pick-none{ color:var(--text-soft); font-style:italic; }
 .screen-hook-pick-label{ font-family:var(--font-mono); font-size:10.5px; letter-spacing:0.09em; text-transform:uppercase; color:var(--text-soft); margin-bottom:-2px; }
+.screen-hook-pick-section{ font-family:var(--font-mono); font-size:9.5px; letter-spacing:0.1em; text-transform:uppercase; color:var(--text-soft); opacity:0.75; margin:4px 0 -1px; }
+.screen-hook-pick-section:first-child{ margin-top:0; }
 .habit-day-row{ display:flex; gap:6px; }
 .habit-day-row.field-invalid{ outline:1.5px dashed var(--red); outline-offset:4px; border-radius:8px; }
 .habit-day-chip{ width:32px; height:32px; border-radius:50%; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.04); color:var(--text-soft); font-family:var(--font-mono); font-size:12px; }

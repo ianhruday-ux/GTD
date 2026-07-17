@@ -850,6 +850,8 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 .screen-hook-pick-item:hover{ background:rgba(255,255,255,0.11); }
 .screen-hook-pick-none{ color:var(--text-soft); font-style:italic; }
 .screen-hook-pick-label{ font-family:var(--font-mono); font-size:10.5px; letter-spacing:0.09em; text-transform:uppercase; color:var(--text-soft); margin-bottom:-2px; }
+.screen-hook-pick-section{ font-family:var(--font-mono); font-size:9.5px; letter-spacing:0.1em; text-transform:uppercase; color:var(--text-soft); opacity:0.75; margin:4px 0 -1px; }
+.screen-hook-pick-section:first-child{ margin-top:0; }
 .habit-day-row{ display:flex; gap:6px; }
 .habit-day-row.field-invalid{ outline:1.5px dashed var(--red); outline-offset:4px; border-radius:8px; }
 .habit-day-chip{ width:32px; height:32px; border-radius:50%; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.04); color:var(--text-soft); font-family:var(--font-mono); font-size:12px; }
@@ -1220,10 +1222,30 @@ function injectChunkMap(){
       return habitIncomingHookCount(t.id, excludeId) < MAX_HOOKS;
     });
   }
+  // Every context it's safe to add as a habit's cue (§4.5, §4.3d): not
+  // already among this draft's cue rows, and not already carrying
+  // MAX_HOOKS incoming hooks. A context takes no part in the hook CYCLE
+  // (nothing hooks out of it), so there is no self/mutual exclusion — only
+  // the shared 7-incoming cap and de-duplication. Note habitIncomingHookCount
+  // already tallies context ids for free: a context-cue is stored in the
+  // habit's own hooks array, so the same incoming count that guards habit
+  // anchors guards contexts too.
+  function getValidContextCueTargets(currentHookIds, excludeHabitId){
+    const excluded = new Set(currentHookIds || []);
+    return state.contexts.filter(function(c){
+      if (excluded.has(c.id)) return false;
+      return habitIncomingHookCount(c.id, excludeHabitId) < MAX_HOOKS;
+    });
+  }
   // A hook is live today iff its target exists, is scheduled today, and
   // isn't paused (11.2). One link deep only — the target's own cue
   // doesn't matter, because the target itself still occurs today.
   function hookLiveToday(hook){
+    // A context-cue (§4.3d/§4.5) is ALWAYS live: a context has no schedule
+    // and cannot be paused or completed. It only stops being live if the
+    // context was deleted, in which case it reads as an orphan — exactly
+    // like a deleted habit target below.
+    if (hook.ctx) return !!findContext(hook.id);
     const target = state.tasks.habit.find(function(h){ return h.id === hook.id && !h.isGroup; });
     if (!target) return false;
     const run = ensureHabitRun(target.id);
@@ -2236,8 +2258,15 @@ function injectChunkMap(){
       const whens = task.whenTexts || [];
       if (liveHooks.length){
         liveHooks.forEach(function(hk){
-          const target = state.tasks.habit.find(function(h){ return h.id === hk.id && !h.isGroup; });
-          cueBlock += '<button class="link-pill" data-action="open-edit" data-kind="habit" data-id="' + task.id + '">&#128279; After ' + escapeHtml(target.title) + '</button>';
+          if (hk.ctx){
+            // Context-cue: always-live, shown as the context name with a
+            // location glyph (distinct from 🔗 "After X" and 🕐 text cues).
+            const ctx = findContext(hk.id);
+            cueBlock += '<button class="link-pill" data-action="open-edit" data-kind="habit" data-id="' + task.id + '">&#128205; ' + escapeHtml(ctx.name) + '</button>';
+          } else {
+            const target = state.tasks.habit.find(function(h){ return h.id === hk.id && !h.isGroup; });
+            cueBlock += '<button class="link-pill" data-action="open-edit" data-kind="habit" data-id="' + task.id + '">&#128279; After ' + escapeHtml(target.title) + '</button>';
+          }
         });
       } else if (whens.length){
         whens.forEach(function(w){
@@ -2538,7 +2567,7 @@ function injectChunkMap(){
         const task = state.tasks.habit.find(function(t){ return t.id === taskId; });
         if (!task) return;
         const run = ensureHabitRun(taskId);
-        let cueRows = (task.hooks || []).map(function(hk){ return { hook: { id: hk.id, label: hk.label } }; })
+        let cueRows = (task.hooks || []).map(function(hk){ return { hook: { id: hk.id, label: hk.label, ctx: !!hk.ctx } }; })
           .concat((task.whenTexts || []).map(function(w){ return { text: w }; }));
         if (!cueRows.length) cueRows = [{ text: "" }];
         draft = {
@@ -2925,14 +2954,31 @@ function injectChunkMap(){
       });
     });
   }
-  function screenPickHook(targetId){
+  function screenPickHook(targetId, isCtx){
     const s = state.screen;
     if (!s) return;
     const d = s.draft;
-    const target = state.tasks.habit.find(function(h){ return h.id === targetId; });
     const hooks = draftCueHooks(d);
     const already = hooks.some(function(hk){ return hk.id === targetId; });
     const row = d.cueRows[d.hookPickerRow];
+    if (isCtx){
+      // Context-cue (§4.5): a context is a SHARED cue target — multiple
+      // habits cueing one context is the ordinary case (§11.4), so there is
+      // no "already hooked by N / Replace" takeover prompt (that guards the
+      // near-exclusive habit anchor). Only the shared 7-incoming cap and
+      // de-duplication gate it; the outgoing cap is the cue-row count.
+      d.hookPicker = false;
+      const ctx = findContext(targetId);
+      const addable = !already && row && ctx && hooks.length < MAX_HOOKS &&
+        habitIncomingHookCount(targetId, s.taskId) < MAX_HOOKS;
+      if (!addable){ renderScreen(); return; }
+      d.cueRows[d.hookPickerRow] = { hook: { id: targetId, label: ctx.name, ctx: true } };
+      if (s.invalidField === "habitWhen") s.invalidField = null;
+      playHookChime();
+      renderScreen();
+      return;
+    }
+    const target = state.tasks.habit.find(function(h){ return h.id === targetId; });
     // MAX_HOOKS in both directions (restored — see getValidHookTargets):
     // the row model bounds outgoing anyway, and the incoming count keeps
     // a target from anchoring an 8th dependent.
@@ -3241,7 +3287,18 @@ function injectChunkMap(){
     const anyHook = rowsArr.some(function(r){ return r.hook; });
     let rows = "";
     rowsArr.forEach(function(row, i){
-      if (row.hook){
+      if (row.hook && row.hook.ctx){
+        // Context-cue row: always live, so there is no "not today" dim
+        // state — only present (context name) or orphaned (deleted context).
+        const hk = row.hook;
+        const ctx = findContext(hk.id);
+        const label = ctx ? ctx.name : (hk.label || "a deleted context");
+        const suffix = ctx ? "" : " (deleted)";
+        rows += '<div class="screen-hooked-pill-row">' +
+          '<span class="screen-hooked-pill' + (ctx ? "" : " cue-orphaned") + '">&#128205; ' + escapeHtml(label) + suffix + '</span>' +
+          '<button type="button" class="icon-btn" data-action="screen-remove-cue-row" data-row="' + i + '" title="Remove this cue">&times;</button>' +
+        '</div>';
+      } else if (row.hook){
         const hk = row.hook;
         const target = state.tasks.habit.find(function(h){ return h.id === hk.id && !h.isGroup; });
         const live = target ? hookLiveToday(hk) : false;
@@ -3273,12 +3330,25 @@ function injectChunkMap(){
     // cleared state.
     const currentIds = draftCueHooks(s.draft).map(function(hk){ return hk.id; });
     const targets = getValidHookTargets(s.taskId, currentIds);
-    const itemsHtml = targets.length
-      ? targets.map(function(t){ return '<button type="button" class="screen-hook-pick-item" data-action="screen-pick-hook" data-id="' + t.id + '">' + escapeHtml(t.title) + '</button>'; }).join("")
-      : '<div class="empty-note">No habits available to hook to yet.</div>';
+    const ctxTargets = getValidContextCueTargets(currentIds, s.taskId);
+    // The list now holds two kinds of cue target (§4.5): other habits, and
+    // contexts. Group them into labelled sections so they read as distinct.
+    let sections = "";
+    if (targets.length){
+      sections += '<div class="screen-hook-pick-section">Habits</div>' +
+        targets.map(function(t){ return '<button type="button" class="screen-hook-pick-item" data-action="screen-pick-hook" data-id="' + t.id + '">' + escapeHtml(t.title) + '</button>'; }).join("");
+    }
+    if (ctxTargets.length){
+      sections += '<div class="screen-hook-pick-section">Contexts</div>' +
+        ctxTargets.map(function(c){ return '<button type="button" class="screen-hook-pick-item" data-action="screen-pick-hook" data-ctx="1" data-id="' + c.id + '">&#128205; ' + escapeHtml(c.name) + '</button>'; }).join("");
+    }
+    // Empty state names the way out, per the empty-picker-teaches rule
+    // (§4.3d/§12.1b): no habits to hook to AND no contexts to cue on.
+    const itemsHtml = sections ||
+      '<div class="empty-note">No cues yet — add a habit, or create a context with + on the Next or Waiting lane.</div>';
     return (
       '<div>' +
-        '<div class="screen-hook-pick-label">Hook onto which habit?</div>' +
+        '<div class="screen-hook-pick-label">Cue on which habit or context?</div>' +
         '<div class="screen-hook-pick-list">' +
           itemsHtml +
         '</div>' +
@@ -4113,7 +4183,7 @@ function injectChunkMap(){
       if (cancelHookPickBtn){ screenCancelHookPick(); return; }
 
       const pickHookBtn = e.target.closest('[data-action="screen-pick-hook"]');
-      if (pickHookBtn){ screenPickHook(pickHookBtn.getAttribute("data-id")); return; }
+      if (pickHookBtn){ screenPickHook(pickHookBtn.getAttribute("data-id"), pickHookBtn.getAttribute("data-ctx") === "1"); return; }
 
       const removeCueRowBtn = e.target.closest('[data-action="screen-remove-cue-row"]');
       if (removeCueRowBtn){ screenRemoveCueRow(Number(removeCueRowBtn.getAttribute("data-row"))); return; }
