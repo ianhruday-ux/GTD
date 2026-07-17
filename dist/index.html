@@ -2259,10 +2259,12 @@ function injectChunkMap(){
       if (liveHooks.length){
         liveHooks.forEach(function(hk){
           if (hk.ctx){
-            // Context-cue: always-live, shown as the context name with a
-            // location glyph (distinct from 🔗 "After X" and 🕐 text cues).
+            // Context-cue: always-live. SAME linked-cue visual language as a
+            // habit hook (user ruling): the 🔗 icon just says "a cue is
+            // linked" — consistency is the whole point — with the context
+            // name standing in for the hook target.
             const ctx = findContext(hk.id);
-            cueBlock += '<button class="link-pill" data-action="open-edit" data-kind="habit" data-id="' + task.id + '">&#128205; ' + escapeHtml(ctx.name) + '</button>';
+            cueBlock += '<button class="link-pill" data-action="open-edit" data-kind="habit" data-id="' + task.id + '">&#128279; ' + escapeHtml(ctx.name) + '</button>';
           } else {
             const target = state.tasks.habit.find(function(h){ return h.id === hk.id && !h.isGroup; });
             cueBlock += '<button class="link-pill" data-action="open-edit" data-kind="habit" data-id="' + task.id + '">&#128279; After ' + escapeHtml(target.title) + '</button>';
@@ -2961,32 +2963,25 @@ function injectChunkMap(){
     const hooks = draftCueHooks(d);
     const already = hooks.some(function(hk){ return hk.id === targetId; });
     const row = d.cueRows[d.hookPickerRow];
-    if (isCtx){
-      // Context-cue (§4.5): a context is a SHARED cue target — multiple
-      // habits cueing one context is the ordinary case (§11.4), so there is
-      // no "already hooked by N / Replace" takeover prompt (that guards the
-      // near-exclusive habit anchor). Only the shared 7-incoming cap and
-      // de-duplication gate it; the outgoing cap is the cue-row count.
-      d.hookPicker = false;
-      const ctx = findContext(targetId);
-      const addable = !already && row && ctx && hooks.length < MAX_HOOKS &&
-        habitIncomingHookCount(targetId, s.taskId) < MAX_HOOKS;
-      if (!addable){ renderScreen(); return; }
-      d.cueRows[d.hookPickerRow] = { hook: { id: targetId, label: ctx.name, ctx: true } };
-      if (s.invalidField === "habitWhen") s.invalidField = null;
-      playHookChime();
-      renderScreen();
-      return;
-    }
-    const target = state.tasks.habit.find(function(h){ return h.id === targetId; });
+    // Resolve the target on either side of the ONE registry: another habit,
+    // or a context used as a cue (§4.5). Context-cues go through the SAME
+    // path as habit hooks (user ruling) — same cap, same "already hooked"
+    // warning, same replace-at-save takeover — because a single cue driving
+    // more than one behaviour is the same habit-formation problem whatever
+    // the cue points at, and the warning is partly a teaching tool. Only the
+    // display label and the stored `ctx` flag differ.
+    const ctx = isCtx ? findContext(targetId) : null;
+    const target = isCtx ? null : state.tasks.habit.find(function(h){ return h.id === targetId; });
+    const label = isCtx ? (ctx && ctx.name) : (target && target.title);
+    const exists = isCtx ? !!ctx : !!target;
     // MAX_HOOKS in both directions (restored — see getValidHookTargets):
     // the row model bounds outgoing anyway, and the incoming count keeps
     // a target from anchoring an 8th dependent.
-    const addable = !already && row && hooks.length < MAX_HOOKS && target &&
+    const addable = !already && row && hooks.length < MAX_HOOKS && exists &&
       habitIncomingHookCount(targetId, s.taskId) < MAX_HOOKS;
     d.hookPicker = false;
     if (!addable){ renderScreen(); return; }
-    const newHook = { id: targetId, label: target.title };
+    const newHook = isCtx ? { id: targetId, label: label, ctx: true } : { id: targetId, label: label };
     const commit = function(){
       // D7 (principles doc), now per-row: picking a hook for a cue row
       // REPLACES whatever was typed in that row — legible, not silent
@@ -3013,7 +3008,7 @@ function injectChunkMap(){
     renderScreen(); // close the picker beneath the dialog first
     const many = dependents.length > 1;
     openConfirmDialog(
-      "\u201C" + target.title + "\u201D already has " + (many ? dependents.length + " habits" : "\u201C" + dependents[0].title + "\u201D") + " hooked to it. Hook to it anyway?",
+      "\u201C" + label + "\u201D already has " + (many ? dependents.length + " habits" : "\u201C" + dependents[0].title + "\u201D") + " hooked to it. Hook to it anyway?",
       [
         { label: "Hook anyway", style: "primary", action: commit },
         { label: many ? "Replace them" : "Replace that hook", action: function(){
@@ -3295,7 +3290,7 @@ function injectChunkMap(){
         const label = ctx ? ctx.name : (hk.label || "a deleted context");
         const suffix = ctx ? "" : " (deleted)";
         rows += '<div class="screen-hooked-pill-row">' +
-          '<span class="screen-hooked-pill' + (ctx ? "" : " cue-orphaned") + '">&#128205; ' + escapeHtml(label) + suffix + '</span>' +
+          '<span class="screen-hooked-pill' + (ctx ? "" : " cue-orphaned") + '">&#128279; ' + escapeHtml(label) + suffix + '</span>' +
           '<button type="button" class="icon-btn" data-action="screen-remove-cue-row" data-row="' + i + '" title="Remove this cue">&times;</button>' +
         '</div>';
       } else if (row.hook){
@@ -3340,7 +3335,7 @@ function injectChunkMap(){
     }
     if (ctxTargets.length){
       sections += '<div class="screen-hook-pick-section">Contexts</div>' +
-        ctxTargets.map(function(c){ return '<button type="button" class="screen-hook-pick-item" data-action="screen-pick-hook" data-ctx="1" data-id="' + c.id + '">&#128205; ' + escapeHtml(c.name) + '</button>'; }).join("");
+        ctxTargets.map(function(c){ return '<button type="button" class="screen-hook-pick-item" data-action="screen-pick-hook" data-ctx="1" data-id="' + c.id + '">' + escapeHtml(c.name) + '</button>'; }).join("");
     }
     // Empty state names the way out, per the empty-picker-teaches rule
     // (§4.3d/§12.1b): no habits to hook to AND no contexts to cue on.
@@ -4675,10 +4670,10 @@ function injectChunkMap(){
   // loaded your existing saved lists — so it shows up either way. Not
   // referenced by anything else; safe to delete this whole function (and
   // its boot() call below) once QA is done, or before handing the file
-  // off to chunk 3.
+  // off to the next chunk.
   // =========================================================
   function injectQAChecklist(){
-    const FLAG = "gtd_qa_checklist_chunk2";
+    const FLAG = "gtd_qa_checklist_chunk3";
     if (Storage.get(FLAG)) return;
     Storage.set(FLAG, "1");
 
@@ -4709,18 +4704,27 @@ function injectChunkMap(){
       });
     }
 
-    addGroupWithItems("\u2705 QA \u2014 Chunk 2: the new look and the + button", [
-      { title: "The tab bar shrinks to a small pill when you scroll down, and expands again when you scroll up", notes: "Open a lane with several items and scroll down through the list \u2014 the row of tabs at the top should shrink into a small floating pill showing just the current lane. Scroll back up and it should return to the full row." },
-      { title: "The round + button opens a small menu instead of creating something right away (except on Habits)", notes: "On Next Actions, Waiting On, Current Projects, or Future/Someday, tap the round + button in the bottom corner \u2014 a small menu with two choices should pop up instead of jumping straight to a new item. On Habits, + should still create a new habit right away with no menu." },
-      { title: "The menu's second option opens a small name box that creates a list or context", notes: "Tap +, then the second menu choice (\u2018New context\u2019 on Next/Waiting, \u2018New list\u2019 on Current/Future). A small text box should appear in the list \u2014 type a name, tap the + next to it, and it should show up as a new group right away." },
-      { title: "A due date on a Next Action or Current Project now shows a thin progress bar", notes: "Open a Next Action or Current Project, give it a deadline, and save. Back on the list, a thin bar should appear under its title, filling up as the due date approaches, turning red near the end, and showing a \u2018passed\u2019 label once it's gone by." },
-      { title: "Items on a list no longer have their own \u00d7 \u2014 you delete them from the item's own page", notes: "Look at any card in any lane \u2014 there should be no small \u00d7 on it anymore. To delete something, tap it open and use the trash icon on its own page." },
-      { title: "Press-and-hold still lets you drag items into a new order", notes: "Press and hold an item's title for about half a second, then drag it up or down. It should follow your finger/cursor and land in the new spot when you let go." }
+    addGroupWithItems("\u2705 QA \u2014 Chunk 3: Contexts (shared by Next & Waiting)", [
+      { title: "A context you make on Next Actions is also there to pick on Waiting On", notes: "On Next Actions, tap +, choose \u2018New context\u2019, and name one (say \u2018Phone\u2019). Now open a Waiting On item and tap its Context box \u2014 \u2018Phone\u2019 should be in the list. Next and Waiting share one set of contexts." },
+      { title: "Moving a waiting item into Next keeps it in the same context", notes: "Put a Waiting On item into a context, then promote it to Next Actions (the \u2190 arrow on its card). It should land under the same-named context on Next Actions, not lose its grouping." },
+      { title: "The Context box on an item's page only lets you PICK a context, never make one", notes: "Open any Next or Waiting item and tap its Context box. You should see your existing contexts to choose from and NO \u2018+ new\u2019 option. If you have no contexts yet, it should tell you to make one with + on the lane." },
+      { title: "You can drag an action into a context on the lane", notes: "On Next Actions, press and hold an action for about half a second and drag it onto a context group. It should join that context." },
+      { title: "Deleting a context keeps its actions (nothing is lost)", notes: "Delete a context that still has actions in it (the \u00d7 on the context header). After the confirm, the context disappears but its actions survive, moving to the top of the lane with no context. Nothing should be deleted." }
     ]);
 
-    addGroupWithItems("\u2705 QA \u2014 Recheck chunk 1", [
-      { title: "Opening a linked action from a project, then Cancel, still returns to the project (not the lane list)", notes: "Open a project, tap one of its linked actions to open that action's own page, then tap \u2715 (Cancel). You should land back on the project page, not out at the Current Projects list." },
-      { title: "Creating a brand new action from a project's pencil icon, then Cancel, still returns to the project", notes: "Open a project, tap the pencil icon next to its quick-add row, then tap \u2715. You should land back on the project page, and nothing new should have been created." }
+    addGroupWithItems("\u2705 QA \u2014 Chunk 3: A habit can be cued by a context", [
+      { title: "The cue picker on a habit lists your contexts as well as your other habits", notes: "Open a habit, tap the cue/hook icon on its \u2018When?\u2019 row. The picker should be split into \u2018Habits\u2019 and \u2018Contexts\u2019 sections, and the wording should talk about a \u2018cue\u2019 rather than only a \u2018habit\u2019." },
+      { title: "Picking a context shows a linked-cue tag on the habit \u2014 same look as hooking to another habit", notes: "Pick a context in that picker and save. The habit should show a linked-cue tag (the link icon and the context name) that looks the same as being hooked to another habit." },
+      { title: "A context cue always shows up (it has no schedule)", notes: "A habit cued on a context should show that cue every day \u2014 a context isn't tied to particular weekdays the way a habit hook is." },
+      { title: "Cueing a second habit on the same context warns you first", notes: "Cue one habit on a context, then try to cue a different habit on that same context. You should get the \u2018already has \u2026 hooked to it\u2019 warning, exactly like re-using a habit as a cue." },
+      { title: "Deleting a context that a habit is cued on shows the cue as deleted", notes: "Cue a habit on a context, then delete that context from the lane. On the habit's page the cue should now read as deleted (orphaned) \u2014 the same as when a habit you were hooked to is deleted." },
+      { title: "You still can't file a habit INTO a context", notes: "The Habits lane should have no context groups \u2014 you can cue a habit on a context, but you cannot drop a habit into one. Only Next Actions and Waiting On group by context." }
+    ]);
+
+    addGroupWithItems("\u2705 QA \u2014 Chunk 3: the simpler date model", [
+      { title: "A Waiting item's \u2018waiting for\u2019 no longer offers a date", notes: "Open a Waiting On item. Its \u2018waiting for\u2019 should only offer free text or a linked item to wait on \u2014 there should be no option to wait for a date." },
+      { title: "The deadline box has no repeat option and no \u2018make this a habit?\u2019 prompt", notes: "Give a Next Action or project a deadline. There should be no repeat/recurring dropdown on the deadline, and no bubble asking if you want to make it a habit." },
+      { title: "A Next Action with a deadline can't be turned into a Waiting action", notes: "Open a Next Action, give it a deadline. The \u2018Make Waiting Action\u2019 button should be greyed out with a note that a waiting action can't hold a date. Clear the deadline and it should work again." }
     ]);
 
     saveTasksLocal("next");
