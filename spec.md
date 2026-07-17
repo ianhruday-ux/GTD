@@ -327,7 +327,7 @@ into and back out of), not inline editors.
 | Title | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Description (free text) | ✅ | ✅ | ✅ | ✅ *(identity placeholder — see 4.5)* | ✅ |
 | Link to Project | ✅ | ✅ | — | — | ✅ *(from the event page only — 4.15d)* |
-| Condition link (→ Next Action *or* Waiting) | 🚫 shown but greyed — see 4.2 | ✅ | — | — | ❌ |
+| Condition link (→ Next Action *or* Waiting) | 🚫 not offered *(the greyed icon was removed — see 4.2)* | ✅ | — | — | ❌ |
 | "When?" / hook-to-habit cue | — | — | — | ✅ | — |
 | **Deadline** | ✅ | ❌ *(4.13a — waiting actions have no dates)* | ✅ *(Current only)* | ❌ | ❌ |
 | **Time (optional)** | ✅ *(4.4, 4.4d)* | — | ✅ *(Current only — 4.4, 4.4d)* | — | ✅ *(supplying it is what makes it an appointment — 4.13)* |
@@ -358,8 +358,12 @@ pattern, not the single-select project-link pattern.*
   `state.tasks.next` consumers — the picker is on it.
 - **Branching is allowed** (unlike habit hooks): several Waiting items may share one condition.
 - **A Waiting action can hold both a Project link and a Condition link** — different questions.
-- **Next Actions cannot have conditions.** The icon still appears, greyed, as a teaching
-  affordance: a next action waiting on something else is, by definition, a waiting action.
+- **Next Actions cannot have conditions.** *(Amended — user round, chunk 2: the condition icon is
+  no longer shown on the Next Action page.* It used to appear greyed there as a teaching affordance —
+  "a next action waiting on something else is, by definition, a waiting action" — but in practice it
+  read as a broken control, not a lesson, so it was **deleted**. The rule stands; only the greyed
+  icon is gone. The show-but-disable teaching pattern itself still lives on elsewhere — see §4.13a's
+  disabled "Make Waiting" and §12.1's locked project-link field.)*
 - **Layout:** once hooked, the condition pill displays **immediately under the title** — second
   only to the title in importance. The when-row is where it gets *set*.
 - **Required at creation:** a Waiting action cannot exist without specifying what it's waiting
@@ -1366,8 +1370,10 @@ not behaviour to preserve.
 3).** A Waiting action cannot hold a date, so converting a **dated Next Action** into one would have
 to silently drop the date — a lie. Instead the **"Make Waiting" convert is disabled whenever a
 deadline is set** on the Next Action page: greyed, inert, with a tooltip ("A waiting action can't
-hold a date — clear the deadline first"). This mirrors the greyed **condition icon** on Next Actions
-(§4.2) — the same teaching-affordance pattern, shown-but-disabled rather than hidden. Scope is the
+hold a date — clear the deadline first"). This is the same **show-but-disable** teaching pattern used
+for §12.1's locked project-link field — the control stays visible and explains itself rather than
+vanishing. *(This used to cite the greyed condition icon on Next Actions as the exemplar; that icon
+was removed in chunk 2 — §4.2 — but the pattern it demonstrated still applies here.)* Scope is the
 **Next Action page only** (Current/Future projects don't convert to actions). The `.disabled` state
 already exists for the Complete-mutual-exclusion case; this adds a second reason. **The
 pseudo-action's counterpart is an *absence*, not a disable** — pseudo-actions are edited through the
@@ -1772,7 +1778,7 @@ A chunk that can't be reverted is a chunk that shouldn't have been written.
 | Native dialogs | Banned app-wide (silently blocked in sandboxed contexts). `openConfirmDialog` only |
 | Waiting condition targets | Anything in the **Next Actions lane** — **pseudo-actions included** (§4.2, §4.14) — **or** another Waiting action; branching allowed. From chunk 8, also a **not-yet-live event** (§10) |
 | Waiting promotion rule | Auto-move when a condition **that lives in the Next Actions lane** is completed. **⚠ The qualifier is the LANE, not the type** (§4.2) — a literal `type === 'next'` check silently refuses to promote anything hooked to an event |
-| Next Actions with conditions | Never — icon shown greyed as a teaching affordance |
+| Next Actions with conditions | Never — no condition control on the Next Action page (§4.2; the greyed icon was removed, user round chunk 2) |
 | Waiting creation requirement | Must specify what it's waiting for — **free text or a hook. That is the whole list** (§4.2, §4.13a). *(A date was struck this round; it was the last one left in this table.)* |
 | Habit metric | Personal best + lifetime total. **Current streak never displayed** |
 | Habit streak-break rule | **Never miss twice** — one miss is a stumble; two consecutive end the run |
@@ -2310,7 +2316,9 @@ anything that changed underneath from another source, i.e. it passes every test 
   round).** When an action **that carries this project's link** is opened as a **child of the project
   page**, its **Link-to-Project field is locked** — shown disabled, with a tooltip ("Linked to this
   project — remove it from the project's list instead"), the same show-but-disable teaching pattern as
-  the greyed condition icon (§4.2). The membership is the reason you are on that page; silently
+  §4.13a's disabled "Make Waiting" convert. *(This used to cite the greyed condition icon on Next
+  Actions; that icon was removed in chunk 2 — §4.2 — but the pattern still holds.)* The membership is
+  the reason you are on that page; silently
   re-pointing it mid-staged-edit would make the atomic save incoherent. **This is contextual, not a
   property of the action:** the *same* action opened from its own lane keeps a fully editable project
   link. It is knowable which context you are in because chunk 1's navigation stack records that the
