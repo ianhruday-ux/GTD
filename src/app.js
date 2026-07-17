@@ -1333,7 +1333,10 @@
     const moveBtn = moveDest
       ? '<button class="icon-btn" data-action="move" data-id="' + group.id + '" data-is-group="1" title="Move to ' + escapeHtml(LIST_TITLES[moveDest]) + '">&#8592;</button>'
       : "";
-    const deleteTitle = children.length ? "Remove items inside first" : "Delete list";
+    // Deleting a list no longer requires emptying it first (user ruling): it
+    // mirrors context deletion — the items survive, landing ungrouped at the
+    // top of the lane, behind a confirm that says so. So the × is always live.
+    const deleteTitle = "Delete list";
     const childrenHtml = children.map(function(c){ return leafCardHtml(kind, c); }).join("");
     // devContext is set only on the dev-injected QA-checklist / chunk-map
     // groups (injectQAChecklist / injectChunkMap) — a plain data attribute
@@ -3103,16 +3106,28 @@
         if (dest) moveItem(kind, dest, moveBtn.getAttribute("data-id"), moveBtn.getAttribute("data-is-group") === "1");
         return;
       }
+      // Delete a list (project-lane group): UNLINK, mirroring context deletion
+      // (user ruling). No longer requires emptying the list first — its items
+      // survive, parent cleared, landing ungrouped at the top of the lane,
+      // behind a confirm that says so. deleteTask then removes only the group
+      // row (the now-parentless children no longer match t.parent === groupId).
       const delGroupBtn = e.target.closest('[data-action="delete-group"]');
       if (delGroupBtn){
         const kind = delGroupBtn.closest(".lane").getAttribute("data-kind");
         const groupId = delGroupBtn.getAttribute("data-id");
-        const hasChildren = state.tasks[kind].some(function(t){ return t.parent === groupId; });
-        if (hasChildren){
-          openConfirmDialog("Move or remove the items inside this list first.", [{ label: "OK", style: "primary", action: function(){} }]);
-          return;
-        }
-        deleteTask(kind, groupId);
+        const group = state.tasks[kind].find(function(t){ return t.id === groupId && t.isGroup; });
+        const name = group ? group.title : "this list";
+        const affected = state.tasks[kind].filter(function(t){ return t.parent === groupId && !t.isGroup; }).length;
+        const msg = affected
+          ? "Delete the “" + name + "” list? Its " + affected + " item" + (affected === 1 ? "" : "s") + " will stay — ungrouped, at the top of the lane."
+          : "Delete the “" + name + "” list?";
+        openConfirmDialog(msg, [
+          { label: "Delete list", style: "danger", action: function(){
+              state.tasks[kind].forEach(function(t){ if (t.parent === groupId) t.parent = null; });
+              deleteTask(kind, groupId);
+            } },
+          { label: "Cancel", action: function(){} }
+        ]);
         return;
       }
       // Delete a context (chunk 3, §4.3d): UNLINK, never destroy. The context
