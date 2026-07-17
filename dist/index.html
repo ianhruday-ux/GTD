@@ -85,7 +85,7 @@
      needs reserved space matching the CURRENT state). Keep the spacer and the
      chrome reading the same variable so they can never drift. */
   --header-h:56px;
-  --tabbar-h-open:52px;    /* full tab row at rest                 */
+  --tabbar-h-open:66px;    /* full row at rest -- tall enough for two stacked half-tabs per pair */
   --tabbar-h-collapsed:40px; /* slim floating pill when scrolled  */
   --lane-accent:var(--brass); /* overridden per-lane below         */
 }
@@ -110,20 +110,24 @@ body{
   min-height:100vh;
   background:var(--desk); /* fallback under the fixed layer */
 }
-/* Dark wood grain (user round, replacing the flat gradient): fine irregular
-   streaks at a shallow angle -- two repeating layers at slightly different
-   pitch so they don't read as a mechanical stripe -- over the same top-to-
-   bottom depth gradient chunk 2 already had. Restrained on purpose, same as
-   before: it must not fight the semi-transparent white overlays tuned
-   against the dark tone. */
+/* Dark wood grain (user round, replacing the flat gradient). The earlier
+   repeating-linear-gradient attempt read as mechanical pinstripe, not wood --
+   this uses an inline SVG feTurbulence filter instead (fractalNoise, an
+   asymmetric baseFrequency so the noise stretches into long horizontal
+   fibrous streaks rather than uniform blobs, tinted warm brown via
+   feColorMatrix), tiled over the same top-to-bottom depth gradient chunk 2
+   already had. Self-contained (base64 data URI, no external asset) per the
+   app's single-file constraint. Restrained on purpose, same as before: it
+   must not fight the semi-transparent white overlays tuned against the dark
+   tone. */
 body::before{
   content:"";
   position:fixed; inset:0; z-index:-1;
-  background:
-    repeating-linear-gradient(4deg, rgba(0,0,0,0.14) 0px, rgba(0,0,0,0.14) 1px, transparent 1px, transparent 6px),
-    repeating-linear-gradient(4deg, var(--desk-grain) 0px, var(--desk-grain) 2px, transparent 2px, transparent 13px),
-    repeating-linear-gradient(-2deg, rgba(255,225,180,0.03) 0px, rgba(255,225,180,0.03) 1px, transparent 1px, transparent 9px),
+  background-image:
+    url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScyNDAnIGhlaWdodD0nMjQwJz4KPGZpbHRlciBpZD0nZyc+CjxmZVR1cmJ1bGVuY2UgdHlwZT0nZnJhY3RhbE5vaXNlJyBiYXNlRnJlcXVlbmN5PScwLjAxMiAwLjknIG51bU9jdGF2ZXM9JzQnIHNlZWQ9JzExJyBzdGl0Y2hUaWxlcz0nc3RpdGNoJy8+CjxmZUNvbG9yTWF0cml4IHR5cGU9J21hdHJpeCcgdmFsdWVzPScwIDAgMCAwIDAuMDkgIDAgMCAwIDAgMC4wNiAgMCAwIDAgMCAwLjAzICAwIDAgMCAwLjU1IDAnLz4KPC9maWx0ZXI+CjxyZWN0IHdpZHRoPScxMDAlJyBoZWlnaHQ9JzEwMCUnIGZpbHRlcj0ndXJsKCNnKScvPgo8L3N2Zz4="),
     linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
+  background-size: 240px 240px, cover;
+  background-repeat: repeat, no-repeat;
 }
 
 a{ color:inherit; }
@@ -235,7 +239,7 @@ header{
 .tabbar{
   position:fixed; left:0; right:0; z-index:110;
   top:calc(var(--header-h) + env(safe-area-inset-top));
-  display:flex; gap:6px; align-items:center;
+  display:flex; gap:6px; align-items:stretch;
   height:var(--tabbar-h);
   padding:8px calc(16px + env(safe-area-inset-right)) 0 calc(16px + env(safe-area-inset-left));
   max-width:672px; margin:0 auto;
@@ -251,15 +255,27 @@ header{
 body.drag-active .tabbar,
 body.drag-active .tabbar-spacer{ transition:none; }
 
-/* No horizontal scroll: every tab shares the row equally (flex:1), so five
-   panels always fit the viewport width instead of overflowing it. */
+/* No horizontal scroll: three panels share the row equally. Two are pairs
+   of related lanes split top/bottom into independently-tappable halves
+   (Next/Waiting, Projects/Someday); Habits stands alone until Notes gives
+   it a partner (chunk 6). */
+.tab-pair{
+  flex:1 1 0; min-width:0; display:flex; flex-direction:column; gap:3px;
+}
+.tab-pair .tab{ flex:1 1 0; }
+.tab.tab-solo{ flex:1 1 0; }
+
+/* Letter sits to the left of the icon (user round). */
 .tab{
-  flex:1 1 0; min-width:0; border:none; border-radius:9px; padding:7px 2px 6px 2px;
-  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
-  background:rgba(237,231,218,0.06); color:var(--text-primary); opacity:0.72;
+  min-width:0; border:none; border-radius:7px; padding:2px 4px;
+  display:flex; flex-direction:row; align-items:center; justify-content:center; gap:4px;
+  /* Every tab carries its own lane's color at low opacity, even at rest --
+     --lane-accent is set unconditionally below, not just on .active. */
+  background:color-mix(in srgb, var(--lane-accent, var(--brass)) 16%, transparent);
+  color:var(--text-primary); opacity:0.85;
   position:relative;
 }
-.tab .tab-icon{ font-size:16px; line-height:1; }
+.tab .tab-icon{ font-size:14px; line-height:1; }
 .tab .tab-letter{
   font-family:var(--font-mono); font-weight:700; font-size:10px;
   letter-spacing:0.04em;
@@ -273,9 +289,9 @@ body.drag-active .tabbar-spacer{ transition:none; }
 /* The count sits as a small corner badge rather than inline text -- there's
    no room for both a word and a number in a narrow equal-width panel. */
 .tab .tab-count{
-  position:absolute; top:2px; right:4px;
-  font-family:var(--font-mono); font-weight:600; font-size:8.5px;
-  background:rgba(0,0,0,0.24); padding:1px 4px; border-radius:8px; line-height:1.3;
+  position:absolute; top:1px; right:3px;
+  font-family:var(--font-mono); font-weight:600; font-size:8px;
+  background:rgba(0,0,0,0.24); padding:0 3px; border-radius:7px; line-height:1.3;
 }
 .tab.active{
   opacity:1; background:var(--lane-accent, var(--brass)); color:var(--dark-on-accent);
@@ -284,23 +300,34 @@ body.drag-active .tabbar-spacer{ transition:none; }
 /* Unread / open-loop dot -- opposite corner from the count badge so the two
    never collide. */
 .tab.has-badge::before{
-  content:""; position:absolute; top:2px; left:4px; width:6px; height:6px;
+  content:""; position:absolute; top:1px; left:3px; width:6px; height:6px;
   border-radius:50%; background:var(--red); box-shadow:0 0 0 2px var(--bg-top);
 }
-/* Per-tab accent so the active pill shows its lane's color. Mirror the lane map. */
-.tab[data-kind="next"].active    { --lane-accent:var(--red);    }
-.tab[data-kind="waiting"].active { --lane-accent:var(--yellow); }
-.tab[data-kind="current"].active { --lane-accent:var(--moss);   }
-.tab[data-kind="future"].active  { --lane-accent:var(--dusty);  }
-.tab[data-kind="habit"].active   { --lane-accent:var(--purple); }
+/* Per-tab accent -- set unconditionally (not just .active) so the resting
+   background can tint itself from the same variable. Mirror the lane map. */
+.tab[data-kind="next"]    { --lane-accent:var(--red);    }
+.tab[data-kind="waiting"] { --lane-accent:var(--yellow); }
+.tab[data-kind="current"] { --lane-accent:var(--moss);   }
+.tab[data-kind="future"]  { --lane-accent:var(--dusty);  }
+.tab[data-kind="habit"]   { --lane-accent:var(--purple); }
 
-/* --- STATE B: collapsed → a single floating pill (the active tab only). --- */
+/* --- STATE B: collapsed → a single floating pill (the active tab only). ---
+   Whichever panel holds the active tab (a pair or the solo Habits button)
+   is the only one shown; within a pair, only the active half survives. */
 body.tabs-collapsed .tabbar{
   justify-content:flex-start;
+  align-items:flex-start;
   padding-top:2px;
 }
-body.tabs-collapsed .tab{ display:none; }          /* hide the rest … */
-body.tabs-collapsed .tab.active{                    /* … show only the active one, as a pill */
+body.tabs-collapsed .tab-pair,
+body.tabs-collapsed .tab.tab-solo{ display:none; }
+body.tabs-collapsed .tab-pair:has(.tab.active){ display:flex; flex:0 0 auto; }
+body.tabs-collapsed .tab-pair .tab{ display:none; }          /* hide the inactive half … */
+/* Explicit override (not a specificity tie-break) so the solo Habits button
+   still shows when it's the active tab, even though the blanket rule above
+   hides every .tab-solo by default. */
+body.tabs-collapsed .tab.tab-solo.active{ display:flex; }
+body.tabs-collapsed .tab.active{                              /* … show only the active one, as a pill */
   display:flex; flex-direction:row; flex:0 0 auto; gap:7px;
   border-radius:20px;
   padding:7px 16px 7px 14px;
@@ -869,16 +896,23 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
   </div>
 </header>
 
-<!-- Compact letter+icon panels, no horizontal scroll (user round). Five
-     equal-width panels fill the bar; Notes joins as a sixth in chunk 6,
-     same pattern. tab-name is kept (visually hidden) for accessibility --
-     the letter+icon are decorative shorthand, not the accessible label. -->
+<!-- Compact letter+icon panels, no horizontal scroll (user round). Related
+     lanes share one panel, split into two independently-tappable halves --
+     Next/Waiting and Projects/Someday. Habits stands alone for now; its
+     natural partner is Notes, which has no lane yet (chunk 6) -- when it
+     lands, Habits pairs with it the same way. tab-name is kept (visually
+     hidden) for accessibility -- the letter+icon are decorative shorthand,
+     not the accessible label. -->
 <nav class="tabbar" id="lane-switcher" role="tablist">
-  <button class="tab active" data-kind="next"><span class="tab-icon">&#9889;</span><span class="tab-letter">N</span><span class="tab-count">0</span><span class="tab-name">Next Actions</span></button>
-  <button class="tab" data-kind="waiting"><span class="tab-icon">&#9203;</span><span class="tab-letter">W</span><span class="tab-count">0</span><span class="tab-name">Waiting On</span></button>
-  <button class="tab" data-kind="current"><span class="tab-icon">&#128296;</span><span class="tab-letter">P</span><span class="tab-count">0</span><span class="tab-name">Projects</span></button>
-  <button class="tab" data-kind="future"><span class="tab-icon">&#128301;</span><span class="tab-letter">S</span><span class="tab-count">0</span><span class="tab-name">Someday</span></button>
-  <button class="tab" data-kind="habit"><span class="tab-icon">&#127937;</span><span class="tab-letter">H</span><span class="tab-count">0</span><span class="tab-name">Habits</span></button>
+  <div class="tab-pair">
+    <button class="tab active" data-kind="next"><span class="tab-letter">N</span><span class="tab-icon">&#9889;</span><span class="tab-count">0</span><span class="tab-name">Next Actions</span></button>
+    <button class="tab" data-kind="waiting"><span class="tab-letter">W</span><span class="tab-icon">&#9203;</span><span class="tab-count">0</span><span class="tab-name">Waiting On</span></button>
+  </div>
+  <div class="tab-pair">
+    <button class="tab" data-kind="current"><span class="tab-letter">P</span><span class="tab-icon">&#128296;</span><span class="tab-count">0</span><span class="tab-name">Projects</span></button>
+    <button class="tab" data-kind="future"><span class="tab-letter">S</span><span class="tab-icon">&#128301;</span><span class="tab-count">0</span><span class="tab-name">Someday</span></button>
+  </div>
+  <button class="tab tab-solo" data-kind="habit"><span class="tab-letter">H</span><span class="tab-icon">&#127937;</span><span class="tab-count">0</span><span class="tab-name">Habits</span></button>
 </nav>
 <div class="tabbar-spacer" aria-hidden="true"></div>
 

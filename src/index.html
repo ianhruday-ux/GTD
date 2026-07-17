@@ -32,16 +32,23 @@
   </div>
 </header>
 
-<!-- Compact letter+icon panels, no horizontal scroll (user round). Five
-     equal-width panels fill the bar; Notes joins as a sixth in chunk 6,
-     same pattern. tab-name is kept (visually hidden) for accessibility --
-     the letter+icon are decorative shorthand, not the accessible label. -->
+<!-- Compact letter+icon panels, no horizontal scroll (user round). Related
+     lanes share one panel, split into two independently-tappable halves --
+     Next/Waiting and Projects/Someday. Habits stands alone for now; its
+     natural partner is Notes, which has no lane yet (chunk 6) -- when it
+     lands, Habits pairs with it the same way. tab-name is kept (visually
+     hidden) for accessibility -- the letter+icon are decorative shorthand,
+     not the accessible label. -->
 <nav class="tabbar" id="lane-switcher" role="tablist">
-  <button class="tab active" data-kind="next"><span class="tab-icon">&#9889;</span><span class="tab-letter">N</span><span class="tab-count">0</span><span class="tab-name">Next Actions</span></button>
-  <button class="tab" data-kind="waiting"><span class="tab-icon">&#9203;</span><span class="tab-letter">W</span><span class="tab-count">0</span><span class="tab-name">Waiting On</span></button>
-  <button class="tab" data-kind="current"><span class="tab-icon">&#128296;</span><span class="tab-letter">P</span><span class="tab-count">0</span><span class="tab-name">Projects</span></button>
-  <button class="tab" data-kind="future"><span class="tab-icon">&#128301;</span><span class="tab-letter">S</span><span class="tab-count">0</span><span class="tab-name">Someday</span></button>
-  <button class="tab" data-kind="habit"><span class="tab-icon">&#127937;</span><span class="tab-letter">H</span><span class="tab-count">0</span><span class="tab-name">Habits</span></button>
+  <div class="tab-pair">
+    <button class="tab active" data-kind="next"><span class="tab-letter">N</span><span class="tab-icon">&#9889;</span><span class="tab-count">0</span><span class="tab-name">Next Actions</span></button>
+    <button class="tab" data-kind="waiting"><span class="tab-letter">W</span><span class="tab-icon">&#9203;</span><span class="tab-count">0</span><span class="tab-name">Waiting On</span></button>
+  </div>
+  <div class="tab-pair">
+    <button class="tab" data-kind="current"><span class="tab-letter">P</span><span class="tab-icon">&#128296;</span><span class="tab-count">0</span><span class="tab-name">Projects</span></button>
+    <button class="tab" data-kind="future"><span class="tab-letter">S</span><span class="tab-icon">&#128301;</span><span class="tab-count">0</span><span class="tab-name">Someday</span></button>
+  </div>
+  <button class="tab tab-solo" data-kind="habit"><span class="tab-letter">H</span><span class="tab-icon">&#127937;</span><span class="tab-count">0</span><span class="tab-name">Habits</span></button>
 </nav>
 <div class="tabbar-spacer" aria-hidden="true"></div>
 
