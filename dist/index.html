@@ -2916,6 +2916,24 @@ function injectChunkMap(){
       screenGenerateAction("waiting", title);
       return;
     }
+    // Duplicate-title check (§7 ruling, chunk 3): the fast path enforces the
+    // same per-lane, case-insensitive block the drafting page does at Save.
+    // There's no popup channel here, so flash the input's border red and KEEP
+    // the typed text (no create, no re-render) — the user edits and presses
+    // Enter again. The Waiting path above already routes through the drafting
+    // page, which runs the check on Save. (Group headers are excluded, matching
+    // saveScreen's own check.)
+    const dup = state.tasks.next.some(function(t){
+      return !t.isGroup && (t.title || "").trim().toLowerCase() === title.toLowerCase();
+    });
+    if (dup){
+      const input = qs('.quick-add-row [data-quickadd="next"]');
+      if (input){
+        input.classList.add("field-invalid");
+        input.addEventListener("input", function h(){ input.classList.remove("field-invalid"); input.removeEventListener("input", h); });
+      }
+      return;
+    }
     Promise.resolve(createTask("next", { title: title, notesClean: "", linkedProjectId: s.taskId, deadline: null }))
       .then(function(){ renderScreen(); });
   }
@@ -4725,6 +4743,10 @@ function injectChunkMap(){
       { title: "A Waiting item's \u2018waiting for\u2019 no longer offers a date", notes: "Open a Waiting On item. Its \u2018waiting for\u2019 should only offer free text or a linked item to wait on \u2014 there should be no option to wait for a date." },
       { title: "The deadline box has no repeat option and no \u2018make this a habit?\u2019 prompt", notes: "Give a Next Action or project a deadline. There should be no repeat/recurring dropdown on the deadline, and no bubble asking if you want to make it a habit." },
       { title: "A Next Action with a deadline can't be turned into a Waiting action", notes: "Open a Next Action, give it a deadline. The \u2018Make Waiting Action\u2019 button should be greyed out with a note that a waiting action can't hold a date. Clear the deadline and it should work again." }
+    ]);
+
+    addGroupWithItems("\u2705 QA \u2014 Chunk 3: No duplicate titles from the quick-add", [
+      { title: "Adding an action from a project can't reuse a name that already exists", notes: "Open a Current Project and use its quick-add row (the \u2018Next action\u2026\u2019 box) to type a name that already exists somewhere in Next Actions, then press Enter. The box should flash with a dashed red outline, keep what you typed, and NOT create a duplicate. Change the name and it should add normally. (Capitalisation doesn't matter \u2014 \u2018Email Sarah\u2019 and \u2018email sarah\u2019 count as the same.)" }
     ]);
 
     saveTasksLocal("next");
