@@ -1577,7 +1577,7 @@
       // Only scroll when the close landed all the way back at the lanes
       // (not a child-screen return to a project page) — new items land at
       // the top of the lane now, so the camera should meet them there.
-      if (wasCreate && !state.screen) window.scrollTo(0, 0);
+      if (wasCreate && !state.screen){ window.scrollTo(0, 0); resyncTabScroll(); }
     });
   }
   function deleteScreenItem(){
@@ -1857,16 +1857,14 @@
     renderScreen();
   }
 
-  // Condition icon lives beside the Deadline row (not the Project-link row)
-  // — deadline and wait-condition are the two mutually-exclusive ways an
-  // item becomes actionable later, so they're paired visually. On the
-  // Next Action page this icon stays permanently disabled (4.2: "Next
-  // Actions cannot have conditions" — a teaching affordance). Waiting no
-  // longer uses this function at all — see waitingForRowHtml below.
+  // The Deadline row (date + optional time + recurrence). A disabled
+  // condition/thread icon used to sit beside it on the Next Action page as a
+  // greyed teaching affordance (4.2), but it read as a broken control rather
+  // than a lesson, so it was deleted (user round). FLAG: this contradicts
+  // 4.2's "the icon still appears, greyed" line -- update the spec to match.
   function deadlineFieldsHtml(draft, kind){
     const d = draft.deadline || {};
     const showBubble = kind === "next" && d.date && (d.recurrence === "daily" || d.recurrence === "weekly");
-    const showConditionIcon = kind === "next";
     return (
       '<div>' +
         '<div class="screen-row">' +
@@ -1881,16 +1879,12 @@
             '</select>' : "") +
             (d.date ? '<button type="button" class="screen-clear-x" data-action="clear-deadline" title="Clear deadline">&times;</button>' : "") +
           '</div>' +
-          (showConditionIcon ? conditionIconHtml() : "") +
         '</div>' +
         (showBubble ?
           '<div class="suggestion-bubble">Daily/weekly recurring items often work better as a Habit. <button type="button" data-action="suggest-habit">Make it a habit</button></div>'
           : "") +
       '</div>'
     );
-  }
-  function conditionIconHtml(){
-    return '<button type="button" class="screen-icon-toggle" disabled title="Next Actions can\u2019t have conditions \u2014 if it\u2019s waiting on something, it\u2019s a Waiting Action">&#129525;</button>';
   }
   // The project page's linked-actions list (overnight notes): every Next /
   // Waiting action linked to this project, read-only, tap to open (as a
@@ -2331,6 +2325,17 @@
     }
     return '<div class="screen-body">' + fields + '</div>';
   }
+  // Collapsing-tab-bar scroll state (module scope so lockBodyScroll and the
+  // create-close scroll reset can resync it — see the scroll listener in
+  // bindEvents). resyncTabScroll re-baselines the tracker to the current
+  // scroll position WITHOUT toggling, so a programmatic scrollTo (screen
+  // close restoring the lanes' position, or jumping to the top after a
+  // create) isn't mistaken for a scroll gesture and bounced.
+  let tabScrollLastY = 0;
+  let tabScrollAccum = 0;
+  const TAB_COLLAPSE_HYSTERESIS = 16; // px of committed one-way movement before the bar flips
+  function resyncTabScroll(){ tabScrollLastY = window.scrollY || 0; tabScrollAccum = 0; }
+
   // Freeze the document while a page is open — the page's own body is the
   // only thing allowed to scroll. Saves/restores the lanes' scroll
   // position around the position:fixed lock.
@@ -2344,6 +2349,7 @@
       document.body.classList.remove("screen-open");
       document.body.style.top = "";
       window.scrollTo(0, state.savedScrollY || 0);
+      resyncTabScroll(); // the restore jump is not a scroll gesture — don't bounce the bar
     }
   }
   // =========================================================
@@ -2477,7 +2483,10 @@
   function applyQaTimeJump(minutes){
     state.qaTimeOffset = (state.qaTimeOffset || 0) + minutes;
     processHabitBoundaries();
-    renderLane("habit");
+    // Re-render EVERY lane, not just habits: deadline progress bars (§4.4,
+    // Next + Current) read the clock at render time too, so a time jump has
+    // to refresh them or they sit stale until you open/close a page.
+    KINDS.forEach(renderLane);
     updateHabitBadge();
     updateQaTimeReadout();
   }
@@ -2991,42 +3000,64 @@
       dragPointer = null;
       autoScrollHoldStart = null;
     }
+    // Midpoint-based live reorder (user round -- fixes "tall items resist
+    // reordering"). The old version needed elementFromPoint to land on a
+    // *sibling* card before it would move anything; but the dragged element
+    // stays in flow directly under the pointer, so on a tall card (a wrapped
+    // multi-line title is ~2.5x a one-liner) you had to drag the finger clear
+    // past the whole card before a different one got hit -- each slot felt
+    // sticky. Now we only need the container the pointer is over plus the
+    // pointer's Y, and we insert before the first sibling whose midpoint is
+    // below the finger. That tracks the finger directly, independent of the
+    // dragged card's height.
     function applyLiveMove(drag, targetEl, clientY){
       if (!targetEl) return;
-      const target = targetEl.closest("[data-drag-id], [data-dropzone-parent]");
-      if (!target) return;
-      const laneEl = target.closest(".lane");
-      if (!laneEl || laneEl.getAttribute("data-kind") !== drag.kind) return;
       const el = drag.el;
-      const cardTarget = targetEl.closest("[data-drag-id]");
-      if (cardTarget && cardTarget !== el && !el.contains(cardTarget)){
-        let anchor = cardTarget;
-        if (drag.isGroup){
-          // Groups only reorder among top-level elements — resolve the
-          // hovered card up to its root-level ancestor first.
-          while (anchor.parentElement && !anchor.parentElement.classList.contains("cards-root")){
-            anchor = anchor.parentElement;
-          }
-          if (anchor === el || el.contains(anchor)) return;
-        }
-        const rect = anchor.getBoundingClientRect();
-        const before = (clientY - rect.top) < rect.height / 2;
-        const ref = before ? anchor : anchor.nextSibling;
-        if (ref !== el && el.nextSibling !== ref){
-          anchor.parentElement.insertBefore(el, ref);
-        }
-        clearDropIndicator();
-        if (anchor.classList.contains("card")){
-          anchor.classList.add(before ? "drop-before" : "drop-after");
-          dropIndicatorEl = anchor;
-        }
-      } else if (!cardTarget){
-        const zone = targetEl.closest("[data-dropzone-parent]");
-        if (!zone || el.contains(zone) || el.parentElement === zone) return;
-        if (!drag.isGroup || zone.classList.contains("cards-root")){
-          zone.appendChild(el);
-        }
-        clearDropIndicator();
+      // Which dropzone (a group-body or the cards-root) is the pointer over?
+      const hitCard = targetEl.closest("[data-drag-id]");
+      let zone;
+      if (hitCard && hitCard !== el && !el.contains(hitCard)){
+        zone = hitCard.parentElement.closest("[data-dropzone-parent]") || hitCard.parentElement;
+      } else {
+        // Pointer is over the dragged element itself, or over empty container
+        // space -- walk up to the nearest dropzone either way.
+        zone = targetEl.closest("[data-dropzone-parent]");
+      }
+      if (!zone || el.contains(zone)) return;
+      const laneEl = zone.closest(".lane");
+      if (!laneEl || laneEl.getAttribute("data-kind") !== drag.kind) return;
+      // Groups only ever live at the top level -- force them to the cards-root
+      // instead of letting them drop inside another group's body.
+      if (drag.isGroup && !zone.classList.contains("cards-root")){
+        zone = laneEl.querySelector(".cards-root");
+        if (!zone) return;
+      }
+      // Draggable siblings in this zone, minus the dragged element itself.
+      const sibs = Array.prototype.filter.call(zone.children, function(c){
+        return c.nodeType === 1 && c.hasAttribute("data-drag-id") && c !== el && !el.contains(c);
+      });
+      let ref = null;
+      for (let i = 0; i < sibs.length; i++){
+        const r = sibs[i].getBoundingClientRect();
+        if (clientY < r.top + r.height / 2){ ref = sibs[i]; break; }
+      }
+      // Past the last card: stay ABOVE a trailing non-draggable row (a group's
+      // "Add to list…" input) rather than dropping below it.
+      if (!ref){
+        const trailing = zone.querySelector(":scope > .add-row-mini");
+        if (trailing) ref = trailing;
+      }
+      if (ref !== el && el.nextSibling !== ref){
+        zone.insertBefore(el, ref);
+      }
+      // Drop indicator: a rule before the card we'd land in front of, else
+      // after the last card when appending.
+      clearDropIndicator();
+      if (ref && ref.classList && ref.classList.contains("card")){
+        ref.classList.add("drop-before"); dropIndicatorEl = ref;
+      } else if (sibs.length){
+        const last = sibs[sibs.length - 1];
+        if (last.classList.contains("card")){ last.classList.add("drop-after"); dropIndicatorEl = last; }
       }
     }
     function commitLiveMove(drag){
@@ -3236,16 +3267,36 @@
     // drag-active so an in-progress drag's auto-scroll can never flip it
     // mid-drag (spec 4.10b, known issue 2 -- the freeze is body.drag-active
     // itself, set/cleared at every liveDrag/touchDrag transition above).
-    let lastScrollY = 0, tabsScrollTicking = false;
+    //
+    // HYSTERESIS (user round -- fixes the bounce): the naive "any downward
+    // pixel collapses, any upward pixel expands" flipped on every jitter, so
+    // a quick flick, mobile rubber-band overscroll, or the tiny scroll clamp
+    // that toggling itself produces would oscillate the bar. Instead we
+    // accumulate movement in ONE direction (reset on a direction change) and
+    // only flip once a committed run exceeds TAB_COLLAPSE_HYSTERESIS.
+    let tabsScrollTicking = false;
     window.addEventListener("scroll", function(){
       if (tabsScrollTicking) return;
       tabsScrollTicking = true;
       requestAnimationFrame(function(){
         if (!document.body.classList.contains("drag-active")){
-          const y = window.scrollY;
-          if (y > 24 && y > lastScrollY) document.body.classList.add("tabs-collapsed");
-          else if (y < lastScrollY) document.body.classList.remove("tabs-collapsed");
-          lastScrollY = y;
+          const y = Math.max(0, window.scrollY);
+          const dy = y - tabScrollLastY;
+          if (dy !== 0){
+            if ((dy > 0) !== (tabScrollAccum > 0)) tabScrollAccum = 0; // direction flipped
+            tabScrollAccum += dy;
+          }
+          if (y <= 8){
+            document.body.classList.remove("tabs-collapsed"); // always full near the top
+            tabScrollAccum = 0;
+          } else if (tabScrollAccum > TAB_COLLAPSE_HYSTERESIS){
+            document.body.classList.add("tabs-collapsed");
+            tabScrollAccum = 0;
+          } else if (tabScrollAccum < -TAB_COLLAPSE_HYSTERESIS){
+            document.body.classList.remove("tabs-collapsed");
+            tabScrollAccum = 0;
+          }
+          tabScrollLastY = y;
         }
         tabsScrollTicking = false;
       });
