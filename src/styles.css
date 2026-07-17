@@ -90,25 +90,27 @@ body{
   min-height:100vh;
   background:var(--desk); /* fallback under the fixed layer */
 }
-/* Dark wood grain (user round 2, matching a reference screenshot the user
-   supplied). Vertical fibrous streaks this time (baseFrequency swapped so
-   the noise varies slowly down the Y axis -- long streaks -- and quickly
-   across X -- streak-to-streak variation), warmer/richer tint and higher
-   contrast than the first attempt, and an explicit filter region (x/y/
-   width/height="100%") so stitchTiles lines up exactly with the CSS tile
-   size -- without it the noise's own default tile (110% of the rect,
-   offset -10%) mismatches background-size and leaves visible seams.
-   Layered over the same top-to-bottom depth gradient chunk 2 already had.
-   Self-contained (base64 data URI, no external asset) per the app's
-   single-file constraint. */
+/* Dark wood grain (user round 3). Round 2 layered the noise (at partial
+   alpha) OVER the depth gradient -- that alpha compositing is exactly what
+   read as "a hazy transparent layer on top" once the user compared it
+   against their reference screenshot, a real (fully opaque) photograph.
+   Fixed properly this time: the feColorMatrix now outputs a CONSTANT alpha
+   of 1 (opaque everywhere) and derives brightness from a single coherent
+   noise channel (alpha in, mapped to all three of R/G/B out) rather than
+   feeding each output channel from its own differently-phased input
+   channel, which produced red/green/blue fringing the first time this was
+   tried. No haze, no separate gradient layer needed underneath -- the
+   texture alone now carries the darkness and the contrast. Self-contained
+   (base64 data URI, no external asset) per the app's single-file
+   constraint. */
 body::before{
   content:"";
   position:fixed; inset:0; z-index:-1;
+  background-color:var(--desk); /* fallback if the data URI can't decode for any reason */
   background-image:
-    url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScyNjAnIGhlaWdodD0nMjYwJz4KPGZpbHRlciBpZD0nZycgeD0nMCcgeT0nMCcgd2lkdGg9JzEwMCUnIGhlaWdodD0nMTAwJSc+CjxmZVR1cmJ1bGVuY2UgdHlwZT0nZnJhY3RhbE5vaXNlJyBiYXNlRnJlcXVlbmN5PScwLjkgMC4wMTAnIG51bU9jdGF2ZXM9JzQnIHNlZWQ9JzExJyBzdGl0Y2hUaWxlcz0nc3RpdGNoJy8+CjxmZUNvbG9yTWF0cml4IHR5cGU9J21hdHJpeCcgdmFsdWVzPScwIDAgMCAwIDAuMzIgIDAgMCAwIDAgMC4yMCAgMCAwIDAgMCAwLjExICAwIDAgMCAwLjg1IDAnLz4KPC9maWx0ZXI+CjxyZWN0IHdpZHRoPScxMDAlJyBoZWlnaHQ9JzEwMCUnIGZpbHRlcj0ndXJsKCNnKScvPgo8L3N2Zz4="),
-    linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
-  background-size: 260px 260px, cover;
-  background-repeat: repeat, no-repeat;
+    url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScyNjAnIGhlaWdodD0nMjYwJz4KPGZpbHRlciBpZD0nZycgeD0nMCcgeT0nMCcgd2lkdGg9JzEwMCUnIGhlaWdodD0nMTAwJSc+CjxmZVR1cmJ1bGVuY2UgdHlwZT0nZnJhY3RhbE5vaXNlJyBiYXNlRnJlcXVlbmN5PScwLjkgMC4wMTAnIG51bU9jdGF2ZXM9JzQnIHNlZWQ9JzExJyBzdGl0Y2hUaWxlcz0nc3RpdGNoJy8+CjxmZUNvbG9yTWF0cml4IHR5cGU9J21hdHJpeCcgdmFsdWVzPScwIDAgMCAwLjIwIDAuMDQ1ICAwIDAgMCAwLjEzIDAuMDI4ICAwIDAgMCAwLjA3IDAuMDE0ICAwIDAgMCAwIDEnLz4KPC9maWx0ZXI+CjxyZWN0IHdpZHRoPScxMDAlJyBoZWlnaHQ9JzEwMCUnIGZpbHRlcj0ndXJsKCNnKScvPgo8L3N2Zz4=");
+  background-size: 260px 260px;
+  background-repeat: repeat;
 }
 
 a{ color:inherit; }
