@@ -110,23 +110,24 @@ body{
   min-height:100vh;
   background:var(--desk); /* fallback under the fixed layer */
 }
-/* Dark wood grain (user round, replacing the flat gradient). The earlier
-   repeating-linear-gradient attempt read as mechanical pinstripe, not wood --
-   this uses an inline SVG feTurbulence filter instead (fractalNoise, an
-   asymmetric baseFrequency so the noise stretches into long horizontal
-   fibrous streaks rather than uniform blobs, tinted warm brown via
-   feColorMatrix), tiled over the same top-to-bottom depth gradient chunk 2
-   already had. Self-contained (base64 data URI, no external asset) per the
-   app's single-file constraint. Restrained on purpose, same as before: it
-   must not fight the semi-transparent white overlays tuned against the dark
-   tone. */
+/* Dark wood grain (user round 2, matching a reference screenshot the user
+   supplied). Vertical fibrous streaks this time (baseFrequency swapped so
+   the noise varies slowly down the Y axis -- long streaks -- and quickly
+   across X -- streak-to-streak variation), warmer/richer tint and higher
+   contrast than the first attempt, and an explicit filter region (x/y/
+   width/height="100%") so stitchTiles lines up exactly with the CSS tile
+   size -- without it the noise's own default tile (110% of the rect,
+   offset -10%) mismatches background-size and leaves visible seams.
+   Layered over the same top-to-bottom depth gradient chunk 2 already had.
+   Self-contained (base64 data URI, no external asset) per the app's
+   single-file constraint. */
 body::before{
   content:"";
   position:fixed; inset:0; z-index:-1;
   background-image:
-    url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScyNDAnIGhlaWdodD0nMjQwJz4KPGZpbHRlciBpZD0nZyc+CjxmZVR1cmJ1bGVuY2UgdHlwZT0nZnJhY3RhbE5vaXNlJyBiYXNlRnJlcXVlbmN5PScwLjAxMiAwLjknIG51bU9jdGF2ZXM9JzQnIHNlZWQ9JzExJyBzdGl0Y2hUaWxlcz0nc3RpdGNoJy8+CjxmZUNvbG9yTWF0cml4IHR5cGU9J21hdHJpeCcgdmFsdWVzPScwIDAgMCAwIDAuMDkgIDAgMCAwIDAgMC4wNiAgMCAwIDAgMCAwLjAzICAwIDAgMCAwLjU1IDAnLz4KPC9maWx0ZXI+CjxyZWN0IHdpZHRoPScxMDAlJyBoZWlnaHQ9JzEwMCUnIGZpbHRlcj0ndXJsKCNnKScvPgo8L3N2Zz4="),
+    url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScyNjAnIGhlaWdodD0nMjYwJz4KPGZpbHRlciBpZD0nZycgeD0nMCcgeT0nMCcgd2lkdGg9JzEwMCUnIGhlaWdodD0nMTAwJSc+CjxmZVR1cmJ1bGVuY2UgdHlwZT0nZnJhY3RhbE5vaXNlJyBiYXNlRnJlcXVlbmN5PScwLjkgMC4wMTAnIG51bU9jdGF2ZXM9JzQnIHNlZWQ9JzExJyBzdGl0Y2hUaWxlcz0nc3RpdGNoJy8+CjxmZUNvbG9yTWF0cml4IHR5cGU9J21hdHJpeCcgdmFsdWVzPScwIDAgMCAwIDAuMzIgIDAgMCAwIDAgMC4yMCAgMCAwIDAgMCAwLjExICAwIDAgMCAwLjg1IDAnLz4KPC9maWx0ZXI+CjxyZWN0IHdpZHRoPScxMDAlJyBoZWlnaHQ9JzEwMCUnIGZpbHRlcj0ndXJsKCNnKScvPgo8L3N2Zz4="),
     linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
-  background-size: 240px 240px, cover;
+  background-size: 260px 260px, cover;
   background-repeat: repeat, no-repeat;
 }
 
@@ -269,10 +270,11 @@ body.drag-active .tabbar-spacer{ transition:none; }
 .tab{
   min-width:0; border:none; border-radius:7px; padding:2px 4px;
   display:flex; flex-direction:row; align-items:center; justify-content:center; gap:4px;
-  /* Every tab carries its own lane's color at low opacity, even at rest --
-     --lane-accent is set unconditionally below, not just on .active. */
-  background:color-mix(in srgb, var(--lane-accent, var(--brass)) 16%, transparent);
-  color:var(--text-primary); opacity:0.85;
+  /* Every tab carries its own lane's color at rest, not just when active --
+     --lane-accent is set unconditionally below. Bumped up (user round) from
+     an earlier, barely-there 16% tint. */
+  background:color-mix(in srgb, var(--lane-accent, var(--brass)) 34%, transparent);
+  color:var(--text-primary); opacity:0.94;
   position:relative;
 }
 .tab .tab-icon{ font-size:14px; line-height:1; }
