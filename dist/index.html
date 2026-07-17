@@ -18,667 +18,851 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <style>
-  :root{
-    --desk:#171513;
-    --desk-grain:#1D1A17;
-    --paper:#262420;
-    --paper-2:#302D27;
-    --text-primary:#EDE7DA;
-    --text-soft:#A79E8C;
-    --brass:#C68A3E;
-    --brass-dark:#9C6B2C;
-    --red:#C24A3D;
-    --yellow:#D9A62C;
-    --moss:#6B9E6B;
-    --dusty:#6E90AC;
-    --purple:#8E6FB0;
-    --bezel:#0F0E0C;
-    --dark-on-accent:#1a1408;
-    --paper-shadow: 0 6px 14px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.03) inset;
-    --font-display:'Space Grotesk', sans-serif;
-    --font-body:'Inter', sans-serif;
-    --font-mono:'IBM Plex Mono', monospace;
-  }
-  *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;}
-  body{
-    background:
-      radial-gradient(ellipse at top left, rgba(255,255,255,0.02), transparent 60%),
-      repeating-linear-gradient(135deg, var(--desk) 0px, var(--desk) 2px, var(--desk-grain) 2px, var(--desk-grain) 4px);
-    background-color:var(--desk);
-    color:var(--text-primary);
-    font-family:var(--font-body);
-    min-height:100vh;
-  }
-  a{color:inherit;}
-  button{font-family:var(--font-body); cursor:pointer;}
-  input{font-family:var(--font-body);}
+/* ============================================================================
+   GTD CONSOLE — styles.css   (CHUNK 2: Main UI visual redesign)
+   ============================================================================
+   Drop-in replacement for the <style> block in index-47.
 
-  header{
-    display:flex; align-items:center; justify-content:space-between; gap:16px;
-    padding:18px 22px; border-bottom:1px solid rgba(237,231,218,0.12); flex-wrap:wrap;
-  }
-  .brand{ display:flex; align-items:baseline; gap:10px; }
-  .brand .mark{
-    font-family:var(--font-display); font-weight:700; font-size:20px;
-    letter-spacing:0.02em; color:var(--text-primary);
-  }
-  .brand .sub{
-    font-family:var(--font-mono); font-size:11px; color:var(--text-soft);
-    letter-spacing:0.08em; text-transform:uppercase;
-  }
-  .header-right{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
-  .qa-time-readout{ font-family:var(--font-mono); font-size:11px; color:var(--text-soft); }
+   This file implements the four visual pieces chunk 2 owns:
+     §4.7b  Layout cleanup      — remove the "ledger" boxing; items on the page.
+     §4.10b Collapsing tab bar  — full row at rest, slim pill when scrolled.
+     §4.4b/c/d Deadline bar     — thin progress bar under a dated card's title.
+     §4.3e  Creation affordance — the + badge opens a two-option menu; the
+                                   second option opens an inline naming row.
 
-  .btn{
-    border:none; border-radius:6px; padding:9px 16px; font-size:13.5px;
-    font-weight:600; letter-spacing:0.01em; transition:transform .12s ease, filter .12s ease;
-  }
-  .btn:active{transform:translateY(1px);}
-  .btn-brass{background:var(--brass); color:var(--dark-on-accent);}
-  .btn-brass:hover{filter:brightness(1.08);}
-  .btn-ghost{background:transparent; color:var(--text-primary); border:1px solid rgba(237,231,218,0.3);}
-  .btn-ghost:hover{background:rgba(237,231,218,0.08);}
-  .btn-small{padding:5px 10px; font-size:12px; border-radius:5px;}
+   HOW TO READ THIS FILE
+   - Blocks tagged  /* ▲ CHUNK 2 … */  are new or reworked this chunk. Wire the
+     markup to them per the "MARKUP" notes.
+   - Blocks tagged  /* = carried over =*/  are unchanged from index-47 and are
+     here so the stylesheet stays complete. Do not restyle them; other chunks
+     own them.
+   - Colors ALWAYS come from the CSS variables below. Never hard-code a hex.
+   - Build every fixed/floating element with env(safe-area-inset-*) — the app
+     is installed to the home screen and runs under the notch/gesture bar
+     (§2 wrapper prerequisites).
 
-  .lane-switcher{
-    display:flex; gap:8px; padding:14px 16px 0 16px; overflow-x:auto;
-    max-width:640px; margin:0 auto;
-  }
-  .lane-switcher button{
-    flex:0 0 auto; border:none; border-radius:7px 7px 0 0; padding:9px 14px;
-    font-family:var(--font-mono); font-size:11.5px; font-weight:600; letter-spacing:0.06em;
-    text-transform:uppercase; background:rgba(237,231,218,0.06); color:var(--text-primary); opacity:0.75;
-    position:relative;
-  }
-  .lane-switcher button.has-badge::after{
-    content:""; position:absolute; top:5px; right:6px; width:7px; height:7px;
-    border-radius:50%; background:var(--red); box-shadow:0 0 0 2px rgba(20,18,24,0.6);
-  }
-  .lane-switcher button.active{
-    opacity:1; background:var(--accent, var(--brass)); color:var(--dark-on-accent); font-weight:700;
-  }
+   WHAT THIS FILE DELIBERATELY DOES NOT DO
+   - No JS. Widths, the red-shift class, the "passed" chip, the collapsed/drag
+     states, and which lanes get a menu are all set by JS toggling the classes
+     documented inline. The renderer that computes the deadline bar's fill
+     MUST take its window origin as a parameter (§4.4d) — do not assume the
+     card's creation date; chunk 7 reuses this same bar for events.
+============================================================================ */
 
-  /* On a phone held upright, stack the tabs into rows instead of making
-     them horizontally scrollable — much easier to reach every tab with a
-     thumb. Landscape/desktop keeps the single scrollable row. */
-  @media (orientation: portrait){
-    .lane-switcher{
-      flex-wrap:wrap;
-      overflow-x:visible;
-      row-gap:6px;
-    }
-    .lane-switcher button{
-      border-radius:6px;
-      padding:8px 11px;
-    }
-  }
+/* ----------------------------------------------------------------------------
+   DESIGN TOKENS  (= carried over =, plus a few chunk-2 additions)
+---------------------------------------------------------------------------- */
+:root{
+  /* Warm "desk" palette — unchanged. */
+  --desk:#171513;
+  --desk-grain:#1D1A17;
+  --paper:#262420;
+  --paper-2:#302D27;
+  --text-primary:#EDE7DA;
+  --text-soft:#A79E8C;
+  --brass:#C68A3E;
+  --brass-dark:#9C6B2C;
+  --red:#C24A3D;
+  --yellow:#D9A62C;
+  --moss:#6B9E6B;
+  --dusty:#6E90AC;
+  --purple:#8E6FB0;
+  --bezel:#0F0E0C;
+  --dark-on-accent:#1a1408;
+  --paper-shadow: 0 6px 14px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.03) inset;
+  --font-display:'Space Grotesk', sans-serif;
+  --font-body:'Inter', sans-serif;
+  --font-mono:'IBM Plex Mono', monospace;
 
-  main{ padding:0 20px 20px 20px; }
-  .lanes{ max-width:640px; margin:0 auto; }
-  .lane{ display:none; }
-  .lane.active-lane{ display:flex; }
-  .lane{
-    background:var(--paper); border-radius:4px 10px 10px 10px; box-shadow:var(--paper-shadow);
-    color:var(--text-primary); flex-direction:column; min-height:220px; width:100%; position:relative;
-  }
-  .lane-tab{
-    position:relative; background:var(--accent); color:var(--dark-on-accent);
-    font-family:var(--font-display); font-weight:700; font-size:13.5px; letter-spacing:0.02em;
-    padding:10px 14px; border-radius:4px 10px 0 0; display:flex; align-items:center; justify-content:space-between;
-  }
-  .lane-tab .count{
-    font-family:var(--font-mono); font-weight:600; font-size:11.5px;
-    background:rgba(0,0,0,0.18); padding:2px 7px; border-radius:10px;
-  }
-  .lane-tab-title{ display:inline-flex; align-items:center; }
-  .lane-tab-right{ display:inline-flex; align-items:center; gap:7px; }
-  .info-btn{
-    border:none; background:rgba(0,0,0,0.28); color:var(--dark-on-accent);
-    opacity:1; font-size:15px; font-weight:800; font-style:italic; font-family:Georgia, 'Times New Roman', serif;
-    line-height:1; width:22px; height:22px; border-radius:50%; padding:0; margin:0;
-    display:inline-flex; align-items:center; justify-content:center;
-  }
-  .info-btn:hover{ background:rgba(0,0,0,0.42); }
-  .lane-info{
-    display:none; padding:10px 14px; font-size:12px; line-height:1.55;
-    color:var(--text-soft); background:rgba(255,255,255,0.04);
-    border-bottom:1px solid rgba(255,255,255,0.08);
-  }
-  .lane-info.show{ display:block; }
-  .lane-body{ padding:12px; display:flex; flex-direction:column; gap:10px; flex:1; }
-  .add-row{ display:flex; gap:6px; }
-  .add-row input[type=text]{
-    flex:1; border:1px solid rgba(255,255,255,0.16); background:rgba(255,255,255,0.05);
-    border-radius:6px; padding:8px 10px; font-size:13.5px; color:var(--text-primary);
-  }
-  .add-row input[type=text]::placeholder{ color:var(--text-soft); }
-  .add-row input[type=text]:focus{ outline:2px solid var(--accent); outline-offset:1px; }
-  .add-row button{
-    border:none; background:var(--accent); color:var(--dark-on-accent); border-radius:6px;
-    padding:0 12px; font-weight:700; font-size:16px;
-  }
-  .new-list-btn{ align-self:flex-start; font-size:11.5px !important; }
-  .lane-actions-row{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
-  .lane-actions-row .add-row.new-list-inline{ flex:1 1 auto; }
-  .tidy-btn{ font-size:11.5px !important; flex:0 0 auto; }
+  /* ▲ CHUNK 2 — the viewport gradient (§4.7b). Warm family, darkest at the
+     top, a touch lighter and warmer at the bottom edge. Restrained on purpose
+     so it never fights the semi-transparent white overlays (pills, quick-add
+     rows, condition badges) that are tuned against the dark tone. */
+  --bg-top:#141210;
+  --bg-bottom:#221E19;
 
-  .cards-root{ display:flex; flex-direction:column; gap:8px; min-height:12px; }
-  .empty-note{ font-size:12.5px; color:var(--text-soft); font-style:italic; padding:6px 2px; }
-  .card{
-    background:var(--paper-2); border-radius:6px; padding:9px 10px;
-    box-shadow:0 1px 0 rgba(255,255,255,0.04) inset, 0 2px 6px rgba(0,0,0,0.35);
-  }
-  .card.dragging, .group.dragging{
-    opacity:0.35; touch-action:none; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
-  }
-  /* Long-press-to-drag needs press-and-hold on the card without the
-     browser's text-selection/callout UI stealing the gesture first. */
-  .card, .group{ -webkit-touch-callout:none; }
-  .card-top{ display:flex; align-items:flex-start; gap:8px; }
-  .check{
-    flex:0 0 auto; width:17px; height:17px; border-radius:4px; border:2px solid var(--accent);
-    background:transparent; margin-top:2px; padding:0; display:flex; align-items:center;
-    justify-content:center; font-size:11px; line-height:1; color:var(--dark-on-accent);
-  }
-  .check:hover{background:rgba(255,255,255,0.08);}
-  .check.checked{ background:var(--accent); }
-  /* Check-mark pop when a box gets ticked (overnight notes). Applied via
-     the .check-anim class so it replays on every check, not just first render. */
-  .check.check-anim{ animation:checkPop 0.28s ease; }
-  @keyframes checkPop{
-    0%{ transform:scale(0.7); }
-    55%{ transform:scale(1.25); }
-    100%{ transform:scale(1); }
-  }
-  /* Emphasized target inside a cue pill: the thing you're waiting on reads
-     at full title strength; the connective word ("After", "Waiting for")
-     stays soft (overnight notes). */
-  .pill-target{ color:var(--text-primary); }
-  /* Compact green project-link icon on Waiting cards — replaces the
-     project-title pill, which competed for space with the condition pill
-     (overnight notes). Tap = open the project's page. */
-  .project-jump{
-    display:inline-flex; align-items:center; justify-content:center; margin-top:6px; margin-left:6px;
-    width:22px; height:22px; border-radius:50%; border:1px solid var(--moss); color:var(--moss);
-    background:rgba(107,158,107,0.1); font-size:11px; padding:0;
-  }
-  .project-jump:hover{ background:rgba(107,158,107,0.25); }
-  /* Stalled-project flag on the Current Projects lane card (overnight
-     notes: the no-linked-actions indicator shows beneath the project). */
-  .card-project-flag{
-    margin-top:6px; font-family:var(--font-mono); font-size:10px; letter-spacing:0.05em;
-    color:var(--yellow); opacity:0.85;
-  }
-  /* Floating create button, bottom-right (overnight notes: replaces the
-     static create button at the top of each lane, Google-Tasks-style).
-     z-index below the screen overlay (200) so an open page covers it. */
-  #fab-create{
-    position:fixed; right:18px; bottom:18px; width:52px; height:52px; border-radius:50%;
-    border:none; background:var(--accent, var(--brass)); color:var(--dark-on-accent);
-    font-size:26px; line-height:1; z-index:150; box-shadow:0 4px 14px rgba(0,0,0,0.45);
-    display:flex; align-items:center; justify-content:center; padding:0 0 3px 0;
-  }
-  #fab-create:hover{ filter:brightness(1.1); }
-  /* Project-page quick-add rows and the linked-actions list (overnight
-     notes + doc 4.3): create actions without leaving the project page;
-     conditioned Waiting items indent under their condition. */
-  .quick-add-row{ display:flex; gap:6px; align-items:center; }
-  .quick-add-row input{
-    flex:1; font-size:12.5px; padding:7px 9px; border-radius:6px; min-width:0;
-    border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.06); color:var(--text-primary);
-  }
-  .quick-add-row button{
-    flex:0 0 auto; width:30px; height:30px; border-radius:6px; border:1px solid rgba(255,255,255,0.25);
-    background:transparent; color:var(--text-primary); font-size:15px; padding:0;
-  }
-  .quick-add-row button:hover{ background:rgba(255,255,255,0.1); }
-  .linked-actions-list{ display:flex; flex-direction:column; gap:5px; }
-  .linked-action-item{
-    text-align:left; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1);
-    color:var(--text-primary); padding:7px 10px; border-radius:6px; font-size:12.5px;
-    display:flex; align-items:center; gap:7px;
-  }
-  .linked-action-item:hover{ background:rgba(255,255,255,0.1); }
-  .linked-action-item.indented{ margin-left:22px; }
-  .linked-action-kind{ font-size:10px; font-family:var(--font-mono); color:var(--text-soft); flex:0 0 auto; }
-  /* Promote control on Waiting/Future cards — a visible left arrow, not a
-     checkbox. (Bugfix: the arrow glyph was invisible inside .check's
-     checkbox styling.) */
-  .promote-arrow{
-    flex:0 0 auto; width:20px; height:20px; border:none; background:transparent;
-    color:var(--accent); font-size:16px; line-height:1; padding:0; margin-top:1px;
-    cursor:pointer; display:flex; align-items:center; justify-content:center;
-  }
-  .promote-arrow:hover{ color:var(--text-primary); }
-  /* Blocked-save feedback: dashed outline on the offending field instead of
-     a popup (popups are also unreliable in embedded/sandboxed contexts). */
-  .field-invalid{ outline:2px dashed var(--red) !important; outline-offset:2px; border-radius:4px; }
-  .card-title{
-    flex:1; font-size:13.5px; line-height:1.4; word-break:break-word;
-    -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
-    /* pan-y, NOT none (QA, Chrome/Android): touch-action:none makes any
-       scroll swipe that happens to LAND on a title scroll-dead — and
-       titles cover most of the lane, hence "doesn't always recognize my
-       touch". pan-y lets vertical scrolling start natively; the long-press
-       drag still wins when it should, because a successful hold stays
-       inside the slop (no pan begins), and once active the non-passive
-       touchmove preventDefault blocks the pan from ever starting.
-       Selection suppression never needed this — user-select/callout above
-       do that job. */
-    touch-action:pan-y;
-  }
-  .card-title.done{ text-decoration:line-through; color:var(--text-soft); }
-  .card-actions{ display:flex; gap:4px; flex:0 0 auto; }
-  .icon-btn{
-    border:none; background:transparent; color:var(--text-soft); font-size:13px;
-    padding:2px 5px; border-radius:4px;
-  }
-  .icon-btn:hover{background:rgba(255,255,255,0.08); color:var(--text-primary);}
-  .link-pill{
-    display:inline-flex; align-items:center; gap:4px; margin-top:6px; font-family:var(--font-mono);
-    font-size:10.5px; letter-spacing:0.03em; background:rgba(255,255,255,0.07); color:var(--text-soft);
-    padding:3px 8px; border-radius:10px; border:none;
-  }
-  .link-pill:hover{background:rgba(255,255,255,0.13); color:var(--text-primary);}
-  .link-pill.cue-orphaned{
-    background:rgba(217,166,44,0.12); color:var(--yellow);
-    border:1px dashed var(--yellow); padding:2px 7px;
-  }
-  .link-pill.cue-empty{ opacity:0.7; font-style:italic; }
-  .link-row{ margin-top:7px; display:flex; gap:6px; }
-  .link-row select{
-    flex:1; font-size:12px; padding:5px 6px; border-radius:5px;
-    border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.06); color:var(--text-primary);
-  }
-  .cue-edit-row{ flex-wrap:wrap; }
-  .cue-when-input{
-    flex:1; min-width:140px; font-size:12px; padding:5px 8px; border-radius:5px;
-    border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.06); color:var(--text-primary);
-  }
+  /* ▲ CHUNK 2 — fixed-chrome heights, used both to draw the chrome and to
+     reserve the exact space beneath it (§4.10b: content below fixed chrome
+     needs reserved space matching the CURRENT state). Keep the spacer and the
+     chrome reading the same variable so they can never drift. */
+  --header-h:56px;
+  --tabbar-h-open:52px;    /* full tab row at rest                 */
+  --tabbar-h-collapsed:40px; /* slim floating pill when scrolled  */
+  --lane-accent:var(--brass); /* overridden per-lane below         */
+}
 
-  /* ---------- habit creation panel ---------- */
-  .habit-create-panel{ margin-top: 2px; }
-  .habit-panel-inner{
-    display:flex; flex-direction:column; gap:9px; background:rgba(255,255,255,0.03);
-    border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:12px;
-  }
-  .habit-panel-title{ font-family:var(--font-display); font-weight:700; font-size:13px; color:var(--text-primary); }
-  .habit-panel-inner input[type=text]{
-    width:100%; border:1px solid rgba(255,255,255,0.16); background:rgba(255,255,255,0.05);
-    border-radius:6px; padding:8px 10px; font-size:13.5px; color:var(--text-primary);
-  }
-  .habit-panel-inner input[type=text]::placeholder{ color:var(--text-soft); }
-  .habit-field-label{
-    font-family:var(--font-mono); font-size:10.5px; color:var(--text-soft);
-    text-transform:uppercase; letter-spacing:0.06em; margin-top:2px;
-  }
-  .when-field-row{ display:flex; gap:6px; align-items:center; }
-  .when-field-row input{ flex:1; }
-  .hook-icon-btn{
-    font-size:16px; padding:6px 9px; border-radius:6px; background:rgba(255,255,255,0.07);
-    flex:0 0 auto;
-  }
-  .hook-icon-btn:hover{ background:rgba(255,255,255,0.13); }
-  .hooked-pill-row{
-    display:flex; align-items:center; gap:8px; background:rgba(142,111,176,0.16);
-    border:1px solid rgba(142,111,176,0.45); border-radius:6px; padding:8px 10px;
-  }
-  .hooked-pill{ font-size:12.5px; color:var(--text-primary); flex:1; }
-  .habit-panel-actions{ display:flex; justify-content:flex-end; gap:8px; margin-top:2px; }
-  .habit-panel-actions .btn-brass:disabled{ opacity:0.4; cursor:not-allowed; }
-  .hook-pick-list{ display:flex; flex-direction:column; gap:6px; max-height:260px; overflow-y:auto; }
-  .hook-pick-item{
-    text-align:left; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.12);
-    color:var(--text-primary); padding:9px 11px; border-radius:6px; font-size:13px;
-  }
-  .hook-pick-item:hover{ background:rgba(255,255,255,0.11); }
+/* ▲ CHUNK 2 — one live variable the whole collapsing-tab system keys off.
+   JS toggles `body.tabs-collapsed`; everything else is CSS. */
+:root{ --tabbar-h: var(--tabbar-h-open); }
+body.tabs-collapsed{ --tabbar-h: var(--tabbar-h-collapsed); }
 
-  .group{
-    background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08);
-    border-radius:7px; overflow:hidden;
-  }
-  .group-header{ display:flex; align-items:center; gap:7px; padding:8px 9px; cursor:pointer; }
-  .group-header .chevron{ font-size:10px; color:var(--accent); flex:0 0 auto; }
-  .group-title{
-    flex:1; font-size:12.5px; font-weight:600; color:var(--text-primary);
-    -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
-    touch-action:pan-y; /* same fix as .card-title — see comment there */
-  }
-  .group-header .count{
-    font-family:var(--font-mono); font-size:10.5px; color:var(--text-soft);
-    background:rgba(255,255,255,0.06); padding:1px 7px; border-radius:9px;
-  }
-  .group-actions{ display:flex; gap:2px; }
-  .group-body{ padding:0 9px 9px 9px; display:flex; flex-direction:column; gap:7px; }
-  .group-body .add-row-mini input{ font-size:12.5px; padding:6px 8px; }
+*{ box-sizing:border-box; }
+html,body{ margin:0; padding:0; }
 
-  /* Completed archive — visually quieter than an active .group (dashed
-     border, no fill) since it's a look-back list, not something you act on
-     day to day. Default-collapsed; see completedSectionHtml(). */
-  .completed-section{
-    border:1px dashed rgba(255,255,255,0.14); border-radius:7px; overflow:hidden; margin-top:4px;
-  }
-  .completed-section .group-header .chevron{ color:var(--text-soft); }
-  .completed-section .group-title{ color:var(--text-soft); }
-  .completed-list{ padding:0 9px 9px 9px; display:flex; flex-direction:column; gap:5px; }
-  .completed-item{
-    display:flex; align-items:center; gap:8px; padding:6px 2px;
-    border-bottom:1px solid rgba(255,255,255,0.06);
-  }
-  .completed-item:last-child{ border-bottom:none; }
-  .completed-item-title{
-    flex:1; font-size:13px; color:var(--text-soft); text-decoration:line-through; text-decoration-color:rgba(237,231,218,0.3);
-  }
+/* ----------------------------------------------------------------------------
+   ▲ CHUNK 2 — BACKGROUND (§4.7b)
+   A viewport-pinned vertical gradient. We paint it on a fixed, full-viewport
+   pseudo-element rather than `background-attachment: fixed`, which is
+   unreliable on mobile Chrome/iOS. Content scrolls as a separate layer over it.
+---------------------------------------------------------------------------- */
+body{
+  color:var(--text-primary);
+  font-family:var(--font-body);
+  min-height:100vh;
+  background:var(--desk); /* fallback under the fixed layer */
+}
+body::before{
+  content:"";
+  position:fixed; inset:0; z-index:-1;
+  background:linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
+}
 
-  .lane[data-kind="next"]    { --accent: var(--red); }
-  .lane[data-kind="waiting"] { --accent: var(--yellow); }
-  .lane[data-kind="current"] { --accent: var(--moss); }
-  .lane[data-kind="future"]  { --accent: var(--dusty); }
-  .lane[data-kind="habit"]   { --accent: var(--purple); }
+a{ color:inherit; }
+button{ font-family:var(--font-body); cursor:pointer; }
+input{ font-family:var(--font-body); }
 
-  footer{ text-align:center; color:var(--text-soft); font-size:11.5px; padding:30px 10px 20px 10px; }
+/* ----------------------------------------------------------------------------
+   ▲ CHUNK 2 — HEADER (§4.10)  — fixed, ALWAYS visible, never collapses.
+   MARKUP:
+     <header>
+       <div class="brand"><span class="mark">GTD Console</span></div>
+       <div class="header-right">
+         <button class="header-icon" data-action="open-tray">📥</button>
+         <button class="header-icon" data-action="open-calendar">📅</button>
+         <button class="header-icon" data-action="open-overflow">⋯</button>
+       </div>
+     </header>
+   NOTES:
+   - The points counter is gone (§2 / §4.10). Do not leave a gap for it.
+   - The "Runs on its own" sub-brand line is deleted (0b). Brand is the mark only.
+   - ⋯ becomes the settings surface in chunk 6; here it's just a button.
+---------------------------------------------------------------------------- */
+header{
+  position:fixed; top:0; left:0; right:0; z-index:120;
+  display:flex; align-items:center; justify-content:space-between; gap:16px;
+  height:calc(var(--header-h) + env(safe-area-inset-top));
+  padding:0 22px;
+  padding-top:env(safe-area-inset-top);
+  padding-left:calc(22px + env(safe-area-inset-left));
+  padding-right:calc(22px + env(safe-area-inset-right));
+  background:linear-gradient(180deg, var(--bg-top) 0%, rgba(20,18,16,0.92) 100%);
+  border-bottom:1px solid rgba(237,231,218,0.10);
+  backdrop-filter:blur(6px);
+}
+.brand{ display:flex; align-items:baseline; gap:10px; }
+.brand .mark{
+  font-family:var(--font-display); font-weight:700; font-size:20px;
+  letter-spacing:0.02em; color:var(--text-primary);
+}
+.header-right{ display:flex; align-items:center; gap:4px; }
+.header-icon{
+  border:none; background:transparent; color:var(--text-primary);
+  font-size:19px; line-height:1; width:38px; height:38px; border-radius:9px;
+  display:inline-flex; align-items:center; justify-content:center;
+}
+.header-icon:hover{ background:rgba(237,231,218,0.08); }
+.qa-time-readout{ font-family:var(--font-mono); font-size:11px; color:var(--text-soft); }
 
-  /* =========================================================
-     FULL-SCREEN EDIT/CREATE NAVIGATION
-  ========================================================= */
-  .card-title{ cursor:pointer; }
-  .screen-overlay{
-    position:fixed; inset:0; background:var(--desk); z-index:200;
-    display:flex; flex-direction:column;
-    transform:translateX(100%); transition:transform .22s ease;
-  }
-  .screen-overlay.open{ transform:translateX(0); }
-  .screen-header{
-    display:flex; align-items:center; justify-content:space-between; gap:10px;
-    padding:12px 18px; border-bottom:1px solid rgba(237,231,218,0.12); flex:0 0 auto;
-    position:relative;
-  }
-  .screen-chrome-btn{
-    border:none; background:transparent; color:var(--text-primary);
-    font-size:18px; padding:4px 6px; display:inline-flex;
-    align-items:center; justify-content:center; line-height:1;
-  }
-  .screen-chrome-btn:hover{ opacity:0.65; }
-  .screen-chrome-btn.danger{ font-size:15px; }
-  .screen-chrome-btn.danger:hover{ color:var(--red); opacity:1; }
-  .screen-header-right{ display:flex; align-items:center; gap:12px; }
-  .screen-kind-badge{
-    position:absolute; left:50%; top:50%; transform:translate(-50%, -50%);
-    font-family:var(--font-mono); font-size:10px; font-weight:700; letter-spacing:0.09em;
-    text-transform:uppercase; padding:5px 14px; border-radius:11px; white-space:nowrap;
-    background:var(--accent, var(--brass)); color:var(--dark-on-accent);
-  }
-  .screen-body{
-    flex:1 1 auto; overflow-y:auto; padding:16px 20px 96px 20px;
-    max-width:640px; margin:0 auto; width:100%; display:flex; flex-direction:column; gap:11px;
-    overscroll-behavior:contain;
-  }
-  /* Body-scroll lock while a page is open (QA round 2): without it, touch
-     scrolls with nothing to scroll inside the overlay chain through to the
-     document — mobile Chrome pans the layout viewport and the fixed
-     overlay rides along, exposing the lanes/FAB/footer beneath (see the
-     screenshot in the doc's QA log). position:fixed is the lock that holds
-     on both Android and iOS; the scroll position is saved/restored in JS. */
-  body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; }
-  .screen-field-title{
-    width:100%; border:1px solid rgba(255,255,255,0.16); background:rgba(255,255,255,0.05);
-    color:var(--text-primary); font-family:var(--font-body); font-weight:600; font-size:16px;
-    padding:11px 13px; border-radius:8px;
-  }
-  .screen-field-title:focus{ outline:2px solid var(--accent, var(--brass)); outline-offset:1px; }
-  .screen-field-title::placeholder{ color:var(--text-soft); font-weight:400; }
-  .screen-field-desc{
-    width:100%; min-height:34px; resize:none; overflow:hidden; border:1px solid rgba(255,255,255,0.14);
-    background:rgba(255,255,255,0.04); border-radius:8px; color:var(--text-primary);
-    font-family:var(--font-body); font-size:13.5px; line-height:1.5; padding:9px 11px;
-    /* .screen-body is a column flex container; without this, flex-shrink
-       overrides the JS-set height and the box never grows while typing. */
-    flex:0 0 auto;
-  }
-  .screen-field-desc::placeholder{ color:var(--text-soft); }
-  .screen-field-desc:focus{ outline:2px solid var(--accent, var(--brass)); outline-offset:1px; }
-  .screen-row{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-  /* A single bordered "field" that hosts an icon + one or more plain,
-     borderless native controls — reads as one row like the mockups
-     (🔗 Link to project…, 📅 Deadline…) while staying fully functional. */
-  .screen-boxed-row{
-    display:flex; align-items:center; gap:6px; flex:1; min-width:180px;
-    border:1px solid rgba(255,255,255,0.14); background:rgba(255,255,255,0.04);
-    border-radius:8px; padding:0 10px; min-height:34px;
-  }
-  .screen-boxed-row .field-icon{ font-size:13px; flex:0 0 auto; opacity:0.8; }
-  .screen-boxed-row select, .screen-boxed-row input{
-    border:none; background:transparent; padding:8px 0; font-size:12.5px;
-    color:var(--text-primary); min-width:0;
-  }
-  .screen-boxed-row select:focus, .screen-boxed-row input:focus{ outline:none; }
-  .screen-boxed-row .screen-link-select{ flex:1; }
-  .screen-boxed-row .screen-date{ flex:1.1; }
-  .screen-boxed-row .screen-time{ flex:0.9; }
-  .screen-boxed-row .screen-recurrence{ flex:1.3; }
-  .screen-clear-x{
-    border:none; background:transparent; color:var(--text-soft); font-size:13px; padding:2px 2px 2px 4px;
-    flex:0 0 auto;
-  }
-  .screen-clear-x:hover{ color:var(--text-primary); }
-  .screen-icon-toggle{
-    flex:0 0 auto; border:1px solid rgba(255,255,255,0.14); background:rgba(255,255,255,0.04); color:var(--text-primary);
-    width:38px; height:34px; border-radius:8px; font-size:14px; display:inline-flex;
-    align-items:center; justify-content:center;
-  }
-  .screen-icon-toggle.active{ background:var(--accent, var(--brass)); border-color:transparent; color:var(--dark-on-accent); }
-  .screen-icon-toggle[disabled]{ opacity:0.35; cursor:not-allowed; border-style:dashed; }
-  .screen-overlay[data-kind="habit"] .screen-when-field-row .screen-icon-toggle{
-    border-color:var(--accent); background:rgba(142,111,176,0.12); color:var(--accent);
-  }
-  .suggestion-bubble{
-    display:flex; align-items:center; gap:8px; background:rgba(198,138,62,0.14);
-    border:1px solid rgba(198,138,62,0.35); border-radius:8px; padding:9px 11px; font-size:12.5px;
-  }
-  .suggestion-bubble button{
-    border:none; background:var(--brass); color:var(--dark-on-accent); font-weight:700;
-    font-size:11.5px; padding:5px 10px; border-radius:6px; flex:0 0 auto;
-  }
-  .screen-project-flag{
-    font-size:12px; color:var(--yellow); background:rgba(217,166,44,0.12);
-    border:1px solid rgba(217,166,44,0.3); border-radius:7px; padding:8px 10px;
-  }
-  /* .screen-spacer removed (QA round 2): the Complete pill is a floating
-     badge now, so nothing needs in-flow bottom spacing — .screen-body's
-     padding-bottom covers clearance. */
-  /* Outlined pill for Make Waiting / Make Next / Make Current / Make Future
-     — border+text tinted with the *destination* kind's accent color. */
-  .screen-make-kind-btn{
-    align-self:stretch; border:1px solid rgba(237,231,218,0.4); background:transparent;
-    border-radius:8px; padding:9px 12px; font-size:13px; font-weight:600; text-align:center;
-    color:var(--text-primary);
-  }
-  .screen-make-kind-btn:hover{ background:rgba(255,255,255,0.05); }
-  /* Armed state (§13.0 Chunk A): convert is now draft-only, like Complete.
-     Solid fill in the destination's own accent color signals "this will
-     happen on save" the same way the armed Complete badge does, but stays
-     in normal flow (not floating) since it sits among the other fields. */
-  .screen-make-kind-btn.armed{ font-weight:700; }
-  .screen-make-kind-btn.armed:hover{ filter:brightness(1.06); }
-  /* Mutual exclusion (user ruling): grey and inert while Complete is
-     armed — matches the Complete pill's own .paused-style deadening when
-     a convert is armed. Handler guard lives in screenMakeKind. */
-  .screen-make-kind-btn.disabled:hover{ background:transparent; }
-  /* Floating badge (QA round 2). Sits fixed at the bottom-right like the
-     + FAB — floating chrome tracking the viewport reads as normal, unlike
-     page content jumping. Note: .screen-overlay carries a transform, which
-     makes it the containing block for fixed descendants — so this pins to
-     the overlay's corner, exactly what we want. .screen-body carries
-     bottom padding so content scrolls clear of it. */
-  .screen-complete-pill{
-    position:fixed; right:18px; bottom:24px; z-index:5;
-    border:none; border-radius:19px; padding:11px 22px; font-size:14px;
-    font-weight:700; background:var(--accent, var(--moss)); color:var(--dark-on-accent);
-    box-shadow:0 4px 14px rgba(0,0,0,0.45);
-  }
-  .screen-complete-pill:hover{ filter:brightness(1.06); }
-  /* Habit completion is a toggle, not a one-way archive like the other
-     kinds — the "done" state swaps to an outline treatment (same
-     language as .habit-pause-btn.active) so it reads as "tap to
-     undo" rather than a second irreversible Complete. Solid desk
-     backdrop so the floating badge stays legible over content. */
-  .screen-complete-pill.done{
-    background:var(--desk); border:1px solid var(--accent, var(--moss)); color:var(--accent, var(--moss));
-  }
-  /* Paused habits can't be completed (design ruling) — the badge goes
-     inert-grey; the matching guard lives in screenComplete/toggleHabit. */
-  .screen-complete-pill.paused{
-    background:var(--desk); border:1px solid var(--paper-2); color:var(--text-soft);
-    cursor:default; box-shadow:none;
-  }
-  .screen-complete-pill.paused:hover{ filter:none; }
-  .check.check-paused{ opacity:0.35; cursor:default; }
+/* ----------------------------------------------------------------------------
+   ▲ CHUNK 2 — DEV TOOLBAR (dev-only scaffolding, not a designed surface)
+   Sits in normal document flow, right below the fixed header/tab bar, so it
+   scrolls with content instead of competing for space in the fixed chrome.
+   Houses Reset + the QA time-jump/snapshot/restore dev tools (see CLAUDE.md,
+   chunk 0c) — nothing here is part of the app's feature set.
+---------------------------------------------------------------------------- */
+#dev-toolbar{
+  display:flex; flex-wrap:wrap; align-items:center; gap:6px;
+  max-width:672px; margin:0 auto;
+  padding:8px calc(16px + env(safe-area-inset-right)) 0 calc(16px + env(safe-area-inset-left));
+  opacity:0.85;
+}
 
-  /* habit "when/hook" field inside the full-screen habit page — same
-     visual language as the old in-lane panel, just re-hosted */
-  .screen-when-field-row{ display:flex; gap:6px; align-items:center; }
-  .screen-when-field-row .habit-when-input{ flex:1; }
-  .habit-when-input{
-    border:1px solid rgba(255,255,255,0.14); background:rgba(255,255,255,0.04); color:var(--text-primary);
-    border-radius:8px; padding:9px 11px; font-size:13px;
-  }
-  .screen-hooked-pill-row{
-    display:flex; align-items:center; gap:8px; background:rgba(142,111,176,0.16);
-    border:1px solid rgba(142,111,176,0.45); border-radius:6px; padding:8px 10px;
-  }
-  .screen-hooked-pill{ font-size:12.5px; color:var(--text-primary); flex:1; }
-  /* Deleted hook target: red, full-strength (a broken reference to repair,
-     not a merely-dormant cue). Only actual deletion triggers this —
-     completing a habit never removes it from the lane's task list. */
-  .screen-hooked-pill.cue-orphaned{ color:var(--red); }
-  /* Waiting's condition pill — same shape as the habit hook pill, but
-     tinted with the Waiting lane's yellow accent instead of habit purple,
-     matching the mockup. */
-  .screen-condition-pill-row{
-    display:flex; align-items:center; gap:8px; background:rgba(217,166,44,0.14);
-    border:1px solid rgba(217,166,44,0.5); border-radius:6px; padding:8px 10px;
-  }
-  /* Mutual-exclusion made visible (4.2): once a condition is hooked, the
-     "waiting for" text/date row greys out and goes dashed rather than
-     disappearing outright. */
-  .screen-row-disabled{ opacity:0.4; }
-  .screen-row-disabled input{ cursor:not-allowed; }
-  .screen-waitfor-input{ flex:1.4; min-width:110px; }
-  .screen-hook-pick-list{ display:flex; flex-direction:column; gap:6px; max-height:50vh; overflow-y:auto; }
-  .screen-hook-pick-item{
-    text-align:left; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.12);
-    color:var(--text-primary); padding:9px 11px; border-radius:6px; font-size:13px;
-  }
-  .screen-hook-pick-item:hover{ background:rgba(255,255,255,0.11); }
-  .screen-hook-pick-none{ color:var(--text-soft); font-style:italic; }
+/* ----------------------------------------------------------------------------
+   BUTTONS  (= carried over =)
+---------------------------------------------------------------------------- */
+.btn{
+  border:none; border-radius:6px; padding:9px 16px; font-size:13.5px;
+  font-weight:600; letter-spacing:0.01em; transition:transform .12s ease, filter .12s ease;
+}
+.btn:active{ transform:translateY(1px); }
+.btn-brass{ background:var(--brass); color:var(--dark-on-accent); }
+.btn-brass:hover{ filter:brightness(1.08); }
+.btn-ghost{ background:transparent; color:var(--text-primary); border:1px solid rgba(237,231,218,0.3); }
+.btn-ghost:hover{ background:rgba(237,231,218,0.08); }
+.btn-small{ padding:5px 10px; font-size:12px; border-radius:5px; }
 
-  /* Habit overhaul (chunk 3): day-of-week schedule chips, pause toggle,
-     the run track (ghost + you), celebration banner, off-day note. */
-  .habit-day-row{ display:flex; gap:6px; }
-  .habit-day-row.field-invalid{ outline:1.5px dashed var(--red); outline-offset:4px; border-radius:8px; }
-  .habit-day-chip{
-    width:32px; height:32px; border-radius:50%; border:1px solid rgba(255,255,255,0.15);
-    background:rgba(255,255,255,0.04); color:var(--text-soft); font-family:var(--font-mono); font-size:12px;
-  }
-  .habit-day-chip.active{ background:var(--purple); border-color:var(--purple); color:var(--dark-on-accent); font-weight:700; }
-  .habit-pause-btn.active{ border-color:var(--yellow); color:var(--yellow); }
-  .cue-dim{ opacity:0.55; }
-  /* Advanced options dialog (doc §12) */
-  .adv-dialog{ text-align:left; max-width:420px; }
-  .adv-title{ font-weight:700; font-size:14px; margin-bottom:8px; }
-  .adv-tabs{ display:flex; gap:6px; margin-bottom:10px; }
-  .adv-tab{
-    border:1px solid rgba(255,255,255,0.14); background:transparent; color:var(--text-soft);
-    border-radius:14px; padding:4px 12px; font-size:12px;
-  }
-  .adv-tab.active{ border-color:var(--accent, var(--moss)); color:var(--text-primary); }
-  .adv-note{ font-size:12px; color:var(--text-soft); line-height:1.5; margin:0 0 10px; }
-  .adv-textarea{
-    width:100%; min-height:64px; resize:vertical; border-radius:6px;
-    background:var(--paper-2); border:1px solid rgba(255,255,255,0.12);
-    color:var(--text-primary); font-size:13px; padding:8px;
-  }
-  .adv-hook-row{ display:flex; align-items:center; justify-content:space-between; font-size:12.5px; padding:4px 0; }
-  .adv-content{ margin-bottom:10px; }
-  .screen-advanced-btn{ align-self:flex-start; }
-  .bundle-pill{ align-self:flex-start; }
-  .habit-track-block{ display:flex; flex-direction:column; gap:8px; margin-top:4px; }
-  .habit-track{
-    display:flex; flex-direction:column; gap:5px; background:rgba(255,255,255,0.04);
-    border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:10px 12px;
-  }
-  .habit-track-row{ display:flex; flex-wrap:wrap; gap:4px; }
-  .habit-dot{ width:11px; height:11px; border-radius:50%; background:rgba(255,255,255,0.12); flex:0 0 auto; }
-  .habit-dot-done{ background:var(--moss); }
-  .habit-dot-stumble{ background:var(--yellow); }
-  .habit-dot-miss{ background:var(--red); opacity:0.6; }
-  .habit-dot-pending{ background:transparent; border:1.5px dashed var(--text-soft); }
-  .habit-dot-empty{ background:transparent; }
-  .habit-dot-ghost{ opacity:0.35; }
-  .habit-track-ghost .habit-dot-done{ background:var(--purple); }
-  .habit-track-ghost .habit-dot-stumble{ background:var(--dusty); }
-  .habit-metrics{ display:flex; gap:16px; font-family:var(--font-mono); font-size:11px; color:var(--text-soft); }
-  .habit-metrics b{ color:var(--text-primary); font-size:13px; }
-  .habit-celebration{
-    border-radius:8px; padding:10px 12px; font-size:13px; text-align:center; font-weight:600;
-    animation:habitCelebrate 0.5s ease;
-  }
-  .habit-celebration-record{ background:rgba(163,141,224,0.18); color:var(--purple); border:1px solid var(--purple); }
-  .habit-celebration-tie{ background:rgba(212,175,110,0.16); color:var(--dusty); border:1px solid var(--dusty); }
-  .habit-celebration-restart{ background:rgba(255,255,255,0.05); color:var(--text-soft); border:1px solid rgba(255,255,255,0.12); font-weight:500; }
-  @keyframes habitCelebrate{ from{ transform:scale(0.94); opacity:0; } to{ transform:scale(1); opacity:1; } }
-  .habit-offday{
-    background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); border-radius:8px;
-    padding:10px 12px; font-size:12.5px; color:var(--text-soft); text-align:center;
-  }
-  .screen-hook-pick-label{
-    font-family:var(--font-mono); font-size:10.5px; letter-spacing:0.09em; text-transform:uppercase;
-    color:var(--text-soft); margin-bottom:-2px;
-  }
+/* ============================================================================
+   ▲ CHUNK 2 — COLLAPSING TOP TAB BAR (§4.10b)
+   ----------------------------------------------------------------------------
+   Two states, one element. Scroll-direction (a JS listener, debounced) toggles
+   `body.tabs-collapsed`; nothing else. The bar is position:fixed under the
+   header, so a spacer reserves its space, sized off the SAME --tabbar-h so the
+   two can never disagree.
 
-  .choice-dialog-backdrop{
-    position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:300;
-    display:flex; align-items:center; justify-content:center; padding:20px;
-  }
-  .choice-dialog{
-    background:var(--paper); border-radius:10px; box-shadow:var(--paper-shadow);
-    max-width:360px; width:100%; padding:18px; display:flex; flex-direction:column; gap:12px;
-  }
-  .choice-dialog p{ margin:0; font-size:13.5px; line-height:1.5; }
-  .choice-dialog-btns{ display:flex; flex-direction:column; gap:8px; }
-  .choice-dialog-btns button{
-    border:none; border-radius:7px; padding:10px 12px; font-size:13px; font-weight:600;
-    background:rgba(255,255,255,0.08); color:var(--text-primary); text-align:left;
-  }
-  .choice-dialog-btns button:hover{ background:rgba(255,255,255,0.15); }
-  .choice-dialog-btns button.primary{ background:var(--brass); color:var(--dark-on-accent); }
-  .choice-dialog-btns button.danger{ background:var(--red); color:#fff; }
+   STATE A (rest): full-width row of tab buttons.
+   STATE B (scrolled down): a slim floating pill showing ONLY the active tab —
+   icon, name, count. Scroll back up returns to A.
+
+   FREEZE-DURING-DRAG (§3 known issue 2): while a card drag is active, JS adds
+   `body.drag-active`. That (a) is the signal for the scroll listener to stop
+   toggling, and (b) here kills the transition so a drag-driven auto-scroll can't
+   animate the bar and shift everything under the finger. Whatever state the bar
+   was in when the drag began, it holds.
+
+   MARKUP:
+     <nav class="tabbar" role="tablist">
+       <button class="tab active" data-kind="next">
+         <span class="tab-icon">◎</span><span class="tab-name">Next Actions</span>
+         <span class="tab-count">4</span>
+       </button>
+       … one per lane …
+     </nav>
+     <div class="tabbar-spacer" aria-hidden="true"></div>
+   The active tab carries `.active`; a lane with an open loop / badge carries
+   `.has-badge`. In the collapsed pill, CSS hides every tab except `.active`.
+============================================================================ */
+.tabbar{
+  position:fixed; left:0; right:0; z-index:110;
+  top:calc(var(--header-h) + env(safe-area-inset-top));
+  display:flex; gap:8px; align-items:center;
+  height:var(--tabbar-h);
+  padding:8px calc(16px + env(safe-area-inset-right)) 0 calc(16px + env(safe-area-inset-left));
+  max-width:672px; margin:0 auto;
+  overflow-x:auto;
+  transition:height .2s ease;
+}
+/* The spacer sits in normal flow and reserves exactly the bar's height plus the
+   fixed chrome above it, so lane content never hides under the chrome. */
+.tabbar-spacer{
+  height:calc(var(--header-h) + env(safe-area-inset-top) + var(--tabbar-h) + 6px);
+  transition:height .2s ease;
+  flex:0 0 auto;
+}
+body.drag-active .tabbar,
+body.drag-active .tabbar-spacer{ transition:none; }
+
+.tab{
+  flex:0 0 auto; border:none; border-radius:8px; padding:8px 14px;
+  display:inline-flex; align-items:center; gap:8px;
+  font-family:var(--font-mono); font-size:11.5px; font-weight:600;
+  letter-spacing:0.06em; text-transform:uppercase;
+  background:rgba(237,231,218,0.06); color:var(--text-primary); opacity:0.72;
+  position:relative;
+}
+.tab .tab-icon{ font-size:13px; }
+.tab .tab-count{
+  font-family:var(--font-mono); font-weight:600; font-size:10.5px;
+  background:rgba(0,0,0,0.22); padding:1px 7px; border-radius:10px;
+}
+.tab.active{
+  opacity:1; background:var(--lane-accent, var(--brass)); color:var(--dark-on-accent);
+  font-weight:700;
+}
+.tab.active .tab-count{ background:rgba(0,0,0,0.18); }
+/* Unread / open-loop dot, same idea as the old .has-badge. */
+.tab.has-badge::after{
+  content:""; position:absolute; top:4px; right:6px; width:7px; height:7px;
+  border-radius:50%; background:var(--red); box-shadow:0 0 0 2px var(--bg-top);
+}
+/* Per-tab accent so the active pill shows its lane's color. Mirror the lane map. */
+.tab[data-kind="next"].active    { --lane-accent:var(--red);    }
+.tab[data-kind="waiting"].active { --lane-accent:var(--yellow); }
+.tab[data-kind="current"].active { --lane-accent:var(--moss);   }
+.tab[data-kind="future"].active  { --lane-accent:var(--dusty);  }
+.tab[data-kind="habit"].active   { --lane-accent:var(--purple); }
+
+/* --- STATE B: collapsed → a single floating pill (the active tab only). --- */
+body.tabs-collapsed .tabbar{
+  justify-content:flex-start;
+  overflow:visible;
+  padding-top:2px;
+}
+body.tabs-collapsed .tab{ display:none; }          /* hide the rest … */
+body.tabs-collapsed .tab.active{                    /* … show only the active one, as a pill */
+  display:inline-flex;
+  border-radius:20px;
+  padding:7px 16px;
+  box-shadow:0 4px 12px rgba(0,0,0,0.4);
+}
+
+/* ----------------------------------------------------------------------------
+   MAIN / LANES SHELL
+---------------------------------------------------------------------------- */
+main{
+  padding:0 calc(20px + env(safe-area-inset-right)) 40px calc(20px + env(safe-area-inset-left));
+}
+.lanes{ max-width:640px; margin:0 auto; }
+
+/* ============================================================================
+   ▲ CHUNK 2 — LANES & CARDS (§4.7b)  "Layout cleanup"
+   ----------------------------------------------------------------------------
+   The nested "ledger" look is gone: NO paper-colored lane panel, NO per-item
+   gray card background. Items sit directly on the viewport gradient, separated
+   by whitespace alone — no dividers, no hairlines.
+
+   The colored lane header survives as a FLOATING LABEL (a standalone pill in
+   the lane's accent color), no longer capping a panel.
+
+   Three nested paddings (page / lane body / card) collapse to ONE. Items are
+   bigger — larger text, taller rows.
+============================================================================ */
+.lane{ display:none; }
+.lane.active-lane{ display:flex; flex-direction:column; gap:4px; }
+/* Per-lane accent — unchanged map, now consumed by the floating label, the
+   deadline bar, checkboxes, pills, and the active tab. */
+.lane[data-kind="next"]    { --lane-accent:var(--red);    }
+.lane[data-kind="waiting"] { --lane-accent:var(--yellow); }
+.lane[data-kind="current"] { --lane-accent:var(--moss);   }
+.lane[data-kind="future"]  { --lane-accent:var(--dusty);  }
+.lane[data-kind="habit"]   { --lane-accent:var(--purple); }
+
+/* The floating label. MARKUP:
+     <div class="lane-label">
+       <span class="lane-label-title">Next Actions</span>
+       <span class="lane-label-right">
+         <span class="lane-count">4</span>
+         <button class="info-btn" data-action="toggle-info" aria-label="About this lane">i</button>
+       </span>
+     </div>
+   It floats over the gradient; it does not cap anything. */
+.lane-label{
+  align-self:flex-start;
+  display:inline-flex; align-items:center; gap:10px;
+  background:var(--lane-accent); color:var(--dark-on-accent);
+  font-family:var(--font-display); font-weight:700; font-size:13.5px; letter-spacing:0.02em;
+  padding:7px 14px; border-radius:9px;
+  box-shadow:0 3px 10px rgba(0,0,0,0.35);
+  margin:6px 0 10px 0;
+}
+.lane-count{
+  font-family:var(--font-mono); font-weight:600; font-size:11.5px;
+  background:rgba(0,0,0,0.18); padding:2px 7px; border-radius:10px;
+}
+.lane-label-right{ display:inline-flex; align-items:center; gap:7px; }
+.info-btn{
+  border:none; background:rgba(0,0,0,0.28); color:var(--dark-on-accent);
+  font-size:14px; font-weight:800; font-style:italic;
+  font-family:Georgia,'Times New Roman',serif; line-height:1;
+  width:21px; height:21px; border-radius:50%; padding:0;
+  display:inline-flex; align-items:center; justify-content:center;
+}
+.info-btn:hover{ background:rgba(0,0,0,0.42); }
+
+/* Habits' "Tidy order" button — no menu, no lane-actions-row anymore, so it
+   floats right after the label on its own line. Reuses the plain .btn
+   classes; no dedicated styling needed. */
+.lane-tools-row{ display:flex; margin:-4px 0 8px 0; }
+
+/* The info panel drops in under the label when toggled (unchanged behavior). */
+.lane-info{
+  display:none; padding:11px 14px; font-size:12.5px; line-height:1.55;
+  color:var(--text-primary); background:rgba(255,255,255,0.05);
+  border-radius:10px; margin:0 0 10px 0;
+}
+.lane-info.show{ display:block; }
+
+/* The lane body is now a single flow of items — one padding, generous gap. */
+.lane-body{ display:flex; flex-direction:column; gap:14px; }
+.cards-root{ display:flex; flex-direction:column; gap:14px; min-height:12px; }
+.empty-note{ font-size:13px; color:var(--text-soft); font-style:italic; padding:8px 2px; }
+
+/* --- The card: no background, no shadow. Bigger. Sits on the page. --- */
+.card{
+  background:transparent; border:none; box-shadow:none;
+  padding:4px 2px;                 /* was 9px/10px inside a boxed card */
+}
+.card.dragging, .group.dragging{
+  opacity:0.35; touch-action:none;
+  -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
+}
+.card, .group{ -webkit-touch-callout:none; }
+
+/* ▲ CHUNK 2 — drag-time insertion indicator (§3 known issue 2).
+   With card backgrounds gone, drop targets aren't legible on their own. JS adds
+   `.drop-before` (or `.drop-after`) to the card the finger is hovering; this
+   paints a brass rule in the gap. Only appears mid-drag. */
+.card.drop-before::before,
+.card.drop-after::after{
+  content:""; display:block; height:2px; border-radius:2px;
+  background:var(--brass); margin:6px 0; opacity:0.9;
+}
+
+.card-top{ display:flex; align-items:flex-start; gap:11px; }
+.check{
+  flex:0 0 auto; width:20px; height:20px; border-radius:5px;
+  border:2px solid var(--lane-accent); background:transparent; margin-top:2px;
+  padding:0; display:flex; align-items:center; justify-content:center;
+  font-size:12px; line-height:1; color:var(--dark-on-accent);
+}
+.check:hover{ background:rgba(255,255,255,0.08); }
+.check.checked{ background:var(--lane-accent); }
+.check.check-anim{ animation:checkPop 0.28s ease; }
+@keyframes checkPop{ 0%{transform:scale(0.7);} 55%{transform:scale(1.25);} 100%{transform:scale(1);} }
+.check.check-paused{ opacity:0.35; cursor:default; }
+
+.card-title{
+  flex:1; font-size:15.5px; line-height:1.4; word-break:break-word;  /* bigger text */
+  -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
+  touch-action:pan-y; cursor:pointer;
+}
+.card-title.done{ text-decoration:line-through; color:var(--text-soft); }
+
+/* The list-view "×" delete is REMOVED (§4.7b): items are deleted from their own
+   page. `.card-actions` stays only for surviving affordances (e.g. none by
+   default on a plain card). The promote ← arrow stays. */
+.card-actions{ display:flex; gap:4px; flex:0 0 auto; }
+.icon-btn{
+  border:none; background:transparent; color:var(--text-soft); font-size:13px;
+  padding:2px 5px; border-radius:4px;
+}
+.icon-btn:hover{ background:rgba(255,255,255,0.08); color:var(--text-primary); }
+.promote-arrow{
+  flex:0 0 auto; width:22px; height:22px; border:none; background:transparent;
+  color:var(--lane-accent); font-size:17px; line-height:1; padding:0; margin-top:1px;
+  display:flex; align-items:center; justify-content:center;
+}
+.promote-arrow:hover{ color:var(--text-primary); }
+
+/* --- Overlays on a card stay semi-transparent-white (tuned to the dark tone,
+       §4.7b says keep these). Pills, project-jump, flags. (= carried over =) --- */
+.pill-target{ color:var(--text-primary); }
+.project-jump{
+  display:inline-flex; align-items:center; justify-content:center; margin-top:6px; margin-left:6px;
+  width:22px; height:22px; border-radius:50%; border:1px solid var(--moss); color:var(--moss);
+  background:rgba(107,158,107,0.1); font-size:11px; padding:0;
+}
+.project-jump:hover{ background:rgba(107,158,107,0.25); }
+.card-project-flag{
+  margin-top:6px; font-family:var(--font-mono); font-size:10.5px; letter-spacing:0.05em;
+  color:var(--yellow); opacity:0.9;
+}
+.link-pill{
+  display:inline-flex; align-items:center; gap:4px; margin-top:6px; font-family:var(--font-mono);
+  font-size:10.5px; letter-spacing:0.03em; background:rgba(255,255,255,0.07); color:var(--text-soft);
+  padding:3px 8px; border-radius:10px; border:none;
+}
+.link-pill:hover{ background:rgba(255,255,255,0.13); color:var(--text-primary); }
+.link-pill.cue-orphaned{
+  background:rgba(217,166,44,0.12); color:var(--yellow);
+  border:1px dashed var(--yellow); padding:2px 7px;
+}
+.link-pill.cue-empty{ opacity:0.7; font-style:italic; }
+
+/* ============================================================================
+   ▲ CHUNK 2 — DEADLINE PROGRESS BAR (§4.4b / §4.4c / §4.4d)
+   ----------------------------------------------------------------------------
+   A thin (~5px) rounded bar beneath the title. Brass fill normally; RED in the
+   final-15% window. No label, no icon. When the moment passes uncompleted the
+   bar stays FULL and RED and a small "passed" chip renders at the END of the bar.
+
+   THE RENDERER IS ORIGIN-AGNOSTIC. CSS only draws the track/fill/red/chip. JS:
+     - sets the fill WIDTH from §4.4b's curve (linear under 3 weeks; light
+       front-loaded curve for the first 85% of a 3-week+ window; 1:1 in the
+       final 15%);
+     - adds `.red` at the final-15% point (keys off the WINDOW, not the clock —
+       §4.4d);
+     - a same-day deadline has a zero/negative window → render `.full` (width
+       100%), no red-shift arithmetic (§4.4d: don't divide by zero);
+     - when passed, adds `.passed` and appends the chip.
+   ⚠ The window ORIGIN is a parameter, never the card's creation date. A
+   deadline measures creation→due; chunk 7 reuses this exact bar for events,
+   whose window opens at the 4 AM appearance (measuring from creation paints an
+   event 98%-full-and-red at birth — §4.4d, §4.14c). Take the origin in.
+
+   MARKUP (place directly beneath the title, inside the card):
+     <div class="deadline-bar" style="--fill:62%">
+       <div class="deadline-bar-fill"></div>
+     </div>
+   Passed:
+     <div class="deadline-bar full red passed" style="--fill:100%">
+       <div class="deadline-bar-fill"></div>
+       <span class="deadline-passed-chip">passed</span>
+     </div>
+============================================================================ */
+.deadline-bar{
+  position:relative;
+  height:5px; border-radius:3px; margin:8px 0 2px 0;
+  background:rgba(255,255,255,0.10);           /* the track */
+  overflow:visible;                             /* the chip sits past the end */
+}
+.deadline-bar-fill{
+  height:100%; width:var(--fill, 0%); border-radius:3px;
+  background:var(--brass);
+  transition:width .3s ease;
+}
+.deadline-bar.full .deadline-bar-fill{ width:100%; }
+.deadline-bar.red  .deadline-bar-fill{ background:var(--red); }
+.deadline-passed-chip{
+  position:absolute; right:0; top:50%; transform:translate(calc(100% + 6px), -50%);
+  font-family:var(--font-mono); font-size:9.5px; font-weight:600; letter-spacing:0.06em;
+  text-transform:uppercase; white-space:nowrap;
+  color:var(--red); background:rgba(194,74,61,0.14);
+  border:1px solid rgba(194,74,61,0.5); border-radius:9px; padding:1px 7px;
+}
+
+/* ============================================================================
+   ▲ CHUNK 2 — CREATION AFFORDANCE (§4.3e)
+   ----------------------------------------------------------------------------
+   The floating + badge is the SINGLE creation entry point on every lane. The
+   old "+ New list" button is deleted (its style is gone).
+
+   On the five lanes with something to create besides the item itself, the badge
+   opens a TWO-OPTION pop-up menu, labelled by the active tab:
+     Next / Waiting:  New action · New context
+     Current/Future:  New project · New list
+     Habits:          NO MENU — the badge creates a habit in one tap.
+   (Notes/Calendar rows arrive in later chunks; Calendar has no badge at all.)
+
+   The SECOND option opens an inline naming row (text box + add button) — not a
+   page, not a dialog. In chunk 2 "New context" calls the existing group path;
+   chunk 3 swaps that handler underneath, untouched here.
+
+   MARKUP:
+     <button id="fab-create" data-action="fab">+</button>
+     <div class="fab-menu" hidden>            <!-- JS un-hides on tap; omit on Habits -->
+       <button class="fab-menu-item" data-action="new-primary">New action</button>
+       <button class="fab-menu-item" data-action="new-secondary">New context</button>
+     </div>
+     <!-- the inline naming row, injected at the top of the lane body when the
+          second option is chosen: -->
+     <div class="inline-name-row">
+       <input type="text" placeholder="Context name…">
+       <button data-action="confirm-inline">+</button>
+     </div>
+============================================================================ */
+#fab-create{
+  position:fixed; z-index:150;
+  right:calc(18px + env(safe-area-inset-right));
+  bottom:calc(18px + env(safe-area-inset-bottom));
+  width:54px; height:54px; border-radius:50%;
+  border:none; background:var(--lane-accent, var(--brass)); color:var(--dark-on-accent);
+  font-size:27px; line-height:1; box-shadow:0 4px 14px rgba(0,0,0,0.45);
+  display:flex; align-items:center; justify-content:center; padding:0 0 3px 0;
+}
+#fab-create:hover{ filter:brightness(1.1); }
+/* The FAB adopts the active lane's accent. Set --lane-accent on <body> (or a
+   wrapper) from the active tab, OR duplicate the per-kind map here if the FAB
+   sits outside the lane. */
+
+.fab-menu{
+  position:fixed; z-index:151;
+  right:calc(18px + env(safe-area-inset-right));
+  bottom:calc(84px + env(safe-area-inset-bottom));   /* just above the badge */
+  display:flex; flex-direction:column; gap:6px;
+  background:var(--paper); border-radius:12px; padding:7px;
+  box-shadow:var(--paper-shadow);
+  min-width:184px;
+  animation:fabMenuIn .14s ease;
+}
+.fab-menu[hidden]{ display:none; }
+@keyframes fabMenuIn{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
+.fab-menu-item{
+  border:none; background:rgba(255,255,255,0.05); color:var(--text-primary);
+  text-align:left; font-size:13.5px; font-weight:600;
+  padding:11px 13px; border-radius:8px;
+}
+.fab-menu-item:hover{ background:rgba(255,255,255,0.12); }
+
+/* The inline naming row — same affordance the old "+ New list" expanded into,
+   now hung off the badge menu. (Native prompt() is banned, §3.) */
+.inline-name-row{ display:flex; gap:6px; align-items:center; margin:2px 0 10px 0; }
+.inline-name-row input[type=text]{
+  flex:1; border:1px solid rgba(255,255,255,0.16); background:rgba(255,255,255,0.06);
+  border-radius:8px; padding:9px 11px; font-size:13.5px; color:var(--text-primary);
+}
+.inline-name-row input[type=text]::placeholder{ color:var(--text-soft); }
+.inline-name-row input[type=text]:focus{ outline:2px solid var(--lane-accent); outline-offset:1px; }
+.inline-name-row button{
+  flex:0 0 auto; width:38px; height:38px; border-radius:8px; border:none;
+  background:var(--lane-accent); color:var(--dark-on-accent); font-weight:700; font-size:18px;
+}
+
+/* The per-lane quick-add row that creates the item itself (Enter/+). Kept, but
+   restyled to sit on the gradient without the old boxed-lane framing. */
+.add-row{ display:flex; gap:6px; margin-top:2px; }
+.add-row input[type=text]{
+  flex:1; border:1px solid rgba(255,255,255,0.16); background:rgba(255,255,255,0.06);
+  border-radius:8px; padding:10px 12px; font-size:14px; color:var(--text-primary);
+}
+.add-row input[type=text]::placeholder{ color:var(--text-soft); }
+.add-row input[type=text]:focus{ outline:2px solid var(--lane-accent); outline-offset:1px; }
+.add-row button{
+  border:none; background:var(--lane-accent); color:var(--dark-on-accent); border-radius:8px;
+  padding:0 14px; font-weight:700; font-size:17px;
+}
+
+/* Blocked-save feedback: dashed outline on the offending field (no popups). */
+.field-invalid{ outline:2px dashed var(--red) !important; outline-offset:2px; border-radius:4px; }
+
+/* ----------------------------------------------------------------------------
+   GROUPS (contexts / project lists rendered in a lane)  (= carried over =,
+   de-boxed lightly to match the flatter lane)
+---------------------------------------------------------------------------- */
+.group{
+  background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08);
+  border-radius:10px; overflow:hidden;
+}
+.group.dragging{ opacity:0.35; }
+.group-header{ display:flex; align-items:center; gap:8px; padding:10px 11px; cursor:pointer; }
+.group-header .chevron{ font-size:10px; color:var(--lane-accent); flex:0 0 auto; }
+.group-title{
+  flex:1; font-size:13.5px; font-weight:600; color:var(--text-primary);
+  -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; touch-action:pan-y;
+}
+.group-header .count{
+  font-family:var(--font-mono); font-size:10.5px; color:var(--text-soft);
+  background:rgba(255,255,255,0.06); padding:1px 7px; border-radius:9px;
+}
+.group-actions{ display:flex; gap:2px; }
+.group-body{ padding:0 11px 11px 11px; display:flex; flex-direction:column; gap:10px; }
+.group-body .add-row-mini input{ font-size:12.5px; padding:7px 9px; }
+
+/* ----------------------------------------------------------------------------
+   COMPLETED ARCHIVE  (= carried over =)
+---------------------------------------------------------------------------- */
+.completed-section{ border:1px dashed rgba(255,255,255,0.14); border-radius:10px; overflow:hidden; margin-top:6px; }
+.completed-section .group-header .chevron{ color:var(--text-soft); }
+.completed-section .group-title{ color:var(--text-soft); }
+.completed-list{ padding:0 11px 11px 11px; display:flex; flex-direction:column; gap:6px; }
+.completed-item{ display:flex; align-items:center; gap:8px; padding:7px 2px; border-bottom:1px solid rgba(255,255,255,0.06); }
+.completed-item:last-child{ border-bottom:none; }
+.completed-item-title{ flex:1; font-size:13px; color:var(--text-soft); text-decoration:line-through; text-decoration-color:rgba(237,231,218,0.3); }
+
+footer{ text-align:center; color:var(--text-soft); font-size:11.5px; padding:30px 10px calc(20px + env(safe-area-inset-bottom)) 10px; }
+
+/* ============================================================================
+   FULL-SCREEN EDIT / CREATE NAVIGATION  (= carried over =)
+   The overlay is a page in the same "world", so it gets the gradient too; every
+   field style below is unchanged from index-47 and owned by other chunks.
+============================================================================ */
+.screen-overlay{
+  position:fixed; inset:0; z-index:200;
+  background:linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%), var(--desk);
+  display:flex; flex-direction:column;
+  transform:translateX(100%); transition:transform .22s ease;
+}
+.screen-overlay.open{ transform:translateX(0); }
+.screen-header{
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  padding:12px 18px; padding-top:calc(12px + env(safe-area-inset-top));
+  border-bottom:1px solid rgba(237,231,218,0.12); flex:0 0 auto; position:relative;
+}
+.screen-chrome-btn{
+  border:none; background:transparent; color:var(--text-primary);
+  font-size:18px; padding:4px 6px; display:inline-flex; align-items:center; justify-content:center; line-height:1;
+}
+.screen-chrome-btn:hover{ opacity:0.65; }
+.screen-chrome-btn.danger{ font-size:15px; }
+.screen-chrome-btn.danger:hover{ color:var(--red); opacity:1; }
+.screen-header-right{ display:flex; align-items:center; gap:12px; }
+.screen-kind-badge{
+  position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+  font-family:var(--font-mono); font-size:10px; font-weight:700; letter-spacing:0.09em;
+  text-transform:uppercase; padding:5px 14px; border-radius:11px; white-space:nowrap;
+  background:var(--lane-accent, var(--brass)); color:var(--dark-on-accent);
+}
+.screen-body{
+  flex:1 1 auto; overflow-y:auto;
+  padding:16px 20px calc(96px + env(safe-area-inset-bottom)) 20px;
+  max-width:640px; margin:0 auto; width:100%; display:flex; flex-direction:column; gap:11px;
+  overscroll-behavior:contain;
+}
+body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; }
+.screen-field-title{
+  width:100%; border:1px solid rgba(255,255,255,0.16); background:rgba(255,255,255,0.05);
+  color:var(--text-primary); font-family:var(--font-body); font-weight:600; font-size:16px;
+  padding:11px 13px; border-radius:8px;
+}
+.screen-field-title:focus{ outline:2px solid var(--lane-accent, var(--brass)); outline-offset:1px; }
+.screen-field-title::placeholder{ color:var(--text-soft); font-weight:400; }
+.screen-field-desc{
+  width:100%; min-height:34px; resize:none; overflow:hidden; border:1px solid rgba(255,255,255,0.14);
+  background:rgba(255,255,255,0.04); border-radius:8px; color:var(--text-primary);
+  font-family:var(--font-body); font-size:13.5px; line-height:1.5; padding:9px 11px; flex:0 0 auto;
+}
+.screen-field-desc::placeholder{ color:var(--text-soft); }
+.screen-field-desc:focus{ outline:2px solid var(--lane-accent, var(--brass)); outline-offset:1px; }
+.screen-row{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.screen-boxed-row{
+  display:flex; align-items:center; gap:6px; flex:1; min-width:180px;
+  border:1px solid rgba(255,255,255,0.14); background:rgba(255,255,255,0.04);
+  border-radius:8px; padding:0 10px; min-height:34px;
+}
+.screen-boxed-row .field-icon{ font-size:13px; flex:0 0 auto; opacity:0.8; }
+.screen-boxed-row select, .screen-boxed-row input{
+  border:none; background:transparent; padding:8px 0; font-size:12.5px; color:var(--text-primary); min-width:0;
+}
+.screen-boxed-row select:focus, .screen-boxed-row input:focus{ outline:none; }
+.screen-boxed-row .screen-link-select{ flex:1; }
+.screen-boxed-row .screen-date{ flex:1.1; }
+.screen-boxed-row .screen-time{ flex:0.9; }
+.screen-boxed-row .screen-recurrence{ flex:1.3; }
+.screen-clear-x{ border:none; background:transparent; color:var(--text-soft); font-size:13px; padding:2px 2px 2px 4px; flex:0 0 auto; }
+.screen-clear-x:hover{ color:var(--text-primary); }
+.screen-icon-toggle{
+  flex:0 0 auto; border:1px solid rgba(255,255,255,0.14); background:rgba(255,255,255,0.04); color:var(--text-primary);
+  width:38px; height:34px; border-radius:8px; font-size:14px; display:inline-flex; align-items:center; justify-content:center;
+}
+.screen-icon-toggle.active{ background:var(--lane-accent, var(--brass)); border-color:transparent; color:var(--dark-on-accent); }
+.screen-icon-toggle[disabled]{ opacity:0.35; cursor:not-allowed; border-style:dashed; }
+.screen-overlay[data-kind="habit"] .screen-when-field-row .screen-icon-toggle{
+  border-color:var(--lane-accent); background:rgba(142,111,176,0.12); color:var(--lane-accent);
+}
+.suggestion-bubble{
+  display:flex; align-items:center; gap:8px; background:rgba(198,138,62,0.14);
+  border:1px solid rgba(198,138,62,0.35); border-radius:8px; padding:9px 11px; font-size:12.5px;
+}
+.suggestion-bubble button{
+  border:none; background:var(--brass); color:var(--dark-on-accent); font-weight:700; font-size:11.5px; padding:5px 10px; border-radius:6px; flex:0 0 auto;
+}
+.screen-project-flag{ font-size:12px; color:var(--yellow); background:rgba(217,166,44,0.12); border:1px solid rgba(217,166,44,0.3); border-radius:7px; padding:8px 10px; }
+.screen-make-kind-btn{
+  align-self:stretch; border:1px solid rgba(237,231,218,0.4); background:transparent;
+  border-radius:8px; padding:9px 12px; font-size:13px; font-weight:600; text-align:center; color:var(--text-primary);
+}
+.screen-make-kind-btn:hover{ background:rgba(255,255,255,0.05); }
+.screen-make-kind-btn.armed{ font-weight:700; }
+.screen-make-kind-btn.armed:hover{ filter:brightness(1.06); }
+.screen-make-kind-btn.disabled:hover{ background:transparent; }
+.screen-complete-pill{
+  position:fixed; z-index:5;
+  right:calc(18px + env(safe-area-inset-right)); bottom:calc(24px + env(safe-area-inset-bottom));
+  border:none; border-radius:19px; padding:11px 22px; font-size:14px; font-weight:700;
+  background:var(--lane-accent, var(--moss)); color:var(--dark-on-accent); box-shadow:0 4px 14px rgba(0,0,0,0.45);
+}
+.screen-complete-pill:hover{ filter:brightness(1.06); }
+.screen-complete-pill.done{ background:var(--desk); border:1px solid var(--lane-accent, var(--moss)); color:var(--lane-accent, var(--moss)); }
+.screen-complete-pill.paused{ background:var(--desk); border:1px solid var(--paper-2); color:var(--text-soft); cursor:default; box-shadow:none; }
+.screen-complete-pill.paused:hover{ filter:none; }
+
+/* Project-page quick-add + linked-actions list (= carried over =) */
+.quick-add-row{ display:flex; gap:6px; align-items:center; }
+.quick-add-row input{
+  flex:1; font-size:12.5px; padding:7px 9px; border-radius:6px; min-width:0;
+  border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.06); color:var(--text-primary);
+}
+.quick-add-row button{
+  flex:0 0 auto; width:30px; height:30px; border-radius:6px; border:1px solid rgba(255,255,255,0.25);
+  background:transparent; color:var(--text-primary); font-size:15px; padding:0;
+}
+.quick-add-row button:hover{ background:rgba(255,255,255,0.1); }
+.linked-actions-list{ display:flex; flex-direction:column; gap:5px; }
+.linked-action-item{
+  text-align:left; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1);
+  color:var(--text-primary); padding:7px 10px; border-radius:6px; font-size:12.5px;
+  display:flex; align-items:center; gap:7px;
+}
+.linked-action-item:hover{ background:rgba(255,255,255,0.1); }
+.linked-action-item.indented{ margin-left:22px; }
+.linked-action-kind{ font-size:10px; font-family:var(--font-mono); color:var(--text-soft); flex:0 0 auto; }
+
+/* Habit page: hook pill, condition pill, run track, schedule chips … (= carried over =) */
+.screen-when-field-row{ display:flex; gap:6px; align-items:center; }
+.screen-when-field-row .habit-when-input{ flex:1; }
+.habit-when-input{ border:1px solid rgba(255,255,255,0.14); background:rgba(255,255,255,0.04); color:var(--text-primary); border-radius:8px; padding:9px 11px; font-size:13px; }
+.screen-hooked-pill-row{ display:flex; align-items:center; gap:8px; background:rgba(142,111,176,0.16); border:1px solid rgba(142,111,176,0.45); border-radius:6px; padding:8px 10px; }
+.screen-hooked-pill{ font-size:12.5px; color:var(--text-primary); flex:1; }
+.screen-hooked-pill.cue-orphaned{ color:var(--red); }
+.screen-condition-pill-row{ display:flex; align-items:center; gap:8px; background:rgba(217,166,44,0.14); border:1px solid rgba(217,166,44,0.5); border-radius:6px; padding:8px 10px; }
+.screen-row-disabled{ opacity:0.4; }
+.screen-row-disabled input{ cursor:not-allowed; }
+.screen-waitfor-input{ flex:1.4; min-width:110px; }
+.screen-hook-pick-list{ display:flex; flex-direction:column; gap:6px; max-height:50vh; overflow-y:auto; }
+.screen-hook-pick-item{ text-align:left; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.12); color:var(--text-primary); padding:9px 11px; border-radius:6px; font-size:13px; }
+.screen-hook-pick-item:hover{ background:rgba(255,255,255,0.11); }
+.screen-hook-pick-none{ color:var(--text-soft); font-style:italic; }
+.screen-hook-pick-label{ font-family:var(--font-mono); font-size:10.5px; letter-spacing:0.09em; text-transform:uppercase; color:var(--text-soft); margin-bottom:-2px; }
+.habit-day-row{ display:flex; gap:6px; }
+.habit-day-row.field-invalid{ outline:1.5px dashed var(--red); outline-offset:4px; border-radius:8px; }
+.habit-day-chip{ width:32px; height:32px; border-radius:50%; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.04); color:var(--text-soft); font-family:var(--font-mono); font-size:12px; }
+.habit-day-chip.active{ background:var(--purple); border-color:var(--purple); color:var(--dark-on-accent); font-weight:700; }
+.habit-pause-btn.active{ border-color:var(--yellow); color:var(--yellow); }
+.cue-dim{ opacity:0.55; }
+.habit-track-block{ display:flex; flex-direction:column; gap:8px; margin-top:4px; }
+.habit-track{ display:flex; flex-direction:column; gap:5px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:10px 12px; }
+.habit-track-row{ display:flex; flex-wrap:wrap; gap:4px; }
+.habit-dot{ width:11px; height:11px; border-radius:50%; background:rgba(255,255,255,0.12); flex:0 0 auto; }
+.habit-dot-done{ background:var(--moss); }
+.habit-dot-stumble{ background:var(--yellow); }
+.habit-dot-miss{ background:var(--red); opacity:0.6; }
+.habit-dot-pending{ background:transparent; border:1.5px dashed var(--text-soft); }
+.habit-dot-empty{ background:transparent; }
+.habit-dot-ghost{ opacity:0.35; }
+.habit-track-ghost .habit-dot-done{ background:var(--purple); }
+.habit-track-ghost .habit-dot-stumble{ background:var(--dusty); }
+.habit-metrics{ display:flex; gap:16px; font-family:var(--font-mono); font-size:11px; color:var(--text-soft); }
+.habit-metrics b{ color:var(--text-primary); font-size:13px; }
+.habit-celebration{ border-radius:8px; padding:10px 12px; font-size:13px; text-align:center; font-weight:600; animation:habitCelebrate 0.5s ease; }
+.habit-celebration-record{ background:rgba(163,141,224,0.18); color:var(--purple); border:1px solid var(--purple); }
+.habit-celebration-tie{ background:rgba(212,175,110,0.16); color:var(--dusty); border:1px solid var(--dusty); }
+.habit-celebration-restart{ background:rgba(255,255,255,0.05); color:var(--text-soft); border:1px solid rgba(255,255,255,0.12); font-weight:500; }
+@keyframes habitCelebrate{ from{ transform:scale(0.94); opacity:0; } to{ transform:scale(1); opacity:1; } }
+.habit-offday{ background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:10px 12px; font-size:12.5px; color:var(--text-soft); text-align:center; }
+.habit-create-panel{ margin-top:2px; }
+.habit-panel-inner{ display:flex; flex-direction:column; gap:9px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:12px; }
+
+/* Advanced options dialog (= carried over =) */
+.adv-dialog{ text-align:left; max-width:420px; }
+.adv-title{ font-weight:700; font-size:14px; margin-bottom:8px; }
+.adv-tabs{ display:flex; gap:6px; margin-bottom:10px; }
+.adv-tab{ border:1px solid rgba(255,255,255,0.14); background:transparent; color:var(--text-soft); border-radius:14px; padding:4px 12px; font-size:12px; }
+.adv-tab.active{ border-color:var(--lane-accent, var(--moss)); color:var(--text-primary); }
+.adv-note{ font-size:12px; color:var(--text-soft); line-height:1.5; margin:0 0 10px; }
+.adv-textarea{ width:100%; min-height:64px; resize:vertical; border-radius:6px; background:var(--paper-2); border:1px solid rgba(255,255,255,0.12); color:var(--text-primary); font-size:13px; padding:8px; }
+.adv-hook-row{ display:flex; align-items:center; justify-content:space-between; font-size:12.5px; padding:4px 0; }
+.adv-content{ margin-bottom:10px; }
+.screen-advanced-btn{ align-self:flex-start; }
+.bundle-pill{ align-self:flex-start; }
+
+/* Confirm / choice dialog (= carried over =) */
+.choice-dialog-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:300; display:flex; align-items:center; justify-content:center; padding:20px; }
+.choice-dialog{ background:var(--paper); border-radius:10px; box-shadow:var(--paper-shadow); max-width:360px; width:100%; padding:18px; display:flex; flex-direction:column; gap:12px; }
+.choice-dialog p{ margin:0; font-size:13.5px; line-height:1.5; }
+.choice-dialog-btns{ display:flex; flex-direction:column; gap:8px; }
+.choice-dialog-btns button{ border:none; border-radius:7px; padding:10px 12px; font-size:13px; font-weight:600; background:rgba(255,255,255,0.08); color:var(--text-primary); text-align:left; }
+.choice-dialog-btns button:hover{ background:rgba(255,255,255,0.15); }
+.choice-dialog-btns button.primary{ background:var(--brass); color:var(--dark-on-accent); }
+.choice-dialog-btns button.danger{ background:var(--red); color:#fff; }
+
+/* ----------------------------------------------------------------------------
+   REDUCED MOTION — honor the OS preference (quality floor).
+---------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{ animation-duration:.001ms !important; transition-duration:.001ms !important; }
+}
 </style>
 </head>
 <body>
 
 <header>
-  <div class="brand">
-    <span class="mark">GTD Console</span>
-  </div>
+  <div class="brand"><span class="mark">GTD Console</span></div>
   <div class="header-right">
-    <button class="btn btn-ghost btn-small" id="reset-btn">Reset local data</button>
-    <button class="btn btn-ghost btn-small" id="qa-day-btn" title="Dev QA aid: advances the app's clock by one day and re-runs habit boundary processing, so multi-day habit logic (stumbles, misses, run-ending, badges) can be tested without waiting">QA: +1 Day</button>
-    <button class="btn btn-ghost btn-small" id="qa-hour-btn" title="Dev QA aid: advances the app's clock by one hour and re-runs habit boundary processing">QA: +1 Hr</button>
-    <button class="btn btn-ghost btn-small" id="qa-min-btn" title="Dev QA aid: advances the app's clock by fifteen minutes and re-runs habit boundary processing — fine-grained enough to step through the midnight-4am window where the calendar date and the app's day boundary deliberately disagree">QA: +15 Min</button>
-    <span class="qa-time-readout" id="qa-time-readout" title="What the app currently thinks &lsquo;now&rsquo; is, after any QA time jumps"></span>
-    <button class="btn btn-ghost btn-small" id="qa-snapshot-btn" title="Dev QA aid: saves all current data to one snapshot slot (survives Reset), so you can try something destructive and get back to exactly this state">Snapshot</button>
-    <button class="btn btn-ghost btn-small" id="qa-restore-btn" title="Dev QA aid: replaces all current data with the last snapshot, then reloads">Restore</button>
+    <button class="header-icon" type="button" title="Intray">&#128229;</button>
+    <button class="header-icon" type="button" title="Calendar">&#128197;</button>
+    <button class="header-icon" type="button" title="More">&#8943;</button>
   </div>
 </header>
 
-<div class="lane-switcher" id="lane-switcher">
-  <button data-kind="next" class="active" style="--accent:var(--red)">Next Actions</button>
-  <button data-kind="waiting" style="--accent:var(--yellow)">Waiting On</button>
-  <button data-kind="current" style="--accent:var(--moss)">Current Projects</button>
-  <button data-kind="future" style="--accent:var(--dusty)">Future / Someday</button>
-  <button data-kind="habit" style="--accent:var(--purple)">Habits</button>
+<nav class="tabbar" id="lane-switcher" role="tablist">
+  <button class="tab active" data-kind="next"><span class="tab-icon">&#9678;</span><span class="tab-name">Next Actions</span><span class="tab-count">0</span></button>
+  <button class="tab" data-kind="waiting"><span class="tab-icon">&#9203;</span><span class="tab-name">Waiting On</span><span class="tab-count">0</span></button>
+  <button class="tab" data-kind="current"><span class="tab-icon">&#9635;</span><span class="tab-name">Projects</span><span class="tab-count">0</span></button>
+  <button class="tab" data-kind="future"><span class="tab-icon">&#9737;</span><span class="tab-name">Someday</span><span class="tab-count">0</span></button>
+  <button class="tab" data-kind="habit"><span class="tab-icon">&#9873;</span><span class="tab-name">Habits</span><span class="tab-count">0</span></button>
+</nav>
+<div class="tabbar-spacer" aria-hidden="true"></div>
+
+<!-- Dev-only scaffolding — not part of the app's designed surface. Scrolls
+     with content instead of living in the fixed chrome above, which is
+     reserved for the real header (chunk 2, §4.10). -->
+<div id="dev-toolbar">
+  <button class="btn btn-ghost btn-small" id="reset-btn">Reset local data</button>
+  <button class="btn btn-ghost btn-small" id="qa-day-btn" title="Dev QA aid: advances the app's clock by one day and re-runs habit boundary processing, so multi-day habit logic (stumbles, misses, run-ending, badges) can be tested without waiting">QA: +1 Day</button>
+  <button class="btn btn-ghost btn-small" id="qa-hour-btn" title="Dev QA aid: advances the app's clock by one hour and re-runs habit boundary processing">QA: +1 Hr</button>
+  <button class="btn btn-ghost btn-small" id="qa-min-btn" title="Dev QA aid: advances the app's clock by fifteen minutes and re-runs habit boundary processing — fine-grained enough to step through the midnight-4am window where the calendar date and the app's day boundary deliberately disagree">QA: +15 Min</button>
+  <span class="qa-time-readout" id="qa-time-readout" title="What the app currently thinks &lsquo;now&rsquo; is, after any QA time jumps"></span>
+  <button class="btn btn-ghost btn-small" id="qa-snapshot-btn" title="Dev QA aid: saves all current data to one snapshot slot (survives Reset), so you can try something destructive and get back to exactly this state">Snapshot</button>
+  <button class="btn btn-ghost btn-small" id="qa-restore-btn" title="Dev QA aid: replaces all current data with the last snapshot, then reloads">Restore</button>
 </div>
 
 <main id="main">
@@ -689,7 +873,11 @@
 
 <div id="screen-root"></div>
 <div id="dialog-root"></div>
-<button id="fab-create" type="button" title="Create" data-action="open-create" data-kind="next">+</button>
+<button id="fab-create" type="button" title="Create" data-action="fab" data-kind="next">+</button>
+<div class="fab-menu" id="fab-menu" hidden>
+  <button type="button" class="fab-menu-item" data-action="new-primary">New action</button>
+  <button type="button" class="fab-menu-item" data-action="new-secondary">New context</button>
+</div>
 
 <script>
 (function(){
@@ -843,6 +1031,12 @@ function injectChunkMap(){
   const NEW_ITEM_LABEL = {
     next: "+ New Action", waiting: "+ New Waiting Item",
     current: "+ New Project", future: "+ New Project", habit: "+ New Habit"
+  };
+  // §4.3e's label table — the FAB's two-option menu on every lane but
+  // Habits (which has no menu at all; the badge creates directly there).
+  const FAB_MENU_LABELS = {
+    next: ["New action", "New context"], waiting: ["New action", "New context"],
+    current: ["New project", "New list"], future: ["New project", "New list"]
   };
   const TITLE_PLACEHOLDER = {
     next: "Next action\u2026", waiting: "What are you waiting on\u2026",
@@ -1520,7 +1714,7 @@ function injectChunkMap(){
       notesClean: data.notesClean || "", linkedProjectId: data.linkedProjectId || null, deadline: data.deadline || null,
       whenText: data.whenText || null, conditionId: data.conditionId || null,
       conditionKind: data.conditionKind || null, conditionLabel: data.conditionLabel || null,
-      bundleText: data.bundleText || null
+      bundleText: data.bundleText || null, createdAt: Date.now() // deadline-bar origin (§4.4b)
     };
     const task = Object.assign({ id: genId(), title: data.title, isGroup: false, parent: null }, base);
     state.tasks[kind].unshift(task);
@@ -1797,6 +1991,57 @@ function injectChunkMap(){
     });
     return byParent;
   }
+  // Deadline progress bar (§4.4b/c/d). Origin-agnostic math per the spec's own
+  // instruction (chunk 7 reuses this exact bar for events with a different
+  // origin) — deadlineBarState() just needs an origin + due instant, and
+  // leafCardHtml only calls it for Next Actions / Current Projects (§4.1).
+  function deadlineDueInstant(deadline){
+    const d = dateStrToDate(deadline.date);
+    if (deadline.time){
+      const parts = deadline.time.split(":").map(Number);
+      d.setHours(parts[0] || 0, parts[1] || 0, 0, 0);
+      return d.getTime();
+    }
+    // Untimed: due at the 4 AM boundary that BEGINS the due day (§4.4d) —
+    // the same shift boundaryNow() applies, in reverse, to locate it.
+    return d.getTime() + 4 * 3600 * 1000;
+  }
+  function deadlineBarState(task){
+    const deadline = task.deadline;
+    if (!deadline || !deadline.date) return null;
+    const due = deadlineDueInstant(deadline);
+    const now = Date.now() + (state.qaTimeOffset || 0) * 60000;
+    if (now >= due) return { full: true, red: true, passed: true, fillPercent: 100 };
+    // Missing createdAt (pre-chunk-2 / hand-edited test data) → treat as a
+    // zero-width window, the same safe fallback a same-day deadline uses
+    // (§4.4d: don't divide by zero).
+    const origin = task.createdAt || due;
+    const totalWindow = due - origin;
+    if (totalWindow <= 0) return { full: true, red: false, passed: false, fillPercent: 100 };
+    const elapsedFrac = Math.max(0, Math.min(1, (now - origin) / totalWindow));
+    const threeWeeksMs = 21 * 24 * 3600 * 1000;
+    let fillFrac;
+    if (totalWindow <= threeWeeksMs){
+      fillFrac = elapsedFrac;
+    } else {
+      // Light front-loaded curve for the first 85% of elapsed time, then
+      // honest 1:1 tracking for the final 15%, reaching exactly 100% at the
+      // due instant (§4.4b). fillAt85 is a build-time tuning constant; the
+      // shape — front-loaded, then linear home — is what's locked.
+      const fillAt85 = 0.7;
+      fillFrac = elapsedFrac <= 0.85
+        ? fillAt85 * Math.pow(elapsedFrac / 0.85, 0.6)
+        : fillAt85 + (elapsedFrac - 0.85) / 0.15 * (1 - fillAt85);
+    }
+    return { full: false, red: elapsedFrac >= 0.85, passed: false, fillPercent: Math.round(fillFrac * 100) };
+  }
+  function deadlineBarHtml(task){
+    const s = deadlineBarState(task);
+    if (!s) return "";
+    const classes = "deadline-bar" + (s.full ? " full" : "") + (s.red ? " red" : "") + (s.passed ? " passed" : "");
+    const chip = s.passed ? '<span class="deadline-passed-chip">passed</span>' : "";
+    return '<div class="' + classes + '" style="--fill:' + s.fillPercent + '%"><div class="deadline-bar-fill"></div>' + chip + '</div>';
+  }
   function leafCardHtml(kind, task){
     const canLink = (kind === "next" || kind === "waiting");
     const moveDest = MOVE_MAP[kind];
@@ -1895,14 +2140,18 @@ function injectChunkMap(){
     } else {
       checkboxHtml = '<button class="check" data-action="complete" data-id="' + task.id + '" title="Mark complete"></button>';
     }
+    // \u00a74.7b: the list-view "\u00d7" delete is gone \u2014 items are deletable from
+    // their own page only (screen-delete). Next/Current cards that carry a
+    // deadline (\u00a74.1) get the progress bar (\u00a74.4b/c/d) directly under the
+    // title; everything else renders the title as a bare flex:1 child, same
+    // as before.
+    const titleHtml = '<div class="card-title' + (done ? " done" : "") + '" data-action="open-edit" data-kind="' + kind + '" data-id="' + task.id + '" title="Tap to open \u2014 press and hold to reorder">' + escapeHtml(task.title) + '</div>';
+    const deadlineBarBlock = (kind === "next" || kind === "current") ? deadlineBarHtml(task) : "";
+    const titleBlock = deadlineBarBlock ? ('<div style="flex:1">' + titleHtml + deadlineBarBlock + '</div>') : titleHtml;
     return (
       '<div class="card" draggable="true" data-drag-id="' + task.id + '" data-drag-parent="' + (task.parent || "") + '" data-drag-group="0">' +
-        '<div class="card-top">' + checkboxHtml +
-          '<div class="card-title' + (done ? " done" : "") + '" data-action="open-edit" data-kind="' + kind + '" data-id="' + task.id + '" title="Tap to open \u2014 press and hold to reorder">' + escapeHtml(task.title) + '</div>' +
-          '<div class="card-actions">' +
-            '<button class="icon-btn" data-action="delete" data-id="' + task.id + '" title="Delete">&times;</button>' +
-          '</div>' +
-        '</div>' + (kind === "waiting" ? cueBlock + linkBlock : linkBlock + cueBlock) + projectFlagBlock +
+        '<div class="card-top">' + checkboxHtml + titleBlock + '</div>' +
+        (kind === "waiting" ? cueBlock + linkBlock : linkBlock + cueBlock) + projectFlagBlock +
       '</div>'
     );
   }
@@ -1976,6 +2225,8 @@ function injectChunkMap(){
       updateHabitBadge();
     }
     laneEl.querySelector(".count").textContent = state.tasks[kind].length;
+    const tabCountEl = qs('.tab[data-kind="' + kind + '"] .tab-count');
+    if (tabCountEl) tabCountEl.textContent = state.tasks[kind].length;
     const rootEl = laneEl.querySelector(".cards-root");
     let activeHtml, completedHtml;
     if (kind === "habit"){
@@ -2006,21 +2257,19 @@ function injectChunkMap(){
   function laneShellHtml(k){
     return (
       '<div class="lane" data-kind="' + k + '">' +
-        '<div class="lane-tab">' +
-          '<span class="lane-tab-title">' + escapeHtml(LIST_TITLES[k]) + '</span>' +
-          '<span class="lane-tab-right">' +
+        '<div class="lane-label">' +
+          '<span class="lane-label-title">' + escapeHtml(LIST_TITLES[k]) + '</span>' +
+          '<span class="lane-label-right">' +
             '<span class="count">0</span>' +
             '<button class="info-btn" data-action="toggle-info" data-kind="' + k + '" type="button" title="What is this list for?">i</button>' +
           '</span>' +
         '</div>' +
         '<div class="lane-info" data-kind="' + k + '">' + escapeHtml(LANE_INFO[k]) + '</div>' +
-        '<div class="lane-body">' +
-          '<div class="lane-actions-row">' +
-            '<button class="btn btn-ghost btn-small new-list-btn" data-action="new-list" data-kind="' + k + '" type="button">+ New list</button>' +
-            (k === "habit" ? '<button class="btn btn-ghost btn-small tidy-btn" data-action="tidy-habits" type="button" title="Suggest an order from your hooks (you can still rearrange freely afterward)">&#8645; Tidy order</button>' : "") +
-          '</div>' +
-          '<div class="cards-root" data-dropzone-parent=""></div>' +
-        '</div>' +
+        (k === "habit"
+          ? '<div class="lane-tools-row"><button class="btn btn-ghost btn-small tidy-btn" data-action="tidy-habits" type="button" title="Suggest an order from your hooks (you can still rearrange freely afterward)">&#8645; Tidy order</button></div>'
+          : "") +
+        '<div class="inline-slot" data-kind="' + k + '"></div>' +
+        '<div class="cards-root" data-dropzone-parent=""></div>' +
       '</div>'
     );
   }
@@ -2034,8 +2283,22 @@ function injectChunkMap(){
     const fab = qs("#fab-create");
     if (fab){
       fab.setAttribute("data-kind", state.activeKind);
-      fab.style.setProperty("--accent", "var(" + accentVarForKind(state.activeKind) + ")");
+      fab.style.setProperty("--lane-accent", "var(" + accentVarForKind(state.activeKind) + ")");
       fab.title = NEW_ITEM_LABEL[state.activeKind] || "Create";
+    }
+    // ▲ CHUNK 2 (§4.3e) — relabel the FAB's two-option menu for the newly
+    // active lane, and close it on every tab switch so a stale menu never
+    // survives a jump to a different lane (Habits has no menu; its labels
+    // just sit unused).
+    const menu = qs("#fab-menu");
+    if (menu){
+      const labels = FAB_MENU_LABELS[state.activeKind];
+      const items = menu.querySelectorAll(".fab-menu-item");
+      if (labels && items.length === 2){
+        items[0].textContent = labels[0];
+        items[1].textContent = labels[1];
+      }
+      menu.hidden = true;
     }
   }
 
@@ -2054,7 +2317,8 @@ function injectChunkMap(){
   // Deliberately NOT in this chunk (per the doc's own chunk breakdown):
   //  - waiting condition / hook picker for Waiting items (chunk 2) — that
   //    hook icon is shown greyed-out on both Next and Waiting for now.
-  //  - deadline-approaching progress bar visuals (chunk 6).
+  //  - deadline-approaching progress bar visuals — built in chunk 2, see
+  //    deadlineBarHtml()/deadlineBarState() above.
   //  - habit personal-best / animation box — built in chunk 3, see
   //    habitTrackHtml() and the habitRuns engine above.
   // =========================================================
@@ -3197,7 +3461,7 @@ function injectChunkMap(){
     }
     // Fresh open, or navigation to a different item (child screens,
     // returning from one): full rebuild with the slide-in.
-    root.innerHTML = '<div class="screen-overlay" data-kind="' + s.kind + '" data-screen-key="' + key + '" style="--accent:var(' + accentVarForKind(s.kind) + ')">' + inner + '</div>';
+    root.innerHTML = '<div class="screen-overlay" data-kind="' + s.kind + '" data-screen-key="' + key + '" style="--lane-accent:var(' + accentVarForKind(s.kind) + ')">' + inner + '</div>';
     requestAnimationFrame(function(){
       const overlay = qs(".screen-overlay");
       if (overlay) overlay.classList.add("open");
@@ -3329,37 +3593,33 @@ function injectChunkMap(){
       input.value = "";
       addTask(row.getAttribute("data-kind"), title, row.getAttribute("data-parent") || null);
     }
-    function openNewListRow(btn, kind){
-      const row = document.createElement("div");
-      row.className = "add-row new-list-inline";
-      row.innerHTML = '<input type="text" placeholder="List name\u2026" /><button type="button" data-role="new-list-confirm">+</button>';
-      btn.replaceWith(row);
-      const input = row.querySelector("input");
+    // CHUNK 2 (spec 4.3e) -- the FAB menu's second option ("New context" /
+    // "New list"). Replaces the old button-swap openNewListRow(): there's no
+    // "+ New list" button to swap out anymore, so this targets the lane's
+    // own inline-slot div (laneShellHtml) instead. Still calls the existing
+    // addGroup() path -- chunk 3 swaps that handler underneath.
+    function openInlineNameRow(kind){
+      const slot = qs('.inline-slot[data-kind="' + kind + '"]');
+      if (!slot) return;
+      const placeholder = (kind === "current" || kind === "future") ? "List name\u2026" : "Context name\u2026";
+      slot.innerHTML = '<div class="inline-name-row"><input type="text" placeholder="' + escapeHtml(placeholder) + '" /><button type="button" data-role="inline-name-confirm">+</button></div>';
+      const input = slot.querySelector("input");
       input.focus();
-      // Bugfix: renderLane() only rebuilds .cards-root, not the lane-body's
-      // own button row that this inline input replaced — so it never
-      // actually restored the "+ New list" button, and the typed text sat
-      // there uncleared after a successful create (the only feedback was
-      // the new group, which was also landing at the bottom of the lane,
-      // off-screen). Restore the button ourselves, immediately, on every
-      // exit path.
-      function restore(){
-        if (row.isConnected) row.replaceWith(btn);
-      }
+      function clear(){ slot.innerHTML = ""; }
       function commit(){
         const name = input.value.trim();
-        if (!name){ restore(); return; }
-        restore();
+        if (!name){ clear(); return; }
+        clear();
         addGroup(kind, name);
       }
-      row.querySelector("button").addEventListener("click", commit);
+      slot.querySelector("button").addEventListener("click", commit);
       input.addEventListener("keydown", function(ev){
         if (ev.key === "Enter") commit();
-        else if (ev.key === "Escape") restore();
+        else if (ev.key === "Escape") clear();
       });
       input.addEventListener("blur", function(){
-        // Give the + button's click a beat to land before restoring.
-        setTimeout(function(){ if (document.body.contains(row) && !row.contains(document.activeElement)) restore(); }, 150);
+        // Give the + button's click a beat to land before clearing.
+        setTimeout(function(){ if (slot.isConnected && !slot.contains(document.activeElement)) clear(); }, 150);
       });
     }
     document.addEventListener("click", function(e){
@@ -3367,6 +3627,10 @@ function injectChunkMap(){
       if (addMiniBtn){ submitAddMini(addMiniBtn.closest(".add-row-mini")); return; }
     });
     document.addEventListener("keydown", function(e){
+      if (e.key === "Escape"){
+        const fabMenuEl = qs("#fab-menu");
+        if (fabMenuEl && !fabMenuEl.hidden) fabMenuEl.hidden = true;
+      }
       if (e.key !== "Enter") return;
       const row = e.target.closest && e.target.closest(".add-row-mini");
       if (row && e.target.matches("input[type=text]")){ e.preventDefault(); submitAddMini(row); }
@@ -3383,6 +3647,15 @@ function injectChunkMap(){
         if (act !== "screen-pick-hook" && act !== "screen-pick-condition") playNavClick();
       }
 
+      // CHUNK 2 (spec 4.3e) -- close the FAB menu on any click that isn't
+      // the FAB itself or one of its own items. A side effect, not a
+      // return, so it applies uniformly ahead of every other branch below,
+      // including clicks that match no data-action at all.
+      const fabMenuEl = qs("#fab-menu");
+      if (fabMenuEl && !fabMenuEl.hidden && !e.target.closest("#fab-create") && !e.target.closest("#fab-menu")){
+        fabMenuEl.hidden = true;
+      }
+
       const infoBtn = e.target.closest('[data-action="toggle-info"]');
       if (infoBtn){
         const kind = infoBtn.getAttribute("data-kind");
@@ -3397,9 +3670,27 @@ function injectChunkMap(){
       const advBtn = e.target.closest('[data-action="screen-open-advanced"]');
       if (advBtn){ openAdvancedDialog(); return; }
 
-      const newListBtn = e.target.closest('[data-action="new-list"]');
-      if (newListBtn){
-        openNewListRow(newListBtn, newListBtn.getAttribute("data-kind"));
+      // CHUNK 2 (spec 4.3e) -- the FAB is now a two-option menu on every
+      // lane but Habits, where it still creates directly (no menu).
+      const fabBtn = e.target.closest('[data-action="fab"]');
+      if (fabBtn){
+        if (state.activeKind === "habit"){ openScreen("habit", null); return; }
+        const menu = qs("#fab-menu");
+        if (menu) menu.hidden = !menu.hidden;
+        return;
+      }
+      const fabPrimary = e.target.closest('[data-action="new-primary"]');
+      if (fabPrimary){
+        const menu = qs("#fab-menu");
+        if (menu) menu.hidden = true;
+        openScreen(state.activeKind, null);
+        return;
+      }
+      const fabSecondary = e.target.closest('[data-action="new-secondary"]');
+      if (fabSecondary){
+        const menu = qs("#fab-menu");
+        if (menu) menu.hidden = true;
+        openInlineNameRow(state.activeKind);
         return;
       }
       const moveBtn = e.target.closest('[data-action="move"]');
@@ -3442,12 +3733,8 @@ function injectChunkMap(){
         restoreTask(restoreBtn.getAttribute("data-kind"), restoreBtn.getAttribute("data-id"));
         return;
       }
-      const deleteBtn = e.target.closest('[data-action="delete"]');
-      if (deleteBtn){
-        const k = deleteBtn.closest(".lane").getAttribute("data-kind");
-        deleteTask(k, deleteBtn.getAttribute("data-id"));
-        return;
-      }
+      // Lane-card delete is gone (§4.7b) — deleteTask() is still called from
+      // the full-screen page's own 🗑 (screen-delete, deleteScreenItem()).
       const habitBtn = e.target.closest('[data-action="toggle-habit"]');
       if (habitBtn){
         const habitId = habitBtn.getAttribute("data-id");
@@ -3476,8 +3763,8 @@ function injectChunkMap(){
       }
 
       // ---- full-screen create/edit ----
-      const openCreateBtn = e.target.closest('[data-action="open-create"]');
-      if (openCreateBtn){ openScreen(openCreateBtn.getAttribute("data-kind"), null); return; }
+      // (creation is now the FAB's own data-action="fab"/"new-primary"
+      // branches above, chunk 2 -- edit still opens via data-action="open-edit" below)
 
       const openEditEl = e.target.closest('[data-action="open-edit"]');
       if (openEditEl){ openScreen(openEditEl.getAttribute("data-kind"), openEditEl.getAttribute("data-id")); return; }
@@ -3628,10 +3915,19 @@ function injectChunkMap(){
     // have no native HTML5 drag-and-drop at all, so touch needs its own
     // gesture handling that lands in the same place.
     let liveDrag = null; // { el, kind, isGroup }
+    // CHUNK 2 (spec 4.7b known issue 2) -- with card backgrounds gone, the
+    // live-reordered card sliding into place isn't always legible on its
+    // own. Track the last-marked anchor so a brass rule (.drop-before /
+    // .drop-after, styles.css) can show exactly where it'll land, and clear
+    // it as soon as the hover target changes.
+    let dropIndicatorEl = null;
+    function clearDropIndicator(){
+      if (dropIndicatorEl){ dropIndicatorEl.classList.remove("drop-before", "drop-after"); dropIndicatorEl = null; }
+    }
     // Clamps the hit-test point to the active-card area of a lane before
     // calling elementFromPoint. Without this, dragging past the last card
     // lands on the Completed section (or empty margin) below it — and past
-    // the first card lands on the "+ New list" button or header above it —
+    // the first card lands on the floating + badge or header above it —
     // neither of which is a valid drop target, so the drag just stalls
     // wherever the last valid hover was instead of tracking to the edge.
     // Clamping guarantees the point always falls on a real card or the
@@ -3733,12 +4029,18 @@ function injectChunkMap(){
         if (ref !== el && el.nextSibling !== ref){
           anchor.parentElement.insertBefore(el, ref);
         }
+        clearDropIndicator();
+        if (anchor.classList.contains("card")){
+          anchor.classList.add(before ? "drop-before" : "drop-after");
+          dropIndicatorEl = anchor;
+        }
       } else if (!cardTarget){
         const zone = targetEl.closest("[data-dropzone-parent]");
         if (!zone || el.contains(zone) || el.parentElement === zone) return;
         if (!drag.isGroup || zone.classList.contains("cards-root")){
           zone.appendChild(el);
         }
+        clearDropIndicator();
       }
     }
     function commitLiveMove(drag){
@@ -3763,11 +4065,14 @@ function injectChunkMap(){
       e.dataTransfer.effectAllowed = "move";
       el.classList.add("dragging");
       liveDrag = { el: el, kind: kind, isGroup: payload.isGroup };
+      document.body.classList.add("drag-active"); // freeze the collapsing tab bar (spec 4.10b, known issue 2)
     });
     document.addEventListener("dragend", function(){
       if (!liveDrag) return;
       const kind = liveDrag.kind;
       liveDrag = null;
+      document.body.classList.remove("drag-active");
+      clearDropIndicator();
       stopAutoScroll();
       renderLane(kind); // restores state order on cancel; settles the DOM after a committed drop
     });
@@ -3821,6 +4126,8 @@ function injectChunkMap(){
       disarmDragWatchdog();
       if (wasActive){
         liveDrag = null;
+        document.body.classList.remove("drag-active");
+        clearDropIndicator();
         stopAutoScroll();
         renderLane(kind);
       }
@@ -3887,6 +4194,7 @@ function injectChunkMap(){
         touchDrag.active = true;
         el.classList.add("dragging");
         liveDrag = { el: el, kind: kind, isGroup: isGroup };
+        document.body.classList.add("drag-active"); // freeze the collapsing tab bar (spec 4.10b, known issue 2)
         dragPointer = { x: touchDrag.startX, y: touchDrag.startY };
         startAutoScroll();
         armDragWatchdog();
@@ -3918,6 +4226,8 @@ function injectChunkMap(){
         commitLiveMove(liveDrag);
         const kind = liveDrag.kind;
         liveDrag = null;
+        document.body.classList.remove("drag-active");
+        clearDropIndicator();
         renderLane(kind);
       }
       touchDragCleanup();
@@ -3926,12 +4236,34 @@ function injectChunkMap(){
       if (touchDrag && touchDrag.active){
         const kind = touchDrag.kind;
         liveDrag = null;
+        document.body.classList.remove("drag-active");
+        clearDropIndicator();
         disarmDragWatchdog();
         stopAutoScroll();
         renderLane(kind);
       }
       touchDragCleanup();
     });
+
+    // CHUNK 2 (spec 4.10b) -- collapsing tab bar. rAF-debounced scroll
+    // listener toggles body.tabs-collapsed on scroll direction; gated on
+    // drag-active so an in-progress drag's auto-scroll can never flip it
+    // mid-drag (spec 4.10b, known issue 2 -- the freeze is body.drag-active
+    // itself, set/cleared at every liveDrag/touchDrag transition above).
+    let lastScrollY = 0, tabsScrollTicking = false;
+    window.addEventListener("scroll", function(){
+      if (tabsScrollTicking) return;
+      tabsScrollTicking = true;
+      requestAnimationFrame(function(){
+        if (!document.body.classList.contains("drag-active")){
+          const y = window.scrollY;
+          if (y > 24 && y > lastScrollY) document.body.classList.add("tabs-collapsed");
+          else if (y < lastScrollY) document.body.classList.remove("tabs-collapsed");
+          lastScrollY = y;
+        }
+        tabsScrollTicking = false;
+      });
+    }, { passive: true });
   }
 
   // =========================================================
@@ -3951,7 +4283,7 @@ function injectChunkMap(){
   // off to chunk 3.
   // =========================================================
   function injectQAChecklist(){
-    const FLAG = "gtd_qa_checklist_chunk1";
+    const FLAG = "gtd_qa_checklist_chunk2";
     if (Storage.get(FLAG)) return;
     Storage.set(FLAG, "1");
 
@@ -3982,16 +4314,18 @@ function injectChunkMap(){
       });
     }
 
-    addGroupWithItems("\u2705 QA \u2014 Chunk 1: back always means back one screen", [
-      { title: "Opening a linked action from a project, then Cancel, returns to the project (not the lane list)", notes: "Open the Kitchen remodel project. Tap its linked \u2018Contractor quote from Dana\u2019 row to open that action's own page. Tap \u2715 (Cancel). You should land back on the Kitchen remodel project page, not out at the Current Projects list." },
-      { title: "Same thing, but Save instead of Cancel", notes: "From the project page, open a linked action again, change its title, and tap \u2190 (Save). You should land back on the project page, and the linked action's new title should show correctly if you reopen it." },
-      { title: "The project page's own unsaved typing survives that round trip", notes: "Open a project, type something new into its description box (don't save yet), then open a linked action and Cancel back out. Your unsaved project description should still be sitting there, untouched." },
-      { title: "Creating a brand new action from a project (the pencil icon), then Cancel, returns to the project", notes: "Open a project, tap the pencil icon next to its quick-add row to open a full blank action page, then tap \u2715. You should land back on the project page, not the lane list, and nothing new should have been created." }
+    addGroupWithItems("\u2705 QA \u2014 Chunk 2: the new look and the + button", [
+      { title: "The tab bar shrinks to a small pill when you scroll down, and expands again when you scroll up", notes: "Open a lane with several items and scroll down through the list \u2014 the row of tabs at the top should shrink into a small floating pill showing just the current lane. Scroll back up and it should return to the full row." },
+      { title: "The round + button opens a small menu instead of creating something right away (except on Habits)", notes: "On Next Actions, Waiting On, Current Projects, or Future/Someday, tap the round + button in the bottom corner \u2014 a small menu with two choices should pop up instead of jumping straight to a new item. On Habits, + should still create a new habit right away with no menu." },
+      { title: "The menu's second option opens a small name box that creates a list or context", notes: "Tap +, then the second menu choice (\u2018New context\u2019 on Next/Waiting, \u2018New list\u2019 on Current/Future). A small text box should appear in the list \u2014 type a name, tap the + next to it, and it should show up as a new group right away." },
+      { title: "A due date on a Next Action or Current Project now shows a thin progress bar", notes: "Open a Next Action or Current Project, give it a deadline, and save. Back on the list, a thin bar should appear under its title, filling up as the due date approaches, turning red near the end, and showing a \u2018passed\u2019 label once it's gone by." },
+      { title: "Items on a list no longer have their own \u00d7 \u2014 you delete them from the item's own page", notes: "Look at any card in any lane \u2014 there should be no small \u00d7 on it anymore. To delete something, tap it open and use the trash icon on its own page." },
+      { title: "Press-and-hold still lets you drag items into a new order", notes: "Press and hold an item's title for about half a second, then drag it up or down. It should follow your finger/cursor and land in the new spot when you let go." }
     ]);
 
-    addGroupWithItems("\u2705 QA \u2014 Recheck chunk 0c", [
-      { title: "Snapshot and Restore still work", notes: "Tap Snapshot, delete something, tap Restore and confirm \u2014 the deleted item should come back." },
-      { title: "The QA time buttons still move the clock", notes: "Tap \u2018QA: +1 Day\u2019 and confirm the small readout text next to it changes." }
+    addGroupWithItems("\u2705 QA \u2014 Recheck chunk 1", [
+      { title: "Opening a linked action from a project, then Cancel, still returns to the project (not the lane list)", notes: "Open a project, tap one of its linked actions to open that action's own page, then tap \u2715 (Cancel). You should land back on the project page, not out at the Current Projects list." },
+      { title: "Creating a brand new action from a project's pencil icon, then Cancel, still returns to the project", notes: "Open a project, tap the pencil icon next to its quick-add row, then tap \u2715. You should land back on the project page, and nothing new should have been created." }
     ]);
 
     saveTasksLocal("next");

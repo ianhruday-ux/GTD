@@ -148,7 +148,13 @@ SEL = {
     "card": ".card-title",                        # carries data-action="open-edit" + data-id; reliably clickable
 
     # capture / create
-    "fab": "#fab-create",                              # + FAB, data-action="open-create"
+    # CHUNK 2 (§4.3e): the FAB no longer creates directly except on Habits --
+    # it opens a two-option menu (data-action="fab"). "fab_menu_primary" is
+    # the menu's first option ("New action"/"New project"), equivalent to
+    # the FAB's old direct-create tap; use it after clicking "fab" on any
+    # non-Habit lane.
+    "fab": "#fab-create",
+    "fab_menu_primary": '[data-action="new-primary"]',
     "title_input": "[data-field='title']",
     "save_btn": "[data-action='screen-save']",         # ← save+exit (§4.6)
     "cancel_btn": "[data-action='screen-cancel']",     # ✕ discard (§4.6)

@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<!--
+  GTD CONSOLE — chunk 2 redesign MOCKUP
+  A reference render of styles.css. It shows the four chunk-2 surfaces and the
+  markup each expects. The small <script> at the bottom is DEMO-ONLY (collapse
+  on scroll, the FAB menu, the info toggle) so you can feel the interactions;
+  it is not part of the handoff. styles.css carries no JS.
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>GTD Console — chunk 2 mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- FIXED HEADER — always visible, never collapses (§4.10) -->
+  <header>
+    <div class="brand"><span class="mark">GTD Console</span></div>
+    <div class="header-right">
+      <button class="header-icon" title="Intray">&#128229;</button>
+      <button class="header-icon" title="Calendar">&#128197;</button>
+      <button class="header-icon" title="More">&#8943;</button>
+    </div>
+  </header>
+
+  <!-- COLLAPSING TAB BAR (§4.10b) — scroll down to see it become a pill -->
+  <nav class="tabbar" role="tablist">
+    <button class="tab active" data-kind="next"><span class="tab-icon">&#9678;</span><span class="tab-name">Next</span><span class="tab-count">5</span></button>
+    <button class="tab has-badge" data-kind="waiting"><span class="tab-icon">&#9203;</span><span class="tab-name">Waiting</span><span class="tab-count">2</span></button>
+    <button class="tab" data-kind="current"><span class="tab-icon">&#9635;</span><span class="tab-name">Projects</span><span class="tab-count">3</span></button>
+    <button class="tab" data-kind="future"><span class="tab-icon">&#9737;</span><span class="tab-name">Someday</span><span class="tab-count">4</span></button>
+    <button class="tab" data-kind="habit"><span class="tab-icon">&#9873;</span><span class="tab-name">Habits</span><span class="tab-count">3</span></button>
+  </nav>
+  <div class="tabbar-spacer" aria-hidden="true"></div>
+
+  <main>
+    <div class="lanes">
+      <div class="lane active-lane" data-kind="next">
+
+        <!-- Floating lane label — no longer caps a panel (§4.7b) -->
+        <div class="lane-label">
+          <span class="lane-label-title">Next Actions</span>
+          <span class="lane-label-right">
+            <span class="lane-count">5</span>
+            <button class="info-btn" data-action="toggle-info" aria-label="About Next Actions">i</button>
+          </span>
+        </div>
+        <div class="lane-info">The single next physical step for anything you're actively moving forward — not the whole project, just what you'd do next if you sat down right now.</div>
+
+        <!-- The inline naming row appears here when "New context" is chosen -->
+        <div id="inline-slot"></div>
+
+        <div class="cards-root">
+
+          <!-- plain next action -->
+          <div class="card">
+            <div class="card-top">
+              <button class="check" aria-label="Complete"></button>
+              <div class="card-title">Email Sarah the draft agenda</div>
+            </div>
+          </div>
+
+          <!-- dated: mid-window brass bar (~62%) -->
+          <div class="card">
+            <div class="card-top">
+              <button class="check" aria-label="Complete"></button>
+              <div style="flex:1">
+                <div class="card-title">Submit the grant application</div>
+                <div class="deadline-bar" style="--fill:62%"><div class="deadline-bar-fill"></div></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- dated: final-15% window → red (~92%) -->
+          <div class="card">
+            <div class="card-top">
+              <button class="check" aria-label="Complete"></button>
+              <div style="flex:1">
+                <div class="card-title">Renew the domain before it lapses</div>
+                <div class="deadline-bar red" style="--fill:92%"><div class="deadline-bar-fill"></div></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- dated: passed → full red bar + "passed" chip -->
+          <div class="card">
+            <div class="card-top">
+              <button class="check" aria-label="Complete"></button>
+              <div style="flex:1">
+                <div class="card-title">File the expense report</div>
+                <div class="deadline-bar full red passed" style="--fill:100%">
+                  <div class="deadline-bar-fill"></div>
+                  <span class="deadline-passed-chip">passed</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- a card carrying a project-jump + pill, to show overlays survive -->
+          <div class="card">
+            <div class="card-top">
+              <button class="check" aria-label="Complete"></button>
+              <div style="flex:1">
+                <div class="card-title">Book the venue for the launch</div>
+                <span class="link-pill">&#128279; Website relaunch</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- a context group rendered in the lane -->
+          <div class="group">
+            <div class="group-header">
+              <span class="chevron">&#9660;</span>
+              <span class="group-title">At computer</span>
+              <span class="count">2</span>
+            </div>
+            <div class="group-body">
+              <div class="card">
+                <div class="card-top">
+                  <button class="check"></button>
+                  <div class="card-title">Update the budget spreadsheet</div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-top">
+                  <button class="check"></button>
+                  <div class="card-title">Reply to the invoice question</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- the item's own quick-add row (the primary create path) -->
+        <div class="add-row">
+          <input type="text" placeholder="Next action…">
+          <button>+</button>
+        </div>
+
+      </div>
+    </div>
+
+    <footer>Everything is stored on this device. No account, no server.</footer>
+  </main>
+
+  <!-- CREATION AFFORDANCE (§4.3e) — the single + badge; menu shown open here -->
+  <button id="fab-create" data-action="fab">+</button>
+  <div class="fab-menu" id="fab-menu" hidden>
+    <button class="fab-menu-item" data-action="new-primary">New action</button>
+    <button class="fab-menu-item" data-action="new-secondary">New context</button>
+  </div>
+
+<script>
+  /* DEMO ONLY — not part of the handoff. */
+  // Collapsing tab bar: toggle body.tabs-collapsed on scroll direction.
+  var lastY = 0, ticking = false;
+  addEventListener('scroll', function(){
+    if (ticking) return; ticking = true;
+    requestAnimationFrame(function(){
+      var y = window.scrollY;
+      if (y > 24 && y > lastY) document.body.classList.add('tabs-collapsed');
+      else if (y < lastY) document.body.classList.remove('tabs-collapsed');
+      lastY = y; ticking = false;
+    });
+  }, {passive:true});
+
+  // Info toggle.
+  document.querySelector('[data-action="toggle-info"]').addEventListener('click', function(){
+    document.querySelector('.lane-info').classList.toggle('show');
+  });
+
+  // FAB menu.
+  var fab = document.getElementById('fab-create'), menu = document.getElementById('fab-menu');
+  fab.addEventListener('click', function(e){ e.stopPropagation(); menu.hidden = !menu.hidden; });
+  document.addEventListener('click', function(){ menu.hidden = true; });
+  menu.addEventListener('click', function(e){ e.stopPropagation(); });
+
+  // Second option → inline naming row.
+  menu.querySelector('[data-action="new-secondary"]').addEventListener('click', function(){
+    menu.hidden = true;
+    var slot = document.getElementById('inline-slot');
+    slot.innerHTML =
+      '<div class="inline-name-row">' +
+        '<input type="text" placeholder="Context name…" autofocus>' +
+        '<button>+</button>' +
+      '</div>';
+    var input = slot.querySelector('input'); if (input) input.focus();
+  });
+  menu.querySelector('[data-action="new-primary"]').addEventListener('click', function(){
+    menu.hidden = true;
+  });
+</script>
+</body>
+</html>

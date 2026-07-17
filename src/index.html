@@ -24,26 +24,34 @@
 <body>
 
 <header>
-  <div class="brand">
-    <span class="mark">GTD Console</span>
-  </div>
+  <div class="brand"><span class="mark">GTD Console</span></div>
   <div class="header-right">
-    <button class="btn btn-ghost btn-small" id="reset-btn">Reset local data</button>
-    <button class="btn btn-ghost btn-small" id="qa-day-btn" title="Dev QA aid: advances the app's clock by one day and re-runs habit boundary processing, so multi-day habit logic (stumbles, misses, run-ending, badges) can be tested without waiting">QA: +1 Day</button>
-    <button class="btn btn-ghost btn-small" id="qa-hour-btn" title="Dev QA aid: advances the app's clock by one hour and re-runs habit boundary processing">QA: +1 Hr</button>
-    <button class="btn btn-ghost btn-small" id="qa-min-btn" title="Dev QA aid: advances the app's clock by fifteen minutes and re-runs habit boundary processing — fine-grained enough to step through the midnight-4am window where the calendar date and the app's day boundary deliberately disagree">QA: +15 Min</button>
-    <span class="qa-time-readout" id="qa-time-readout" title="What the app currently thinks &lsquo;now&rsquo; is, after any QA time jumps"></span>
-    <button class="btn btn-ghost btn-small" id="qa-snapshot-btn" title="Dev QA aid: saves all current data to one snapshot slot (survives Reset), so you can try something destructive and get back to exactly this state">Snapshot</button>
-    <button class="btn btn-ghost btn-small" id="qa-restore-btn" title="Dev QA aid: replaces all current data with the last snapshot, then reloads">Restore</button>
+    <button class="header-icon" type="button" title="Intray">&#128229;</button>
+    <button class="header-icon" type="button" title="Calendar">&#128197;</button>
+    <button class="header-icon" type="button" title="More">&#8943;</button>
   </div>
 </header>
 
-<div class="lane-switcher" id="lane-switcher">
-  <button data-kind="next" class="active" style="--accent:var(--red)">Next Actions</button>
-  <button data-kind="waiting" style="--accent:var(--yellow)">Waiting On</button>
-  <button data-kind="current" style="--accent:var(--moss)">Current Projects</button>
-  <button data-kind="future" style="--accent:var(--dusty)">Future / Someday</button>
-  <button data-kind="habit" style="--accent:var(--purple)">Habits</button>
+<nav class="tabbar" id="lane-switcher" role="tablist">
+  <button class="tab active" data-kind="next"><span class="tab-icon">&#9678;</span><span class="tab-name">Next Actions</span><span class="tab-count">0</span></button>
+  <button class="tab" data-kind="waiting"><span class="tab-icon">&#9203;</span><span class="tab-name">Waiting On</span><span class="tab-count">0</span></button>
+  <button class="tab" data-kind="current"><span class="tab-icon">&#9635;</span><span class="tab-name">Projects</span><span class="tab-count">0</span></button>
+  <button class="tab" data-kind="future"><span class="tab-icon">&#9737;</span><span class="tab-name">Someday</span><span class="tab-count">0</span></button>
+  <button class="tab" data-kind="habit"><span class="tab-icon">&#9873;</span><span class="tab-name">Habits</span><span class="tab-count">0</span></button>
+</nav>
+<div class="tabbar-spacer" aria-hidden="true"></div>
+
+<!-- Dev-only scaffolding — not part of the app's designed surface. Scrolls
+     with content instead of living in the fixed chrome above, which is
+     reserved for the real header (chunk 2, §4.10). -->
+<div id="dev-toolbar">
+  <button class="btn btn-ghost btn-small" id="reset-btn">Reset local data</button>
+  <button class="btn btn-ghost btn-small" id="qa-day-btn" title="Dev QA aid: advances the app's clock by one day and re-runs habit boundary processing, so multi-day habit logic (stumbles, misses, run-ending, badges) can be tested without waiting">QA: +1 Day</button>
+  <button class="btn btn-ghost btn-small" id="qa-hour-btn" title="Dev QA aid: advances the app's clock by one hour and re-runs habit boundary processing">QA: +1 Hr</button>
+  <button class="btn btn-ghost btn-small" id="qa-min-btn" title="Dev QA aid: advances the app's clock by fifteen minutes and re-runs habit boundary processing — fine-grained enough to step through the midnight-4am window where the calendar date and the app's day boundary deliberately disagree">QA: +15 Min</button>
+  <span class="qa-time-readout" id="qa-time-readout" title="What the app currently thinks &lsquo;now&rsquo; is, after any QA time jumps"></span>
+  <button class="btn btn-ghost btn-small" id="qa-snapshot-btn" title="Dev QA aid: saves all current data to one snapshot slot (survives Reset), so you can try something destructive and get back to exactly this state">Snapshot</button>
+  <button class="btn btn-ghost btn-small" id="qa-restore-btn" title="Dev QA aid: replaces all current data with the last snapshot, then reloads">Restore</button>
 </div>
 
 <main id="main">
@@ -54,7 +62,11 @@
 
 <div id="screen-root"></div>
 <div id="dialog-root"></div>
-<button id="fab-create" type="button" title="Create" data-action="open-create" data-kind="next">+</button>
+<button id="fab-create" type="button" title="Create" data-action="fab" data-kind="next">+</button>
+<div class="fab-menu" id="fab-menu" hidden>
+  <button type="button" class="fab-menu-item" data-action="new-primary">New action</button>
+  <button type="button" class="fab-menu-item" data-action="new-secondary">New context</button>
+</div>
 
 <script>
 <!--BUILD:SCRIPT-->

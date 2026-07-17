@@ -18,6 +18,12 @@
     next: "+ New Action", waiting: "+ New Waiting Item",
     current: "+ New Project", future: "+ New Project", habit: "+ New Habit"
   };
+  // §4.3e's label table — the FAB's two-option menu on every lane but
+  // Habits (which has no menu at all; the badge creates directly there).
+  const FAB_MENU_LABELS = {
+    next: ["New action", "New context"], waiting: ["New action", "New context"],
+    current: ["New project", "New list"], future: ["New project", "New list"]
+  };
   const TITLE_PLACEHOLDER = {
     next: "Next action\u2026", waiting: "What are you waiting on\u2026",
     current: "Project title\u2026", future: "Project title\u2026", habit: "Habit title\u2026"
@@ -694,7 +700,7 @@
       notesClean: data.notesClean || "", linkedProjectId: data.linkedProjectId || null, deadline: data.deadline || null,
       whenText: data.whenText || null, conditionId: data.conditionId || null,
       conditionKind: data.conditionKind || null, conditionLabel: data.conditionLabel || null,
-      bundleText: data.bundleText || null
+      bundleText: data.bundleText || null, createdAt: Date.now() // deadline-bar origin (§4.4b)
     };
     const task = Object.assign({ id: genId(), title: data.title, isGroup: false, parent: null }, base);
     state.tasks[kind].unshift(task);
@@ -971,6 +977,57 @@
     });
     return byParent;
   }
+  // Deadline progress bar (§4.4b/c/d). Origin-agnostic math per the spec's own
+  // instruction (chunk 7 reuses this exact bar for events with a different
+  // origin) — deadlineBarState() just needs an origin + due instant, and
+  // leafCardHtml only calls it for Next Actions / Current Projects (§4.1).
+  function deadlineDueInstant(deadline){
+    const d = dateStrToDate(deadline.date);
+    if (deadline.time){
+      const parts = deadline.time.split(":").map(Number);
+      d.setHours(parts[0] || 0, parts[1] || 0, 0, 0);
+      return d.getTime();
+    }
+    // Untimed: due at the 4 AM boundary that BEGINS the due day (§4.4d) —
+    // the same shift boundaryNow() applies, in reverse, to locate it.
+    return d.getTime() + 4 * 3600 * 1000;
+  }
+  function deadlineBarState(task){
+    const deadline = task.deadline;
+    if (!deadline || !deadline.date) return null;
+    const due = deadlineDueInstant(deadline);
+    const now = Date.now() + (state.qaTimeOffset || 0) * 60000;
+    if (now >= due) return { full: true, red: true, passed: true, fillPercent: 100 };
+    // Missing createdAt (pre-chunk-2 / hand-edited test data) → treat as a
+    // zero-width window, the same safe fallback a same-day deadline uses
+    // (§4.4d: don't divide by zero).
+    const origin = task.createdAt || due;
+    const totalWindow = due - origin;
+    if (totalWindow <= 0) return { full: true, red: false, passed: false, fillPercent: 100 };
+    const elapsedFrac = Math.max(0, Math.min(1, (now - origin) / totalWindow));
+    const threeWeeksMs = 21 * 24 * 3600 * 1000;
+    let fillFrac;
+    if (totalWindow <= threeWeeksMs){
+      fillFrac = elapsedFrac;
+    } else {
+      // Light front-loaded curve for the first 85% of elapsed time, then
+      // honest 1:1 tracking for the final 15%, reaching exactly 100% at the
+      // due instant (§4.4b). fillAt85 is a build-time tuning constant; the
+      // shape — front-loaded, then linear home — is what's locked.
+      const fillAt85 = 0.7;
+      fillFrac = elapsedFrac <= 0.85
+        ? fillAt85 * Math.pow(elapsedFrac / 0.85, 0.6)
+        : fillAt85 + (elapsedFrac - 0.85) / 0.15 * (1 - fillAt85);
+    }
+    return { full: false, red: elapsedFrac >= 0.85, passed: false, fillPercent: Math.round(fillFrac * 100) };
+  }
+  function deadlineBarHtml(task){
+    const s = deadlineBarState(task);
+    if (!s) return "";
+    const classes = "deadline-bar" + (s.full ? " full" : "") + (s.red ? " red" : "") + (s.passed ? " passed" : "");
+    const chip = s.passed ? '<span class="deadline-passed-chip">passed</span>' : "";
+    return '<div class="' + classes + '" style="--fill:' + s.fillPercent + '%"><div class="deadline-bar-fill"></div>' + chip + '</div>';
+  }
   function leafCardHtml(kind, task){
     const canLink = (kind === "next" || kind === "waiting");
     const moveDest = MOVE_MAP[kind];
@@ -1069,14 +1126,18 @@
     } else {
       checkboxHtml = '<button class="check" data-action="complete" data-id="' + task.id + '" title="Mark complete"></button>';
     }
+    // \u00a74.7b: the list-view "\u00d7" delete is gone \u2014 items are deletable from
+    // their own page only (screen-delete). Next/Current cards that carry a
+    // deadline (\u00a74.1) get the progress bar (\u00a74.4b/c/d) directly under the
+    // title; everything else renders the title as a bare flex:1 child, same
+    // as before.
+    const titleHtml = '<div class="card-title' + (done ? " done" : "") + '" data-action="open-edit" data-kind="' + kind + '" data-id="' + task.id + '" title="Tap to open \u2014 press and hold to reorder">' + escapeHtml(task.title) + '</div>';
+    const deadlineBarBlock = (kind === "next" || kind === "current") ? deadlineBarHtml(task) : "";
+    const titleBlock = deadlineBarBlock ? ('<div style="flex:1">' + titleHtml + deadlineBarBlock + '</div>') : titleHtml;
     return (
       '<div class="card" draggable="true" data-drag-id="' + task.id + '" data-drag-parent="' + (task.parent || "") + '" data-drag-group="0">' +
-        '<div class="card-top">' + checkboxHtml +
-          '<div class="card-title' + (done ? " done" : "") + '" data-action="open-edit" data-kind="' + kind + '" data-id="' + task.id + '" title="Tap to open \u2014 press and hold to reorder">' + escapeHtml(task.title) + '</div>' +
-          '<div class="card-actions">' +
-            '<button class="icon-btn" data-action="delete" data-id="' + task.id + '" title="Delete">&times;</button>' +
-          '</div>' +
-        '</div>' + (kind === "waiting" ? cueBlock + linkBlock : linkBlock + cueBlock) + projectFlagBlock +
+        '<div class="card-top">' + checkboxHtml + titleBlock + '</div>' +
+        (kind === "waiting" ? cueBlock + linkBlock : linkBlock + cueBlock) + projectFlagBlock +
       '</div>'
     );
   }
@@ -1150,6 +1211,8 @@
       updateHabitBadge();
     }
     laneEl.querySelector(".count").textContent = state.tasks[kind].length;
+    const tabCountEl = qs('.tab[data-kind="' + kind + '"] .tab-count');
+    if (tabCountEl) tabCountEl.textContent = state.tasks[kind].length;
     const rootEl = laneEl.querySelector(".cards-root");
     let activeHtml, completedHtml;
     if (kind === "habit"){
@@ -1180,21 +1243,19 @@
   function laneShellHtml(k){
     return (
       '<div class="lane" data-kind="' + k + '">' +
-        '<div class="lane-tab">' +
-          '<span class="lane-tab-title">' + escapeHtml(LIST_TITLES[k]) + '</span>' +
-          '<span class="lane-tab-right">' +
+        '<div class="lane-label">' +
+          '<span class="lane-label-title">' + escapeHtml(LIST_TITLES[k]) + '</span>' +
+          '<span class="lane-label-right">' +
             '<span class="count">0</span>' +
             '<button class="info-btn" data-action="toggle-info" data-kind="' + k + '" type="button" title="What is this list for?">i</button>' +
           '</span>' +
         '</div>' +
         '<div class="lane-info" data-kind="' + k + '">' + escapeHtml(LANE_INFO[k]) + '</div>' +
-        '<div class="lane-body">' +
-          '<div class="lane-actions-row">' +
-            '<button class="btn btn-ghost btn-small new-list-btn" data-action="new-list" data-kind="' + k + '" type="button">+ New list</button>' +
-            (k === "habit" ? '<button class="btn btn-ghost btn-small tidy-btn" data-action="tidy-habits" type="button" title="Suggest an order from your hooks (you can still rearrange freely afterward)">&#8645; Tidy order</button>' : "") +
-          '</div>' +
-          '<div class="cards-root" data-dropzone-parent=""></div>' +
-        '</div>' +
+        (k === "habit"
+          ? '<div class="lane-tools-row"><button class="btn btn-ghost btn-small tidy-btn" data-action="tidy-habits" type="button" title="Suggest an order from your hooks (you can still rearrange freely afterward)">&#8645; Tidy order</button></div>'
+          : "") +
+        '<div class="inline-slot" data-kind="' + k + '"></div>' +
+        '<div class="cards-root" data-dropzone-parent=""></div>' +
       '</div>'
     );
   }
@@ -1208,8 +1269,22 @@
     const fab = qs("#fab-create");
     if (fab){
       fab.setAttribute("data-kind", state.activeKind);
-      fab.style.setProperty("--accent", "var(" + accentVarForKind(state.activeKind) + ")");
+      fab.style.setProperty("--lane-accent", "var(" + accentVarForKind(state.activeKind) + ")");
       fab.title = NEW_ITEM_LABEL[state.activeKind] || "Create";
+    }
+    // ▲ CHUNK 2 (§4.3e) — relabel the FAB's two-option menu for the newly
+    // active lane, and close it on every tab switch so a stale menu never
+    // survives a jump to a different lane (Habits has no menu; its labels
+    // just sit unused).
+    const menu = qs("#fab-menu");
+    if (menu){
+      const labels = FAB_MENU_LABELS[state.activeKind];
+      const items = menu.querySelectorAll(".fab-menu-item");
+      if (labels && items.length === 2){
+        items[0].textContent = labels[0];
+        items[1].textContent = labels[1];
+      }
+      menu.hidden = true;
     }
   }
 
@@ -1228,7 +1303,8 @@
   // Deliberately NOT in this chunk (per the doc's own chunk breakdown):
   //  - waiting condition / hook picker for Waiting items (chunk 2) — that
   //    hook icon is shown greyed-out on both Next and Waiting for now.
-  //  - deadline-approaching progress bar visuals (chunk 6).
+  //  - deadline-approaching progress bar visuals — built in chunk 2, see
+  //    deadlineBarHtml()/deadlineBarState() above.
   //  - habit personal-best / animation box — built in chunk 3, see
   //    habitTrackHtml() and the habitRuns engine above.
   // =========================================================
@@ -2371,7 +2447,7 @@
     }
     // Fresh open, or navigation to a different item (child screens,
     // returning from one): full rebuild with the slide-in.
-    root.innerHTML = '<div class="screen-overlay" data-kind="' + s.kind + '" data-screen-key="' + key + '" style="--accent:var(' + accentVarForKind(s.kind) + ')">' + inner + '</div>';
+    root.innerHTML = '<div class="screen-overlay" data-kind="' + s.kind + '" data-screen-key="' + key + '" style="--lane-accent:var(' + accentVarForKind(s.kind) + ')">' + inner + '</div>';
     requestAnimationFrame(function(){
       const overlay = qs(".screen-overlay");
       if (overlay) overlay.classList.add("open");
@@ -2503,37 +2579,33 @@
       input.value = "";
       addTask(row.getAttribute("data-kind"), title, row.getAttribute("data-parent") || null);
     }
-    function openNewListRow(btn, kind){
-      const row = document.createElement("div");
-      row.className = "add-row new-list-inline";
-      row.innerHTML = '<input type="text" placeholder="List name\u2026" /><button type="button" data-role="new-list-confirm">+</button>';
-      btn.replaceWith(row);
-      const input = row.querySelector("input");
+    // CHUNK 2 (spec 4.3e) -- the FAB menu's second option ("New context" /
+    // "New list"). Replaces the old button-swap openNewListRow(): there's no
+    // "+ New list" button to swap out anymore, so this targets the lane's
+    // own inline-slot div (laneShellHtml) instead. Still calls the existing
+    // addGroup() path -- chunk 3 swaps that handler underneath.
+    function openInlineNameRow(kind){
+      const slot = qs('.inline-slot[data-kind="' + kind + '"]');
+      if (!slot) return;
+      const placeholder = (kind === "current" || kind === "future") ? "List name\u2026" : "Context name\u2026";
+      slot.innerHTML = '<div class="inline-name-row"><input type="text" placeholder="' + escapeHtml(placeholder) + '" /><button type="button" data-role="inline-name-confirm">+</button></div>';
+      const input = slot.querySelector("input");
       input.focus();
-      // Bugfix: renderLane() only rebuilds .cards-root, not the lane-body's
-      // own button row that this inline input replaced — so it never
-      // actually restored the "+ New list" button, and the typed text sat
-      // there uncleared after a successful create (the only feedback was
-      // the new group, which was also landing at the bottom of the lane,
-      // off-screen). Restore the button ourselves, immediately, on every
-      // exit path.
-      function restore(){
-        if (row.isConnected) row.replaceWith(btn);
-      }
+      function clear(){ slot.innerHTML = ""; }
       function commit(){
         const name = input.value.trim();
-        if (!name){ restore(); return; }
-        restore();
+        if (!name){ clear(); return; }
+        clear();
         addGroup(kind, name);
       }
-      row.querySelector("button").addEventListener("click", commit);
+      slot.querySelector("button").addEventListener("click", commit);
       input.addEventListener("keydown", function(ev){
         if (ev.key === "Enter") commit();
-        else if (ev.key === "Escape") restore();
+        else if (ev.key === "Escape") clear();
       });
       input.addEventListener("blur", function(){
-        // Give the + button's click a beat to land before restoring.
-        setTimeout(function(){ if (document.body.contains(row) && !row.contains(document.activeElement)) restore(); }, 150);
+        // Give the + button's click a beat to land before clearing.
+        setTimeout(function(){ if (slot.isConnected && !slot.contains(document.activeElement)) clear(); }, 150);
       });
     }
     document.addEventListener("click", function(e){
@@ -2541,6 +2613,10 @@
       if (addMiniBtn){ submitAddMini(addMiniBtn.closest(".add-row-mini")); return; }
     });
     document.addEventListener("keydown", function(e){
+      if (e.key === "Escape"){
+        const fabMenuEl = qs("#fab-menu");
+        if (fabMenuEl && !fabMenuEl.hidden) fabMenuEl.hidden = true;
+      }
       if (e.key !== "Enter") return;
       const row = e.target.closest && e.target.closest(".add-row-mini");
       if (row && e.target.matches("input[type=text]")){ e.preventDefault(); submitAddMini(row); }
@@ -2557,6 +2633,15 @@
         if (act !== "screen-pick-hook" && act !== "screen-pick-condition") playNavClick();
       }
 
+      // CHUNK 2 (spec 4.3e) -- close the FAB menu on any click that isn't
+      // the FAB itself or one of its own items. A side effect, not a
+      // return, so it applies uniformly ahead of every other branch below,
+      // including clicks that match no data-action at all.
+      const fabMenuEl = qs("#fab-menu");
+      if (fabMenuEl && !fabMenuEl.hidden && !e.target.closest("#fab-create") && !e.target.closest("#fab-menu")){
+        fabMenuEl.hidden = true;
+      }
+
       const infoBtn = e.target.closest('[data-action="toggle-info"]');
       if (infoBtn){
         const kind = infoBtn.getAttribute("data-kind");
@@ -2571,9 +2656,27 @@
       const advBtn = e.target.closest('[data-action="screen-open-advanced"]');
       if (advBtn){ openAdvancedDialog(); return; }
 
-      const newListBtn = e.target.closest('[data-action="new-list"]');
-      if (newListBtn){
-        openNewListRow(newListBtn, newListBtn.getAttribute("data-kind"));
+      // CHUNK 2 (spec 4.3e) -- the FAB is now a two-option menu on every
+      // lane but Habits, where it still creates directly (no menu).
+      const fabBtn = e.target.closest('[data-action="fab"]');
+      if (fabBtn){
+        if (state.activeKind === "habit"){ openScreen("habit", null); return; }
+        const menu = qs("#fab-menu");
+        if (menu) menu.hidden = !menu.hidden;
+        return;
+      }
+      const fabPrimary = e.target.closest('[data-action="new-primary"]');
+      if (fabPrimary){
+        const menu = qs("#fab-menu");
+        if (menu) menu.hidden = true;
+        openScreen(state.activeKind, null);
+        return;
+      }
+      const fabSecondary = e.target.closest('[data-action="new-secondary"]');
+      if (fabSecondary){
+        const menu = qs("#fab-menu");
+        if (menu) menu.hidden = true;
+        openInlineNameRow(state.activeKind);
         return;
       }
       const moveBtn = e.target.closest('[data-action="move"]');
@@ -2616,12 +2719,8 @@
         restoreTask(restoreBtn.getAttribute("data-kind"), restoreBtn.getAttribute("data-id"));
         return;
       }
-      const deleteBtn = e.target.closest('[data-action="delete"]');
-      if (deleteBtn){
-        const k = deleteBtn.closest(".lane").getAttribute("data-kind");
-        deleteTask(k, deleteBtn.getAttribute("data-id"));
-        return;
-      }
+      // Lane-card delete is gone (§4.7b) — deleteTask() is still called from
+      // the full-screen page's own 🗑 (screen-delete, deleteScreenItem()).
       const habitBtn = e.target.closest('[data-action="toggle-habit"]');
       if (habitBtn){
         const habitId = habitBtn.getAttribute("data-id");
@@ -2650,8 +2749,8 @@
       }
 
       // ---- full-screen create/edit ----
-      const openCreateBtn = e.target.closest('[data-action="open-create"]');
-      if (openCreateBtn){ openScreen(openCreateBtn.getAttribute("data-kind"), null); return; }
+      // (creation is now the FAB's own data-action="fab"/"new-primary"
+      // branches above, chunk 2 -- edit still opens via data-action="open-edit" below)
 
       const openEditEl = e.target.closest('[data-action="open-edit"]');
       if (openEditEl){ openScreen(openEditEl.getAttribute("data-kind"), openEditEl.getAttribute("data-id")); return; }
@@ -2802,10 +2901,19 @@
     // have no native HTML5 drag-and-drop at all, so touch needs its own
     // gesture handling that lands in the same place.
     let liveDrag = null; // { el, kind, isGroup }
+    // CHUNK 2 (spec 4.7b known issue 2) -- with card backgrounds gone, the
+    // live-reordered card sliding into place isn't always legible on its
+    // own. Track the last-marked anchor so a brass rule (.drop-before /
+    // .drop-after, styles.css) can show exactly where it'll land, and clear
+    // it as soon as the hover target changes.
+    let dropIndicatorEl = null;
+    function clearDropIndicator(){
+      if (dropIndicatorEl){ dropIndicatorEl.classList.remove("drop-before", "drop-after"); dropIndicatorEl = null; }
+    }
     // Clamps the hit-test point to the active-card area of a lane before
     // calling elementFromPoint. Without this, dragging past the last card
     // lands on the Completed section (or empty margin) below it — and past
-    // the first card lands on the "+ New list" button or header above it —
+    // the first card lands on the floating + badge or header above it —
     // neither of which is a valid drop target, so the drag just stalls
     // wherever the last valid hover was instead of tracking to the edge.
     // Clamping guarantees the point always falls on a real card or the
@@ -2907,12 +3015,18 @@
         if (ref !== el && el.nextSibling !== ref){
           anchor.parentElement.insertBefore(el, ref);
         }
+        clearDropIndicator();
+        if (anchor.classList.contains("card")){
+          anchor.classList.add(before ? "drop-before" : "drop-after");
+          dropIndicatorEl = anchor;
+        }
       } else if (!cardTarget){
         const zone = targetEl.closest("[data-dropzone-parent]");
         if (!zone || el.contains(zone) || el.parentElement === zone) return;
         if (!drag.isGroup || zone.classList.contains("cards-root")){
           zone.appendChild(el);
         }
+        clearDropIndicator();
       }
     }
     function commitLiveMove(drag){
@@ -2937,11 +3051,14 @@
       e.dataTransfer.effectAllowed = "move";
       el.classList.add("dragging");
       liveDrag = { el: el, kind: kind, isGroup: payload.isGroup };
+      document.body.classList.add("drag-active"); // freeze the collapsing tab bar (spec 4.10b, known issue 2)
     });
     document.addEventListener("dragend", function(){
       if (!liveDrag) return;
       const kind = liveDrag.kind;
       liveDrag = null;
+      document.body.classList.remove("drag-active");
+      clearDropIndicator();
       stopAutoScroll();
       renderLane(kind); // restores state order on cancel; settles the DOM after a committed drop
     });
@@ -2995,6 +3112,8 @@
       disarmDragWatchdog();
       if (wasActive){
         liveDrag = null;
+        document.body.classList.remove("drag-active");
+        clearDropIndicator();
         stopAutoScroll();
         renderLane(kind);
       }
@@ -3061,6 +3180,7 @@
         touchDrag.active = true;
         el.classList.add("dragging");
         liveDrag = { el: el, kind: kind, isGroup: isGroup };
+        document.body.classList.add("drag-active"); // freeze the collapsing tab bar (spec 4.10b, known issue 2)
         dragPointer = { x: touchDrag.startX, y: touchDrag.startY };
         startAutoScroll();
         armDragWatchdog();
@@ -3092,6 +3212,8 @@
         commitLiveMove(liveDrag);
         const kind = liveDrag.kind;
         liveDrag = null;
+        document.body.classList.remove("drag-active");
+        clearDropIndicator();
         renderLane(kind);
       }
       touchDragCleanup();
@@ -3100,12 +3222,34 @@
       if (touchDrag && touchDrag.active){
         const kind = touchDrag.kind;
         liveDrag = null;
+        document.body.classList.remove("drag-active");
+        clearDropIndicator();
         disarmDragWatchdog();
         stopAutoScroll();
         renderLane(kind);
       }
       touchDragCleanup();
     });
+
+    // CHUNK 2 (spec 4.10b) -- collapsing tab bar. rAF-debounced scroll
+    // listener toggles body.tabs-collapsed on scroll direction; gated on
+    // drag-active so an in-progress drag's auto-scroll can never flip it
+    // mid-drag (spec 4.10b, known issue 2 -- the freeze is body.drag-active
+    // itself, set/cleared at every liveDrag/touchDrag transition above).
+    let lastScrollY = 0, tabsScrollTicking = false;
+    window.addEventListener("scroll", function(){
+      if (tabsScrollTicking) return;
+      tabsScrollTicking = true;
+      requestAnimationFrame(function(){
+        if (!document.body.classList.contains("drag-active")){
+          const y = window.scrollY;
+          if (y > 24 && y > lastScrollY) document.body.classList.add("tabs-collapsed");
+          else if (y < lastScrollY) document.body.classList.remove("tabs-collapsed");
+          lastScrollY = y;
+        }
+        tabsScrollTicking = false;
+      });
+    }, { passive: true });
   }
 
   // =========================================================
@@ -3125,7 +3269,7 @@
   // off to chunk 3.
   // =========================================================
   function injectQAChecklist(){
-    const FLAG = "gtd_qa_checklist_chunk1";
+    const FLAG = "gtd_qa_checklist_chunk2";
     if (Storage.get(FLAG)) return;
     Storage.set(FLAG, "1");
 
@@ -3156,16 +3300,18 @@
       });
     }
 
-    addGroupWithItems("\u2705 QA \u2014 Chunk 1: back always means back one screen", [
-      { title: "Opening a linked action from a project, then Cancel, returns to the project (not the lane list)", notes: "Open the Kitchen remodel project. Tap its linked \u2018Contractor quote from Dana\u2019 row to open that action's own page. Tap \u2715 (Cancel). You should land back on the Kitchen remodel project page, not out at the Current Projects list." },
-      { title: "Same thing, but Save instead of Cancel", notes: "From the project page, open a linked action again, change its title, and tap \u2190 (Save). You should land back on the project page, and the linked action's new title should show correctly if you reopen it." },
-      { title: "The project page's own unsaved typing survives that round trip", notes: "Open a project, type something new into its description box (don't save yet), then open a linked action and Cancel back out. Your unsaved project description should still be sitting there, untouched." },
-      { title: "Creating a brand new action from a project (the pencil icon), then Cancel, returns to the project", notes: "Open a project, tap the pencil icon next to its quick-add row to open a full blank action page, then tap \u2715. You should land back on the project page, not the lane list, and nothing new should have been created." }
+    addGroupWithItems("\u2705 QA \u2014 Chunk 2: the new look and the + button", [
+      { title: "The tab bar shrinks to a small pill when you scroll down, and expands again when you scroll up", notes: "Open a lane with several items and scroll down through the list \u2014 the row of tabs at the top should shrink into a small floating pill showing just the current lane. Scroll back up and it should return to the full row." },
+      { title: "The round + button opens a small menu instead of creating something right away (except on Habits)", notes: "On Next Actions, Waiting On, Current Projects, or Future/Someday, tap the round + button in the bottom corner \u2014 a small menu with two choices should pop up instead of jumping straight to a new item. On Habits, + should still create a new habit right away with no menu." },
+      { title: "The menu's second option opens a small name box that creates a list or context", notes: "Tap +, then the second menu choice (\u2018New context\u2019 on Next/Waiting, \u2018New list\u2019 on Current/Future). A small text box should appear in the list \u2014 type a name, tap the + next to it, and it should show up as a new group right away." },
+      { title: "A due date on a Next Action or Current Project now shows a thin progress bar", notes: "Open a Next Action or Current Project, give it a deadline, and save. Back on the list, a thin bar should appear under its title, filling up as the due date approaches, turning red near the end, and showing a \u2018passed\u2019 label once it's gone by." },
+      { title: "Items on a list no longer have their own \u00d7 \u2014 you delete them from the item's own page", notes: "Look at any card in any lane \u2014 there should be no small \u00d7 on it anymore. To delete something, tap it open and use the trash icon on its own page." },
+      { title: "Press-and-hold still lets you drag items into a new order", notes: "Press and hold an item's title for about half a second, then drag it up or down. It should follow your finger/cursor and land in the new spot when you let go." }
     ]);
 
-    addGroupWithItems("\u2705 QA \u2014 Recheck chunk 0c", [
-      { title: "Snapshot and Restore still work", notes: "Tap Snapshot, delete something, tap Restore and confirm \u2014 the deleted item should come back." },
-      { title: "The QA time buttons still move the clock", notes: "Tap \u2018QA: +1 Day\u2019 and confirm the small readout text next to it changes." }
+    addGroupWithItems("\u2705 QA \u2014 Recheck chunk 1", [
+      { title: "Opening a linked action from a project, then Cancel, still returns to the project (not the lane list)", notes: "Open a project, tap one of its linked actions to open that action's own page, then tap \u2715 (Cancel). You should land back on the project page, not out at the Current Projects list." },
+      { title: "Creating a brand new action from a project's pencil icon, then Cancel, still returns to the project", notes: "Open a project, tap the pencil icon next to its quick-add row, then tap \u2715. You should land back on the project page, and nothing new should have been created." }
     ]);
 
     saveTasksLocal("next");

@@ -57,8 +57,14 @@ start fresh from the backup format rather than inheriting the Tasks API's shape.
 ### RULING: there is no real user data yet, and won't be until the base product is done
 
 Everything currently in localStorage is test data. **Nothing in the app is precious.** The author
-will begin real daily use only once the base product is finished — at minimum after the calendar
-(chunk 7), and probably not until it is a phone/desktop app.
+will begin real daily use only once the base product is finished and **distributed — which is after
+chunk 9** (the service worker that makes it reliably offline-capable and install-polished; note the
+manifest that makes it *installable* already ships in 0b — chunk 9 adds the offline cache, not
+installability). *(Corrected,
+user, this round: earlier phrasings pegged this to "after the calendar, chunk 7." That was always a
+floor, not the date; the actual switch-over is distribution, and distribution is after chunk 9. The
+testers are experienced programmers who receive the finished product at that same distribution, not
+a half-built one, so there is no early-tester data to protect before then either.)*
 
 **Consequences for every session between now and then:**
 - **Migrations are optional.** If a schema change is cleaner without one — the notes-marker
@@ -67,13 +73,20 @@ will begin real daily use only once the base product is finished — at minimum 
   data that doesn't matter. Flag it in the handoff so the decision is visible; don't ask.
 - **Data-model changes are cheap right now and will never be this cheap again.** Make them now.
   This is the window for getting the shape right.
-- **This window closes on a specific event:** the first day the app is used for real. That day is
-  late by design — the author will not switch over until the base product is finished (at minimum
-  after the calendar, chunk 7), and **the testers are experienced programmers who receive the
-  finished product at roughly the same time**, not a half-built one. So there is no early-tester
-  data to protect either. From that day forward, every schema change carries a migration and every
-  bug can destroy something irreplaceable. **Export/import (chunk 8) must exist before that day** —
-  it is the last chunk before the app stops being disposable.
+- **This window closes on a specific event:** the first day the app is used for real, which is
+  **distribution, after chunk 9** (see the corrected timeline above). That day is late by design —
+  the author will not switch over until the base product is finished and distributed, and **the
+  testers are experienced programmers who receive the finished product at roughly the same time**,
+  not a half-built one. So there is no early-tester data to protect either. From that day forward,
+  every schema change carries a migration and every bug can destroy something irreplaceable.
+  **Export/import (chunk 8) must exist before that day** — it is a hard prerequisite for
+  distribution, and it precedes chunk 9, so this still holds. *(Softened this round: this line used
+  to call chunk 8 "the last chunk before the app stops being disposable." With the switch-over moved
+  to distribution, chunk 8 is no longer the **last** disposable chunk — chunk 9 is — but it remains a
+  hard prerequisite. **⚑ Flagged consequence, not rewritten:** the chunk-8 row and §4.14a warn about
+  work landing "on the far side of §1's migration boundary." Against the corrected timeline those
+  warnings now fire *before* the real boundary — i.e. they are conservative, which is harmless. Left
+  as-is deliberately; do not relax them on the strength of this correction.)*
 
 ---
 
@@ -101,13 +114,13 @@ deadline moved later; everything that removes friction from the next twenty sess
 | **0c** | **Dev tools: snapshot & restore** (§12.3) | Cheap, and it pays for itself across every remaining chunk. One button to capture state before destructive testing, one to roll back. Do it *before* the heavy chunks, not after. |
 | **1** | **Navigation stack** | Replace the single `state.returnScreen` slot with a real screen stack (§3, known issue 1). **In plain terms:** the app currently remembers *one* place to go back to, so any flow that goes two screens deep (lane → project → linked action → back) has nowhere to put the second breadcrumb and lands you in the wrong place. A stack remembers the whole path, so ← always means "back one screen." Small, and it unblocks **two** later chunks (5 and 6) that would otherwise each hack around the limitation independently. **⚑ Wording flagged (user, this round): the original one-line description was too terse to be understood by anyone not already holding `state.returnScreen` in their head** — the plain-terms sentence above is the fix; check the same failure mode in the other rows before the build sessions start. |
 | **2** | **Main UI visual redesign** | §4.7b layout cleanup + §4.10b floating nav tabs. **Builds the deadline progress bar — §4.4b, §4.4c, and the two DEADLINE rows of §4.4d (assigned this round; §4.4 previously had no owner in this table and the bar has never existed in the code).** The two EVENT rows of §4.4d extend the same renderer in chunk 7 — so **the renderer must TAKE its window's origin, not assume the item's creation date** (§4.4d, §4.14c: an event's bar opens at its 4 AM appearance, and measuring it from creation puts it 98% full and red at birth). One parameter now; a rewrite in chunk 7 if it is hard-coded. Build with `env(safe-area-inset-*)` from day one. Implement the **freeze-tab-collapse-during-drag** ruling (§3, known issue 2). Comes before any new surface exists, so nothing gets built in the old visual language and reworked. **Build the new creation affordance (§4.3e — RULED):** delete the "+ New list" button, give the + badge a two-option pop-up menu (no menu on Habits), second option opens an inline naming row. On the action lanes that option still calls the existing group path — chunk 3 swaps the handler underneath it. |
-| **3** | **Contexts rework + retire the old date model** | §4.3d. A `gtd_contexts` registry, **shared Next↔Waiting, and no second registry anywhere** — **RULED: the project lanes keep plain lists and Habits have no grouping at all** (§4.3d). Contexts are an action-lane feature; do not build a second registry for Current Projects. *(This is a statement about **registries**, not a ban on anything else touching the one registry: from chunk 7 the pseudo-action takes a context too, because it lives in the Next Actions lane — §4.3d, §4.14.)* Touches the same card/lane rendering chunk 2 just reworked. **No migration needed** (§1). Includes the **duplicate-title check on quick-add rows** (below). Creation UI already exists from chunk 2 — this chunk swaps *one handler*: *New context* stops creating a lane-local group and starts writing to the registry (§4.3e). Project-lane lists are **not** touched; they stay plain groups. **Also, and purely subtractive — retire the old date model (§4.13a):** delete the *date* option from a Waiting action's "waiting for", delete date-based auto-promotion, delete the **recurrence `<select>` from the deadline picker** on the Next / Waiting / Project pages, and delete the *"make this a habit?"* bubble that currently hangs off a **deadline's** recurrence (it returns in chunk 7, on the event page). **Why here and not in chunk 7:** §9's case table is chunk 5's build reference and it no longer contains the date rows — so the code must stop containing them *before* chunk 5, or the riskiest chunk on the board gets built against a spec that doesn't describe it. The app has no events at all between this chunk and chunk 7; that is correct and costs nothing (§1). **⚑ Judgment call — flagged, overrule if you'd rather carry the dead code to chunk 7.** |
+| **3** | **Contexts rework + retire the old date model** | §4.3d. A `gtd_contexts` registry, **shared Next↔Waiting, and no second registry anywhere** — **RULED: the project lanes keep plain lists and Habits have no grouping at all** (§4.3d). Contexts are an action-lane feature; do not build a second registry for Current Projects. *(This is a statement about **registries**, not a ban on anything else touching the one registry: from chunk 7 the pseudo-action takes a context too, because it lives in the Next Actions lane — §4.3d, §4.14.)* Touches the same card/lane rendering chunk 2 just reworked. **No migration needed** (§1). Includes the **duplicate-title check on quick-add rows** (below). Creation UI already exists from chunk 2 — this chunk swaps *one handler*: *New context* stops creating a lane-local group and starts writing to the registry (§4.3e). Project-lane lists are **not** touched; they stay plain groups. **Also, and purely subtractive — retire the old date model (§4.13a):** delete the *date* option from a Waiting action's "waiting for", delete date-based auto-promotion, delete the **recurrence `<select>` from the deadline picker** on the Next / Waiting / Project pages, and delete the *"make this a habit?"* bubble that currently hangs off a **deadline's** recurrence (it returns in chunk 7, on the event page). **Why here and not in chunk 7:** §9's case table is chunk 5's build reference and it no longer contains the date rows — so the code must stop containing them *before* chunk 5, or the riskiest chunk on the board gets built against a spec that doesn't describe it. The app has no events at all between this chunk and chunk 7; that is correct and costs nothing (§1). **⚑ Judgment call — flagged, overrule if you'd rather carry the dead code to chunk 7.** **⭐ ALSO IN THIS CHUNK, three additions ruled this round (user):** (a) **contexts become cue targets in the habit hook picker** (§4.5, §4.3d, §11) — a habit can be cued by a context, distinct from *filing* a habit into one, which stays banned; (b) the picker copy stops saying "habit" and says **"cue"** (§4.5, §11), because the list now holds contexts as well as habits; (c) as part of retiring the date model, **a Next Action with a deadline set has its "Make Waiting" convert disabled** (greyed + tooltip, §4.13a) — a dated thing does not wait. All three land here because the contexts registry and the date-model retirement are both this chunk. **⚑ Flagged: (a)/(b) depend on the registry existing, so they cannot precede this chunk; (c) is the §4.13a enforcement.** |
 | **4** | **Completed-items overhaul** | §12.2. Spec'd, self-contained, ready to build as written (minus its Google clauses). |
-| **5** | **Chunk B — staged child actions** | §12.1. **Unblocked — the staged-edits-vs-timer question is RULED in §9.** Build to that ruling exactly; do not re-derive it, and mind the by-ID staged-delete trap. Riskiest chunk on the board: it moves the storage boundary for a whole class of edits. Better done with weeks of recovery time left than days. Depends on chunk 1. **Promotion has exactly ONE trigger — a completed condition** (chunk 3 deleted the other). Do not build staging support for date-based promotion; do not re-add the rows chunk 3 removed. |
+| **5** | **Chunk B — staged child actions** | §12.1. **Unblocked — the staged-edits-vs-timer question is RULED in §9.** Build to that ruling exactly; do not re-derive it, and mind the by-ID staged-delete trap. Riskiest chunk on the board: it moves the storage boundary for a whole class of edits. Better done with weeks of recovery time left than days. Depends on chunk 1. **Promotion has exactly ONE trigger — a completed condition** (chunk 3 deleted the other). Do not build staging support for date-based promotion; do not re-add the rows chunk 3 removed. **⭐ TWO additions ruled this round (user), both riding on this chunk's staging machinery:** (1) **creating a Current project requires at least one staged action** — the drafting page will not save an actionless Current project (§4.3, §12.1); staging is what makes the action and the project land atomically. **Scoped deliberately:** drafting page only, **Current only** (Future projects hold no actions), and the **calendar creation row is exempt** (§4.15a still creates a dateless, actionless project by design). The review's stalled-project kind is **retained** — a project can still be stranded later (§4.8b). (2) **a linked action opened *as a child of the project page* cannot be un-linked from it** — the project-link field is locked (disabled + tooltip); the same action opened from its lane stays freely unlinkable (§12.1). |
 | **6** | **Tray drawer + Notes + header + settings surface** | §4.8a (**the capture drawer — a left drawer, not a full-screen tray**), §4.9, §4.10, §4.3c. **The review (§4.8b) is NOT in this chunk** — see 6b. Depends on chunk 1. **The settings surface arrives here** — it owns **Clear all app data** (today's Reset) and, from chunk 8, **Export/Import**. **The Completed trash can does NOT move into it (RULED, user, this round):** it is lane-scoped — *clear **this lane's** archive* — and it stays in the Completed section header where chunk 4 puts it (§4.12b). Two destructive controls, two scopes, one never-accidental ruling — and it is satisfied **inside the sprint**, not hung on the wrapper stretch goal. |
-| **6b** | **The review (open loops)** | §4.8b. Split out of chunk 6 on purpose — daily review is the highest design-surface part of GTD, and chunk 6 is already full. Derived queue over four open-loop types, redaction-as-state, decision menus, session-scoped "Not now", empty-vs-N-deferred end states. **Depends on chunk 1** (returns to the review after a tap-through). **Mind the fence at the end of §4.8b** — this is where scope dies. **⚠ RESEQUENCED THIS ROUND — 6b now builds ALL FOUR kinds.** The previous ruling deferred the past-due kind to chunk 7 because it was "only a pseudo-action"; **that premise died when past-due deadlines became open loops (§4.8b, user ruling this round)** — and deadlines exist today. So 6b builds **four open-loop kinds** (past-due in its **deadline** shape — the *push the date / complete / delete / Not now* menu — plus stalled projects, orphaned waitings, and captures) and **five** sort chips. **Chunk 7 extends the past-due kind to its second shape** (the pseudo-action, which gets a checkbox, not the menu), adds the sixth chip, and the "it moved" banner (§4.15e). Build the past-due kind so a second **shape** slots in — do not hard-code the deadline case. |
-| **7** | **Calendar + events + recurrence + seeded sample habits** | **MERGED (was 7 + 8) — calendar planning round.** Under the new model recurrence is *calendar machinery*: it operates on events, and events do not exist until the calendar does, so a standalone recurrence chunk scheduled first would have nothing to operate on. Contents: the calendar (month/day, marks, creation row) · events/appointments as an entity with their own store · the **pseudo-action** (§4.14) · recurrence (roll-forward, projection, skip / delete-series, pause) · completed-series collapse · **`seriesId`** (now internal to this chunk, not a cross-chunk dependency) · **the pseudo-action SHAPE of the review's past-due kind** (the checkbox variant — 6b already built the kind, in its deadline shape) + the Calendar chip · **the two EVENT rows of §4.4d** (the appointment window, §4.14c; the untimed event's born-full bar), extending the renderer chunk 2 built · seeded sample habits (§4.16). §4.13–§4.15. **⚠ ONE-LINE REQUIREMENT WITH A LONG SHADOW: the pseudo-action's task ID is minted WHEN THE EVENT IS CREATED, not when the row first appears at 4 AM (§4.14a).** The ID's home is the event record. This costs nothing here — §4.14a already requires the ID to be *stable* across every roll, and allocating it at creation is the simplest way to make it so — but getting it wrong makes **chunk 8's advance-conditioning cheap and re-allocates every condition reference in the app**, at exactly the moment migrations stop being optional (§1). Mint at creation. **Unambiguously the largest chunk on the board** — it already was; the merge is honest about it. **Core, not stretch:** it is the **floor** for real use — the author will not switch over before it ships, and probably not until export/import (chunk 8) and a wrapper exist (§1). *(Stated as a floor, not a start date: §1 requires export/import to exist **before** the first real day, and chunk 8 lands after this one.)* Everything it depends on is settled. |
-| **8** | **Export / import** | *(was 9.)* Late now that there is no data to protect and no early testers. Lands in the settings surface from chunk 6. **The backup must serialize events and series too** — they are a new top-level entity as of chunk 7, and the export format is where new entities get silently forgotten. **Import REPLACES, it does not merge** — behind a confirm reading "This will replace everything currently in the app." Merge is a conflict engine in disguise (§10); replace makes the file an honest snapshot. Foundation for the sync design (§10). **⚠ ALSO IN THIS CHUNK, and thematically it does not belong here — it is here because it is cheap and this is the only chunk with room (user ruling, this round): CONDITIONING A WAITING ACTION ON A NOT-YET-LIVE EVENT** (§10 — re-costed this round from five subsystems down to two). **Two pieces only:** (1) the condition picker gains a section for **pending events**, filtered to live occurrences only; (2) **condition resolution stops treating a pending pseudo-action as an orphan** — today a lookup searches live lanes only, so a hook to Tuesday's event would wear the dashed orphan pill until Tuesday 4 AM. That is the one place that has to learn `gtd_events` exists. **Everything else is free *only if chunk 7 minted the ID at event creation*** — if it did not, stop and fix that first; do not re-allocate IDs here, in the chunk that ships the export format, on the far side of §1's migration boundary. **Order within the chunk: build the feature first, then the serializer** — a serializer written against a data model that changes underneath it in the same session is exactly how the export format silently forgets an entity. |
+| **6b** | **The review (open loops)** | §4.8b. Split out of chunk 6 on purpose — daily review is the highest design-surface part of GTD, and chunk 6 is already full. Derived queue over four open-loop types, redaction-as-state, decision menus, session-scoped "Not now", empty-vs-N-deferred end states. **Depends on chunk 1** (returns to the review after a tap-through). **Mind the fence at the end of §4.8b** — this is where scope dies. **⚠ RESEQUENCED THIS ROUND — 6b now builds ALL FOUR kinds.** The previous ruling deferred the past-due kind to chunk 7 because it was "only a pseudo-action"; **that premise died when past-due deadlines became open loops (§4.8b, user ruling this round)** — and deadlines exist today. So 6b builds **four open-loop kinds** (past-due in its **deadline** shape — the *push the date / complete / delete / Not now* menu — plus stalled projects, orphaned waitings, and captures) and **five** sort chips. **Chunk 7 extends the past-due kind to its second shape** (the pseudo-action, which gets a checkbox, not the menu), adds the sixth chip, and the "it moved" banner (§4.15e). Build the past-due kind so a second **shape** slots in — do not hard-code the deadline case. **⭐ ALSO IN THIS CHUNK (user, this round): explicit teaching in the review.** A prominent **info button** (extending the §4.8a exception to the no-help-on-pages rule) explains the options visible while sorting — the capture sort chips and the decision menus. It reuses the tab info text where it fits (the chips map to lanes; reuse `LANE_INFO`) and needs fresh copy for the decision menus. **Single info-button pattern, not an onboarding overlay** — the redaction discipline and the §4.8b fence still hold (§4.8b). |
+| **7** | **Calendar + events + recurrence + seeded sample habits** | **MERGED (was 7 + 8) — calendar planning round.** Under the new model recurrence is *calendar machinery*: it operates on events, and events do not exist until the calendar does, so a standalone recurrence chunk scheduled first would have nothing to operate on. Contents: the calendar (month/day, marks, creation row) · events/appointments as an entity with their own store · the **pseudo-action** (§4.14) · recurrence (roll-forward, projection, skip / delete-series, pause) · completed-series collapse · **`seriesId`** (now internal to this chunk, not a cross-chunk dependency) · **the pseudo-action SHAPE of the review's past-due kind** (the checkbox variant — 6b already built the kind, in its deadline shape) + the Calendar chip · **the two EVENT rows of §4.4d** (the appointment window, §4.14c; the untimed event's born-full bar), extending the renderer chunk 2 built · seeded sample habits (§4.16). §4.13–§4.15. **⭐ TWO small additions ruled this round (user):** (a) **the project health / stalled computation now counts linked events and appointments as forward motion** (§4.3b, §4.8b) — a project whose plan is "act after the conference on the 14th" is **not** stalled and must not be nagged or offered Someday; a directly-linked waiting action already counts today, events are the gap this closes. (b) **the event page exposes no "Make Waiting" affordance** — this is an *absence*, not a disable (the event page is not built from the action-page template), and it satisfies the pseudo-action half of §4.13a's dated-things-don't-wait rule (§4.14). **⚠ ONE-LINE REQUIREMENT WITH A LONG SHADOW: the pseudo-action's task ID is minted WHEN THE EVENT IS CREATED, not when the row first appears at 4 AM (§4.14a).** The ID's home is the event record. This costs nothing here — §4.14a already requires the ID to be *stable* across every roll, and allocating it at creation is the simplest way to make it so — but getting it wrong makes **chunk 8's advance-conditioning cheap and re-allocates every condition reference in the app**, at exactly the moment migrations stop being optional (§1). Mint at creation. **Unambiguously the largest chunk on the board** — it already was; the merge is honest about it. **Core, not stretch:** it is a **floor** for real use — the author will not switch over before it ships. But it is not *the* switch-over point: per §1 (corrected round 2) real daily use begins at **distribution, after chunk 9**, and export/import (chunk 8) is the hard prerequisite that must precede it. *(Stated as a floor, not a start date: the calendar is necessary for real use but not sufficient — §1 pegs the first real day to distribution after chunk 9, and chunk 8 lands before it.)* Everything it depends on is settled. |
+| **8** | **Export / import** | *(was 9.)* Late now that there is no data to protect and no early testers. Lands in the settings surface from chunk 6. **The backup must serialize events and series too** — they are a new top-level entity as of chunk 7, and the export format is where new entities get silently forgotten. **Import REPLACES, it does not merge** — behind a confirm reading "This will replace everything currently in the app." Merge is a conflict engine in disguise (§10); replace makes the file an honest snapshot. Foundation for the sync design (§10). **⚠ ALSO IN THIS CHUNK, and thematically it does not belong here — it is here because it is cheap and this is the only chunk with room (user ruling, this round): CONDITIONING A WAITING ACTION ON A NOT-YET-LIVE EVENT** (§10 — re-costed this round from five subsystems down to two). **Two pieces only:** (1) the condition picker gains a section for **pending events**, filtered to live occurrences only; (2) **condition resolution stops treating a pending pseudo-action as an orphan** — today a lookup searches live lanes only, so a hook to Tuesday's event would wear the dashed orphan pill until Tuesday 4 AM. That is the one place that has to learn `gtd_events` exists. **Everything else is free *only if chunk 7 minted the ID at event creation*** — if it did not, stop and fix that first; do not re-allocate IDs here, in the chunk that ships the export format, on the far side of §1's migration boundary. **Order within the chunk: build the feature first, then the serializer** — a serializer written against a data model that changes underneath it in the same session is exactly how the export format silently forgets an entity. **⭐ ALSO IN THIS CHUNK (user, this round), riding on the same event-conditioning work:** (1) **waiting actions appear as dependents in the project's linked list** (§4.15d) — a waiting action hooked to a project-linked item shows nested beneath it, even when its only tie to the project is the dependency. (2) **Recurrence × condition orphan rulings (§4.15b):** *delete-series* orphans the dependent (target gone); *skip-this-one* does **not** (same task ID, the dependent re-targets the next occurrence — §4.14a); *pause* shows the dependent orphaned as a **reversible render-time state** that clears on unpause (a few lines in the resolver you are already touching — **⚑ optional/flagged**, take it or leave it). (3) **Deferred, not built: the uncompleted-bump orphan** (a dependent whose occurrence passed uncompleted before being bumped) — see §10; it costs a return to per-dependent occurrence-binding and may be redundant with the missed occurrence's own review surfacing, so it is an **open question to revisit during real use (post-chunk-9)**, not scope here. |
 | **9** | **Service worker + offline + install polish** | *(was 10.)* **Deliberately last.** The app has stopped changing, so caching becomes a feature instead of a debugging tax. |
 | — | **Stretch: native wrappers** | Android → Windows/Linux → macOS. iPhone never. See below. |
 
@@ -380,14 +393,52 @@ pattern, not the single-select project-link pattern.*
     "+" opened the drafting page anyway because a trigger was required — which made the "+" a lie.)*
   - Under Chunk B, everything created here is **staged**, not written — and **staged actions can hook
     to each other**, because the project page is a planning surface. See §12.1b.
+- **Creating a Current project REQUIRES at least one action — RULED (user, chunk 5).** The project
+  drafting page will not save a Current project with an empty staged action set; the block uses the
+  standard dashed-outline feedback (§4.6), and the requirement is satisfied by any staged action
+  (next or waiting), created via the quick-add rows or ✎. **Why chunk 5:** staging (§12.1) is what
+  lets the action and the project land **atomically** — on a *new* project with no ID yet, there is
+  nothing to link a child action to until save, so the requirement is only coherent once staged
+  children exist. **Scope, deliberately narrow:**
+  - **Current projects only.** Future/Someday projects hold no linked actions by design (§4.3d,
+    §4.8b) — the requirement cannot apply to them, and converting Future→Current does not retroactively
+    demand one.
+  - **The drafting page only. The calendar creation row is EXEMPT** (§4.15a) — a deadline created
+    there still makes a dateless, actionless Current project by design, which is *stalled by
+    definition* and correctly surfaces in the review. Fast capture stays fast.
+    - **⚠ Build trap — enforce this at the drafting-page save handler, NOT in a shared
+      `createProject`/`saveProject` path.** Three creators deliberately make actionless Current
+      projects: the calendar creation row (above), and the QA-checklist and chunk-map injectors
+      (§8.1/§8.2, which push actionless Current projects straight into state so they show the "no
+      linked actions" flag on purpose). A check placed in a shared create/save function breaks all
+      three. The block belongs on the drafting-page save gesture only.
+  - **The review's stalled-project kind is RETAINED, not replaced.** Requiring an action at creation
+    does not mean a project can never be stalled: completing a project's last action re-strands it
+    (§4.8b), and the calendar path creates stalled projects on purpose. The two mechanisms are
+    complementary — one at birth, one for the whole life after. **⚑ Judgment call, flagged:** the
+    daily review only ever *offers* "add a next action" (it is one of five menu options, never
+    forced); requiring one at creation is a stricter, separate stance. Overrule if you would rather
+    the drafting page also merely *nudge* toward an action instead of blocking save.
 
 ### 4.3b Project health indicator
 
-Projects with **zero linked actions** show an icon plus a short muted-amber line beneath the
-title on the lane card: **"⚠ no linked actions."** (GTD rationale: an active project with no
-next action is stalled by definition.) This is **derived** state, computed from the next/waiting
-lanes at render time — every commit that mutates those lanes calls `refreshProjectFlags(kind)`,
-which re-renders the Current lane. Commit-time only; never from a draft.
+Projects with **no way forward** show an icon plus a short muted-amber line beneath the
+title on the lane card: **"⚠ no linked actions."** This is **derived** state, computed at render
+time — every commit that mutates the relevant stores calls `refreshProjectFlags(kind)`, which
+re-renders the Current lane. Commit-time only; never from a draft.
+
+**⚠ WHAT COUNTS AS "FORWARD MOTION" — CORRECTED (user ruling, this round).** The GTD rationale is
+*"an active project with no way to move it forward is stalled,"* **not** *"a project with no next
+action is stalled."* The goal is to know how to move each project forward, and **waiting is a
+legitimate way forward.** So a project is stalled only when it has **none of**: a linked **next
+action**, a linked **waiting action**, or (from chunk 7) a linked **event/appointment**. A directly
+linked waiting action already counts today (the computation scans both action lanes). **The gap this
+closes is events:** a project whose only plan is *"act after the conference on the 14th"* — an event
+linked from the event page (§4.15d) — must read as **healthy, not stalled**, and must **not** be
+nagged to add an action or offered Someday/Maybe in the review (§4.8b). **Build note (chunk 7):**
+extend the health computation (and the review's stalled query, §4.8b) to count linked events, once
+events can link to projects. *(Rejected: counting a **projected** future occurrence of a recurring
+event — only the one live occurrence counts, matching §4.15d's "shows exactly one instance.")*
 
 ### 4.3c Linked notes on Projects
 
@@ -414,6 +465,18 @@ it belongs to*. Classic GTD batching — all your calls together, all your erran
   entirely (context-batching doesn't transfer to habits; each runs on its own schedule, and the
   hook-chain system already encodes real behavioral sequence, which is a better grouping than an
   arbitrary label).
+  - **⚠ "NOT HABITS" IS ABOUT GROUPING, NOT CUEING — RULED (user, this round).** A habit is never
+    *filed into* a context (there is no context grouping on the Habits lane; the line above stands).
+    But a habit may be **cued by** a context: from chunk 3 the habit hook picker offers contexts
+    alongside habits as cue targets, because **a context is a cue** — being in a context ("at the
+    computer," "on errands") is exactly the kind of cue a habit fires on ("when I sit at the
+    computer, check my computer list"). These are two different relationships to the one registry, and
+    only the *grouping* one is banned for habits. **A context-cue behaves like a text cue** (§11): it
+    is **always live** (a context has no schedule and cannot be completed) and it takes **no part in
+    the hook cycle** (nothing hooks back out of a context, so it can never close a loop). It is **not**
+    exempt from the caps, though: cueing a habit on a context spends one of the habit's **7 outgoing**
+    slots (the Habit card already counts it), and a context accepts at most **7 incoming** hooks like
+    any other target (§7). See §4.5, §11.
   - **⚠ EVENTS ARE NOT AN EXCEPTION TO THIS, AND THEY ARE NOT ABSENT FROM IT.** A **pseudo-action
     lives in the Next Actions lane** (§4.14), so it takes a context like anything else there: it is
     **droppable into one**, it **stores** it (§4.14a), it **inherits** it across a series roll
@@ -643,6 +706,19 @@ be if I build this habit?"* (shorter approved variant if it truncates: "Who will
 me?"). Identity-based framing is the strongest known anchor for habit persistence, and the
 placeholder does that teaching silently — consistent with the no-field-labels rule.
 
+**Hook picker — contexts as cue targets, and the copy follows (chunk 3, user ruling this round).**
+From chunk 3 the picker lists **contexts as well as habits** as things a habit's cue can point at
+(§4.3d: a context is a cue, not a grouping-for-habits). Because the list is no longer habits-only,
+**the picker copy stops saying "habit" and says "cue"**: the header "Hook onto which habit?" becomes
+a cue-framed prompt, and the empty state "No habits available to hook to yet." becomes a cue-framed
+one that **names the way out** (per the empty-picker-teaches rule, §12.1b/§4.3d): e.g. *"No cues yet —
+add a habit, or create a context with + on the Next/Waiting lane."* A context in this list behaves
+like a text cue — always live, and outside the hook **cycle** — but it is **not** cap-exempt: it
+counts against the habit's 7 outgoing slots and against the context's own 7 incoming (§7, §4.3d), so
+the picker blocks an 8th outgoing cue and hides a context that already carries seven incoming hooks.
+Group the picker so habits and contexts read as distinct sections. *(This is the same
+list-widening/relabel that the condition and hook pickers already model; reuse, don't reinvent.)*
+
 ### 4.6 Edit page chrome
 
 - **← (top left):** saves and exits. The safe default.
@@ -753,7 +829,7 @@ and the settings surface would roughly double that chunk. It gets its own.
 |---|---|---|
 | **Past-due dated item** — *any* dated thing whose moment has passed uncompleted (§4.4d): a **deadline** (its day, or its time), or a **pseudo-action** (§4.14) whose appointment time has passed or whose untimed event's app-day has ended. **Both shapes; see the split below** | Next Actions / Current Projects | **Depends on which** — a pseudo-action gets **a checkbox** (and is tappable: a rescheduled appointment gets edited, not just ticked); a past-due **deadline** gets a **decision menu** (below) |
 | **Capture** (typed into the tray; an *uncategorised* open loop) | The tray itself | The sort chips: **Next / Waiting / Project / Future / Note / Calendar** *(the **Calendar chip is chunk 7** — it has nowhere to send a capture until the calendar exists; the other five ship in 6b)* |
-| **Stalled project** (zero linked actions) | Current Projects | Decision menu (below) |
+| **Stalled project** (**no way forward** — no linked next action, no linked waiting action, and from chunk 7 no linked event/appointment; §4.3b) | Current Projects | Decision menu (below) |
 | **Orphaned waiting action** (its condition target was deleted) | Waiting | Decision menu (below) |
 
 - **Actions and projects stay in their lanes.** The review is a **lens, not a container** — it
@@ -830,7 +906,10 @@ are two questions, not one control applied unevenly.
 A stalled project's revealed card does **not** lead with "Not now." It leads with the decision:
 
 > - **Add a next action** — quick-add, right there. Placeholder: **"What's the very next physical
->   action?"** (GTD's actual question, asked at the actual moment.)
+>   action?"** (GTD's actual question, asked at the actual moment.) *(This is the menu's headline exit,
+>   but per §4.3b it is not the only thing that un-stalls a project: a linked waiting action or event is
+>   also a way forward. The menu leads with the next action because it is GTD's real question, not
+>   because it is the sole cure.)*
 > - **Move to Someday/Maybe** — the honest answer. *A project you cannot name a next step for is not
 >   a project you are actively moving.* This is doctrine, not evasion, and the data model already
 >   agrees (Future projects hold no linked actions and take no deadlines).
@@ -879,12 +958,25 @@ an item you fixed drops out; an item you edited but didn't fix stays. It is deri
 snapshot the queue at review-open, or you will be triaging ghosts.
 
 **Consequence, ruled deliberately rather than discovered:** completing a project's last linked action
-makes that project stalled — so **finishing something can add an open loop.** This is GTD-correct (a
-project with no next action is genuinely unresolved; it is what the ⚠ flag has always meant) and it
-should be taught, not hidden. The reward lives in the *empty tray*, not in a count going down.
+makes that project stalled **if that action was its last way forward** — so **finishing something can
+add an open loop.** This is GTD-correct (a project with **no way forward** is genuinely unresolved;
+it is what the ⚠ flag has always meant — see §4.3b, which counts a linked waiting action or event as
+a way forward, not only a next action) and it should be taught, not hidden. The reward lives in the
+*empty tray*, not in a count going down.
+
+**Explicit teaching — an info button (user ruling, this round).** The app teaches implicitly almost
+everywhere, but the review is where a user is actively *sorting their materials* and most needs to
+know what each option does. So the review carries a **prominent info button** — the same exception to
+the no-help-on-pages rule that §4.8a already grants the drawer. It explains the options visible while
+sorting, across **two surfaces**: the **capture sort chips** (Next / Waiting / Project / Future /
+Note / Calendar), whose meanings map to the lanes and can **reuse the tab info text** (`LANE_INFO`);
+and the **decision menus** (stalled project, orphaned waiting, past-due), which need **their own
+copy** because they describe decisions, not lanes. **It is one info button, not an onboarding
+overlay** — coach-marks or a walkthrough would fight the redaction discipline and belong to the
+fenced-off region below.
 
 **⛔ FENCE — what the review is NOT, for the sprint.** A redacted queue, decision menus, a
-tap-through, "Not now," and an empty state. **That is all.** Explicitly out: progress indicators
+tap-through, "Not now," an empty state, and the single info button above. **That is all.** Explicitly out: progress indicators
 ("3 of 12"), Next/Skip buttons, a "review complete" screen, review streaks, scheduled review
 reminders, snoozing to next week, deferral tracking, a weekly-review mode distinct from the daily
 one. Each is defensible and several are in the GTD book; together they are a chunk the size of the
@@ -1270,6 +1362,22 @@ actions. Promotion happens on **condition completion only**. §9's case table lo
 **The code still implements date-promotion until chunk 3 deletes it** (§2) — that is a removal task,
 not behaviour to preserve.
 
+**Second consequence — "Make Waiting" is disabled on a dated item (RULED, user, this round; chunk
+3).** A Waiting action cannot hold a date, so converting a **dated Next Action** into one would have
+to silently drop the date — a lie. Instead the **"Make Waiting" convert is disabled whenever a
+deadline is set** on the Next Action page: greyed, inert, with a tooltip ("A waiting action can't
+hold a date — clear the deadline first"). This mirrors the greyed **condition icon** on Next Actions
+(§4.2) — the same teaching-affordance pattern, shown-but-disabled rather than hidden. Scope is the
+**Next Action page only** (Current/Future projects don't convert to actions). The `.disabled` state
+already exists for the Complete-mutual-exclusion case; this adds a second reason. **The
+pseudo-action's counterpart is an *absence*, not a disable** — pseudo-actions are edited through the
+event page (§4.14, §4.15), which is not built from the action-page template and so carries no
+"Make Waiting" control at all; that lands in chunk 7.
+- **⚠ The disable tracks the DRAFT deadline, not the saved one.** The deadline field is draft-only and
+  armed like everything else on the page (§4.6), so "Make Waiting" must grey/ungrey **live** as the
+  user sets or clears the deadline in the open draft — keying it off the last *saved* value would leave
+  the convert wrongly greyed after a draft clear (or wrongly enabled after a draft set) until Save.
+
 ### 4.13b The calendar's two entry points
 
 1. **Header 📅**, top right, next to the settings menu.
@@ -1449,6 +1557,25 @@ beyond the current occurrence is a **projection from the rule, never stored.**
 - **Delete on a recurring event prompts: Skip this one · Delete series · Cancel.** *("Skip this one"
   = advance to the next occurrence. Relabelled from the old "Delete event / Delete series", which was
   ambiguous about whether next month still came.)*
+- **What these do to a Waiting action hooked on the series (RULED, user, this round; chunk 8).** A
+  condition reference is a **stable task ID** (§4.14a), so the default is *re-target, not orphan*:
+  - **Skip this one → no orphan.** The series advances keeping the same task ID; the dependent simply
+    now waits on the next occurrence (§10's "promote on the first occurrence after the hook is set").
+    Orphaning here would contradict the stable-ID model.
+  - **Delete series → orphan.** The target ID is genuinely gone; the dependent orphans through the
+    existing dead-target machinery (frozen label, dashed pill), and per §9 an orphaned condition
+    still satisfies the waiting-for requirement, so it saves cleanly.
+  - **Pause → orphan, reversibly. ⚑ Optional/flagged.** A paused series will not fire, so a dependent
+    waiting on it is stuck; showing it orphaned is honest. **But pause is reversible** (draft-only,
+    armed), so this must be a **render-time soft-orphan that clears on unpause** — *not* the
+    frozen-label kind, which would not un-freeze. It is a few lines in the same resolver chunk 8 is
+    already teaching about `gtd_events`. Take it or leave it for the sprint.
+  - **Uncompleted-bump → DEFERRED, see §10.** A dependent whose occurrence passed uncompleted before
+    being replaced at the next 4 AM boundary: the user's instinct is to orphan it (the specific thing
+    you were waiting on was missed), but the current model can't tell "wanted *that* occurrence" from
+    "wants *any* occurrence" without adding per-dependent occurrence-binding — the very cost §10
+    costed away. It may also be redundant with the missed occurrence's own past-due review card
+    (§4.14c). **Recorded as an open question (§10), revisited during real use; not built.**
 - **`seriesId` is still required** — for collapsing archived completions ("Pay rent ×6") — but it no
   longer has to survive across spawned tasks. It is a field on one event and its archive entries
   (§3, known issue 3).
@@ -1486,6 +1613,15 @@ round: the patch as drafted said "nothing new to build," which would send a buil
 
   *(Ruling: "dated" beats the grouping. A Next Action with a deadline is both a dated thing and a next
   action; the date wins. — user)*
+- **Dependents show, even by dependency alone (RULED, user, this round; chunk 8).** A **waiting
+  action hooked to a project-linked item** — including a project-linked **event/appointment** once
+  event-conditioning exists (§10, chunk 8) — appears **nested beneath that item** in the list, the
+  same indentation the linked-actions list already uses for in-project chains (§4.3). It shows even
+  when its *only* tie to the project is the dependency (it carries no project link of its own): the
+  thing you are waiting on is part of this project's plan, so the wait is too. **This needs no
+  guardrail against masking a stalled project:** a dependent can only *appear* nested under an anchor
+  the project already has, and any such anchor already makes the project non-stalled (§4.3b) — so
+  there is no empty project for a stray hook to falsely revive.
 
 **4.15e The "it moved" banner.** A save that moves an item **off the surface the user is currently
 looking at** shows a brief confirmation ("Scheduled for 3 Aug — in your calendar"). It fires on the
@@ -1588,7 +1724,7 @@ A chunk that can't be reverted is a chunk that shouldn't have been written.
 | Decision | Resolution |
 |---|---|
 | Google Tasks / Calendar integration | **Removed** (§1). Cross-device sync forfeited; export/import is the replacement |
-| Existing app data | **All test data. Nothing is precious** (§1). Migrations optional until real use begins — which will be after the calendar ships, and probably after the wrapper |
+| Existing app data | **All test data. Nothing is precious** (§1). Migrations optional until real use begins — which is **distribution, after chunk 9** (corrected round 2; the calendar, chunk 7, is a floor but not the switch-over point). Export/import (chunk 8) is the hard prerequisite before that day |
 | Events, appointments, deadlines | **RULED — the model changed** (§4.13). An **event is a calendar entity that never lives in a lane**; it appears in Waiting as a *widget* and in Next Actions, on its day, as a **pseudo-action** (§4.14). **Dates are born in the calendar.** Deletes the 7-day hide rule, the hard-landscape pseudo-list, and the stale-event hole outright |
 | Waiting actions × dates | **Waiting actions have NO dates** (§4.13a). "Waiting for" is free text or a hook. **There is no date-based promotion** — the only trigger is a completed condition. Code carries it until chunk 3 deletes it |
 | Recurrence | **A property of EVENTS only** (§7, §4.15b). Not deadlines, not actions. **One live event that rolls forward** — no spawning; future occurrences are projections, never stored |
@@ -1600,7 +1736,7 @@ A chunk that can't be reverted is a chunk that shouldn't have been written.
 | Multiple app instances | **Not engineered around** (§9). Accepted risk + a `storage`-event banner ("open in another window — reload"), because the failure would otherwise be silent |
 | Back button / gesture | **= ✕ (cancel), never ← (save).** Routes through Chunk B's warning when anything is staged. Order: dialog → drawer → page → exit app at root (§4.6) |
 | The Tray | **Two things.** (a) A left **drawer** for capture (chunk 6) — **auto-opens on launch, even when empty**, opens by tapping 📥, **never by an edge swipe** (that's Android's back gesture), no counter. (b) The **review** (its own chunk, §4.8b) — a redacted, one-at-a-time queue over *all* open loops |
-| What counts as an open loop | Past-due dated items (top of the queue, revealed first), captures, stalled projects, orphaned waiting actions. **Not** overdue deadlines — those are late, not unresolved |
+| What counts as an open loop | Past-due dated items (top of the queue, revealed first) — **including overdue deadlines** (RULED, reversed; §4.8b) — captures, stalled projects, orphaned waiting actions. The past-due kind has **two shapes**: a **deadline** (decision menu — push the date / complete / delete / Not now; built in 6b) and a **pseudo-action** (checkbox; added in chunk 7). *(The old "overdue deadlines are late, not unresolved, so out of scope" ruling was reversed when §4.4d gave every dated thing one display language — §4.8b.)* |
 | Review: redaction | **Redaction is a state, not a card type.** Unrevealed = redaction bar, **not tappable**. Revealed (always the top card) = its normal lane card, minus the checkbox |
 | Review: decisions not execution | With **one exception** — the past-due card gets a checkbox, because for that card completion *is* the decision. It is also tappable, for a rescheduled appointment |
 | Review: the escape hatch | **Decision menus, with "Not now" LAST.** A stalled project offers: add a next action ("What's the very next physical action?") / move to Someday/Maybe / complete / delete / *then* Not now. **Making the alternatives visible is the mechanism** — it reveals Not now as the one option that changes nothing |
@@ -1615,12 +1751,12 @@ A chunk that can't be reverted is a chunk that shouldn't have been written.
 | Completed item page | ← only (no ✕ — nothing to discard); Restore and 🗑 act immediately; **not a drafting surface** |
 | Duplicate titles on quick-add rows | **Enforced** — flash the input border red, keep the typed text |
 | Onboarding / tutorial | **None.** Instead, **three seeded sample habits** that *are* the GTD routine (§4.16) — deletable, ordinary, with cues, a demonstrated hook, and identity-framed descriptions. The app teaches itself by example |
-| Waiting quick-add on the project page | The "+" becomes a **hook** (§12.1b). Quick-add can create a Waiting action **iff the trigger is a hook** — the only single-tap trigger. Dates and text go through ✎ |
+| Waiting quick-add on the project page | The "+" becomes a **hook** (§12.1b). Quick-add can create a Waiting action **iff the trigger is a hook** — the only single-tap trigger. Free text goes through ✎. *(There is no date exit — waiting actions have no dates, §4.13a.)* |
 | Empty pickers | **A teaching surface, not an error state.** The control is never greyed; the picker opens and its empty state names the way out. (Pattern already exists for habit hooks and conditions — reuse it) |
 | Staged actions referencing each other | **Yes** — the project page is a planning surface. And it is nearly free: **staged actions get their real, final ID at stage time; there are no temp IDs and no remapping** (post-Google windfall). "Staged" means only *not yet written* |
 | PWA identity | Name "GTD Console"; theme `#171513`; `standalone`; **portrait-locked** |
 | Service worker | **Last chunk, deliberately.** Caching during active development means debugging stale builds. The manifest (installability) ships early in 0b; the cache does not |
-| Calendar | **Core, not stretch** — real use begins after it ships |
+| Calendar | **Core, not stretch** — a **floor** for real use, but not the switch-over: real daily use begins at **distribution, after chunk 9** (§1, corrected round 2) |
 | Testers | Experienced programmers, receiving the **finished** product. No early-tester data to protect; no half-built releases |
 | Build system | **Option B — "the stapler."** `src/` modules concatenated by `build.py` into one `dist/index.html`. No npm, no Node. Upgradeable to Vite later if the project outlives the sprint |
 | Phone deployment | **PWA + GitHub Pages**, not a native wrapper. Wrapper is a stretch goal |
@@ -1641,7 +1777,7 @@ A chunk that can't be reverted is a chunk that shouldn't have been written.
 | Habit metric | Personal best + lifetime total. **Current streak never displayed** |
 | Habit streak-break rule | **Never miss twice** — one miss is a stumble; two consecutive end the run |
 | Habit rollover | 4:00 AM — **and everything else in the app uses the same boundary** |
-| Contexts | GTD contexts (Calls/Computer/Errands), **shared Next↔Waiting** (§4.3d). **The project lanes keep plain lists; Habits have no grouping.** **One registry, one set** — and the pseudo-action files into that same set, because it lives in the Next Actions lane (§4.14) |
+| Contexts | GTD contexts (Calls/Computer/Errands), **shared Next↔Waiting** (§4.3d). **The project lanes keep plain lists; Habits have no context *grouping*** — but from chunk 3 a habit **can be cued by** a context (a context is a cue, not a grouping-for-habits; §4.3d/§4.5/§11), which counts against the hook caps (§7). **One registry, one set** — and the pseudo-action files into that same set, because it lives in the Next Actions lane (§4.14) |
 | Project auto-lists | Removed |
 | Completed items | Move to a Completed section; keep forever; manual delete behind a confirm |
 | Completed-row restore | Filled checkbox un-completes (↻ removed) |
@@ -1707,6 +1843,15 @@ A chunk that can't be reverted is a chunk that shouldn't have been written.
   with the **more recent** of the tied runs. Short of the record → the fresh-start restart ritual.
 - **Hook caps: 7 outgoing, 7 incoming.** With seven weekdays, one live anchor per day is all the
   coverage a cue set can ever need — so an 8th is safely blockable in both directions.
+  - **The 7-outgoing cap already covers context-cues (RULED, user).** A context added as a habit's cue
+    (chunk 3, §4.3d/§4.5) consumes an **outgoing** slot exactly like a habit-cue does — there is no
+    separate budget. This is not a new rule; it is how the Habit card already implements the outgoing
+    limit (the cap counts *cues on the card*, whatever they point at), so context-cues fall under it for
+    free. A habit therefore has **at most 7 cues total**, in any mix of habits, contexts, and text cues.
+  - **A context accepts at most 7 incoming hooks (RULED, user — the natural extension of the cap).**
+    Nothing hooks *out* of a context (it has no cues of its own), but habits hook *into* it as a cue
+    target, and that incoming edge obeys the same 7-incoming ceiling every hook target has. The picker
+    blocks an 8th habit from cueing on a context that already has seven.
 - **Cycle rule:** the hook picker blocks **self and direct mutuals only.** Longer cycles are
   allowed — a full-graph cycle can be a coherent *rotating weekly routine* (A{Mon,Tue};
   B{Tue,Wed}→A; C{Wed,Mon}→B; A→C — each day's live sub-graph is a clean chain). A mutual pair
@@ -2011,6 +2156,21 @@ window. Reload to see the latest."* This does not fix the problem; it refuses to
   - **The undesigned corner, recorded so it isn't re-derived:** hooking to a *recurring* event means
     promoting on **the first occurrence after the hook is set** — coherent, but it must be said, and
     now it is.
+  - **⏳ OPEN, deferred to real use (user, this round): should an *uncompleted bump* orphan the
+    dependent?** When a recurring occurrence passes uncompleted and is replaced at the next 4 AM
+    boundary (§4.15b), the same task ID rolls forward, so today the dependent silently re-targets the
+    next occurrence. The question is whether a *missed* occurrence should instead orphan the dependent
+    — surfacing "the thing you were waiting on didn't happen" rather than quietly rolling it. **Cost:
+    real.** The dependent stores only a stable ID, with no memory of *which* occurrence it wanted, so
+    orphaning-on-miss needs **per-dependent occurrence-binding** — which reaches back into the picker,
+    the roll logic (chunk 7), the resolver, §9's re-evaluation, and the archive/export, i.e. roughly
+    the five-subsystem job this entry was proud of costing *down* to two. **Possibly redundant:** the
+    missed occurrence already surfaces on its own as a past-due open loop in the review (§4.14c),
+    which may discharge the app's duty to surface without touching the dependent at all. **Ruling:
+    do not build it in the sprint.** Revisit only after the calendar ships and the author has lived
+    with recurring events (post-chunk-9), when it will be clear whether rolling-forward or
+    orphaning-on-miss is what real use actually wants. *(Skip and delete-series are **not** open —
+    they are ruled in §4.15b: re-target and orphan respectively.)*
   - **Why chunk 8 and not chunk 7, where it thematically belongs:** chunk 7 is already the largest
     chunk on the board and this is the first thing that would be cut from it. Chunk 8 is small, it is
     strictly downstream of every dependency, and it is the only chunk with room. **The theme is
@@ -2103,9 +2263,14 @@ questions retroactively:
   with the thing you're doing: allow yourself the treat only while, or right after, doing this."
   Shows as a 🍬 pill with a × to remove (draft-only). Not shown on cards.
 - **A cue is live today** iff its target is scheduled today and not paused. Text cues are always
-  live. Liveness is one link deep. **Cues never get their own schedules — no per-hook day picker,
-  ever.** Coverage is derived from targets; if two hooks are live the same day, both pills show.
-  Crossing this line means building a second scheduling system.
+  live. **Context cues are always live too** (chunk 3, §4.3d) — a context has no schedule and cannot
+  be completed, so it is exactly a text cue that happens to point at a registry entry rather than
+  hold free text; it takes no part in the hook cycle (nothing hooks back out of it), but it is **not**
+  cap-exempt — it spends one of the habit's 7 outgoing slots and a context accepts at most 7 incoming
+  hooks (§7). Liveness is one link deep.
+  **Cues never get their own schedules — no per-hook day picker, ever.** Coverage is derived from
+  targets; if two hooks are live the same day, both pills show. Crossing this line means building a
+  second scheduling system.
 - **"Tidy order" is a verb, not a rule** — a one-shot button that applies a suggested topological
   order (Kahn's, alphabetical tiebreak) and leaves the lane fully manual afterward. Never a standing
   invariant. *(The original standing normalization pass was deleted: schedules killed its premise —
@@ -2141,6 +2306,27 @@ anything that changed underneath from another source, i.e. it passes every test 
   staged action can be reopened, re-edited, or deleted before the project saves.
 - Both creation paths are in scope (quick-add rows; ✎ full drafting page). Editing a **pre-existing**
   linked action from the project page is also staged.
+- **A linked action edited *through the project page* cannot be un-linked from it (RULED, user, this
+  round).** When an action **that carries this project's link** is opened as a **child of the project
+  page**, its **Link-to-Project field is locked** — shown disabled, with a tooltip ("Linked to this
+  project — remove it from the project's list instead"), the same show-but-disable teaching pattern as
+  the greyed condition icon (§4.2). The membership is the reason you are on that page; silently
+  re-pointing it mid-staged-edit would make the atomic save incoherent. **This is contextual, not a
+  property of the action:** the *same* action opened from its own lane keeps a fully editable project
+  link. It is knowable which context you are in because chunk 1's navigation stack records that the
+  page was reached from the project. **Locks only the link** — deleting or completing the action from
+  here stays available (both staged). **Consequence:** "remove this action from the project" is
+  therefore an explicit gesture on the project's own list (a staged delete/unlink there), never a
+  silent field edit on the child.
+  - **⚠ The lock is keyed to the link, NOT to the fact of being opened from the project page (RULED,
+    to resolve the §4.15d collision; chunk 8).** From chunk 8 the project's linked list also shows a
+    **dependency-only** waiting action — one nested under a project-linked item whose *only* tie to the
+    project is the hook, carrying **no project link of its own** (§4.15d). Opening *that* child must
+    **not** lock its Link-to-Project field: there is no membership to protect, the "remove it from the
+    project's list instead" tooltip would be false (it is in the list only via its anchor, not as a
+    member), and the user may legitimately want to add a project link. So: **lock the field iff the
+    action actually carries this project's link; leave it fully editable otherwise.** The chunk-5 lock
+    and the chunk-8 nesting agree once the trigger is *membership*, not *provenance*.
 - ~~**The child page's Save must not say "Save"** — relabel to "Done"~~ — **VOID (user correction).**
   The spec item assumed a text-labelled Save button. The actual control is an **unlabelled ← arrow**,
   so there is no label to lie. And the child page returns to the *project* page, never to the lanes —
@@ -2217,7 +2403,9 @@ says *why*, and *what to do instead* — which is the app's existing habit every
 
 **This pattern already exists and must be reused, not reinvented:** the habit hook picker already
 shows *"No habits available to hook to yet"* and the condition picker already shows *"No valid items
-to link to yet"* (`index-47`, ~L3149 and ~L3274).
+to link to yet"* (`index-47`, ~L3149 and ~L3274). *(Note: chunk 3 relabels the habit-picker string to
+a cue-framed one — see §4.5 — so by the time this chunk builds it reads roughly "No cues yet…"; reuse
+the **pattern**, not the exact literal.)*
 
 **Copy amendment.** The existing condition-picker empty state names the problem but no exit. Since
 this picker is now reachable from the quick-add row — where the alternative is one tap away — it

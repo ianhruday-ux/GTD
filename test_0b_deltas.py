@@ -134,7 +134,10 @@ def test_quota_exceeded_is_surfaced_not_thrown(browser, candidate_url):
         )
 
         # Trigger a save. CONFIRM these selectors drive a persist in the real app.
+        # Chunk 2 (§4.3e): the FAB opens a menu on the default Next Actions
+        # lane rather than creating directly -- take its first option.
         page.click(SEL["fab"])
+        page.click(SEL["fab_menu_primary"])
         page.fill(SEL["title_input"], "trip the quota")
         page.click(SEL["save_btn"])
         page.wait_for_timeout(200)

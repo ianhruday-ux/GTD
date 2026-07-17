@@ -144,20 +144,6 @@ header{
 .qa-time-readout{ font-family:var(--font-mono); font-size:11px; color:var(--text-soft); }
 
 /* ----------------------------------------------------------------------------
-   ▲ CHUNK 2 — DEV TOOLBAR (dev-only scaffolding, not a designed surface)
-   Sits in normal document flow, right below the fixed header/tab bar, so it
-   scrolls with content instead of competing for space in the fixed chrome.
-   Houses Reset + the QA time-jump/snapshot/restore dev tools (see CLAUDE.md,
-   chunk 0c) — nothing here is part of the app's feature set.
----------------------------------------------------------------------------- */
-#dev-toolbar{
-  display:flex; flex-wrap:wrap; align-items:center; gap:6px;
-  max-width:672px; margin:0 auto;
-  padding:8px calc(16px + env(safe-area-inset-right)) 0 calc(16px + env(safe-area-inset-left));
-  opacity:0.85;
-}
-
-/* ----------------------------------------------------------------------------
    BUTTONS  (= carried over =)
 ---------------------------------------------------------------------------- */
 .btn{
@@ -327,11 +313,6 @@ main{
   display:inline-flex; align-items:center; justify-content:center;
 }
 .info-btn:hover{ background:rgba(0,0,0,0.42); }
-
-/* Habits' "Tidy order" button — no menu, no lane-actions-row anymore, so it
-   floats right after the label on its own line. Reuses the plain .btn
-   classes; no dedicated styling needed. */
-.lane-tools-row{ display:flex; margin:-4px 0 8px 0; }
 
 /* The info panel drops in under the label when toggled (unchanged behavior). */
 .lane-info{
