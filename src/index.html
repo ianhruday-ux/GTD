@@ -63,6 +63,16 @@
   <span class="qa-time-readout" id="qa-time-readout" title="What the app currently thinks &lsquo;now&rsquo; is, after any QA time jumps"></span>
   <button class="btn btn-ghost btn-small" id="qa-snapshot-btn" title="Dev QA aid: saves all current data to one snapshot slot (survives Reset), so you can try something destructive and get back to exactly this state">Snapshot</button>
   <button class="btn btn-ghost btn-small" id="qa-restore-btn" title="Dev QA aid: replaces all current data with the last snapshot, then reloads">Restore</button>
+  <button class="btn btn-ghost btn-small" id="drag-log-toggle" title="Dev: record the press-and-hold drag lifecycle so a phone-only drag bug can be reported as copyable text">Drag log: off</button>
+  <button class="btn btn-ghost btn-small" id="drag-log-show" title="Dev: show the recorded drag log to copy or screenshot">Show drag log</button>
+</div>
+<div id="drag-log-panel" hidden>
+  <textarea id="drag-log-text" readonly rows="12" placeholder="Turn the drag log ON, reproduce the bug, then tap Show drag log."></textarea>
+  <div class="drag-log-actions">
+    <button class="btn btn-ghost btn-small" id="drag-log-copy">Copy</button>
+    <button class="btn btn-ghost btn-small" id="drag-log-clear">Clear</button>
+    <button class="btn btn-ghost btn-small" id="drag-log-close">Close</button>
+  </div>
 </div>
 
 <main id="main">

@@ -163,6 +163,11 @@ header{
 }
 .header-icon:hover{ background:rgba(237,231,218,0.08); }
 .qa-time-readout{ font-family:var(--font-mono); font-size:11px; color:var(--text-soft); }
+/* Drag diagnostic log panel (dev tool) */
+#drag-log-panel{ padding:8px 12px; }
+#drag-log-text{ width:100%; box-sizing:border-box; font-family:var(--font-mono); font-size:11px; line-height:1.45;
+  background:rgba(0,0,0,0.35); color:var(--text-primary); border:1px solid rgba(255,255,255,0.16); border-radius:6px; padding:8px; resize:vertical; }
+.drag-log-actions{ display:flex; gap:6px; margin-top:6px; }
 
 /* ----------------------------------------------------------------------------
    ▲ CHUNK 2 — DEV TOOLBAR (dev-only scaffolding, not a designed surface)

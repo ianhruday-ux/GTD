@@ -2849,6 +2849,52 @@
   }
 
   // =========================================================
+  // DEV TOOL: drag diagnostic log. The press-and-hold drag is invisible after
+  // the fact and phone-only, so a bug in it can't be captured in a screenshot
+  // or read from a video. This records the whole lifecycle — touchstart, the
+  // hold timer, native text-selection attempts, cancels, the watchdog — as
+  // copyable text. Off by default; gtddev_ so it survives Reset; strip at the
+  // wrapper like the other dev scaffolding. NOT part of the designed surface.
+  // =========================================================
+  let dragLogOn = false;
+  let dragLogBuf = [];
+  let dragLogT0 = 0;
+  function dragLogInit(){ dragLogOn = Storage.get("gtddev_drag_log_on") === "1"; }
+  function dragDesc(el){
+    if (el && el.nodeType !== 1) el = el.parentElement;
+    if (!el) return "(none)";
+    let cls = "";
+    if (el.className && typeof el.className === "string"){
+      const parts = el.className.trim().split(/\s+/).slice(0, 2);
+      if (parts[0]) cls = "." + parts.join(".");
+    }
+    const txt = (el.textContent || "").trim().slice(0, 16);
+    return el.tagName.toLowerCase() + cls + (txt ? " “" + txt + "”" : "");
+  }
+  function dlog(ev, detail){
+    if (!dragLogOn) return;
+    const now = Date.now();
+    if (!dragLogBuf.length) dragLogT0 = now;
+    dragLogBuf.push("+" + (now - dragLogT0) + "ms  " + ev + (detail ? "  " + detail : ""));
+    if (dragLogBuf.length > 250) dragLogBuf.shift();
+    try { Storage.set("gtddev_drag_log", dragLogBuf.join("\n")); } catch (e){ /* quota — the in-memory buffer still works */ }
+  }
+  function clearDragLog(){ dragLogBuf = []; dragLogT0 = 0; try { Storage.remove("gtddev_drag_log"); } catch (e){} }
+  function updateDragLogUI(){ const b = qs("#drag-log-toggle"); if (b) b.textContent = "Drag log: " + (dragLogOn ? "ON" : "off"); }
+  function toggleDragLog(){
+    dragLogOn = !dragLogOn;
+    Storage.set("gtddev_drag_log_on", dragLogOn ? "1" : "0");
+    if (dragLogOn){ clearDragLog(); dlog("logging ON — now reproduce the drag"); }
+    updateDragLogUI();
+  }
+  function showDragLog(){
+    const panel = qs("#drag-log-panel"); if (!panel) return;
+    const ta = qs("#drag-log-text");
+    if (ta) ta.value = dragLogBuf.length ? dragLogBuf.join("\n") : "(empty — tap ‘Drag log: off’ to turn it ON, reproduce the drag, then Show again)";
+    panel.hidden = false;
+  }
+
+  // =========================================================
   // DEV TOOLS: QA time jump + state snapshot/restore (spec.md §12.3, chunk 0c)
   // Dev tool only — stripped at the wrapper, same as the checklist and
   // chunk-map injectors. Snapshot lets you capture the whole app state
@@ -2946,6 +2992,21 @@
 
     qs("#qa-snapshot-btn").addEventListener("click", takeSnapshot);
     qs("#qa-restore-btn").addEventListener("click", restoreSnapshot);
+
+    // Drag diagnostic log (dev tool) — see the block near updateQaTimeReadout.
+    qs("#drag-log-toggle").addEventListener("click", toggleDragLog);
+    qs("#drag-log-show").addEventListener("click", showDragLog);
+    qs("#drag-log-copy").addEventListener("click", function(){
+      const ta = qs("#drag-log-text"); if (!ta) return;
+      ta.focus(); ta.select();
+      let ok = false;
+      try { ta.setSelectionRange(0, ta.value.length); } catch (e){}
+      try { if (navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(ta.value); ok = true; } } catch (e){}
+      if (!ok){ try { document.execCommand("copy"); } catch (e){} }
+      const btn = qs("#drag-log-copy"); if (btn){ const t = btn.textContent; btn.textContent = "Copied"; setTimeout(function(){ btn.textContent = t; }, 1200); }
+    });
+    qs("#drag-log-clear").addEventListener("click", function(){ clearDragLog(); const ta = qs("#drag-log-text"); if (ta) ta.value = ""; });
+    qs("#drag-log-close").addEventListener("click", function(){ const p = qs("#drag-log-panel"); if (p) p.hidden = true; });
 
     qs("#lane-switcher").addEventListener("click", function(e){
       const btn = e.target.closest("button[data-kind]");
@@ -3627,9 +3688,10 @@
     // native chrome outside the DOM's own event model — so the card's
     // .dragging state (dimmed, looks disabled) was getting stuck with
     // nothing left to clear it.
-    function forceCancelTouchDrag(){
+    function forceCancelTouchDrag(reason){
       const wasActive = touchDrag && touchDrag.active;
       const kind = touchDrag && touchDrag.kind;
+      if (touchDrag) dlog("forceCancel", (reason || "?") + " (wasActive=" + wasActive + ")");
       touchDragCleanup();
       disarmDragWatchdog();
       if (wasActive){
@@ -3652,7 +3714,7 @@
     const DRAG_WATCHDOG_IDLE_MS = 2500;
     function armDragWatchdog(){
       if (dragWatchdog) clearTimeout(dragWatchdog);
-      dragWatchdog = setTimeout(forceCancelTouchDrag, DRAG_WATCHDOG_IDLE_MS);
+      dragWatchdog = setTimeout(function(){ forceCancelTouchDrag("watchdog-idle-" + DRAG_WATCHDOG_IDLE_MS + "ms"); }, DRAG_WATCHDOG_IDLE_MS);
     }
     function disarmDragWatchdog(){
       if (dragWatchdog) clearTimeout(dragWatchdog);
@@ -3671,23 +3733,34 @@
     // project doc) where this can be disabled properly at the WebView
     // layer instead of approximated from page content.
     document.addEventListener("contextmenu", function(e){
-      if (e.target.closest(".card-title, .group-title")) e.preventDefault();
+      if (e.target.closest(".card-title, .group-title")){ dlog("contextmenu prevented", "(native long-press menu) on " + dragDesc(e.target)); e.preventDefault(); }
+    });
+    // selectstart fires the instant the browser decides to begin a text
+    // selection — the clearest signal of the native long-press racing our
+    // hold timer. Logged (not prevented here) so the trace shows its timing.
+    document.addEventListener("selectstart", function(e){
+      if (dragLogOn && e.target && e.target.closest && e.target.closest(".card, .group")) dlog("selectstart", dragDesc(e.target));
     });
     document.addEventListener("selectionchange", function(){
       const sel = window.getSelection();
       if (!sel || !sel.toString()) return;
       const node = sel.anchorNode;
       const el = node && (node.nodeType === 1 ? node : node.parentElement);
-      if (el && el.closest(".card-title, .group-title")){
+      const inTitle = el && el.closest(".card-title, .group-title");
+      dlog("selectionchange", "text “" + sel.toString().slice(0, 16) + "”" + (inTitle ? " IN title → cancelling drag" : " (not in a drag title)"));
+      if (inTitle){
         sel.removeAllRanges();
-        forceCancelTouchDrag();
+        forceCancelTouchDrag("text-selected-in-title");
       }
     });
-    window.addEventListener("blur", forceCancelTouchDrag);
-    document.addEventListener("visibilitychange", function(){ if (document.hidden) forceCancelTouchDrag(); });
+    window.addEventListener("blur", function(){ forceCancelTouchDrag("window-blur"); });
+    document.addEventListener("visibilitychange", function(){ if (document.hidden) forceCancelTouchDrag("page-hidden"); });
     document.addEventListener("touchstart", function(e){
       if (e.touches.length !== 1) return;
       const titleEl = e.target.closest(".card-title, .group-title");
+      if (dragLogOn && e.target.closest && e.target.closest(".card, .group")){
+        dlog("touchstart", dragDesc(e.target) + (titleEl ? "  [IS a drag title]" : "  [NOT a drag title — no drag]"));
+      }
       if (!titleEl) return;
       const el = titleEl.closest("[data-drag-id]");
       if (!el) return;
@@ -3696,10 +3769,12 @@
       const touch = e.touches[0];
       const kind = laneEl.getAttribute("data-kind");
       const isGroup = el.getAttribute("data-drag-group") === "1";
+      dlog("hold-armed", (isGroup ? "group" : "card") + " on " + kind + " lane — waiting " + TOUCH_LONG_PRESS_MS + "ms");
       touchDrag = { el: el, kind: kind, isGroup: isGroup, startX: touch.clientX, startY: touch.clientY, active: false, timer: null };
       touchDrag.timer = setTimeout(function(){
         if (!touchDrag) return;
         touchDrag.active = true;
+        dlog("HOLD FIRED → drag now active");
         el.classList.add("dragging");
         liveDrag = { el: el, kind: kind, isGroup: isGroup };
         document.body.classList.add("drag-active"); // freeze the collapsing tab bar (spec 4.10b, known issue 2)
@@ -3715,7 +3790,10 @@
       if (!touchDrag.active){
         const dx = Math.abs(touch.clientX - touchDrag.startX);
         const dy = Math.abs(touch.clientY - touchDrag.startY);
-        if (dx > TOUCH_MOVE_CANCEL_PX || dy > TOUCH_MOVE_CANCEL_PX) touchDragCleanup();
+        if (dx > TOUCH_MOVE_CANCEL_PX || dy > TOUCH_MOVE_CANCEL_PX){
+          dlog("cancel", "moved " + Math.round(Math.max(dx, dy)) + "px before the hold completed (scroll, not drag)");
+          touchDragCleanup();
+        }
         return;
       }
       e.preventDefault(); // only reached once actively dragging — scroll stays untouched until then
@@ -3728,6 +3806,7 @@
     document.addEventListener("touchend", function(e){
       if (!touchDrag) return;
       if (touchDrag.active){
+        dlog("touchend", "was dragging → commit the move");
         e.preventDefault(); // suppresses the ghost click that'd otherwise fire on whatever's under the finger
         disarmDragWatchdog();
         stopAutoScroll();
@@ -3737,10 +3816,13 @@
         document.body.classList.remove("drag-active");
         clearDropIndicator();
         renderLane(kind);
+      } else {
+        dlog("touchend", "no active drag (a tap, or the hold was cancelled)");
       }
       touchDragCleanup();
     });
     document.addEventListener("touchcancel", function(){
+      if (dragLogOn) dlog("touchcancel", touchDrag ? ("active=" + touchDrag.active) : "(no touchDrag)");
       if (touchDrag && touchDrag.active){
         const kind = touchDrag.kind;
         liveDrag = null;
@@ -3877,6 +3959,8 @@
     KINDS.forEach(renderLane);
     updateLaneVisibility();
     updateQaTimeReadout();
+    dragLogInit();
+    updateDragLogUI();
   }
 
   document.addEventListener("DOMContentLoaded", boot);
