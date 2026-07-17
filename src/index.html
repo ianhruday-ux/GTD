@@ -32,12 +32,16 @@
   </div>
 </header>
 
+<!-- Compact letter+icon panels, no horizontal scroll (user round). Five
+     equal-width panels fill the bar; Notes joins as a sixth in chunk 6,
+     same pattern. tab-name is kept (visually hidden) for accessibility --
+     the letter+icon are decorative shorthand, not the accessible label. -->
 <nav class="tabbar" id="lane-switcher" role="tablist">
-  <button class="tab active" data-kind="next"><span class="tab-icon">&#9678;</span><span class="tab-name">Next Actions</span><span class="tab-count">0</span></button>
-  <button class="tab" data-kind="waiting"><span class="tab-icon">&#9203;</span><span class="tab-name">Waiting On</span><span class="tab-count">0</span></button>
-  <button class="tab" data-kind="current"><span class="tab-icon">&#9635;</span><span class="tab-name">Projects</span><span class="tab-count">0</span></button>
-  <button class="tab" data-kind="future"><span class="tab-icon">&#9737;</span><span class="tab-name">Someday</span><span class="tab-count">0</span></button>
-  <button class="tab" data-kind="habit"><span class="tab-icon">&#9873;</span><span class="tab-name">Habits</span><span class="tab-count">0</span></button>
+  <button class="tab active" data-kind="next"><span class="tab-icon">&#9889;</span><span class="tab-letter">N</span><span class="tab-count">0</span><span class="tab-name">Next Actions</span></button>
+  <button class="tab" data-kind="waiting"><span class="tab-icon">&#9203;</span><span class="tab-letter">W</span><span class="tab-count">0</span><span class="tab-name">Waiting On</span></button>
+  <button class="tab" data-kind="current"><span class="tab-icon">&#128296;</span><span class="tab-letter">P</span><span class="tab-count">0</span><span class="tab-name">Projects</span></button>
+  <button class="tab" data-kind="future"><span class="tab-icon">&#128301;</span><span class="tab-letter">S</span><span class="tab-count">0</span><span class="tab-name">Someday</span></button>
+  <button class="tab" data-kind="habit"><span class="tab-icon">&#127937;</span><span class="tab-letter">H</span><span class="tab-count">0</span><span class="tab-name">Habits</span></button>
 </nav>
 <div class="tabbar-spacer" aria-hidden="true"></div>
 

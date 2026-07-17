@@ -110,10 +110,20 @@ body{
   min-height:100vh;
   background:var(--desk); /* fallback under the fixed layer */
 }
+/* Dark wood grain (user round, replacing the flat gradient): fine irregular
+   streaks at a shallow angle -- two repeating layers at slightly different
+   pitch so they don't read as a mechanical stripe -- over the same top-to-
+   bottom depth gradient chunk 2 already had. Restrained on purpose, same as
+   before: it must not fight the semi-transparent white overlays tuned
+   against the dark tone. */
 body::before{
   content:"";
   position:fixed; inset:0; z-index:-1;
-  background:linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
+  background:
+    repeating-linear-gradient(4deg, rgba(0,0,0,0.14) 0px, rgba(0,0,0,0.14) 1px, transparent 1px, transparent 6px),
+    repeating-linear-gradient(4deg, var(--desk-grain) 0px, var(--desk-grain) 2px, transparent 2px, transparent 13px),
+    repeating-linear-gradient(-2deg, rgba(255,225,180,0.03) 0px, rgba(255,225,180,0.03) 1px, transparent 1px, transparent 9px),
+    linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
 }
 
 a{ color:inherit; }
@@ -208,26 +218,27 @@ header{
    animate the bar and shift everything under the finger. Whatever state the bar
    was in when the drag began, it holds.
 
-   MARKUP:
+   MARKUP (user round: compact letter+icon panels, no horizontal scroll):
      <nav class="tabbar" role="tablist">
        <button class="tab active" data-kind="next">
-         <span class="tab-icon">◎</span><span class="tab-name">Next Actions</span>
-         <span class="tab-count">4</span>
+         <span class="tab-icon">⚡</span><span class="tab-letter">N</span>
+         <span class="tab-count">4</span><span class="tab-name">Next Actions</span>
        </button>
-       … one per lane …
+       … one per lane, five equal-width panels filling the bar …
      </nav>
      <div class="tabbar-spacer" aria-hidden="true"></div>
    The active tab carries `.active`; a lane with an open loop / badge carries
    `.has-badge`. In the collapsed pill, CSS hides every tab except `.active`.
+   `.tab-name` carries the full lane name for assistive tech only (the
+   letter+icon are decorative shorthand, not the accessible label).
 ============================================================================ */
 .tabbar{
   position:fixed; left:0; right:0; z-index:110;
   top:calc(var(--header-h) + env(safe-area-inset-top));
-  display:flex; gap:8px; align-items:center;
+  display:flex; gap:6px; align-items:center;
   height:var(--tabbar-h);
   padding:8px calc(16px + env(safe-area-inset-right)) 0 calc(16px + env(safe-area-inset-left));
   max-width:672px; margin:0 auto;
-  overflow-x:auto;
   transition:height .2s ease;
 }
 /* The spacer sits in normal flow and reserves exactly the bar's height plus the
@@ -240,27 +251,40 @@ header{
 body.drag-active .tabbar,
 body.drag-active .tabbar-spacer{ transition:none; }
 
+/* No horizontal scroll: every tab shares the row equally (flex:1), so five
+   panels always fit the viewport width instead of overflowing it. */
 .tab{
-  flex:0 0 auto; border:none; border-radius:8px; padding:8px 14px;
-  display:inline-flex; align-items:center; gap:8px;
-  font-family:var(--font-mono); font-size:11.5px; font-weight:600;
-  letter-spacing:0.06em; text-transform:uppercase;
+  flex:1 1 0; min-width:0; border:none; border-radius:9px; padding:7px 2px 6px 2px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
   background:rgba(237,231,218,0.06); color:var(--text-primary); opacity:0.72;
   position:relative;
 }
-.tab .tab-icon{ font-size:13px; }
+.tab .tab-icon{ font-size:16px; line-height:1; }
+.tab .tab-letter{
+  font-family:var(--font-mono); font-weight:700; font-size:10px;
+  letter-spacing:0.04em;
+}
+/* The accessible label -- present for screen readers, not shown visually
+   (the letter+icon are the compact visual stand-in). */
+.tab .tab-name{
+  position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+  overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;
+}
+/* The count sits as a small corner badge rather than inline text -- there's
+   no room for both a word and a number in a narrow equal-width panel. */
 .tab .tab-count{
-  font-family:var(--font-mono); font-weight:600; font-size:10.5px;
-  background:rgba(0,0,0,0.22); padding:1px 7px; border-radius:10px;
+  position:absolute; top:2px; right:4px;
+  font-family:var(--font-mono); font-weight:600; font-size:8.5px;
+  background:rgba(0,0,0,0.24); padding:1px 4px; border-radius:8px; line-height:1.3;
 }
 .tab.active{
   opacity:1; background:var(--lane-accent, var(--brass)); color:var(--dark-on-accent);
-  font-weight:700;
 }
-.tab.active .tab-count{ background:rgba(0,0,0,0.18); }
-/* Unread / open-loop dot, same idea as the old .has-badge. */
-.tab.has-badge::after{
-  content:""; position:absolute; top:4px; right:6px; width:7px; height:7px;
+.tab.active .tab-count{ background:rgba(0,0,0,0.2); }
+/* Unread / open-loop dot -- opposite corner from the count badge so the two
+   never collide. */
+.tab.has-badge::before{
+  content:""; position:absolute; top:2px; left:4px; width:6px; height:6px;
   border-radius:50%; background:var(--red); box-shadow:0 0 0 2px var(--bg-top);
 }
 /* Per-tab accent so the active pill shows its lane's color. Mirror the lane map. */
@@ -273,16 +297,17 @@ body.drag-active .tabbar-spacer{ transition:none; }
 /* --- STATE B: collapsed → a single floating pill (the active tab only). --- */
 body.tabs-collapsed .tabbar{
   justify-content:flex-start;
-  overflow:visible;
   padding-top:2px;
 }
 body.tabs-collapsed .tab{ display:none; }          /* hide the rest … */
 body.tabs-collapsed .tab.active{                    /* … show only the active one, as a pill */
-  display:inline-flex;
+  display:flex; flex-direction:row; flex:0 0 auto; gap:7px;
   border-radius:20px;
-  padding:7px 16px;
+  padding:7px 16px 7px 14px;
   box-shadow:0 4px 12px rgba(0,0,0,0.4);
 }
+body.tabs-collapsed .tab.active .tab-count{ position:static; background:rgba(0,0,0,0.18); }
+body.tabs-collapsed .tab.active.has-badge::before{ top:4px; left:6px; }
 
 /* ----------------------------------------------------------------------------
    MAIN / LANES SHELL
@@ -844,12 +869,16 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
   </div>
 </header>
 
+<!-- Compact letter+icon panels, no horizontal scroll (user round). Five
+     equal-width panels fill the bar; Notes joins as a sixth in chunk 6,
+     same pattern. tab-name is kept (visually hidden) for accessibility --
+     the letter+icon are decorative shorthand, not the accessible label. -->
 <nav class="tabbar" id="lane-switcher" role="tablist">
-  <button class="tab active" data-kind="next"><span class="tab-icon">&#9678;</span><span class="tab-name">Next Actions</span><span class="tab-count">0</span></button>
-  <button class="tab" data-kind="waiting"><span class="tab-icon">&#9203;</span><span class="tab-name">Waiting On</span><span class="tab-count">0</span></button>
-  <button class="tab" data-kind="current"><span class="tab-icon">&#9635;</span><span class="tab-name">Projects</span><span class="tab-count">0</span></button>
-  <button class="tab" data-kind="future"><span class="tab-icon">&#9737;</span><span class="tab-name">Someday</span><span class="tab-count">0</span></button>
-  <button class="tab" data-kind="habit"><span class="tab-icon">&#9873;</span><span class="tab-name">Habits</span><span class="tab-count">0</span></button>
+  <button class="tab active" data-kind="next"><span class="tab-icon">&#9889;</span><span class="tab-letter">N</span><span class="tab-count">0</span><span class="tab-name">Next Actions</span></button>
+  <button class="tab" data-kind="waiting"><span class="tab-icon">&#9203;</span><span class="tab-letter">W</span><span class="tab-count">0</span><span class="tab-name">Waiting On</span></button>
+  <button class="tab" data-kind="current"><span class="tab-icon">&#128296;</span><span class="tab-letter">P</span><span class="tab-count">0</span><span class="tab-name">Projects</span></button>
+  <button class="tab" data-kind="future"><span class="tab-icon">&#128301;</span><span class="tab-letter">S</span><span class="tab-count">0</span><span class="tab-name">Someday</span></button>
+  <button class="tab" data-kind="habit"><span class="tab-icon">&#127937;</span><span class="tab-letter">H</span><span class="tab-count">0</span><span class="tab-name">Habits</span></button>
 </nav>
 <div class="tabbar-spacer" aria-hidden="true"></div>
 
