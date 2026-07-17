@@ -1142,6 +1142,12 @@ function injectChunkMap(){
   const state = {
     tasks: {next: [], waiting: [], current: [], future: [], habit: []},
     completed: {next: [], waiting: [], current: [], future: []}, // permanent Completed archive per lane (habits use their own daily habitDone-based grouping instead — see habitCompletedTodayHtml)
+    // chunk 3 (§4.3d): the ONE shared contexts registry, used by Next AND
+    // Waiting. Each context is { id, name }. An action stores its membership
+    // as a `contextId` field (null = ungrouped) — NOT the group-task `parent`
+    // mechanism, which is now project-lanes-only. contextId is what lets a
+    // promoted Waiting item land in the identically-named context for free.
+    contexts: [],
     activeKind: "next",
     collapsed: {},
     habitDone: {},
@@ -1316,6 +1322,29 @@ function injectChunkMap(){
   function saveTasksLocal(kind){
     Storage.setJSON("gtd_tasks_" + kind, state.tasks[kind]);
   }
+  // Contexts registry (chunk 3, §4.3d) — the one shared Next↔Waiting set.
+  function loadContexts(){ return Storage.getJSON("gtd_contexts", null); }
+  function saveContexts(){ Storage.setJSON("gtd_contexts", state.contexts); }
+  function isActionKind(k){ return k === "next" || k === "waiting"; }
+  function findContext(id){ return state.contexts.find(function(c){ return c.id === id; }) || null; }
+  function contextNameExists(name){
+    const n = (name || "").trim().toLowerCase();
+    return state.contexts.some(function(c){ return (c.name || "").trim().toLowerCase() === n; });
+  }
+  // Create a context in the registry (front, so a fresh one surfaces near the
+  // top of the context list). Choose-only pickers never call this — creation
+  // is the + badge alone (§4.3e). Returns the new context, or an existing one
+  // if the name is a duplicate (case-insensitive), so callers can no-op safely.
+  function addContext(name){
+    const trimmed = (name || "").trim();
+    if (!trimmed) return null;
+    const existing = state.contexts.find(function(c){ return (c.name || "").trim().toLowerCase() === trimmed.toLowerCase(); });
+    if (existing) return existing;
+    const ctx = { id: genId(), name: trimmed };
+    state.contexts.unshift(ctx);
+    saveContexts();
+    return ctx;
+  }
   // Completed archive (new): permanent per-lane list of finished Next/
   // Waiting/Current/Future items, most-recently-completed first. Always
   // local, same "app bookkeeping on top of whatever backend" pattern as
@@ -1348,13 +1377,18 @@ function injectChunkMap(){
     }
   }
   function seedData(){
+    // Default seeded contexts (§4.3d): Computer, Calls, Errands. A starting
+    // point, not a taxonomy. Seeded newest-last so they read in this order.
+    const computerCtx = { id: genId(), name: "Computer" };
+    state.contexts = [ computerCtx, { id: genId(), name: "Calls" }, { id: genId(), name: "Errands" } ];
+    saveContexts();
+
+    // Actions carry contextId (null = ungrouped), not a group-task parent.
     state.tasks.next = [
-      { id: genId(), title: "Email Sarah the draft agenda", notesClean: "", linkedProjectId: null, isGroup: false, parent: null }
+      { id: genId(), title: "Email Sarah the draft agenda", notesClean: "", linkedProjectId: null, isGroup: false, parent: null, contextId: null },
+      { id: genId(), title: "Update the budget spreadsheet", notesClean: "", linkedProjectId: null, isGroup: false, parent: null, contextId: computerCtx.id },
+      { id: genId(), title: "Reply to the invoice question", notesClean: "", linkedProjectId: null, isGroup: false, parent: null, contextId: computerCtx.id }
     ];
-    const groupId = genId();
-    state.tasks.next.push({ id: groupId, title: "At computer", notesClean: "", linkedProjectId: null, isGroup: true, parent: null });
-    state.tasks.next.push({ id: genId(), title: "Update the budget spreadsheet", notesClean: "", linkedProjectId: null, isGroup: false, parent: groupId });
-    state.tasks.next.push({ id: genId(), title: "Reply to the invoice question", notesClean: "", linkedProjectId: null, isGroup: false, parent: groupId });
 
     state.tasks.current = [
       { id: genId(), title: "Website relaunch", notesClean: "", linkedProjectId: null, isGroup: false, parent: null },
@@ -1397,6 +1431,16 @@ function injectChunkMap(){
       if (h.isGroup) return;
       if (!h.whenTexts) h.whenTexts = h.whenText ? [h.whenText] : [];
     });
+    const loadedCtx = loadContexts();
+    if (loadedCtx){ state.contexts = loadedCtx; }
+    else if (!anyMissing){
+      // Tasks exist but no registry (pre-chunk-3 data): give a default
+      // registry rather than re-seeding over real tasks. Old parent-based
+      // context group-tasks in the action lanes simply render ungrouped now
+      // (no migration — §1). Reset seeds everything fresh in the new shape.
+      state.contexts = [ { id: genId(), name: "Computer" }, { id: genId(), name: "Calls" }, { id: genId(), name: "Errands" } ];
+      saveContexts();
+    }
     if (anyMissing){ seedData(); }
   }
 
@@ -1671,8 +1715,8 @@ function injectChunkMap(){
   // =========================================================
   // TASK OPERATIONS
   // =========================================================
-  function addTask(kind, title, parentId){
-    state.tasks[kind].push({ id: genId(), title: title, notesClean: "", linkedProjectId: null, isGroup: false, parent: parentId || null, whenText: null, hooks: [] });
+  function addTask(kind, title, parentId, contextId){
+    state.tasks[kind].push({ id: genId(), title: title, notesClean: "", linkedProjectId: null, isGroup: false, parent: parentId || null, contextId: contextId || null, whenText: null, hooks: [] });
     saveTasksLocal(kind);
     renderLane(kind);
   }
@@ -1918,15 +1962,30 @@ function injectChunkMap(){
     renderLane(destKind);
     return Promise.resolve(root);
   }
-  function moveWithinList(kind, taskId, parentId, previousId){
+  // The DOM dropzone's data-dropzone-parent (`containerId`) means different
+  // things per lane (chunk 3): on the ACTION lanes it is a CONTEXT id (or a
+  // dev group-task id, or "" for loose); on the PROJECT lanes it is a
+  // group-task parent id. groupKeyOf collapses that so reordering finds the
+  // right same-group siblings either way.
+  function groupKeyOf(kind, t){ return isActionKind(kind) ? (t.contextId || t.parent || "") : (t.parent || ""); }
+  function moveWithinList(kind, taskId, containerId, previousId){
     const list = state.tasks[kind];
     const idx = list.findIndex(function(t){ return t.id === taskId; });
     if (idx === -1) return;
     const task = list[idx];
     list.splice(idx, 1);
-    task.parent = parentId || null;
+    if (isActionKind(kind)){
+      // A registry id → context membership; anything else (a dev group-task
+      // id, or "") → the group-task parent slot. The other key is cleared, so
+      // an action is never in a context and a group-task at once.
+      if (containerId && findContext(containerId)){ task.contextId = containerId; task.parent = null; }
+      else { task.contextId = null; task.parent = containerId || null; }
+    } else {
+      task.parent = containerId || null;
+    }
+    const myKey = groupKeyOf(kind, task);
     if (!previousId){
-      let insertAt = list.findIndex(function(t){ return (t.parent || null) === (task.parent || null); });
+      let insertAt = list.findIndex(function(t){ return groupKeyOf(kind, t) === myKey; });
       if (insertAt === -1) insertAt = list.length;
       list.splice(insertAt, 0, task);
     } else {
@@ -2309,6 +2368,35 @@ function injectChunkMap(){
       '</div>'
     );
   }
+  // A context group in an action lane (chunk 3, §4.3d). Like groupHtml but
+  // driven by the registry, not a group-task: the header shows the registry
+  // name, its × deletes the CONTEXT (unlink — members survive), and its body
+  // is a dropzone keyed on the context id. Not draggable — contexts don't
+  // reorder as tasks. Renders even when empty so it's a visible drop target
+  // (the §4.3d escape hatch: create a context, drag items in).
+  function contextGroupHtml(kind, ctx, members){
+    const collapsed = isCollapsed(kind, ctx.id);
+    const childrenHtml = members.map(function(c){ return leafCardHtml(kind, c); }).join("");
+    return (
+      '<div class="group" data-context-group="' + ctx.id + '">' +
+        '<div class="group-header" data-action="toggle-group" data-id="' + ctx.id + '">' +
+          '<span class="chevron">' + (collapsed ? "&#9656;" : "&#9662;") + '</span>' +
+          '<span class="group-title" title="Tap to expand/collapse">' + escapeHtml(ctx.name) + '</span>' +
+          '<span class="count">' + members.length + '</span>' +
+          '<span class="group-actions">' +
+            '<button class="icon-btn" data-action="delete-context" data-id="' + ctx.id + '" title="Delete context">&times;</button>' +
+          '</span>' +
+        '</div>' +
+        (collapsed ? "" :
+          '<div class="group-body" data-dropzone-parent="' + ctx.id + '">' + childrenHtml +
+            '<div class="add-row add-row-mini" data-kind="' + kind + '" data-context="' + ctx.id + '">' +
+              '<input type="text" placeholder="Add to context…" /><button type="button" data-role="add-mini">+</button>' +
+            '</div>' +
+          '</div>'
+        ) +
+      '</div>'
+    );
+  }
   function renderLane(kind){
     const laneEl = qs('.lane[data-kind="' + kind + '"]');
     if (!laneEl) return;
@@ -2335,6 +2423,27 @@ function injectChunkMap(){
         ? roots.map(function(r){ return r.isGroup ? groupHtml(kind, r, byParent[r.id] || []) : leafCardHtml(kind, r); }).join("")
         : '<div class="empty-note">Nothing here yet.</div>';
       completedHtml = completedSectionHtml(kind, doneList, function(t){ return leafCardHtml(kind, t); });
+    } else if (isActionKind(kind)){
+      // Action lanes (chunk 3, §4.3d): items group by CONTEXT (registry), not
+      // by group-task. Order: loose actions + any dev group-tasks (the QA
+      // checklist still lives here) in array order at the top, then one group
+      // per registry context. A member whose contextId no longer resolves
+      // (context deleted) falls back to loose — the unlink safety net.
+      const all = state.tasks[kind];
+      const byParent = buildTree(kind);
+      const roots = byParent[""] || [];
+      let html = "";
+      roots.forEach(function(r){
+        if (r.isGroup){ html += groupHtml(kind, r, byParent[r.id] || []); }        // dev scaffolding (QA checklist)
+        else if (!r.contextId || !findContext(r.contextId)){ html += leafCardHtml(kind, r); } // loose / orphaned
+        // context members are rendered in their context group below
+      });
+      state.contexts.forEach(function(ctx){
+        const members = all.filter(function(t){ return !t.isGroup && t.contextId === ctx.id; });
+        html += contextGroupHtml(kind, ctx, members);
+      });
+      activeHtml = html || '<div class="empty-note">Nothing here yet.</div>';
+      completedHtml = completedSectionHtml(kind, state.completed[kind] || [], function(t){ return completedItemHtml(kind, t); });
     } else {
       const byParent = buildTree(kind);
       const roots = byParent[""] || [];
@@ -3638,6 +3747,7 @@ function injectChunkMap(){
           Storage.remove("gtd_habit_done");
           Storage.remove("gtd_habit_runs");
           Storage.remove("gtd_archived_waiting");
+          Storage.remove("gtd_contexts"); // chunk 3: Reset re-seeds the default registry
           // Also clear the QA-checklist and chunk-map injection flags: the
           // reset wipes the injected items with the rest of the data, so the
           // flags must go too or they'd be gone for good — both should
@@ -3678,13 +3788,23 @@ function injectChunkMap(){
     // window.prompt for "+ New list": both native mechanisms are silently
     // blocked in sandboxed/embedded contexts (which is why the buttons
     // appeared dead), and the inline versions work everywhere.
+    // Dashed-outline feedback, cleared on next input (CLAUDE.md validation rule).
+    function markInvalid(input){
+      input.classList.add("field-invalid");
+      input.addEventListener("input", function h(){ input.classList.remove("field-invalid"); input.removeEventListener("input", h); });
+    }
     function submitAddMini(row){
       const input = row.querySelector("input[type=text]");
       const title = input.value.trim();
-      if (!title){ input.classList.add("field-invalid"); return; }
+      if (!title){ markInvalid(input); return; }
+      const kind = row.getAttribute("data-kind");
+      // Duplicate-title check (chunk 3, §2): reject a title already present in
+      // this lane (case-insensitive) with the standard dashed outline.
+      const dup = state.tasks[kind].some(function(t){ return !t.isGroup && (t.title || "").trim().toLowerCase() === title.toLowerCase(); });
+      if (dup){ markInvalid(input); return; }
       input.classList.remove("field-invalid");
       input.value = "";
-      addTask(row.getAttribute("data-kind"), title, row.getAttribute("data-parent") || null);
+      addTask(kind, title, row.getAttribute("data-parent") || null, row.getAttribute("data-context") || null);
     }
     // CHUNK 2 (spec 4.3e) -- the FAB menu's second option ("New context" /
     // "New list"). Replaces the old button-swap openNewListRow(): there's no
@@ -3702,8 +3822,20 @@ function injectChunkMap(){
       function commit(){
         const name = input.value.trim();
         if (!name){ clear(); return; }
-        clear();
-        addGroup(kind, name);
+        // chunk 3 (§4.3e): the ONE handler that swapped this chunk. Action
+        // lanes now write to the contexts registry; project lanes keep the
+        // lane-local group-task path (addGroup) untouched. A duplicate context
+        // name is a no-op (addContext returns the existing one), so the inline
+        // row just closes without creating a second identical bucket.
+        if (isActionKind(kind)){
+          const existed = contextNameExists(name);
+          addContext(name);
+          clear();
+          if (!existed) renderLane(kind);
+        } else {
+          clear();
+          addGroup(kind, name);
+        }
       }
       slot.querySelector("button").addEventListener("click", commit);
       input.addEventListener("keydown", function(ev){
@@ -3803,6 +3935,35 @@ function injectChunkMap(){
           return;
         }
         deleteTask(kind, groupId);
+        return;
+      }
+      // Delete a context (chunk 3, §4.3d): UNLINK, never destroy. The context
+      // leaves the registry; its members survive, contextId cleared, so they
+      // render ungrouped at the top of the lane. Contexts are shared, so this
+      // sweeps BOTH action lanes. Behind a confirm that says so plainly.
+      const delCtxBtn = e.target.closest('[data-action="delete-context"]');
+      if (delCtxBtn){
+        const ctxId = delCtxBtn.getAttribute("data-id");
+        const ctx = findContext(ctxId);
+        if (!ctx) return;
+        const affected = state.tasks.next.filter(function(t){ return t.contextId === ctxId; }).length +
+                         state.tasks.waiting.filter(function(t){ return t.contextId === ctxId; }).length;
+        const msg = affected
+          ? "Delete the “" + ctx.name + "” context? Its " + affected + " item" + (affected === 1 ? "" : "s") + " will stay — ungrouped, at the top of the lane."
+          : "Delete the “" + ctx.name + "” context?";
+        openConfirmDialog(msg, [
+          { label: "Delete context", style: "danger", action: function(){
+            ["next", "waiting"].forEach(function(k){
+              let changed = false;
+              state.tasks[k].forEach(function(t){ if (t.contextId === ctxId){ t.contextId = null; changed = true; } });
+              if (changed) saveTasksLocal(k);
+            });
+            state.contexts = state.contexts.filter(function(c){ return c.id !== ctxId; });
+            saveContexts();
+            renderLane("next"); renderLane("waiting");
+          } },
+          { label: "Cancel", action: function(){} }
+        ]);
         return;
       }
       const completeBtn = e.target.closest('[data-action="complete"]');
