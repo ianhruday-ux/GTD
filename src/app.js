@@ -2846,7 +2846,10 @@
           const existed = contextNameExists(name);
           addContext(name);
           clear();
-          if (!existed) renderLane(kind);
+          // Contexts are ONE shared Next↔Waiting set (§4.3d), so a new one
+          // has to surface on BOTH action lanes immediately — rendering only
+          // the active lane left the sibling stale until a full refresh.
+          if (!existed){ renderLane("next"); renderLane("waiting"); }
         } else {
           clear();
           addGroup(kind, name);
@@ -2975,7 +2978,10 @@
             });
             state.contexts = state.contexts.filter(function(c){ return c.id !== ctxId; });
             saveContexts();
-            renderLane("next"); renderLane("waiting");
+            // Also the Habits lane: a habit cued on this context now shows the
+            // deleted-cue (orphan) pill, and that only recomputes on re-render
+            // — otherwise it stayed stale until a full refresh.
+            renderLane("next"); renderLane("waiting"); renderLane("habit");
           } },
           { label: "Cancel", action: function(){} }
         ]);
