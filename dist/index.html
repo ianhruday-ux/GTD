@@ -253,15 +253,22 @@ header{
   max-width:672px; margin:0 auto;
   transition:height .2s ease;
 }
-/* The spacer sits in normal flow and reserves exactly the bar's height plus the
-   fixed chrome above it, so lane content never hides under the chrome. */
+/* The spacer sits in normal flow and reserves space for the fixed chrome above
+   it, so lane content never hides under it. It keys off --tabbar-h-OPEN, i.e.
+   it is CONSTANT and does NOT shrink when the bar collapses (user round --
+   fixes the bounce at the very bottom of a lane). The bar itself is
+   position:fixed, so only this spacer contributes to document height; if the
+   spacer shrank on collapse, the page would get shorter, the browser would
+   clamp your scroll upward at the bottom, and that clamp jump read as a
+   scroll-up gesture -- expanding the bar, re-growing the page, and
+   oscillating. A constant spacer means toggling the bar never changes
+   document height, so there is nothing to clamp. The collapsed pill floats
+   over the small amount of reserved space it doesn't fill; that is fine. */
 .tabbar-spacer{
-  height:calc(var(--header-h) + env(safe-area-inset-top) + var(--tabbar-h) + 6px);
-  transition:height .2s ease;
+  height:calc(var(--header-h) + env(safe-area-inset-top) + var(--tabbar-h-open) + 6px);
   flex:0 0 auto;
 }
-body.drag-active .tabbar,
-body.drag-active .tabbar-spacer{ transition:none; }
+body.drag-active .tabbar{ transition:none; }
 
 /* No horizontal scroll: three panels share the row equally. Two are pairs
    of related lanes split top/bottom into independently-tappable halves
