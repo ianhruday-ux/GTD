@@ -698,7 +698,12 @@ main{
 .completed-list{ padding:0 11px 11px 11px; display:flex; flex-direction:column; gap:6px; }
 .completed-item{ display:flex; align-items:center; gap:8px; padding:7px 2px; border-bottom:1px solid rgba(255,255,255,0.06); }
 .completed-item:last-child{ border-bottom:none; }
-.completed-item-title{ flex:1; font-size:13px; color:var(--text-soft); text-decoration:line-through; text-decoration-color:rgba(237,231,218,0.3); }
+.completed-item-title{ flex:1; font-size:13px; color:var(--text-soft); text-decoration:line-through; text-decoration-color:rgba(237,231,218,0.3); cursor:pointer; }
+/* Read-only completed-item page (§12.2 step 5) */
+.completed-static{ opacity:0.92; }
+.completed-static-desc{ color:var(--text-soft); font-size:13.5px; line-height:1.5; white-space:pre-wrap; }
+.completed-info-row{ font-size:13px; color:var(--text-soft); padding:3px 2px; }
+.completed-info-row.completed-when{ opacity:0.7; font-family:var(--font-mono); font-size:11px; letter-spacing:0.04em; }
 
 footer{ text-align:center; color:var(--text-soft); font-size:11.5px; padding:30px 10px calc(20px + env(safe-area-inset-bottom)) 10px; }
 
@@ -893,6 +898,8 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 .adv-content{ margin-bottom:10px; }
 .screen-advanced-btn{ align-self:flex-start; }
 .bundle-pill{ align-self:flex-start; }
+.bundle-pill-wrap{ display:inline-flex; align-items:center; gap:3px; align-self:flex-start; }
+.bundle-pill-clear{ font-size:15px; line-height:1; color:var(--text-soft); padding:2px 5px; }
 
 /* Confirm / choice dialog (= carried over =) */
 .choice-dialog-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:300; display:flex; align-items:center; justify-content:center; padding:20px; }
@@ -1385,18 +1392,68 @@ function injectChunkMap(){
   // back to the top of the active list (mirrors the "new items land on
   // top" rule). Projects also restore any Waiting items that were archived
   // alongside them at completion time.
+  // Emergency restore rule (§7, §12.2 step 4). A completed item may have sat
+  // in the archive while its parentage was deleted around it — the origin
+  // bug: complete a Context's only item, delete the Context, restore, and the
+  // item reappears under a group ID that no longer exists and renders
+  // nowhere. Before it lands back in a live lane, sever any dead link so it
+  // can't vanish: a dead parent (dev group) or contextId is nulled (the
+  // item lands loose at the top of the lane), and a dead linkedProjectId is
+  // nulled. Condition fields are left ALONE — dependents were already
+  // orphaned at completion time (§4.12b), and that is not this rule's job.
+  function sanitizeRestoredParentage(kind, task){
+    if (task.parent && !state.tasks[kind].some(function(t){ return t.isGroup && t.id === task.parent; })){
+      task.parent = null;
+    }
+    if (task.contextId && !findContext(task.contextId)){
+      task.contextId = null;
+    }
+    if (task.linkedProjectId && !["current", "future"].some(function(k){
+      return state.tasks[k].some(function(t){ return !t.isGroup && t.id === task.linkedProjectId; });
+    })){
+      task.linkedProjectId = null;
+    }
+  }
   function restoreTask(kind, taskId){
     const idx = state.completed[kind].findIndex(function(t){ return t.id === taskId; });
     if (idx === -1) return;
     const task = state.completed[kind].splice(idx, 1)[0];
     delete task.completedAt;
+    sanitizeRestoredParentage(kind, task);
     saveCompletedLocal(kind);
     state.tasks[kind].unshift(task);
     saveTasksLocal(kind);
     renderLane(kind);
+    refreshProjectFlags(kind);
     if (kind === "current" || kind === "future"){
       restoreArchivedWaitingForProject(taskId); // renders "waiting" itself
     }
+  }
+  // Delete ONE completed item from the archive (§12.2 step 1). Deliberately
+  // NOT routed through deleteTask: that operates on live lanes only, its
+  // filters no-op against the archive, and its side effects (label freeze,
+  // dependent patching) don't apply here — the dependents were orphaned at
+  // completion. A completed PROJECT also drops its archived Waiting actions
+  // (§4.12b): once it is deleted for good there is nothing to reopen against.
+  function deleteCompleted(kind, taskId, skipRender){
+    const idx = state.completed[kind].findIndex(function(t){ return t.id === taskId; });
+    if (idx === -1) return;
+    state.completed[kind].splice(idx, 1);
+    saveCompletedLocal(kind);
+    if (kind === "current" || kind === "future"){
+      const archived = loadArchivedWaiting();
+      if (archived[taskId]){ delete archived[taskId]; saveArchivedWaiting(archived); }
+    }
+    if (!skipRender) renderLane(kind);
+  }
+  // Clear a whole lane's completed archive (§12.2 step 2) — four lanes only,
+  // never Habits. Loops deleteCompleted's per-item logic so the project-
+  // archive cleanup can't diverge (one code path). The caller owns the
+  // confirm dialog; this just does the work.
+  function clearCompleted(kind){
+    const ids = (state.completed[kind] || []).map(function(t){ return t.id; });
+    ids.forEach(function(id){ deleteCompleted(kind, id, true); });
+    renderLane(kind);
   }
   function seedData(){
     // Default seeded contexts (§4.3d): Computer, Calls, Errands. A starting
@@ -2059,7 +2116,11 @@ function injectChunkMap(){
     const archived = loadArchivedWaiting();
     const items = archived[projectId] || [];
     if (!items.length) return;
-    items.forEach(function(t){ state.tasks.waiting.push(t); });
+    // Same emergency-restore rule (§12.2 step 4): the project itself is live
+    // again by the time this runs (restoreTask unshifts it first), so a
+    // waiting item's linkedProjectId resolves — but its parent/context may
+    // have died while archived, so sanitize each before it lands.
+    items.forEach(function(t){ sanitizeRestoredParentage("waiting", t); state.tasks.waiting.push(t); });
     saveTasksLocal("waiting");
     delete archived[projectId];
     saveArchivedWaiting(archived);
@@ -2347,22 +2408,34 @@ function injectChunkMap(){
   function completedSectionHtml(kind, items, renderItem){
     if (!items.length) return "";
     const open = isCollapsed(kind, "__completed_open__");
+    // Clear-all 🗑 (§4.12b, §12.2 step 2): four lanes only. Habits reuse this
+    // section for today's toggles, not an archive, so a clear-all there has no
+    // sane meaning — no trash can. The button lives inside the header row but
+    // its own handler runs first and returns, so it never toggles the section.
+    const clearBtn = (kind !== "habit")
+      ? '<span class="group-actions"><button type="button" class="icon-btn" data-action="clear-completed" data-kind="' + kind + '" title="Delete all completed items">&#128465;</button></span>'
+      : "";
     return (
       '<div class="completed-section">' +
         '<div class="group-header" data-action="toggle-group" data-id="__completed_open__">' +
           '<span class="chevron">' + (open ? "&#9662;" : "&#9656;") + '</span>' +
           '<span class="group-title">Completed</span>' +
           '<span class="count">' + items.length + '</span>' +
+          clearBtn +
         '</div>' +
         (open ? '<div class="completed-list">' + items.map(renderItem).join("") + '</div>' : "") +
       '</div>'
     );
   }
+  // A completed row (Next/Waiting/Current/Future): a FILLED checkbox that
+  // un-completes on tap — mirroring the live checkbox, teaching that the
+  // control that completed the item restores it (§4.12b) — and a tappable
+  // title that opens the read-only completed page.
   function completedItemHtml(kind, task){
     return (
       '<div class="completed-item">' +
-        '<span class="completed-item-title">' + escapeHtml(task.title) + '</span>' +
-        '<button type="button" class="icon-btn" data-action="restore" data-kind="' + kind + '" data-id="' + task.id + '" title="Restore to the active list">&#8635;</button>' +
+        '<button type="button" class="check checked" data-action="restore" data-kind="' + kind + '" data-id="' + task.id + '" title="Restore to the active list">&#10003;</button>' +
+        '<span class="completed-item-title" data-action="open-completed" data-kind="' + kind + '" data-id="' + task.id + '" title="Tap to view">' + escapeHtml(task.title) + '</span>' +
       '</div>'
     );
   }
@@ -2624,6 +2697,17 @@ function injectChunkMap(){
     lockBodyScroll(false);
     qs("#screen-root").innerHTML = "";
   }
+  // The completed-item page (§4.12b, §12.2 step 5): a READ-ONLY view of an
+  // archived item. No draft — the page never edits anything; it only offers
+  // Restore and Delete. `completedTask` is the archive snapshot the body
+  // renders from. Chrome is ← + 🗑 with NO ✕ (user ruling): nothing is
+  // editable, so ← and ✕ would be one gesture.
+  function openCompletedScreen(kind, taskId){
+    const task = (state.completed[kind] || []).find(function(t){ return t.id === taskId; });
+    if (!task) return;
+    state.screen = { kind: kind, taskId: taskId, completedView: true, completedTask: task, draft: {} };
+    renderScreen();
+  }
   // Opens a screen "on top of" the current one — the current screen
   // (draft included) is pushed onto the stack and restored when the new
   // one closes, whichever way it closes: save, cancel, Escape, delete, or
@@ -2647,6 +2731,9 @@ function injectChunkMap(){
   function saveScreen(){
     const s = state.screen;
     if (!s) return;
+    // The completed page is read-only (§12.2): its ← is a plain back with no
+    // side effects — there is no draft to commit.
+    if (s.completedView){ closeScreen(); return; }
     let title = (s.draft.title || "").trim();
     if (!title){
       if (!s.taskId){ closeScreen(); return; } // silent discard on create
@@ -2881,6 +2968,9 @@ function injectChunkMap(){
   function screenMakeKind(destKind){
     const s = state.screen;
     if (!s || !s.taskId) return;
+    // Completed page: convert buttons are greyed + inert (§12.2 step 5) —
+    // restore first. Backstop for the disabled rendering.
+    if (s.completedView) return;
     // MUTUAL EXCLUSION (user ruling): an armed Complete disables the
     // convert buttons — disarm Complete first. Mirror of the guard in
     // screenComplete.
@@ -3278,7 +3368,13 @@ function injectChunkMap(){
   function advancedRowHtml(draft){
     let out = "";
     if ((draft.bundleText || "").trim()){
-      out += '<button type="button" class="link-pill bundle-pill" data-action="screen-open-advanced" title="Edit in Advanced options">&#127852; ' + escapeHtml(draft.bundleText.trim()) + '</button>';
+      // Bundle pill with a × (§12.2 step 6): tapping the pill edits it in
+      // Advanced options; the × clears it. Draft-only — it edits draft.bundleText
+      // and commits on Save, so ✕ discards the removal like any other field.
+      out += '<span class="bundle-pill-wrap">' +
+        '<button type="button" class="link-pill bundle-pill" data-action="screen-open-advanced" title="Edit in Advanced options">&#127852; ' + escapeHtml(draft.bundleText.trim()) + '</button>' +
+        '<button type="button" class="icon-btn bundle-pill-clear" data-action="clear-bundle" title="Remove this bundle">&times;</button>' +
+      '</span>';
     }
     out += '<button type="button" class="btn btn-ghost btn-small screen-advanced-btn" data-action="screen-open-advanced">Advanced options…</button>';
     return out;
@@ -3533,6 +3629,69 @@ function injectChunkMap(){
       '</button>'
     );
   }
+  // Completed-item page chrome (§12.2 step 5): ← (back, no save) and 🗑, and
+  // deliberately NO ✕ — with nothing editable, ← and ✕ would be one gesture.
+  function completedHeaderHtml(s){
+    return (
+      '<div class="screen-header">' +
+        '<button type="button" class="screen-chrome-btn" data-action="screen-save" title="Back">&#8592;</button>' +
+        '<span class="screen-kind-badge">' + escapeHtml(KIND_BADGE_LABEL[s.kind]) + '</span>' +
+        '<div class="screen-header-right">' +
+          '<button type="button" class="screen-chrome-btn danger" data-action="completed-delete" title="Delete">&#128465;</button>' +
+        '</div>' +
+      '</div>'
+    );
+  }
+  // Read-only body: honest static rendering (no inputs that don't save), the
+  // relevant secondary details, the kind's convert button greyed + inert
+  // ("Restore the item to convert it"), and the Complete pill as "↩ Restore".
+  function completedBodyHtml(s){
+    const t = s.completedTask, kind = s.kind;
+    let fields = '<div class="screen-field-title completed-static">' + escapeHtml(t.title) + '</div>';
+    if ((t.notesClean || "").trim()){
+      fields += '<div class="completed-static-desc">' + escapeHtml(t.notesClean.trim()) + '</div>';
+    }
+    const rows = [];
+    if (kind === "waiting"){
+      if (t.conditionId) rows.push("🥅 After " + escapeHtml(t.conditionLabel || "another item"));
+      else if ((t.whenText || "").trim()) rows.push("🕐 Waiting for " + escapeHtml(t.whenText.trim()));
+    }
+    if (isActionKind(kind) && t.contextId){
+      const ctx = findContext(t.contextId);
+      if (ctx) rows.push("Context: " + escapeHtml(ctx.name));
+    }
+    if (isActionKind(kind) && t.linkedProjectId){
+      let proj = null;
+      ["current", "future"].forEach(function(k){
+        const p = state.tasks[k].find(function(x){ return x.id === t.linkedProjectId; }) ||
+                  (state.completed[k] || []).find(function(x){ return x.id === t.linkedProjectId; });
+        if (p) proj = p;
+      });
+      if (proj) rows.push("🔗 Part of “" + escapeHtml(proj.title) + "”");
+    }
+    if (t.deadline && t.deadline.date){
+      const dd = dateStrToDate(t.deadline.date);
+      let ds = dd ? dd.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }) : t.deadline.date;
+      if (t.deadline.time) ds += " at " + escapeHtml(t.deadline.time);
+      rows.push("📅 Due " + escapeHtml(ds));
+    }
+    if ((t.bundleText || "").trim()){
+      rows.push("🍬 " + escapeHtml(t.bundleText.trim()));
+    }
+    rows.forEach(function(r){ fields += '<div class="completed-info-row">' + r + '</div>'; });
+    if (t.completedAt){
+      fields += '<div class="completed-info-row completed-when">Completed ' + escapeHtml(t.completedAt) + '</div>';
+    }
+    // Convert button(s) for this kind — greyed and inert. screenMakeKind
+    // guards completedView, so a tap does nothing even if the class slips.
+    const tip = "Restore the item to convert it";
+    if (kind === "next") fields += makeKindBtnHtml("waiting", "Make Waiting Action", "right", false, true, tip);
+    else if (kind === "waiting") fields += makeKindBtnHtml("next", "Make Next Action", "left", false, true, tip);
+    else if (kind === "current") fields += makeKindBtnHtml("future", "Make Future / Someday", "", false, true, tip);
+    else if (kind === "future") fields += makeKindBtnHtml("current", "Make Current Project", "", false, true, tip);
+    fields += '<button type="button" class="btn screen-complete-pill" data-action="completed-restore" title="Restore to the active list">↩ Restore</button>';
+    return '<div class="screen-body">' + fields + '</div>';
+  }
   function screenBodyHtml(s){
     const draft = s.draft, kind = s.kind;
 
@@ -3762,8 +3921,10 @@ function injectChunkMap(){
     const root = qs("#screen-root");
     lockBodyScroll(!!s);
     if (!s){ root.innerHTML = ""; return; }
-    const key = s.kind + ":" + (s.taskId || "new");
-    const inner = screenHeaderHtml(s) + screenBodyHtml(s);
+    const key = (s.completedView ? "completed:" : "") + s.kind + ":" + (s.taskId || "new");
+    const inner = s.completedView
+      ? completedHeaderHtml(s) + completedBodyHtml(s)
+      : screenHeaderHtml(s) + screenBodyHtml(s);
     const existing = root.querySelector(".screen-overlay");
     if (existing && existing.getAttribute("data-screen-key") === key){
       // Same item re-rendering (hook added, day chip toggled, Complete
@@ -4015,6 +4176,12 @@ function injectChunkMap(){
       const tidyBtn = e.target.closest('[data-action="tidy-habits"]');
       if (tidyBtn){ tidyHabitOrder(); return; }
 
+      const clearBundleBtn = e.target.closest('[data-action="clear-bundle"]');
+      if (clearBundleBtn){
+        const s = state.screen;
+        if (s && s.draft){ s.draft.bundleText = ""; renderScreen(); } // draft-only (§12.2 step 6)
+        return;
+      }
       const advBtn = e.target.closest('[data-action="screen-open-advanced"]');
       if (advBtn){ openAdvancedDialog(); return; }
 
@@ -4113,6 +4280,29 @@ function injectChunkMap(){
         restoreTask(restoreBtn.getAttribute("data-kind"), restoreBtn.getAttribute("data-id"));
         return;
       }
+      // Clear-all (§12.2 step 2). Sits inside the Completed header, so it must
+      // run and return BEFORE the toggle-group handler below or it would also
+      // collapse the section. Behind a confirm — this is the one place the
+      // section says "forever."
+      const clearCompletedBtn = e.target.closest('[data-action="clear-completed"]');
+      if (clearCompletedBtn){
+        const kind = clearCompletedBtn.getAttribute("data-kind");
+        const n = (state.completed[kind] || []).length;
+        if (!n) return;
+        openConfirmDialog(
+          "Delete all " + n + " completed item" + (n === 1 ? "" : "s") + "? This can’t be undone.",
+          [
+            { label: "Delete all", style: "danger", action: function(){ clearCompleted(kind); } },
+            { label: "Cancel", action: function(){} }
+          ]
+        );
+        return;
+      }
+      const openCompletedBtn = e.target.closest('[data-action="open-completed"]');
+      if (openCompletedBtn){
+        openCompletedScreen(openCompletedBtn.getAttribute("data-kind"), openCompletedBtn.getAttribute("data-id"));
+        return;
+      }
       // Lane-card delete is gone (§4.7b) — deleteTask() is still called from
       // the full-screen page's own 🗑 (screen-delete, deleteScreenItem()).
       const habitBtn = e.target.closest('[data-action="toggle-habit"]');
@@ -4157,6 +4347,27 @@ function injectChunkMap(){
 
       const screenDeleteBtn = e.target.closest('[data-action="screen-delete"]');
       if (screenDeleteBtn){ deleteScreenItem(); return; }
+
+      // Completed page (§12.2 step 5): Restore (restore + close) and Delete
+      // (deleteCompleted behind a confirm) both act immediately — the page is
+      // not a drafting surface (same reason the list checkbox acts at once).
+      const completedRestoreBtn = e.target.closest('[data-action="completed-restore"]');
+      if (completedRestoreBtn){
+        const s = state.screen;
+        if (s && s.completedView){ restoreTask(s.kind, s.taskId); closeScreen(); }
+        return;
+      }
+      const completedDeleteBtn = e.target.closest('[data-action="completed-delete"]');
+      if (completedDeleteBtn){
+        const s = state.screen;
+        if (!s || !s.completedView) return;
+        const kind = s.kind, id = s.taskId;
+        openConfirmDialog("Delete this completed item? This can’t be undone.", [
+          { label: "Delete", style: "danger", action: function(){ deleteCompleted(kind, id); closeScreen(); } },
+          { label: "Cancel", action: function(){} }
+        ]);
+        return;
+      }
 
       const screenCompleteBtn = e.target.closest('[data-action="screen-complete"]');
       if (screenCompleteBtn){ screenComplete(); return; }
@@ -4697,7 +4908,7 @@ function injectChunkMap(){
   // off to the next chunk.
   // =========================================================
   function injectQAChecklist(){
-    const FLAG = "gtd_qa_checklist_chunk3";
+    const FLAG = "gtd_qa_checklist_chunk4";
     if (Storage.get(FLAG)) return;
     Storage.set(FLAG, "1");
 
@@ -4728,31 +4939,19 @@ function injectChunkMap(){
       });
     }
 
-    addGroupWithItems("\u2705 QA \u2014 Chunk 3: Contexts (shared by Next & Waiting)", [
-      { title: "A context you make on Next Actions is also there to pick on Waiting On", notes: "On Next Actions, tap +, choose \u2018New context\u2019, and name one (say \u2018Phone\u2019). Now open a Waiting On item and tap its Context box \u2014 \u2018Phone\u2019 should be in the list. Next and Waiting share one set of contexts." },
-      { title: "Moving a waiting item into Next keeps it in the same context", notes: "Put a Waiting On item into a context, then promote it to Next Actions (the \u2190 arrow on its card). It should land under the same-named context on Next Actions, not lose its grouping." },
-      { title: "The Context box on an item's page only lets you PICK a context, never make one", notes: "Open any Next or Waiting item and tap its Context box. You should see your existing contexts to choose from and NO \u2018+ new\u2019 option. If you have no contexts yet, it should tell you to make one with + on the lane." },
-      { title: "You can drag an action into a context on the lane", notes: "On Next Actions, press and hold an action for about half a second and drag it onto a context group. It should join that context." },
-      { title: "Deleting a context keeps its actions (nothing is lost)", notes: "Delete a context that still has actions in it (the \u00d7 on the context header). After the confirm, the context disappears but its actions survive, moving to the top of the lane with no context. Nothing should be deleted." }
+    addGroupWithItems("\u2705 QA \u2014 Chunk 4: Completed items", [
+      { title: "Completed sections start closed, with a count \u2014 tap to open", notes: "Finish an item (tick its checkbox) so a \u2018Completed\u2019 section appears at the bottom of the lane. It should start collapsed, showing a count, and open when you tap the header." },
+      { title: "A finished item's filled checkbox brings it back", notes: "Open a Completed section. Each row has a filled (green \u2713) checkbox. Tap it and the item should return to the top of the live list \u2014 the same checkbox that completed it un-completes it." },
+      { title: "Tapping a completed item opens a read-only view", notes: "Tap a completed item's name. It opens its page, but nothing is editable: the convert button is greyed out, and there is a \u2018\u21a9 Restore\u2019 button plus a trash can. There is a \u2190 back arrow and NO \u2715." },
+      { title: "Restore from the item's page works", notes: "On a completed item's page, tap \u2018\u21a9 Restore\u2019. It should return to the live list and the page should close." },
+      { title: "Deleting one completed item is final, and leaves the live list alone", notes: "On a completed item's page, tap the trash can and confirm. That item should be gone for good (not restorable), and your live lists should be untouched." },
+      { title: "The Completed header trash can clears the whole section \u2014 but not on Habits", notes: "The Completed header on Next Actions, Waiting On, Current Projects, and Future/Someday has a trash can that, after a confirm, empties just that lane's Completed section. The Habits lane's \u2018Completed\u2019 (today's done habits) has NO trash can." },
+      { title: "Restoring an item whose context or list was deleted still works", notes: "Put an action in a context, complete it, then delete that context, then restore the action from Completed. It should reappear at the top of the lane, ungrouped \u2014 never vanish. (Same for a completed project's linked actions.)" }
     ]);
 
-    addGroupWithItems("\u2705 QA \u2014 Chunk 3: A habit can be cued by a context", [
-      { title: "The cue picker on a habit lists your contexts as well as your other habits", notes: "Open a habit, tap the cue/hook icon on its \u2018When?\u2019 row. The picker should be split into \u2018Habits\u2019 and \u2018Contexts\u2019 sections, and the wording should talk about a \u2018cue\u2019 rather than only a \u2018habit\u2019." },
-      { title: "Picking a context shows a linked-cue tag on the habit \u2014 same look as hooking to another habit", notes: "Pick a context in that picker and save. The habit should show a linked-cue tag (the link icon and the context name) that looks the same as being hooked to another habit." },
-      { title: "A context cue always shows up (it has no schedule)", notes: "A habit cued on a context should show that cue every day \u2014 a context isn't tied to particular weekdays the way a habit hook is." },
-      { title: "Cueing a second habit on the same context warns you first", notes: "Cue one habit on a context, then try to cue a different habit on that same context. You should get the \u2018already has \u2026 hooked to it\u2019 warning, exactly like re-using a habit as a cue." },
-      { title: "Deleting a context that a habit is cued on shows the cue as deleted", notes: "Cue a habit on a context, then delete that context from the lane. On the habit's page the cue should now read as deleted (orphaned) \u2014 the same as when a habit you were hooked to is deleted." },
-      { title: "You still can't file a habit INTO a context", notes: "The Habits lane should have no context groups \u2014 you can cue a habit on a context, but you cannot drop a habit into one. Only Next Actions and Waiting On group by context." }
-    ]);
-
-    addGroupWithItems("\u2705 QA \u2014 Chunk 3: the simpler date model", [
-      { title: "A Waiting item's \u2018waiting for\u2019 no longer offers a date", notes: "Open a Waiting On item. Its \u2018waiting for\u2019 should only offer free text or a linked item to wait on \u2014 there should be no option to wait for a date." },
-      { title: "The deadline box has no repeat option and no \u2018make this a habit?\u2019 prompt", notes: "Give a Next Action or project a deadline. There should be no repeat/recurring dropdown on the deadline, and no bubble asking if you want to make it a habit." },
-      { title: "A Next Action with a deadline can't be turned into a Waiting action", notes: "Open a Next Action, give it a deadline. The \u2018Make Waiting Action\u2019 button should be greyed out with a note that a waiting action can't hold a date. Clear the deadline and it should work again." }
-    ]);
-
-    addGroupWithItems("\u2705 QA \u2014 Chunk 3: No duplicate titles from the quick-add", [
-      { title: "Adding an action from a project can't reuse a name that already exists", notes: "Open a Current Project and use its quick-add row (the \u2018Next action\u2026\u2019 box) to type a name that already exists somewhere in Next Actions, then press Enter. The box should flash with a dashed red outline, keep what you typed, and NOT create a duplicate. Change the name and it should add normally. (Capitalisation doesn't matter \u2014 \u2018Email Sarah\u2019 and \u2018email sarah\u2019 count as the same.)" }
+    addGroupWithItems("\u2705 QA \u2014 Chunk 4: Temptation bundle \u00d7", [
+      { title: "You can clear a temptation bundle with its \u00d7", notes: "On a Next Action, Waiting On, or Habit page, open \u2018Advanced options\u2026\u2019 and set a temptation bundle (\u2018what treat goes with this?\u2019). A pill appears on the page with an \u00d7. Tap the \u00d7 and the pill should disappear." },
+      { title: "Clearing the bundle only sticks if you Save", notes: "Set a bundle, leave the page and reopen it to confirm it saved. Now tap its \u00d7, then leave with \u2715 (cancel) \u2014 the bundle should still be there. Tap \u00d7 again and this time Save (\u2190) \u2014 now it should be gone." }
     ]);
 
     saveTasksLocal("next");

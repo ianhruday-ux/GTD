@@ -678,7 +678,12 @@ main{
 .completed-list{ padding:0 11px 11px 11px; display:flex; flex-direction:column; gap:6px; }
 .completed-item{ display:flex; align-items:center; gap:8px; padding:7px 2px; border-bottom:1px solid rgba(255,255,255,0.06); }
 .completed-item:last-child{ border-bottom:none; }
-.completed-item-title{ flex:1; font-size:13px; color:var(--text-soft); text-decoration:line-through; text-decoration-color:rgba(237,231,218,0.3); }
+.completed-item-title{ flex:1; font-size:13px; color:var(--text-soft); text-decoration:line-through; text-decoration-color:rgba(237,231,218,0.3); cursor:pointer; }
+/* Read-only completed-item page (§12.2 step 5) */
+.completed-static{ opacity:0.92; }
+.completed-static-desc{ color:var(--text-soft); font-size:13.5px; line-height:1.5; white-space:pre-wrap; }
+.completed-info-row{ font-size:13px; color:var(--text-soft); padding:3px 2px; }
+.completed-info-row.completed-when{ opacity:0.7; font-family:var(--font-mono); font-size:11px; letter-spacing:0.04em; }
 
 footer{ text-align:center; color:var(--text-soft); font-size:11.5px; padding:30px 10px calc(20px + env(safe-area-inset-bottom)) 10px; }
 
@@ -873,6 +878,8 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 .adv-content{ margin-bottom:10px; }
 .screen-advanced-btn{ align-self:flex-start; }
 .bundle-pill{ align-self:flex-start; }
+.bundle-pill-wrap{ display:inline-flex; align-items:center; gap:3px; align-self:flex-start; }
+.bundle-pill-clear{ font-size:15px; line-height:1; color:var(--text-soft); padding:2px 5px; }
 
 /* Confirm / choice dialog (= carried over =) */
 .choice-dialog-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:300; display:flex; align-items:center; justify-content:center; padding:20px; }
