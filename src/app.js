@@ -28,6 +28,8 @@
     next: "Next action\u2026", waiting: "What are you waiting on\u2026",
     current: "Project title\u2026", future: "Project title\u2026", habit: "Habit title\u2026"
   };
+  // Retained for chunk 7 (recurrence is a property of EVENTS, §4.13); no
+  // longer used by deadlines, whose recurrence <select> was removed in chunk 3.
   const RECURRENCE_LABELS = { none: "Does not repeat", daily: "Daily", weekly: "Weekly", monthly: "Monthly", yearly: "Yearly" };
   const KIND_BADGE_LABEL = {
     next: "Next Action", waiting: "Waiting Action", current: "Current Project",
@@ -1099,9 +1101,9 @@
         }
       } else if (task.whenText){
         cueBlock = '<button class="link-pill" data-action="open-edit" data-kind="waiting" data-id="' + task.id + '">&#128337; Waiting for <span class="pill-target">' + escapeHtml(task.whenText) + '</span></button>';
-      } else if (task.deadline && task.deadline.date){
-        cueBlock = '<button class="link-pill" data-action="open-edit" data-kind="waiting" data-id="' + task.id + '">&#128197; <span class="pill-target">' + escapeHtml(task.deadline.date) + '</span></button>';
       }
+      // (The date-pill fallback was removed in chunk 3 -- Waiting actions no
+      // longer hold dates, §4.13a.)
     }
     // Stalled-project flag: every active project should have at least one
     // linked action — surface that on the lane card itself, beneath the
@@ -1516,13 +1518,12 @@
 
     if (s.kind === "waiting"){
       const d = s.draft;
-      // Enforce mutual exclusivity at save time (text / date / hook), same
-      // pattern as the habit when/hook cue — a hooked condition wins over
-      // a date, which wins over free text.
-      if (d.conditionId){ d.whenText = ""; d.deadline = null; }
-      else if (d.deadline && d.deadline.date){ d.whenText = ""; }
-      else { d.deadline = null; }
-      if (!d.conditionId && !(d.deadline && d.deadline.date) && !(d.whenText || "").trim()){
+      // Enforce mutual exclusivity at save time (§4.2 -- text vs. hook; the
+      // date option is gone as of chunk 3, §4.13a). A hooked condition wins
+      // over free text, and a Waiting action never carries a deadline.
+      d.deadline = null;
+      if (d.conditionId){ d.whenText = ""; }
+      if (!d.conditionId && !(d.whenText || "").trim()){
         s.invalidField = "waitingFor";
         renderScreen();
         return;
@@ -1637,6 +1638,9 @@
     // convert buttons — disarm Complete first. Mirror of the guard in
     // screenComplete.
     if (s.draft.willComplete) return;
+    // §4.13a (chunk 3): "Make Waiting" is inert while a deadline is set --
+    // backstop for the greyed button (which has no disabled attribute).
+    if (destKind === "waiting" && s.draft.deadline && s.draft.deadline.date) return;
     s.draft.convertTo = (s.draft.convertTo === destKind) ? null : destKind;
     renderScreen();
   }
@@ -1668,13 +1672,9 @@
     Promise.resolve(createTask("next", { title: title, notesClean: "", linkedProjectId: s.taskId, deadline: null }))
       .then(function(){ renderScreen(); });
   }
-  function screenSuggestHabit(){
-    const s = state.screen;
-    if (!s) return;
-    const title = s.draft.title;
-    closeScreen();
-    openScreen("habit", null, { title: title });
-  }
+  // (screenSuggestHabit removed in chunk 3 -- the "make it a habit" bubble
+  // that triggered it hung off a deadline's daily/weekly recurrence, and
+  // recurrence left the deadline picker with the date-model retirement.)
   // ---- habit hook-picker sub-view within the screen ----
   function screenOpenHookPick(rowIdx){
     if (!state.screen) return;
@@ -1864,7 +1864,9 @@
   // 4.2's "the icon still appears, greyed" line -- update the spec to match.
   function deadlineFieldsHtml(draft, kind){
     const d = draft.deadline || {};
-    const showBubble = kind === "next" && d.date && (d.recurrence === "daily" || d.recurrence === "weekly");
+    // Recurrence lives on EVENTS only now (§4.13, chunk 7). Chunk 3 removed the
+    // recurrence <select> and the daily/weekly "make it a habit" bubble from
+    // the deadline picker -- a deadline is a one-shot date, it does not recur.
     return (
       '<div>' +
         '<div class="screen-row">' +
@@ -1872,17 +1874,9 @@
             '<span class="field-icon">&#128197;</span>' +
             '<input type="date" class="screen-date" data-field="deadline-date" value="' + escapeHtml(d.date || "") + '">' +
             (d.date ? '<input type="time" class="screen-time" data-field="deadline-time" value="' + escapeHtml(d.time || "") + '">' : "") +
-            (d.date ? '<select class="screen-recurrence" data-field="deadline-recurrence">' +
-              Object.keys(RECURRENCE_LABELS).map(function(r){
-                return '<option value="' + r + '"' + ((d.recurrence || "none") === r ? " selected" : "") + '>' + RECURRENCE_LABELS[r] + '</option>';
-              }).join("") +
-            '</select>' : "") +
             (d.date ? '<button type="button" class="screen-clear-x" data-action="clear-deadline" title="Clear deadline">&times;</button>' : "") +
           '</div>' +
         '</div>' +
-        (showBubble ?
-          '<div class="suggestion-bubble">Daily/weekly recurring items often work better as a Habit. <button type="button" data-action="suggest-habit">Make it a habit</button></div>'
-          : "") +
       '</div>'
     );
   }
@@ -1956,16 +1950,12 @@
   // above (the pill replaces it; unhooking restores these fields).
   function waitingForRowHtml(draft, invalid){
     const hasCondition = !!draft.conditionId;
-    const d = draft.deadline || {};
     const disabledAttr = hasCondition ? " disabled" : "";
-    const showBubble = !hasCondition && d.date && (d.recurrence === "daily" || d.recurrence === "weekly");
     return (
       '<div>' +
         '<div class="screen-row">' +
           '<div class="screen-boxed-row' + (hasCondition ? " screen-row-disabled" : "") + (invalid ? " field-invalid" : "") + '">' +
-            '<input type="text" class="screen-waitfor-input" data-field="waitingForText" placeholder="Waiting for\u2026 (required \u2014 text, a date, or a hook)" value="' + escapeHtml(draft.whenText || "") + '"' + disabledAttr + '>' +
-            '<input type="date" class="screen-date" data-field="waiting-date" value="' + escapeHtml(d.date || "") + '"' + disabledAttr + '>' +
-            (d.date ? '<input type="time" class="screen-time" data-field="waiting-time" value="' + escapeHtml(d.time || "") + '"' + disabledAttr + '>' : "") +
+            '<input type="text" class="screen-waitfor-input" data-field="waitingForText" placeholder="Waiting for\u2026 (required \u2014 text or a hook)" value="' + escapeHtml(draft.whenText || "") + '"' + disabledAttr + '>' +
           '</div>' +
           // The hook button stays enabled while hooked — tapping it reopens
           // the picker to change the condition. (Bugfix: it was disabled
@@ -1973,9 +1963,6 @@
           // change is this button.)
           '<button type="button" class="screen-icon-toggle' + (hasCondition ? " active" : "") + '" data-action="screen-open-condition-pick" title="' + (hasCondition ? "Change the hooked condition" : "Hook to a Next or Waiting action") + '">&#129693;</button>' +
         '</div>' +
-        (showBubble ?
-          '<div class="suggestion-bubble">Daily/weekly recurring items often work better as a Habit. <button type="button" data-action="suggest-habit">Make it a habit</button></div>'
-          : "") +
       '</div>'
     );
   }
@@ -2199,7 +2186,7 @@
   // saveScreen is what actually performs the conversion.
   // MUTUAL EXCLUSION (user ruling): disabled (grey, inert) while Complete
   // is armed — the two can never logically fire together.
-  function makeKindBtnHtml(destKind, label, arrow, armed, disabled){
+  function makeKindBtnHtml(destKind, label, arrow, armed, disabled, disabledTitle){
     const accentVar = accentVarForKind(destKind);
     const style = armed
       ? 'background:var(' + accentVar + ');border-color:var(' + accentVar + ');color:var(--dark-on-accent);'
@@ -2209,7 +2196,7 @@
     const text = armed
       ? "\u2713 Converting to " + escapeHtml(KIND_BADGE_LABEL[destKind]) + " on save"
       : ((arrow === "left" ? "&#8592; " : "") + escapeHtml(label) + (arrow === "right" ? " &#8594;" : ""));
-    const title = armed ? "Tap to undo" : disabled ? "Disarm Complete to convert" : "";
+    const title = armed ? "Tap to undo" : disabled ? (disabledTitle || "Disarm Complete to convert") : "";
     return (
       '<button type="button" class="btn screen-make-kind-btn' + (armed ? " armed" : "") + (disabled ? " disabled" : "") + '" data-action="make-kind" data-dest="' + destKind + '" ' +
         'title="' + title + '" style="' + style + '">' + text +
@@ -2238,7 +2225,15 @@
       fields += '<textarea class="screen-field-desc" data-field="notesClean" placeholder="Description (optional)\u2026">' + escapeHtml(draft.notesClean) + '</textarea>';
       fields += linkRowHtml(draft);
       fields += deadlineFieldsHtml(draft, kind);
-      if (s.taskId) fields += makeKindBtnHtml("waiting", "Make Waiting Action", "right", draft.convertTo === "waiting", !!draft.willComplete);
+      if (s.taskId){
+        // §4.13a (chunk 3): a dated thing does not wait. Disable "Make Waiting"
+        // whenever a deadline is set -- converting would have to silently drop
+        // the date. Complete-armed also disables it (existing mutual exclusion).
+        const dated = !!(draft.deadline && draft.deadline.date);
+        fields += makeKindBtnHtml("waiting", "Make Waiting Action", "right", draft.convertTo === "waiting",
+          !!draft.willComplete || dated,
+          dated ? "A waiting action can’t hold a date — clear the deadline first" : null);
+      }
       fields += advancedRowHtml(draft);
     } else if (kind === "waiting"){
       // Condition pill sits directly under the title (before the
@@ -2803,9 +2798,6 @@
         return;
       }
 
-      const suggestHabitBtn = e.target.closest('[data-action="suggest-habit"]');
-      if (suggestHabitBtn){ screenSuggestHabit(); return; }
-
       const clearDeadlineBtn = e.target.closest('[data-action="clear-deadline"]');
       if (clearDeadlineBtn){
         if (state.screen){ state.screen.draft.deadline = null; renderScreen(); }
@@ -2873,22 +2865,16 @@
       else if (field === "linkedProjectId"){ draft.linkedProjectId = el.value || null; }
       else if (field === "deadline-date"){
         if (!el.value){ draft.deadline = null; }
-        else { draft.deadline = draft.deadline || { date: "", time: "", recurrence: "none" }; draft.deadline.date = el.value; }
+        else { draft.deadline = draft.deadline || { date: "", time: "" }; draft.deadline.date = el.value; }
       }
       else if (field === "deadline-time"){ if (draft.deadline) draft.deadline.time = el.value; }
-      else if (field === "waiting-date"){
-        if (!el.value){ draft.deadline = null; }
-        else { draft.deadline = draft.deadline || { date: "", time: "", recurrence: "none" }; draft.deadline.date = el.value; draft.whenText = ""; }
-      }
-      else if (field === "waiting-time"){ if (draft.deadline) draft.deadline.time = el.value; }
     });
     document.addEventListener("change", function(e){
       const el = e.target.closest("[data-field]");
       if (!el || !state.screen) return;
       const field = el.getAttribute("data-field");
       const draft = state.screen.draft;
-      if (field === "deadline-recurrence" && draft.deadline){ draft.deadline.recurrence = el.value; renderScreen(); }
-      if (field === "linkedProjectId" || field === "deadline-date" || field === "waiting-date"){ renderScreen(); }
+      if (field === "linkedProjectId" || field === "deadline-date"){ renderScreen(); }
     });
 
     document.addEventListener("keydown", function(e){
