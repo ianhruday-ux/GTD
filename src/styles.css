@@ -814,6 +814,9 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
   background:transparent; color:var(--text-primary); font-size:15px; padding:0;
 }
 .quick-add-row button:hover{ background:rgba(255,255,255,0.1); }
+/* §12.1b: the Waiting-row hook reads as greyed until a title is typed. Pure
+   CSS — :placeholder-shown is true exactly when the input is empty. */
+.quick-add-row input[data-quickadd="waiting"]:placeholder-shown ~ .qa-hook{ opacity:0.4; }
 .linked-actions-list{ display:flex; flex-direction:column; gap:5px; }
 .linked-action-item{
   text-align:left; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1);

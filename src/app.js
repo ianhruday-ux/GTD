@@ -188,6 +188,22 @@
       .map(function(t){ return { id: t.id, title: t.title, kind: "waiting" }; });
     return nextTargets.concat(waitingTargets);
   }
+  // Cycle descendants over an arbitrary action set (live ∪ staged) — §12.1b:
+  // the cycle filter must see staged items, not just live ones.
+  function mergedConditionDescendants(waitingId, allActions){
+    const childrenMap = {};
+    allActions.forEach(function(l){
+      if (l.kind === "waiting" && l.task.conditionId && l.task.conditionKind === "waiting"){
+        (childrenMap[l.task.conditionId] = childrenMap[l.task.conditionId] || []).push(l.task.id);
+      }
+    });
+    const result = new Set(); const stack = [waitingId];
+    while (stack.length){
+      const cur = stack.pop();
+      (childrenMap[cur] || []).forEach(function(c){ if (!result.has(c)){ result.add(c); stack.push(c); } });
+    }
+    return result;
+  }
 
   // A short two-tone chime, generated in-browser — no audio file needed.
   function playHookChime(){
@@ -1688,6 +1704,39 @@
     });
     return out;
   }
+  // The project draft (and its id) a condition picker should read from: the
+  // parent project when on a child page, or the project page itself (quick-add
+  // hook). null on an ordinary lane action page (no staging in play).
+  function conditionContext(s){
+    if (s && s.staging) return { proj: s.staging.parent, projectId: s.staging.projectId };
+    if (s && isProjectKind(s.kind)) return { proj: s, projectId: stagingProjectId(s) };
+    return { proj: null, projectId: null };
+  }
+  // Condition targets for a picker, spanning live ∪ staged (§12.1b) with the
+  // project's own actions tagged for project-first grouping. Cycle + self
+  // exclusion runs over the merged graph.
+  function conditionTargetsForScreen(s, excludeId){
+    const ctx = conditionContext(s);
+    let all;
+    if (ctx.proj){
+      all = draftAllActions(ctx.proj);
+    } else {
+      all = [];
+      ["next", "waiting"].forEach(function(k){
+        state.tasks[k].forEach(function(t){ if (!t.isGroup) all.push({ kind: k, task: t }); });
+      });
+    }
+    const excluded = excludeId ? mergedConditionDescendants(excludeId, all) : new Set();
+    if (excludeId) excluded.add(excludeId);
+    return all.filter(function(l){
+      if (l.task.id === excludeId) return false;
+      if (l.kind === "waiting" && excluded.has(l.task.id)) return false;
+      return true;
+    }).map(function(l){
+      return { id: l.task.id, title: l.task.title, kind: l.kind,
+        inProject: !!(ctx.projectId && l.task.linkedProjectId === ctx.projectId) };
+    });
+  }
   // Has the project draft changed anything storage would keep? Drives the ✕
   // warning — a state-compare, not a dirty flag, so create-then-delete and
   // edit-then-revert are silent (§12.1).
@@ -2100,8 +2149,16 @@
         { label: "Delete", style: "danger", action: function(){
             const staged = s.staging.parent.draft.staged;
             const ci = (staged.creates || []).findIndex(function(c){ return c.id === s.taskId; });
-            if (ci !== -1) staged.creates.splice(ci, 1);
-            else { staged.deletes[s.taskId] = true; delete staged.edits[s.taskId]; delete staged.completes[s.taskId]; }
+            if (ci !== -1){
+              const removed = staged.creates[ci];
+              staged.creates.splice(ci, 1);
+              // §12.1b: a staged sibling that hooked onto this one now orphans —
+              // freeze its label so the dashed pill reads the deleted title. It
+              // still saves (an orphaned condition satisfies waiting-for, §9).
+              (staged.creates || []).forEach(function(c){
+                if (c.conditionId === s.taskId) c.conditionLabel = removed.title;
+              });
+            } else { staged.deletes[s.taskId] = true; delete staged.edits[s.taskId]; delete staged.completes[s.taskId]; }
             closeScreen();
           } },
         { label: "Cancel", action: function(){} }
@@ -2196,7 +2253,9 @@
     title = (title || "").trim();
     if (!title) return; // silent no-op, same rule as empty-title creates
     if (destKind === "waiting"){
-      screenGenerateAction("waiting", title);
+      // §12.1b: Enter on the Waiting row opens the hook picker (the single-tap
+      // fast path). The ✎ still opens the drafting page for free text.
+      openWaitingHookPicker(title);
       return;
     }
     // Duplicate-title check (§7), now spanning live ∪ staged (§12.1b) so a
@@ -2383,17 +2442,51 @@
   function screenCancelConditionPick(){
     if (!state.screen) return;
     state.screen.draft.conditionPicker = false;
+    state.screen.draft.waitingHookPicker = false; // §12.1b quick-add hook picker
+    renderScreen();
+  }
+  // Open the project's Waiting quick-add hook picker (§12.1b): stash the typed
+  // title and show the condition picker. Empty text is a no-op (the hook reads
+  // as greyed until you type).
+  function openWaitingHookPicker(title){
+    const s = state.screen;
+    if (!s || s.kind !== "current") return;
+    title = (title || "").trim();
+    if (!title) return;
+    s.draft.waitingHookTitle = title;
+    s.draft.waitingHookPicker = true;
     renderScreen();
   }
   function screenPickCondition(targetId, targetKind){
     const s = state.screen;
     if (!s) return;
-    const pool = targetKind === "next" ? state.tasks.next : state.tasks.waiting;
-    const target = pool.find(function(t){ return t.id === targetId; });
+    let target = (targetKind === "next" ? state.tasks.next : state.tasks.waiting).find(function(t){ return t.id === targetId; });
+    if (!target){
+      const ctx = conditionContext(s);
+      if (ctx.proj) target = (ctx.proj.draft.staged.creates || []).find(function(c){ return c.id === targetId; }) || null;
+    }
+    const label = target ? target.title : "";
+    // Quick-add-hook mode (§12.1b): picking a target CREATES a staged Waiting
+    // action immediately — no trip to the drafting page.
+    if (s.draft.waitingHookPicker){
+      s.draft.staged.creates.push({
+        id: genId(), kind: "waiting", title: (s.draft.waitingHookTitle || "").trim(),
+        notesClean: "", linkedProjectId: stagingProjectId(s), isGroup: false, parent: null,
+        deadline: null, contextId: null, whenText: null,
+        conditionId: targetId, conditionKind: targetKind, conditionLabel: label, bundleText: null,
+        createdAt: Date.now()
+      });
+      if (s.invalidField === "projectActions") s.invalidField = null;
+      s.draft.waitingHookPicker = false;
+      s.draft.waitingHookTitle = "";
+      playHookChime();
+      renderScreen();
+      return;
+    }
     if (s.draft.conditionId !== targetId) playHookChime();
     s.draft.conditionId = targetId;
     s.draft.conditionKind = targetKind;
-    s.draft.conditionLabel = target ? target.title : "";
+    s.draft.conditionLabel = label;
     s.draft.whenText = "";
     s.draft.deadline = null;
     s.draft.conditionPicker = false;
@@ -2781,21 +2874,36 @@
   // can be either a Next Action or another Waiting action. Cycle filtering
   // (getValidConditionTargets) already excludes anything that would loop.
   function conditionPickerHtml(s){
-    const targets = getValidConditionTargets(s.taskId);
-    const nextTargets = targets.filter(function(t){ return t.kind === "next"; });
-    const waitingTargets = targets.filter(function(t){ return t.kind === "waiting"; });
+    // Quick-add-hook mode (§12.1b): opened from the project's Waiting quick-add
+    // row — picking a target CREATES a staged Waiting action, so there is no
+    // "No condition" escape (a waiting can't wait on nothing).
+    const isQuickAdd = !!(s.draft && s.draft.waitingHookPicker);
+    const excludeId = isQuickAdd ? null : s.taskId;
+    const targets = conditionTargetsForScreen(s, excludeId);
+    const ctx = conditionContext(s);
     function itemBtn(t){
-      return '<button type="button" class="screen-hook-pick-item" data-action="screen-pick-condition" data-id="' + t.id + '" data-kind="' + t.kind + '">' + escapeHtml(t.title) + '</button>';
+      return '<button type="button" class="screen-hook-pick-item" data-action="screen-pick-condition" data-id="' + t.id + '" data-kind="' + t.kind + '">' +
+        '<span class="linked-action-kind">' + (t.kind === "next" ? "NEXT" : "WAIT") + '</span>' + escapeHtml(t.title) + '</button>';
     }
-    const nextHtml = nextTargets.length
-      ? '<div class="screen-hook-pick-label">Next Actions</div><div class="screen-hook-pick-list">' + nextTargets.map(itemBtn).join("") + '</div>' : "";
-    const waitingHtml = waitingTargets.length
-      ? '<div class="screen-hook-pick-label">Waiting Actions</div><div class="screen-hook-pick-list">' + waitingTargets.map(itemBtn).join("") + '</div>' : "";
-    const empty = (!nextTargets.length && !waitingTargets.length) ? '<div class="empty-note">No valid items to link to yet.</div>' : "";
-    const noneHtml = '<div class="screen-hook-pick-list"><button type="button" class="screen-hook-pick-item screen-hook-pick-none" data-action="screen-clear-condition-pick">No condition</button></div>';
+    function group(label, arr){ return arr.length ? '<div class="screen-hook-pick-label">' + label + '</div><div class="screen-hook-pick-list">' + arr.map(itemBtn).join("") + '</div>' : ""; }
+    let body;
+    if (ctx.projectId){
+      // GROUP, don't filter (§12.1b): the project's own actions first, the rest
+      // below — a condition may still target anything (§4.2).
+      body = group("This project", targets.filter(function(t){ return t.inProject; })) +
+             group("Everything else", targets.filter(function(t){ return !t.inProject; }));
+    } else {
+      body = group("Next Actions", targets.filter(function(t){ return t.kind === "next"; })) +
+             group("Waiting Actions", targets.filter(function(t){ return t.kind === "waiting"; }));
+    }
+    // Empty state is a teaching surface, not an error (§12.1b) — name the exits.
+    const empty = !targets.length
+      ? '<div class="empty-note">No actions to wait on yet. Add a next action first — or use ✎ to say what you’re waiting for.</div>' : "";
+    const noneHtml = isQuickAdd ? ""
+      : '<div class="screen-hook-pick-list"><button type="button" class="screen-hook-pick-item screen-hook-pick-none" data-action="screen-clear-condition-pick">No condition</button></div>';
     return (
       '<div>' +
-        noneHtml + nextHtml + waitingHtml + empty +
+        noneHtml + body + empty +
         '<div class="screen-row" style="margin-top:8px;"><button type="button" class="btn btn-ghost btn-small" data-action="screen-cancel-condition-pick">Back</button></div>' +
       '</div>'
     );
@@ -2922,6 +3030,16 @@
         conditionPickerHtml(s) +
       '</div>';
     }
+    // §12.1b: the project's Waiting quick-add hook picker (creates a staged
+    // Waiting on pick). Title shown read-only above the target list.
+    if (isProjectKind(kind) && draft.waitingHookPicker){
+      return '<div class="screen-body">' +
+        '<div class="screen-hook-pick-label">New waiting action</div>' +
+        '<input type="text" class="screen-field-title" value="' + escapeHtml(draft.waitingHookTitle || "") + '" readonly>' +
+        '<div class="screen-hook-pick-label" style="margin-top:6px;">Waiting on…</div>' +
+        conditionPickerHtml(s) +
+      '</div>';
+    }
 
     let fields = '<input type="text" class="screen-field-title' + (s.invalidField === "title" ? " field-invalid" : "") + '" data-field="title" placeholder="' + escapeHtml(TITLE_PLACEHOLDER[kind]) + '" value="' + escapeHtml(draft.title) + '">';
 
@@ -2966,9 +3084,12 @@
             '<button type="button" data-action="quick-add-submit" data-gen-kind="next" title="Add">+</button>' +
             '<button type="button" data-action="generate-action" data-gen-kind="next" title="Open full editor">&#9998;</button>' +
           '</div>';
+          // \u00a712.1b: the Waiting row's trigger is a HOOK (single tap), not a
+          // "+": type a title, tap the hook, pick a condition \u2192 staged Waiting.
+          // Free text still goes through \u270e.
           fields += '<div class="quick-add-row">' +
             '<input type="text" data-quickadd="waiting" placeholder="Waiting action\u2026">' +
-            '<button type="button" data-action="quick-add-submit" data-gen-kind="waiting" title="Add">+</button>' +
+            '<button type="button" class="qa-hook" data-action="waiting-quickadd-hook" title="Hook to a condition">&#129693;</button>' +
             '<button type="button" data-action="generate-action" data-gen-kind="waiting" title="Open full editor">&#9998;</button>' +
           '</div>';
           if (!linkedCount) fields += '<div class="screen-project-flag">No linked actions yet \u2014 every active project should have at least one next step.</div>';
@@ -3680,6 +3801,15 @@
         if (input){ screenQuickAdd(quickAddBtn.getAttribute("data-gen-kind"), input.value); }
         return;
       }
+      // §12.1b: Waiting quick-add HOOK — opens the condition picker with the
+      // typed title; picking a target creates the staged Waiting action.
+      const qaHookBtn = e.target.closest('[data-action="waiting-quickadd-hook"]');
+      if (qaHookBtn){
+        const row = qaHookBtn.closest(".quick-add-row");
+        const input = row ? row.querySelector("[data-quickadd]") : null;
+        openWaitingHookPicker(input ? input.value : "");
+        return;
+      }
 
       const linkedActionBtn = e.target.closest('[data-action="open-linked-action"]');
       if (linkedActionBtn){
@@ -4217,7 +4347,7 @@
   // off to the next chunk.
   // =========================================================
   function injectQAChecklist(){
-    const FLAG = "gtd_qa_checklist_chunk4";
+    const FLAG = "gtd_qa_checklist_chunk5";
     if (Storage.get(FLAG)) return;
     Storage.set(FLAG, "1");
 
@@ -4248,19 +4378,20 @@
       });
     }
 
-    addGroupWithItems("\u2705 QA \u2014 Chunk 4: Completed items", [
-      { title: "Completed sections start closed, with a count \u2014 tap to open", notes: "Finish an item (tick its checkbox) so a \u2018Completed\u2019 section appears at the bottom of the lane. It should start collapsed, showing a count, and open when you tap the header." },
-      { title: "A finished item's filled checkbox brings it back", notes: "Open a Completed section. Each row has a filled (green \u2713) checkbox. Tap it and the item should return to the top of the live list \u2014 the same checkbox that completed it un-completes it." },
-      { title: "Tapping a completed item opens a read-only view", notes: "Tap a completed item's name. It opens its page, but nothing is editable: the convert button is greyed out, and there is a \u2018\u21a9 Restore\u2019 button plus a trash can. There is a \u2190 back arrow and NO \u2715." },
-      { title: "Restore from the item's page works", notes: "On a completed item's page, tap \u2018\u21a9 Restore\u2019. It should return to the live list and the page should close." },
-      { title: "Deleting one completed item is final, and leaves the live list alone", notes: "On a completed item's page, tap the trash can and confirm. That item should be gone for good (not restorable), and your live lists should be untouched." },
-      { title: "The Completed header trash can clears the whole section \u2014 but not on Habits", notes: "The Completed header on Next Actions, Waiting On, Current Projects, and Future/Someday has a trash can that, after a confirm, empties just that lane's Completed section. The Habits lane's \u2018Completed\u2019 (today's done habits) has NO trash can." },
-      { title: "Restoring an item whose context or list was deleted still works", notes: "Put an action in a context, complete it, then delete that context, then restore the action from Completed. It should reappear at the top of the lane, ungrouped \u2014 never vanish. (Same for a completed project's linked actions.)" }
+    addGroupWithItems("\u2705 QA \u2014 Chunk 5: A project's actions save WITH the project", [
+      { title: "Actions you add on a project's page aren't saved until you save the project", notes: "Open a Current Project, add a next action in its quick-add row. It appears in the project's list, but it should NOT show up in the Next Actions lane until you save the project (\u2190)." },
+      { title: "Cancelling a project warns you, and Discard undoes everything", notes: "Add or change an action on a project, then tap \u2715. You should get an \u2018Are you sure?\u2019 warning. \u2018Keep editing\u2019 stays; \u2018Discard changes\u2019 throws away everything you did \u2014 the action should exist nowhere." },
+      { title: "Add-then-remove on the same visit leaves no trace", notes: "Add an action on a project, then open it and delete it, all before saving. Now tap \u2715 \u2014 there should be NO warning (nothing actually changed), and nothing is left behind." },
+      { title: "Saving the project saves its actions too, all at once", notes: "Add an action and tap \u2190 to save the project. Now the action should appear in the Next Actions (or Waiting On) lane, linked to the project." },
+      { title: "A new Current project won't save without at least one action", notes: "Make a brand-new Current Project (the + button, first menu option) and try to save it with no actions. Save should be blocked with a dashed red outline. Add an action and it should save." }
     ]);
 
-    addGroupWithItems("\u2705 QA \u2014 Chunk 4: Temptation bundle \u00d7", [
-      { title: "You can clear a temptation bundle with its \u00d7", notes: "On a Next Action, Waiting On, or Habit page, open \u2018Advanced options\u2026\u2019 and set a temptation bundle (\u2018what treat goes with this?\u2019). A pill appears on the page with an \u00d7. Tap the \u00d7 and the pill should disappear." },
-      { title: "Clearing the bundle only sticks if you Save", notes: "Set a bundle, leave the page and reopen it to confirm it saved. Now tap its \u00d7, then leave with \u2715 (cancel) \u2014 the bundle should still be there. Tap \u00d7 again and this time Save (\u2190) \u2014 now it should be gone." }
+    addGroupWithItems("\u2705 QA \u2014 Chunk 5: Linking and hooking on the project page", [
+      { title: "An action opened FROM its project can't be un-linked there", notes: "Open a project, tap one of its actions. Its project-link box should be greyed out (disabled) with a note to remove it from the project's list instead. Open the SAME action from its own lane and the link box should be editable." },
+      { title: "The Waiting quick-add uses a hook, not a +", notes: "On a project, the Waiting action row has a hook icon (goal net), greyed until you type. Type a title, tap the hook, and pick what it waits on \u2014 the waiting action is created right there, no extra page. (The \u270e pencil still opens the full editor for free-text \u2018waiting for\u2019.)" },
+      { title: "The hook picker shows this project's own actions first", notes: "When you pick what a waiting action waits on, the project's own actions appear at the top under \u2018This project\u2019, with everything else below." },
+      { title: "You can wait on an action you just added", notes: "Add a next action, then add a waiting action and hook it \u2014 the next action you just added should be pickable. After saving, the waiting action really is waiting on it." },
+      { title: "Deleting something another action waits on doesn't lose the other", notes: "Add a next action and a waiting action hooked to it, then delete the next action (before saving). The waiting action should stay \u2014 now shown as waiting on a deleted item \u2014 and still save." }
     ]);
 
     saveTasksLocal("next");
