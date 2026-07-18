@@ -5537,6 +5537,53 @@ function injectChunkMap(){
       touchDragCleanup();
     });
 
+    // CHUNK 6 tweak (user): SWIPE the capture drawer open / closed.
+    // §4.8a originally ruled swipe-to-open OUT — a right-swipe from the left
+    // edge IS Android's system back gesture, and a drawer that fights it loses.
+    // The author reversed that ruling. Mitigation baked in here: the OPEN swipe
+    // is accepted anywhere in the left third of the screen, not just the OS
+    // edge band, so even if the OS eats the outermost pixels a slightly-inset
+    // swipe still opens. The residual risk (a true hard-edge swipe going to
+    // system-back instead) is documented in §4.8a as the accepted cost.
+    // Lanes-only: never fires while an edit/create screen or a dialog is up,
+    // and it yields to an active card-reorder drag. Threshold-detected (no
+    // finger-follow); the CSS transition supplies the slide. Live finger-follow
+    // is a possible future polish — flagged, not built.
+    let swipeTrack = null;
+    const SWIPE_MIN_PX = 55;           // horizontal distance to commit a swipe
+    const SWIPE_H_DOMINANCE = 1.5;     // horizontal travel must beat vertical by this factor
+    const SWIPE_OPEN_ZONE_FRAC = 0.33; // an open-swipe must START in the left third
+    function swipeToOpenBlocked(){
+      if (state.screen) return true;                 // a drafting / edit page is up
+      const dlg = qs("#dialog-root");
+      if (dlg && dlg.innerHTML.trim()) return true;  // a modal dialog is up
+      if (touchDrag && touchDrag.active) return true; // a reorder drag owns this gesture
+      return false;
+    }
+    document.addEventListener("touchstart", function(e){
+      if (e.touches.length !== 1){ swipeTrack = null; return; }
+      const t = e.touches[0];
+      swipeTrack = { x0: t.clientX, y0: t.clientY, dx: 0, dy: 0, wasOpen: !!state.trayOpen };
+    }, { passive: true });
+    document.addEventListener("touchmove", function(e){
+      if (!swipeTrack || e.touches.length !== 1) return;
+      if (touchDrag && touchDrag.active){ swipeTrack = null; return; } // became a reorder drag
+      const t = e.touches[0];
+      swipeTrack.dx = t.clientX - swipeTrack.x0;
+      swipeTrack.dy = t.clientY - swipeTrack.y0;
+    }, { passive: true });
+    document.addEventListener("touchend", function(){
+      const s = swipeTrack; swipeTrack = null;
+      if (!s) return;
+      const adx = Math.abs(s.dx), ady = Math.abs(s.dy);
+      if (adx < SWIPE_MIN_PX || adx < ady * SWIPE_H_DOMINANCE) return; // not a clean horizontal swipe
+      if (s.wasOpen){
+        if (s.dx < 0) closeTray();                                     // swipe LEFT closes the open drawer
+      } else if (s.dx > 0 && s.x0 < window.innerWidth * SWIPE_OPEN_ZONE_FRAC && !swipeToOpenBlocked()){
+        openTray();                                                    // swipe RIGHT from the left third opens it
+      }
+    });
+
     // CHUNK 2 (spec 4.10b) -- collapsing tab bar. rAF-debounced scroll
     // listener toggles body.tabs-collapsed on scroll direction; gated on
     // drag-active so an in-progress drag's auto-scroll can never flip it
@@ -5634,8 +5681,8 @@ function injectChunkMap(){
     ]);
 
     addGroupWithItems("\u2705 QA \u2014 Chunk 6: Settings", [
-      { title: "The \u22ef menu opens Settings with \u2018Clear all app data\u2019", notes: "Tap the \u22ef icon in the header. A Settings sheet opens with a \u2018Clear all app data\u2019 option." },
-      { title: "Clear all app data wipes everything after a confirm", notes: "Tap \u2018Clear all app data\u2019. It should ask you to confirm, and only then clear everything and start fresh. (Careful \u2014 this really does erase your data.)" }
+      { title: "The \u22ef menu opens Settings with \u2018Restore app to defaults\u2019", notes: "Tap the \u22ef icon in the header. A Settings sheet opens with a \u2018Restore app to defaults\u2019 option." },
+      { title: "Restore app to defaults wipes everything after a confirm", notes: "Tap \u2018Restore app to defaults\u2019. It should warn you that everything you\u2019ve entered will be erased and replaced with the sample data, ask you to confirm, and only then do it. (Careful \u2014 this really does erase your data.)" }
     ]);
 
     addGroupWithItems("\u2705 QA \u2014 Chunk 6: Notes", [
@@ -5735,15 +5782,15 @@ function injectChunkMap(){
     qs("#dialog-root").innerHTML =
       '<div class="choice-dialog-backdrop"><div class="choice-dialog settings-sheet">' +
         '<div class="settings-title">Settings</div>' +
-        '<button type="button" class="settings-row danger" data-action="clear-all-data">🗑 Clear all app data</button>' +
+        '<button type="button" class="settings-row danger" data-action="clear-all-data">↺ Restore app to defaults</button>' +
         '<div class="choice-dialog-btns"><button type="button" data-action="settings-close">Close</button></div>' +
       '</div></div>';
     const backdrop = qs(".choice-dialog-backdrop");
     backdrop.addEventListener("click", function(e){ if (e.target === backdrop) closeDialog(); });
     qs('[data-action="settings-close"]').addEventListener("click", closeDialog);
     qs('[data-action="clear-all-data"]').addEventListener("click", function(){
-      openConfirmDialog("Clear all app data and start fresh? This can’t be undone.", [
-        { label: "Clear everything", style: "danger", action: clearAllAppData },
+      openConfirmDialog("Restore the app to its default state? Everything you’ve entered — notes, actions, projects, habits — will be permanently erased and replaced with the sample data. This can’t be undone.", [
+        { label: "Erase & restore defaults", style: "danger", action: clearAllAppData },
         { label: "Cancel", action: function(){} }
       ]);
     });
