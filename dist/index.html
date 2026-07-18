@@ -2695,6 +2695,13 @@ function injectChunkMap(){
       }
     }
     if (prefill) Object.assign(draft, prefill);
+    // Chunk 5 (§12.1): a project page carries a staged action set, and a real
+    // project id minted now so brand-new projects can link staged children
+    // before save (§12.1b — ids are real at stage time, never remapped).
+    if (isProjectKind(kind)){
+      draft.staged = newStagedSet();
+      draft.projectId = taskId || genId();
+    }
     state.screen = { kind: kind, taskId: taskId || null, draft: draft };
     renderScreen();
   }
@@ -2730,10 +2737,210 @@ function injectChunkMap(){
   // (draft included) is pushed onto the stack and restored when the new
   // one closes, whichever way it closes: save, cancel, Escape, delete, or
   // complete. Nests to any depth (chunk 1).
-  function openChildScreen(kind, taskId, prefill){
+  // `staging` (chunk 5, §12.1): when set, the child page is a child of a
+  // project page — its Save routes into that project's staged set instead of
+  // storage. { parent: <project screen>, projectId }.
+  function openChildScreen(kind, taskId, prefill, staging){
     state.screenStack.push(state.screen);
     state.screen = null;
     openScreen(kind, taskId, prefill);
+    if (staging && state.screen){
+      state.screen.staging = staging;
+      renderScreen(); // re-render with staging known (link-lock, §12.1)
+    }
+  }
+
+  // =========================================================
+  // CHUNK 5 (§12.1/§12.1b): project-page action STAGING.
+  // Nothing a project page does to its linked actions touches storage until
+  // the PROJECT save-exits. The project draft carries a staged set; the
+  // linked list renders from it; project Save applies it atomically and
+  // re-evaluates promotions (§9). The windfall (§12.1b): staged actions get
+  // their REAL, FINAL id at stage time, so references are by real id and no
+  // remapping is ever needed.
+  // =========================================================
+  function newStagedSet(){ return { creates: [], edits: {}, deletes: {}, completes: {} }; }
+  // The project id a project draft stages against — the live id when editing,
+  // or the id minted at open for a brand-new project (so children can link).
+  function stagingProjectId(s){ return (s && (s.taskId || (s.draft && s.draft.projectId))) || null; }
+  function findTaskAnywhere(id){
+    const kinds = ["next", "waiting", "current", "future"];
+    for (let i = 0; i < kinds.length; i++){
+      const t = state.tasks[kinds[i]].find(function(x){ return x.id === id; });
+      if (t) return { kind: kinds[i], task: t };
+    }
+    return null;
+  }
+  // A staged create for this draft, by id (or null).
+  function stagedCreate(s, id){
+    const staged = s.draft.staged;
+    if (!staged) return null;
+    return staged.creates.find(function(c){ return c.id === id; }) || null;
+  }
+  // The project's linked actions AS THE DRAFT SEES THEM: live links minus
+  // staged deletes/completes, staged edits applied, plus staged creates.
+  function projectDraftLinked(s){
+    const pid = stagingProjectId(s);
+    const staged = s.draft.staged || newStagedSet();
+    const out = [];
+    linkedActionsForProject(pid).forEach(function(l){
+      if (staged.deletes[l.task.id] || staged.completes[l.task.id]) return;
+      const ed = staged.edits[l.task.id];
+      const task = ed ? Object.assign({}, l.task, ed) : l.task;
+      out.push({ kind: (ed && ed.kind) || l.kind, task: task });
+    });
+    (staged.creates || []).forEach(function(c){
+      if (c.stagedComplete) return;
+      out.push({ kind: c.kind, task: Object.assign({}, c) });
+    });
+    return out;
+  }
+  // Every action (live ∪ staged, minus staged-removed) that a condition may
+  // target from THIS project page — used so the condition picker, cycle
+  // filter, and duplicate-title check all see staged items (§12.1b).
+  function draftAllActions(s){
+    const staged = (s && s.draft && s.draft.staged) || newStagedSet();
+    const out = [];
+    ["next", "waiting"].forEach(function(k){
+      state.tasks[k].forEach(function(t){
+        if (t.isGroup) return;
+        if (staged.deletes[t.id] || staged.completes[t.id]) return;
+        const ed = staged.edits[t.id];
+        out.push({ kind: (ed && ed.kind) || k, task: ed ? Object.assign({}, t, ed) : t });
+      });
+    });
+    (staged.creates || []).forEach(function(c){
+      if (c.stagedComplete) return;
+      if (c.kind === "next" || c.kind === "waiting") out.push({ kind: c.kind, task: Object.assign({}, c) });
+    });
+    return out;
+  }
+  // Has the project draft changed anything storage would keep? Drives the ✕
+  // warning — a state-compare, not a dirty flag, so create-then-delete and
+  // edit-then-revert are silent (§12.1).
+  function projectDraftDirty(s){
+    const staged = s.draft.staged;
+    if (staged){
+      if ((staged.creates || []).length) return true;
+      if (Object.keys(staged.deletes).length) return true;
+      if (Object.keys(staged.completes).length) return true;
+      for (const id in staged.edits){
+        const found = findTaskAnywhere(id);
+        if (!found) return true;
+        const ed = staged.edits[id];
+        for (const k in ed){ if (ed[k] !== found.task[k]) return true; }
+      }
+    }
+    if (s.taskId){
+      const proj = state.tasks[s.kind].find(function(t){ return t.id === s.taskId; });
+      if (proj){
+        if ((s.draft.title || "").trim() !== proj.title) return true;
+        if ((s.draft.notesClean || "") !== (proj.notesClean || "")) return true;
+        if (JSON.stringify(s.draft.deadline || null) !== JSON.stringify(proj.deadline || null)) return true;
+      }
+    } else {
+      if ((s.draft.title || "").trim()) return true;
+      if ((s.draft.notesClean || "").trim()) return true;
+    }
+    return false;
+  }
+  // Re-evaluate a live Waiting action's promotion condition against current
+  // saved state (§9): promote iff its condition target has been COMPLETED (a
+  // deleted/orphaned target does NOT promote — §4.2). Stateless; safe to run
+  // for every touched item after a project save.
+  function reEvaluatePromotion(waitingId){
+    const w = state.tasks.waiting.find(function(t){ return t.id === waitingId; });
+    if (!w || !w.conditionId) return;
+    if (findTaskAnywhere(w.conditionId)) return; // target still live → not yet
+    const completed = (state.completed.next || []).concat(state.completed.waiting || [])
+      .some(function(t){ return t.id === w.conditionId; });
+    if (completed) moveItem("waiting", "next", waitingId, false);
+  }
+  // Apply a project draft's staged set to storage, atomically-ish, then
+  // re-evaluate promotions. Order: creates → edits → deletes → completes, all
+  // resolving targets BY ID wherever they now live (the §9 zombie trap), so a
+  // staged delete of an item that promoted mid-edit still finds it.
+  function applyProjectStaging(s){
+    const staged = s.draft.staged;
+    if (!staged) return;
+    const touched = [];
+    (staged.creates || []).forEach(function(c){
+      const task = Object.assign({}, c);
+      const kind = task.kind;
+      delete task.kind; delete task.stagedComplete;
+      state.tasks[kind].unshift(task);
+      touched.push(task.id);
+    });
+    for (const id in staged.edits){
+      const found = findTaskAnywhere(id);
+      if (found){ Object.assign(found.task, staged.edits[id]); touched.push(id); }
+    }
+    ["next", "waiting", "current", "future"].forEach(saveTasksLocal);
+    for (const id in staged.deletes){
+      const found = findTaskAnywhere(id);
+      if (found) deleteTask(found.kind, id);
+    }
+    // completes: staged-created-then-completed, then live-completed — all by id.
+    (staged.creates || []).forEach(function(c){
+      if (c.stagedComplete){ const f = findTaskAnywhere(c.id); if (f) completeTask(f.kind, c.id); }
+    });
+    for (const id in staged.completes){
+      const found = findTaskAnywhere(id);
+      if (found) completeTask(found.kind, id);
+    }
+    // §9 re-evaluation, AFTER the edits land: a Waiting action whose condition
+    // completed on a timer while the page was open promotes now.
+    touched.forEach(reEvaluatePromotion);
+    KINDS.forEach(renderLane);
+  }
+  // The editable fields of a task, for prefilling a child drafting page.
+  function buildPrefillFromTask(t){
+    return {
+      title: t.title || "", notesClean: t.notesClean || "", linkedProjectId: t.linkedProjectId || null,
+      deadline: t.deadline || null, contextId: t.contextId || null,
+      whenText: t.whenText || "", conditionId: t.conditionId || null,
+      conditionKind: t.conditionKind || null, conditionLabel: t.conditionLabel || null,
+      bundleText: t.bundleText || ""
+    };
+  }
+  // Open a linked action from the project page as a STAGED child (§12.1). It
+  // may be a staged create (not in storage yet), a pre-existing action with a
+  // staged edit already recorded, or a plain live linked action.
+  function openLinkedActionChild(kind, id){
+    const s = state.screen;
+    const staged = s && s.draft && s.draft.staged;
+    const staging = { parent: s, projectId: stagingProjectId(s) };
+    const created = staged && (staged.creates || []).find(function(c){ return c.id === id; });
+    if (created){
+      state.screenStack.push(state.screen);
+      state.screen = null;
+      openScreen(created.kind, null, buildPrefillFromTask(created));
+      if (state.screen){
+        state.screen.taskId = id; // edits this staged create in place
+        state.screen.staging = staging;
+        renderScreen();
+      }
+      return;
+    }
+    const ed = staged && staged.edits[id];
+    openChildScreen(kind, id, ed ? Object.assign({}, ed) : undefined, staging);
+  }
+  // The ✕ / Back / Escape gate on a project page (§12.1): warn before
+  // discarding a non-empty staged set (state-compare, not a dirty flag). Every
+  // other page — and a non-dirty project — just closes.
+  function attemptCancelScreen(){
+    const s = state.screen;
+    if (s && !s.staging && isProjectKind(s.kind) && projectDraftDirty(s)){
+      openConfirmDialog(
+        "Are you sure? Exiting without saving will undo everything you did on this page — including actions you created, edited, or deleted, and any changes to the project’s own notes.",
+        [
+          { label: "Discard changes", style: "danger", action: function(){ closeScreen(); } },
+          { label: "Keep editing", action: function(){} }
+        ]
+      );
+      return;
+    }
+    closeScreen();
   }
   // Blocked saves mark the offending field with a dashed outline
   // (s.invalidField, cleared on the next input) instead of a popup —
@@ -2890,6 +3097,12 @@ function injectChunkMap(){
       bundleText: (s.kind === "next" || s.kind === "waiting") ? ((s.draft.bundleText || "").trim() || null) : null,
       contextId: isActionKind(s.kind) ? (s.draft.contextId || null) : null
     };
+    // Chunk 5 (§12.1): a child action page opened from a project stages into
+    // that project's set instead of touching storage. Nothing is written until
+    // the project itself saves.
+    if (s.staging){ stageChildSave(s, data); return; }
+    // Chunk 5: the project page owns the atomic apply of its staged children.
+    if (isProjectKind(s.kind)){ saveProjectScreen(s, data); return; }
     const wasCreate = !s.taskId; // edits already land back focused on the item; only creates need the camera reset
     const taskId = s.taskId;
     const kind = s.kind;
@@ -2933,9 +3146,85 @@ function injectChunkMap(){
       if (wasCreate && !state.screen){ window.scrollTo(0, 0); resyncTabScroll(); }
     });
   }
+  // Stage a child action page's Save into its parent project's staged set
+  // (§12.1) instead of writing to storage. Three cases: a brand-new action
+  // (staged create), a re-edit of an already-staged create, and an edit or
+  // completion of a pre-existing linked action. The project-link is never
+  // stored from here — it is locked to this project (§12.1).
+  function stageChildSave(s, data){
+    const staged = s.staging.parent.draft.staged;
+    const pid = s.staging.projectId;
+    const willComplete = !!s.draft.willComplete;
+    if (!s.taskId){
+      const task = Object.assign({ id: genId(), isGroup: false, parent: null, createdAt: Date.now() }, data);
+      task.linkedProjectId = pid;
+      task.kind = s.kind;
+      if (willComplete) task.stagedComplete = true;
+      staged.creates.push(task);
+    } else {
+      const created = (staged.creates || []).find(function(c){ return c.id === s.taskId; });
+      if (created){
+        Object.assign(created, data);
+        created.linkedProjectId = pid;
+        created.kind = s.kind;
+        created.stagedComplete = !!willComplete;
+      } else if (willComplete){
+        staged.completes[s.taskId] = true;
+      } else {
+        const ed = Object.assign({}, staged.edits[s.taskId] || {}, data);
+        delete ed.linkedProjectId; // the link is locked to this project
+        staged.edits[s.taskId] = ed;
+      }
+    }
+    closeScreen();
+  }
+  // Save a project page (§12.1): write the project's own fields, apply its
+  // staged children atomically (createProject with the minted id so links
+  // match), then complete/convert if armed.
+  function saveProjectScreen(s, data){
+    const d = s.draft;
+    const willComplete = !!d.willComplete;
+    const convertTo = (!willComplete && s.taskId) ? (d.convertTo || null) : null;
+    const projData = {
+      title: data.title, notesClean: data.notesClean, deadline: data.deadline,
+      linkedProjectId: null, whenText: null, conditionId: null, conditionKind: null,
+      conditionLabel: null, bundleText: null, contextId: null
+    };
+    const projectId = stagingProjectId(s);
+    if (!s.taskId){
+      const proj = Object.assign({ id: projectId, isGroup: false, parent: null, createdAt: Date.now() }, projData);
+      state.tasks[s.kind].unshift(proj);
+      saveTasksLocal(s.kind);
+    } else {
+      updateTask(s.kind, s.taskId, projData);
+    }
+    applyProjectStaging(s);
+    if (willComplete && s.taskId){ completeProject(s.kind, s.taskId); closeScreen(); return; }
+    if (convertTo){
+      if (convertTo === "future" && s.kind === "current"){ demoteProjectToFuture(s.taskId); return; }
+      changeKind(s.kind, convertTo, s.taskId).then(closeScreen); return;
+    }
+    closeScreen();
+  }
   function deleteScreenItem(){
     const s = state.screen;
     if (!s || !s.taskId) return;
+    // Child of a project (§12.1): deleting is STAGED, not immediate — it lands
+    // with the project's save (or evaporates on the project's ✕). A staged
+    // create just disappears; a pre-existing linked action is marked deleted.
+    if (s.staging){
+      openConfirmDialog("Delete this for good?", [
+        { label: "Delete", style: "danger", action: function(){
+            const staged = s.staging.parent.draft.staged;
+            const ci = (staged.creates || []).findIndex(function(c){ return c.id === s.taskId; });
+            if (ci !== -1) staged.creates.splice(ci, 1);
+            else { staged.deletes[s.taskId] = true; delete staged.edits[s.taskId]; delete staged.completes[s.taskId]; }
+            closeScreen();
+          } },
+        { label: "Cancel", action: function(){} }
+      ]);
+      return;
+    }
     openConfirmDialog("Delete this for good?", [
       { label: "Delete", style: "danger", action: function(){ deleteTask(s.kind, s.taskId); closeScreen(); } },
       { label: "Cancel", action: function(){} }
@@ -3006,9 +3295,12 @@ function injectChunkMap(){
   // already typed into the quick-add box.
   function screenGenerateAction(destKind, prefillTitle){
     const s = state.screen;
-    if (!s || !s.taskId || s.kind !== "current") return;
-    const projectId = s.taskId;
-    openChildScreen(destKind === "waiting" ? "waiting" : "next", null, { linkedProjectId: projectId, title: prefillTitle || "" });
+    if (!s || s.kind !== "current") return;
+    const projectId = stagingProjectId(s);
+    // Chunk 5: the child page stages into THIS project's set (§12.1).
+    openChildScreen(destKind === "waiting" ? "waiting" : "next", null,
+      { linkedProjectId: projectId, title: prefillTitle || "" },
+      { parent: s, projectId: projectId });
   }
   // Quick-add from the project page (overnight notes: create actions
   // without leaving the project). Next Actions create instantly. Waiting
@@ -3017,22 +3309,18 @@ function injectChunkMap(){
   // and returns here on save (judgment call, flagged in the doc).
   function screenQuickAdd(destKind, title){
     const s = state.screen;
-    if (!s || !s.taskId || s.kind !== "current") return;
+    if (!s || s.kind !== "current") return;
     title = (title || "").trim();
     if (!title) return; // silent no-op, same rule as empty-title creates
     if (destKind === "waiting"){
       screenGenerateAction("waiting", title);
       return;
     }
-    // Duplicate-title check (§7 ruling, chunk 3): the fast path enforces the
-    // same per-lane, case-insensitive block the drafting page does at Save.
-    // There's no popup channel here, so flash the input's border red and KEEP
-    // the typed text (no create, no re-render) — the user edits and presses
-    // Enter again. The Waiting path above already routes through the drafting
-    // page, which runs the check on Save. (Group headers are excluded, matching
-    // saveScreen's own check.)
-    const dup = state.tasks.next.some(function(t){
-      return !t.isGroup && (t.title || "").trim().toLowerCase() === title.toLowerCase();
+    // Duplicate-title check (§7), now spanning live ∪ staged (§12.1b) so a
+    // staged sibling collides too. No popup channel: flash the input red and
+    // KEEP the text. The Waiting path routes through the drafting page.
+    const dup = draftAllActions(s).some(function(l){
+      return l.kind === "next" && (l.task.title || "").trim().toLowerCase() === title.toLowerCase();
     });
     if (dup){
       const input = qs('.quick-add-row [data-quickadd="next"]');
@@ -3042,8 +3330,13 @@ function injectChunkMap(){
       }
       return;
     }
-    Promise.resolve(createTask("next", { title: title, notesClean: "", linkedProjectId: s.taskId, deadline: null }))
-      .then(function(){ renderScreen(); });
+    // Chunk 5: stage the create (real id now, written at project save).
+    s.draft.staged.creates.push({
+      id: genId(), kind: "next", title: title, notesClean: "", linkedProjectId: stagingProjectId(s),
+      isGroup: false, parent: null, deadline: null, contextId: null, whenText: null,
+      conditionId: null, conditionKind: null, conditionLabel: null, bundleText: null, createdAt: Date.now()
+    });
+    renderScreen();
   }
   // (screenSuggestHabit removed in chunk 3 -- the "make it a habit" bubble
   // that triggered it hung off a deadline's daily/weekly recurrence, and
@@ -3267,8 +3560,11 @@ function injectChunkMap(){
   // Waiting action linked to this project, read-only, tap to open (as a
   // child screen, so you come back here). Waiting items conditioned on
   // another item in this same list indent beneath it to show dependency.
-  function linkedActionsListHtml(projectId){
-    const linked = linkedActionsForProject(projectId);
+  // Chunk 5 (§12.1): renders from the DRAFT's staged view (staged creates
+  // appear, staged deletes disappear, staged edits show new titles), not
+  // straight from storage.
+  function linkedActionsListHtml(s){
+    const linked = projectDraftLinked(s);
     if (!linked.length) return "";
     const byId = {};
     linked.forEach(function(l){ byId[l.task.id] = l; });
@@ -3758,9 +4054,9 @@ function injectChunkMap(){
       fields += '<textarea class="screen-field-desc" data-field="notesClean" placeholder="Description (optional)\u2026">' + escapeHtml(draft.notesClean) + '</textarea>';
       fields += deadlineFieldsHtml(draft, kind);
       if (kind === "current"){
-        if (s.taskId){
-          const linkedCount = linkedActionsForProject(s.taskId).length;
-          fields += linkedActionsListHtml(s.taskId);
+        { // §4.3/§12.1: renders on NEW project pages too (staged children)
+          const linkedCount = projectDraftLinked(s).length;
+          fields += linkedActionsListHtml(s);
           // Quick-add rows (doc 4.3's design, pulled forward by the
           // overnight notes): type + Enter/+ creates without leaving this
           // page; the ✎ opens the full drafting page and returns here.
@@ -4434,7 +4730,7 @@ function injectChunkMap(){
       if (screenSaveBtn){ saveScreen(); return; }
 
       const screenCancelBtn = e.target.closest('[data-action="screen-cancel"]');
-      if (screenCancelBtn){ closeScreen(); return; }
+      if (screenCancelBtn){ attemptCancelScreen(); return; }
 
       const screenDeleteBtn = e.target.closest('[data-action="screen-delete"]');
       if (screenDeleteBtn){ deleteScreenItem(); return; }
@@ -4486,7 +4782,7 @@ function injectChunkMap(){
 
       const linkedActionBtn = e.target.closest('[data-action="open-linked-action"]');
       if (linkedActionBtn){
-        openChildScreen(linkedActionBtn.getAttribute("data-kind"), linkedActionBtn.getAttribute("data-id"));
+        openLinkedActionChild(linkedActionBtn.getAttribute("data-kind"), linkedActionBtn.getAttribute("data-id"));
         return;
       }
 
@@ -4573,7 +4869,7 @@ function injectChunkMap(){
     document.addEventListener("keydown", function(e){
       if (e.key !== "Escape") return;
       if (qs(".choice-dialog-backdrop")){ closeDialog(); return; }
-      if (state.screen){ closeScreen(); }
+      if (state.screen){ attemptCancelScreen(); } // §12.1: project ✕-warning on every exit route
     });
 
     // Live-snap reordering (overnight notes): during dragover the dragged
