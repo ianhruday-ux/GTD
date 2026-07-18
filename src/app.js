@@ -30,8 +30,8 @@
     current: ["New project", "New list"], future: ["New project", "New list"],
     // Notes (user): the menu is column-reversed, so item[0] renders NEAREST the
     // badge (bottom). New note is the common one → bottom; checklist above it;
-    // New tag joins on top with §4.9b. DOM order here is primary-first (bottom-up).
-    notes: ["New note", "New checklist"]
+    // New tag on top. DOM order here is bottom-up (item[0] = bottom).
+    notes: ["New note", "New checklist", "New tag"]
   };
   const TITLE_PLACEHOLDER = {
     next: "Next action\u2026", waiting: "What are you waiting on\u2026",
@@ -1521,12 +1521,14 @@
     // just sit unused).
     const menu = qs("#fab-menu");
     if (menu){
-      const labels = FAB_MENU_LABELS[state.activeKind];
+      const labels = FAB_MENU_LABELS[state.activeKind] || [];
       const items = menu.querySelectorAll(".fab-menu-item");
-      if (labels && items.length === 2){
-        items[0].textContent = labels[0];
-        items[1].textContent = labels[1];
-      }
+      // Variable item count: label + show the first N, hide the rest (Notes has
+      // a third option, New tag; the action/project lanes have two).
+      items.forEach(function(item, i){
+        if (i < labels.length){ item.textContent = labels[i]; item.hidden = false; }
+        else item.hidden = true;
+      });
       menu.hidden = true;
     }
   }
@@ -3644,6 +3646,13 @@
         if (menu) menu.hidden = true;
         if (state.activeKind === "notes"){ openNoteScreen(null, { checklist: true }); return; } // secondary = New checklist (above)
         openInlineNameRow(state.activeKind);
+        return;
+      }
+      const fabTertiary = e.target.closest('[data-action="new-tertiary"]');
+      if (fabTertiary){
+        const menu = qs("#fab-menu");
+        if (menu) menu.hidden = true;
+        if (state.activeKind === "notes"){ openTagsScreen(); return; } // New tag → the Tags page (§4.9b)
         return;
       }
       const moveBtn = e.target.closest('[data-action="move"]');
