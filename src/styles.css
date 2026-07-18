@@ -46,6 +46,7 @@
   --moss:#6B9E6B;
   --dusty:#6E90AC;
   --purple:#8E6FB0;
+  --teal:#4FB3A6;
   --bezel:#0F0E0C;
   --dark-on-accent:#1a1408;
   --paper-shadow: 0 6px 14px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.03) inset;
@@ -311,6 +312,7 @@ body.drag-active .tabbar{ transition:none; }
 .tab[data-kind="current"] { --lane-accent:var(--moss);   }
 .tab[data-kind="future"]  { --lane-accent:var(--dusty);  }
 .tab[data-kind="habit"]   { --lane-accent:var(--purple); }
+.tab[data-kind="notes"]   { --lane-accent:var(--teal);   }
 
 /* --- STATE B: collapsed → a single floating pill (the active tab only). ---
    Whichever panel holds the active tab (a pair or the solo Habits button)
@@ -367,6 +369,7 @@ main{
 .lane[data-kind="current"] { --lane-accent:var(--moss);   }
 .lane[data-kind="future"]  { --lane-accent:var(--dusty);  }
 .lane[data-kind="habit"]   { --lane-accent:var(--purple); }
+.lane[data-kind="notes"]   { --lane-accent:var(--teal);   }
 
 /* The floating label. MARKUP:
      <div class="lane-label">
@@ -933,6 +936,12 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 .settings-title{ font-family:var(--font-display); font-weight:700; font-size:17px; }
 .settings-row{ display:block; width:100%; text-align:left; padding:12px 14px; border:1px solid rgba(255,255,255,0.14); border-radius:8px; background:rgba(255,255,255,0.04); color:var(--text-primary); font-size:14px; }
 .settings-row.danger{ color:var(--red); border-color:rgba(194,74,61,0.5); }
+
+/* CHUNK 6 — Notes lane */
+.note-card{ cursor:pointer; }
+.note-preview{ font-size:12.5px; color:var(--text-soft); margin-top:3px; line-height:1.45;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.note-body{ min-height:180px; }
 
 /* ----------------------------------------------------------------------------
    REDUCED MOTION — honor the OS preference (quality floor).

@@ -2,21 +2,26 @@
 
   const LIST_TITLES = {
     next: "Next Actions", waiting: "Waiting On", current: "Current Projects",
-    future: "Future / Someday", habit: "Habits"
+    future: "Future / Someday", habit: "Habits", notes: "Notes"
   };
   const LANE_INFO = {
     next: "The single next physical step for anything you're actively moving forward \u2014 not the whole project, just what you'd do next if you sat down right now.",
     waiting: "Things you can't act on yet because they depend on something else \u2014 a reply from someone, a delivery, a decision, another action getting done, or a future date or event. Nothing to do here but check in occasionally. Use the arrow to promote it once it's back in your hands.",
     current: "Anything that takes more than one action to finish and that you're actively working on right now \u2014 could be as simple as returning a library book or as involved as planning a vacation. Link a Next Action or Waiting On item to one of these to keep the connection visible.",
     future: "Ideas and projects you're not committing to yet \u2014 no pressure, just a parking lot. Use the arrow to promote one to Current Projects when you're ready to start.",
-    habit: "Things you want to do every day, not just once. Checking one off only counts for today \u2014 it resets automatically tomorrow so it keeps showing up. Everyone misses a habit occasionally. We don't track streaks here, but we do track personal bests. If you break your streak, then maybe you'll have a new personal best to beat. After all: \u2018It's more important to be persistent than it is to be consistent.\u2019 \u2013 Rebecca"
+    habit: "Things you want to do every day, not just once. Checking one off only counts for today \u2014 it resets automatically tomorrow so it keeps showing up. Everyone misses a habit occasionally. We don't track streaks here, but we do track personal bests. If you break your streak, then maybe you'll have a new personal best to beat. After all: \u2018It's more important to be persistent than it is to be consistent.\u2019 \u2013 Rebecca",
+    notes: "A place for things that aren't actions. Try linking one to a project so it's there when you need it. One caution: these notes aren't a replacement for a real filing system."
   };
+  // Task lanes (each backed by state.tasks[k]). Notes are a lane too but NOT a
+  // task kind \u2014 they have their own store \u2014 so KINDS stays task-only and
+  // ALL_LANES is what tab/lane rendering and visibility iterate (chunk 6).
   const KINDS = ["next", "waiting", "current", "future", "habit"];
+  const ALL_LANES = ["next", "waiting", "current", "future", "habit", "notes"];
   const PROJECT_KINDS = ["current", "future"];
   const MOVE_MAP = { waiting: "next", future: "current" };
   const NEW_ITEM_LABEL = {
     next: "+ New Action", waiting: "+ New Waiting Item",
-    current: "+ New Project", future: "+ New Project", habit: "+ New Habit"
+    current: "+ New Project", future: "+ New Project", habit: "+ New Habit", notes: "+ New Note"
   };
   // §4.3e's label table — the FAB's two-option menu on every lane but
   // Habits (which has no menu at all; the badge creates directly there).
@@ -26,14 +31,15 @@
   };
   const TITLE_PLACEHOLDER = {
     next: "Next action\u2026", waiting: "What are you waiting on\u2026",
-    current: "Project title\u2026", future: "Project title\u2026", habit: "Habit title\u2026"
+    current: "Project title\u2026", future: "Project title\u2026", habit: "Habit title\u2026",
+    notes: "Note title\u2026"
   };
   // Retained for chunk 7 (recurrence is a property of EVENTS, §4.13); no
   // longer used by deadlines, whose recurrence <select> was removed in chunk 3.
   const RECURRENCE_LABELS = { none: "Does not repeat", daily: "Daily", weekly: "Weekly", monthly: "Monthly", yearly: "Yearly" };
   const KIND_BADGE_LABEL = {
     next: "Next Action", waiting: "Waiting Action", current: "Current Project",
-    future: "Future Project", habit: "Habit"
+    future: "Future Project", habit: "Habit", notes: "Note"
   };
 
   const state = {
@@ -62,6 +68,8 @@
     screenStack: [],
     tray: [],       // chunk 6 (§4.8a): captured stray thoughts
     trayOpen: false,
+    notes: [],      // chunk 6 (§4.9): { id, title, body, projectLinks:[{id,name}], tagIds:[], editedAt }
+    notesFilter: null, // chunk 6 (§4.9): transient project-id filter on the Notes lane
     qaTimeOffset: 0 // dev-only: MINUTES added to boundaryNow() (chunk 0c: hour/minute granular, not just whole days — the midnight-4am window (§4.14b) can only be tested by landing the clock inside it) — see the QA time-jump buttons
   };
 
@@ -1414,6 +1422,7 @@
   function renderLane(kind){
     const laneEl = qs('.lane[data-kind="' + kind + '"]');
     if (!laneEl) return;
+    if (kind === "notes"){ renderNotesLane(laneEl); return; } // chunk 6: notes aren't tasks
     if (kind === "habit"){
       updateHabitBadge();
     }
@@ -1487,7 +1496,7 @@
       '</div>'
     );
   }
-  function renderShell(){ qs("#lanes").innerHTML = KINDS.map(laneShellHtml).join(""); }
+  function renderShell(){ qs("#lanes").innerHTML = ALL_LANES.map(laneShellHtml).join(""); }
 
   function updateLaneVisibility(){
     qsa(".lane").forEach(function(el){ el.classList.toggle("active-lane", el.getAttribute("data-kind") === state.activeKind); });
@@ -1883,6 +1892,7 @@
     // The completed page is read-only (§12.2): its ← is a plain back with no
     // side effects — there is no draft to commit.
     if (s.completedView){ closeScreen(); return; }
+    if (s.noteView){ saveNoteScreen(s); return; } // chunk 6 (§4.9)
     let title = (s.draft.title || "").trim();
     if (!title){
       if (!s.taskId){ closeScreen(); return; } // silent discard on create
@@ -2143,6 +2153,13 @@
   function deleteScreenItem(){
     const s = state.screen;
     if (!s || !s.taskId) return;
+    if (s.noteView){ // chunk 6 (§4.9)
+      openConfirmDialog("Delete this note for good?", [
+        { label: "Delete", style: "danger", action: function(){ deleteNote(s.noteId); closeScreen(); } },
+        { label: "Cancel", action: function(){} }
+      ]);
+      return;
+    }
     // Child of a project (§12.1): deleting is STAGED, not immediate — it lands
     // with the project's save (or evaporates on the project's ✕). A staged
     // create just disappears; a pre-existing linked action is marked deleted.
@@ -2929,7 +2946,7 @@
   // Border/text color for the Make-Waiting/Next/Current/Future pill —
   // tinted with the *destination* kind's accent, per the guide.
   function accentVarForKind(kind){
-    return kind === "next" ? "--red" : kind === "waiting" ? "--yellow" : kind === "current" ? "--moss" : kind === "future" ? "--dusty" : "--purple";
+    return kind === "next" ? "--red" : kind === "waiting" ? "--yellow" : kind === "current" ? "--moss" : kind === "future" ? "--dusty" : kind === "notes" ? "--teal" : "--purple";
   }
   // DRAFT ISOLATION (§13.0 Chunk A): armed renders a filled pill reading
   // "Converting to X on save", the same "nothing has happened yet, but
@@ -3018,6 +3035,7 @@
     return '<div class="screen-body">' + fields + '</div>';
   }
   function screenBodyHtml(s){
+    if (s.noteView) return noteBodyHtml(s); // chunk 6 (§4.9)
     const draft = s.draft, kind = s.kind;
     // §12.1: lock the project link when this action is opened as a child of
     // the project it actually belongs to (membership, not provenance).
@@ -3593,6 +3611,7 @@
       // lane but Habits, where it still creates directly (no menu).
       const fabBtn = e.target.closest('[data-action="fab"]');
       if (fabBtn){
+        if (state.activeKind === "notes"){ openNoteScreen(null); return; } // chunk 6 (menu w/ New tag lands with tags)
         if (state.activeKind === "habit"){ openScreen("habit", null); return; }
         const menu = qs("#fab-menu");
         if (menu) menu.hidden = !menu.hidden;
@@ -3752,6 +3771,9 @@
       // (creation is now the FAB's own data-action="fab"/"new-primary"
       // branches above, chunk 2 -- edit still opens via data-action="open-edit" below)
 
+      const openNoteEl = e.target.closest('[data-action="open-note"]');
+      if (openNoteEl){ openNoteScreen(openNoteEl.getAttribute("data-id")); return; }
+
       const openEditEl = e.target.closest('[data-action="open-edit"]');
       if (openEditEl){ openScreen(openEditEl.getAttribute("data-kind"), openEditEl.getAttribute("data-id")); return; }
 
@@ -3879,6 +3901,8 @@
       const field = el.getAttribute("data-field");
       const draft = state.screen.draft;
       if (field === "title"){ draft.title = el.value; }
+      else if (field === "noteTitle"){ draft.title = el.value; } // chunk 6
+      else if (field === "noteBody"){ draft.body = el.value; el.style.height = "auto"; el.style.height = (el.scrollHeight + 2) + "px"; }
       else if (field === "notesClean"){ draft.notesClean = el.value; el.style.height = "auto"; el.style.height = (el.scrollHeight + 2) + "px"; }
       else if (field === "cueText"){
         const row = state.screen.draft.cueRows && state.screen.draft.cueRows[Number(el.getAttribute("data-row"))];
@@ -4501,6 +4525,71 @@
     });
   }
 
+  // =========================================================
+  // CHUNK 6 (§4.9): Notes. A sixth lane (teal) for things that aren't actions
+  // — its own store (gtd_notes), a flat lane, most-recently-edited first. A
+  // note is title + body (project links and tags land in later checkpoints).
+  // Standard chrome, no Complete, no dates.
+  // =========================================================
+  function loadNotes(){ return Storage.getJSON("gtd_notes", []); }
+  function saveNotes(){ Storage.setJSON("gtd_notes", state.notes); }
+  function findNote(id){ return state.notes.find(function(n){ return n.id === id; }) || null; }
+  function noteCardHtml(note){
+    const preview = (note.body || "").trim().split("\n")[0].slice(0, 120);
+    return (
+      '<div class="card note-card" data-action="open-note" data-id="' + note.id + '">' +
+        '<div class="card-top"><div class="card-title">' + escapeHtml(note.title || "Untitled") + '</div></div>' +
+        (preview ? '<div class="note-preview">' + escapeHtml(preview) + '</div>' : "") +
+      '</div>'
+    );
+  }
+  function renderNotesLane(laneEl){
+    const notes = state.notes.slice().sort(function(a, b){ return (b.editedAt || 0) - (a.editedAt || 0); });
+    laneEl.querySelector(".count").textContent = notes.length;
+    const tabCountEl = qs('.tab[data-kind="notes"] .tab-count');
+    if (tabCountEl) tabCountEl.textContent = notes.length;
+    const rootEl = laneEl.querySelector(".cards-root");
+    rootEl.innerHTML = notes.length
+      ? notes.map(noteCardHtml).join("")
+      : '<div class="empty-note">No notes yet.</div>';
+  }
+  function openNoteScreen(noteId){
+    let draft;
+    if (noteId){
+      const n = findNote(noteId);
+      if (!n) return;
+      draft = { title: n.title || "", body: n.body || "", projectLinks: (n.projectLinks || []).slice(), tagIds: (n.tagIds || []).slice() };
+    } else {
+      draft = { title: "", body: "", projectLinks: [], tagIds: [] };
+    }
+    state.screen = { kind: "notes", taskId: noteId || null, noteId: noteId || null, noteView: true, draft: draft };
+    renderScreen();
+  }
+  function noteBodyHtml(s){
+    const d = s.draft;
+    let fields = '<input type="text" class="screen-field-title' + (s.invalidField === "title" ? " field-invalid" : "") + '" data-field="noteTitle" placeholder="Note title…" value="' + escapeHtml(d.title) + '">';
+    fields += '<textarea class="screen-field-desc note-body" data-field="noteBody" placeholder="Write anything…">' + escapeHtml(d.body) + '</textarea>';
+    return '<div class="screen-body">' + fields + '</div>';
+  }
+  function saveNoteScreen(s){
+    const title = (s.draft.title || "").trim();
+    if (!title){ s.invalidField = "title"; renderScreen(); return; }
+    if (s.noteId){
+      const n = findNote(s.noteId);
+      if (n){ n.title = title; n.body = s.draft.body || ""; n.projectLinks = s.draft.projectLinks || []; n.tagIds = s.draft.tagIds || []; n.editedAt = Date.now(); }
+    } else {
+      state.notes.unshift({ id: genId(), title: title, body: s.draft.body || "", projectLinks: s.draft.projectLinks || [], tagIds: s.draft.tagIds || [], editedAt: Date.now() });
+    }
+    saveNotes();
+    renderLane("notes");
+    closeScreen();
+  }
+  function deleteNote(noteId){
+    state.notes = state.notes.filter(function(n){ return n.id !== noteId; });
+    saveNotes();
+    renderLane("notes");
+  }
+
   function boot(){
     renderShell();
     bindEvents();
@@ -4512,8 +4601,9 @@
     state.habitDoneOrder = loadHabitDoneOrder();
     state.habitRuns = loadHabitRuns();
     state.tray = loadTray();
+    state.notes = loadNotes();
     processHabitBoundaries();
-    KINDS.forEach(renderLane);
+    ALL_LANES.forEach(renderLane);
     updateLaneVisibility();
     updateQaTimeReadout();
     dragLogInit();
