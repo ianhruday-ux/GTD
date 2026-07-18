@@ -27,7 +27,9 @@
   // Habits (which has no menu at all; the badge creates directly there).
   const FAB_MENU_LABELS = {
     next: ["New action", "New context"], waiting: ["New action", "New context"],
-    current: ["New project", "New list"], future: ["New project", "New list"]
+    current: ["New project", "New list"], future: ["New project", "New list"],
+    // Notes (user): checklist sits ABOVE the plain note. New tag joins later (§4.9b).
+    notes: ["New checklist", "New note"]
   };
   const TITLE_PLACEHOLDER = {
     next: "Next action\u2026", waiting: "What are you waiting on\u2026",
@@ -3615,7 +3617,8 @@
       // lane but Habits, where it still creates directly (no menu).
       const fabBtn = e.target.closest('[data-action="fab"]');
       if (fabBtn){
-        if (state.activeKind === "notes"){ openNoteScreen(null); return; } // chunk 6 (menu w/ New tag lands with tags)
+        // Notes now has a two-option menu too (user): New checklist · New note
+        // (New tag joins with §4.9b). Habits still create directly (no menu).
         if (state.activeKind === "habit"){ openScreen("habit", null); return; }
         const menu = qs("#fab-menu");
         if (menu) menu.hidden = !menu.hidden;
@@ -3625,6 +3628,7 @@
       if (fabPrimary){
         const menu = qs("#fab-menu");
         if (menu) menu.hidden = true;
+        if (state.activeKind === "notes"){ openNoteScreen(null, { checklist: true }); return; } // top item
         openScreen(state.activeKind, null);
         return;
       }
@@ -3632,6 +3636,7 @@
       if (fabSecondary){
         const menu = qs("#fab-menu");
         if (menu) menu.hidden = true;
+        if (state.activeKind === "notes"){ openNoteScreen(null); return; } // plain note
         openInlineNameRow(state.activeKind);
         return;
       }
@@ -3780,6 +3785,13 @@
       // Note project-link picker (§4.9), all draft-isolated.
       const mdBtn = e.target.closest("[data-md]");
       if (mdBtn){ applyNoteFormat(mdBtn.getAttribute("data-md")); return; }
+      // Tick a checklist item by tapping its checkbox (the left marker zone).
+      // Tapping the text still edits normally (falls through to caret).
+      const clItem = e.target.closest(".note-body .checklist > li");
+      if (clItem){
+        const rect = clItem.getBoundingClientRect();
+        if (e.clientX - rect.left <= 30){ clItem.classList.toggle("checked"); syncNoteBodyDraft(); return; }
+      }
       if (e.target.closest('[data-action="note-add-link"]')){ if (state.screen){ syncNoteBodyDraft(); state.screen.draft.projectPicker = true; renderScreen(); } return; }
       if (e.target.closest('[data-action="note-cancel-pick"]')){ if (state.screen){ state.screen.draft.projectPicker = false; renderScreen(); } return; }
       const notePickBtn = e.target.closest('[data-action="note-pick-project"]');
@@ -3940,7 +3952,7 @@
         // contenteditable rich body (§4.9): read HTML out, never write it back
         // here — re-rendering a contenteditable mid-keystroke resets the caret.
         draft.body = el.innerHTML;
-        el.classList.toggle("is-empty", !(el.textContent || "").trim());
+        el.classList.toggle("is-empty", isNoteBodyEmpty(el));
       }
       else if (field === "notesClean"){ draft.notesClean = el.value; el.style.height = "auto"; el.style.height = (el.scrollHeight + 2) + "px"; }
       else if (field === "cueText"){
@@ -4366,7 +4378,12 @@
     // contenteditable on mousedown and collapse the selection before the click
     // runs execCommand. preventDefault on the button's own mousedown holds it.
     document.addEventListener("mousedown", function(e){
-      if (e.target.closest(".note-tool[data-md]")) e.preventDefault();
+      if (e.target.closest(".note-tool[data-md]")){ e.preventDefault(); return; }
+      // Suppress caret placement when the tap lands on a checklist checkbox, so
+      // ticking an item doesn't also move the cursor into it (the toggle itself
+      // is on click, above).
+      const li = e.target.closest(".note-body .checklist > li");
+      if (li && (e.clientX - li.getBoundingClientRect().left) <= 30) e.preventDefault();
     });
 
     // CHUNK 6 tweak (user): SWIPE the capture drawer open / closed.
@@ -4685,7 +4702,14 @@
         if (child.nodeType === 3){
           /* text node — keep */
         } else if (child.nodeType === 1 && NOTE_ALLOWED_TAGS[child.tagName]){
-          while (child.attributes.length) child.removeAttribute(child.attributes[0].name); // no styles/classes/handlers/hrefs
+          // The ONLY attributes that survive: class="checklist" on a <ul> and
+          // class="checked" on its <li>s. Values are whitelisted (not copied),
+          // so there is nothing to inject through — everything else is dropped.
+          let keepClass = null;
+          if (child.tagName === "UL" && child.classList.contains("checklist")) keepClass = "checklist";
+          else if (child.tagName === "LI" && child.classList.contains("checked")) keepClass = "checked";
+          while (child.attributes.length) child.removeAttribute(child.attributes[0].name); // no styles/handlers/hrefs
+          if (keepClass) child.setAttribute("class", keepClass);
           clean(child);
         } else if (child.nodeType === 1){
           // disallowed element: unwrap (keep children, drop the wrapper), then
@@ -4701,6 +4725,12 @@
       }
     })(root);
     return root.innerHTML;
+  }
+  // "Empty" for placeholder purposes: no text AND no structural content. A
+  // seeded checklist (empty <li>s) has no text but IS content, so the
+  // "Write anything…" placeholder must not show over it.
+  function isNoteBodyEmpty(node){
+    return !(node.textContent || "").trim() && !node.querySelector("ul,ol,h2,li");
   }
   // One-line plain-text reduction for the card preview.
   function noteBodyToText(html){
@@ -4795,14 +4825,17 @@
       ? notes.map(noteCardHtml).join("")
       : '<div class="empty-note">' + (state.notesFilter ? "No notes for this filter." : "No notes yet.") + '</div>');
   }
-  function openNoteScreen(noteId){
+  function openNoteScreen(noteId, opts){
     let draft;
     if (noteId){
       const n = findNote(noteId);
       if (!n) return;
       draft = { title: n.title || "", body: n.body || "", projectLinks: (n.projectLinks || []).slice(), tagIds: (n.tagIds || []).slice() };
     } else {
-      draft = { title: "", body: "", projectLinks: [], tagIds: [] };
+      // "New checklist" (user) seeds the body with one empty checklist item so
+      // the page IS a checklist from the first keystroke; "New note" is blank.
+      const body = (opts && opts.checklist) ? '<ul class="checklist"><li></li></ul>' : "";
+      draft = { title: "", body: body, projectLinks: [], tagIds: [] };
     }
     state.screen = { kind: "notes", taskId: noteId || null, noteId: noteId || null, noteView: true, draft: draft };
     renderScreen();
@@ -4821,6 +4854,7 @@
       '<button type="button" class="note-tool" data-md="underline" title="Underline"><span style="text-decoration:underline">U</span></button>' +
       '<button type="button" class="note-tool" data-md="h2" title="Heading">H</button>' +
       '<button type="button" class="note-tool" data-md="ul" title="Bullet list">&#8226;</button>' +
+      '<button type="button" class="note-tool" data-md="checklist" title="Checklist">&#9744;</button>' +
       '<span class="note-tool-sep"></span>' +
       '<button type="button" class="note-tool" data-action="note-add-link" title="Add a tag or linked project">&#8862;</button>' +
     '</div>';
@@ -4839,6 +4873,17 @@
   // browser ever drops it the notes are still valid HTML, only the buttons
   // break. Every command yields allow-listed tags, so nothing here can outrun
   // sanitizeNoteHtml. H2 toggles back to a plain block when already a heading.
+  // The UL/OL ancestor of the current selection, bounded to the editable.
+  function currentEditableList(editable){
+    const sel = window.getSelection();
+    if (!sel || !sel.anchorNode) return null;
+    let n = sel.anchorNode;
+    while (n && n !== editable){
+      if (n.nodeType === 1 && (n.tagName === "UL" || n.tagName === "OL")) return n;
+      n = n.parentNode;
+    }
+    return null;
+  }
   function applyNoteFormat(cmd){
     const el = qs('.note-body[contenteditable]');
     if (!el) return;
@@ -4848,6 +4893,22 @@
       else if (cmd === "italic") document.execCommand("italic");
       else if (cmd === "underline") document.execCommand("underline");
       else if (cmd === "ul") document.execCommand("insertUnorderedList");
+      else if (cmd === "checklist"){
+        // A checklist is a <ul class="checklist"> — the checkbox and its ticked
+        // state are pure CSS on the class, so it survives the strict sanitiser
+        // with no attributes to validate. Toggle: none→checklist, plain
+        // bullets→checklist (convert in place), checklist→off.
+        const ul = currentEditableList(el);
+        if (ul && ul.tagName === "UL" && ul.classList.contains("checklist")){
+          document.execCommand("insertUnorderedList");
+        } else if (ul && ul.tagName === "UL"){
+          ul.classList.add("checklist");
+        } else {
+          document.execCommand("insertUnorderedList");
+          const nu = currentEditableList(el);
+          if (nu) nu.classList.add("checklist");
+        }
+      }
       else if (cmd === "h2"){
         const cur = (document.queryCommandValue("formatBlock") || "").toLowerCase();
         document.execCommand("formatBlock", false, (cur === "h2" || cur === "<h2>") ? "div" : "h2");
@@ -4855,7 +4916,7 @@
     } catch (err){ /* execCommand unsupported — leave the body untouched */ }
     if (state.screen && state.screen.draft){
       state.screen.draft.body = el.innerHTML;
-      el.classList.toggle("is-empty", !(el.textContent || "").trim());
+      el.classList.toggle("is-empty", isNoteBodyEmpty(el));
     }
   }
   function noteBodyHtml(s){
@@ -4864,7 +4925,8 @@
     let fields = '<input type="text" class="screen-field-title' + (s.invalidField === "title" ? " field-invalid" : "") + '" data-field="noteTitle" placeholder="Note title…" value="' + escapeHtml(d.title) + '">';
     fields += noteToolbarHtml();
     const bodyHtml = sanitizeNoteHtml(d.body);
-    fields += '<div class="screen-field-desc note-body' + (noteBodyToText(bodyHtml) ? "" : " is-empty") + '" contenteditable="true" data-field="noteBody" data-placeholder="Write anything…">' + bodyHtml + '</div>';
+    const bodyProbe = document.createElement("div"); bodyProbe.innerHTML = bodyHtml;
+    fields += '<div class="screen-field-desc note-body' + (isNoteBodyEmpty(bodyProbe) ? " is-empty" : "") + '" contenteditable="true" data-field="noteBody" data-placeholder="Write anything…">' + bodyHtml + '</div>';
     // Attached chips — projects now (many-valued, §4.9), tags too once §4.9b
     // lands. Draft-isolated: add/remove stage on the draft, commit on Save.
     const attached = (d.projectLinks || []).map(function(l){ return noteChipHtml(l, true); })
