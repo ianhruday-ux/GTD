@@ -60,6 +60,8 @@
     // project page. Each entry is a full stashed screen (draft included);
     // closeScreen() pops the top one, or exits to the lanes once it's empty.
     screenStack: [],
+    tray: [],       // chunk 6 (§4.8a): captured stray thoughts
+    trayOpen: false,
     qaTimeOffset: 0 // dev-only: MINUTES added to boundaryNow() (chunk 0c: hour/minute granular, not just whole days — the midnight-4am window (§4.14b) can only be tested by landing the clock inside it) — see the QA time-jump buttons
   };
 
@@ -3407,22 +3409,10 @@
   // =========================================================
   function bindEvents(){
     qs("#reset-btn").addEventListener("click", function(){
+      // Dev Reset now shares the settings surface's clear (chunk 6) — one code
+      // path, so completed archives, the tray, tags, etc. can't be forgotten.
       openConfirmDialog("Clear all local data and start fresh?", [
-        { label: "Clear data", style: "primary", action: function(){
-          KINDS.forEach(function(k){ Storage.remove("gtd_tasks_" + k); Storage.remove("gtd_collapsed:" + k); });
-          Storage.remove("gtd_habit_done");
-          Storage.remove("gtd_habit_runs");
-          Storage.remove("gtd_archived_waiting");
-          Storage.remove("gtd_contexts"); // chunk 3: Reset re-seeds the default registry
-          // Also clear the QA-checklist and chunk-map injection flags: the
-          // reset wipes the injected items with the rest of the data, so the
-          // flags must go too or they'd be gone for good — both should
-          // re-inject with the fresh data (doc 8.1, 8.2).
-          Storage.keys().forEach(function(key){
-            if (key.indexOf("gtd_qa_checklist") === 0 || key.indexOf("gtd_chunk_map") === 0) Storage.remove(key);
-          });
-          window.location.reload();
-        }},
+        { label: "Clear data", style: "primary", action: clearAllAppData },
         { label: "Cancel", action: function(){} }
       ]);
     });
@@ -3541,6 +3531,7 @@
         if (fabMenuEl && !fabMenuEl.hidden) fabMenuEl.hidden = true;
       }
       if (e.key !== "Enter") return;
+      if (e.target && e.target.id === "tray-input"){ e.preventDefault(); trayAdd(e.target.value); return; }
       const row = e.target.closest && e.target.closest(".add-row-mini");
       if (row && e.target.matches("input[type=text]")){ e.preventDefault(); submitAddMini(row); }
       const quickAddInput = e.target.closest && e.target.closest("[data-quickadd]");
@@ -3554,6 +3545,19 @@
       if (clickedBtn){
         const act = clickedBtn.getAttribute("data-action") || "";
         if (act !== "screen-pick-hook" && act !== "screen-pick-condition") playNavClick();
+      }
+
+      // CHUNK 6 (§4.8a / §4.10): the intray drawer and the settings surface.
+      if (e.target.closest('[data-action="open-tray"]')){ openTray(); return; }
+      if (e.target.closest('[data-action="close-tray"]')){ closeTray(); return; }
+      if (e.target.closest('[data-action="open-overflow"]')){ openSettings(); return; }
+      if (e.target.closest('[data-action="tray-add"]')){
+        const inp = qs("#tray-input"); trayAdd(inp ? inp.value : ""); return;
+      }
+      const trayDelBtn = e.target.closest('[data-action="tray-delete"]');
+      if (trayDelBtn){ trayDelete(trayDelBtn.getAttribute("data-id")); return; }
+      if (e.target.closest('[data-action="tray-info"]')){
+        const panel = qs(".tray-info-panel"); if (panel) panel.hidden = !panel.hidden; return;
       }
 
       // CHUNK 2 (spec 4.3e) -- close the FAB menu on any click that isn't
@@ -3902,7 +3906,9 @@
 
     document.addEventListener("keydown", function(e){
       if (e.key !== "Escape") return;
+      // §4.6 Back/Escape resolution order: dialog → drawer → page → exit.
       if (qs(".choice-dialog-backdrop")){ closeDialog(); return; }
+      if (state.trayOpen){ closeTray(); return; }
       if (state.screen){ attemptCancelScreen(); } // §12.1: project ✕-warning on every exit route
     });
 
@@ -4403,6 +4409,98 @@
   // =========================================================
   // BOOT
   // =========================================================
+  // =========================================================
+  // CHUNK 6 (§4.8a): the capture drawer (intray). A left drawer over the
+  // lanes for frictionless capture — capture is the first job, so it
+  // auto-opens on launch (even when empty). Captures land in gtd_tray as
+  // stray thoughts; the daily review (chunk 6b) is where they get sorted.
+  // Opening/closing changes nothing on the main screen — closing is a cancel.
+  // =========================================================
+  const TRAY_INFO = "A holding pen for stray thoughts. Try sorting through it once a day — an empty intray means nothing's slipping through the cracks.";
+  function loadTray(){ return Storage.getJSON("gtd_tray", []); }
+  function saveTray(){ Storage.setJSON("gtd_tray", state.tray); }
+  function trayCardHtml(item){
+    return '<div class="tray-card">' +
+      '<span class="tray-card-text">' + escapeHtml(item.text) + '</span>' +
+      '<button type="button" class="icon-btn" data-action="tray-delete" data-id="' + item.id + '" title="Discard">&times;</button>' +
+    '</div>';
+  }
+  function renderTray(){
+    const root = qs("#tray-root");
+    if (!root) return;
+    const cards = (state.tray || []).map(trayCardHtml).join("");
+    const list = cards
+      ? '<div class="tray-list">' + cards + '</div>'
+      : '<div class="tray-empty">Empty for now — nothing slipping through the cracks.</div>';
+    root.innerHTML =
+      '<div class="tray-backdrop" data-action="close-tray"></div>' +
+      '<div class="tray-drawer">' +
+        '<div class="tray-head">' +
+          '<span class="tray-title">Intray</span>' +
+          '<span style="flex:1"></span>' +
+          '<button type="button" class="icon-btn" data-action="tray-info" title="What is this?">&#9432;</button>' +
+          '<button type="button" class="icon-btn" data-action="close-tray" title="Close">&times;</button>' +
+        '</div>' +
+        '<div class="tray-info-panel" hidden>' + escapeHtml(TRAY_INFO) + '</div>' +
+        '<div class="tray-capture">' +
+          '<input type="text" id="tray-input" placeholder="Capture a thought…" autocomplete="off">' +
+          '<button type="button" data-action="tray-add" title="Add">+</button>' +
+        '</div>' +
+        list +
+      '</div>';
+    requestAnimationFrame(function(){
+      const d = qs(".tray-drawer"); if (d) d.classList.add("open");
+    });
+  }
+  function openTray(){
+    state.trayOpen = true;
+    renderTray();
+    const input = qs("#tray-input"); if (input) input.focus();
+  }
+  function closeTray(){ state.trayOpen = false; const r = qs("#tray-root"); if (r) r.innerHTML = ""; }
+  function trayAdd(text){
+    text = (text || "").trim();
+    if (!text) return;
+    state.tray.unshift({ id: genId(), text: text, createdAt: Date.now() });
+    saveTray();
+    renderTray();
+    const ni = qs("#tray-input"); if (ni) ni.focus(); // capture clears, stays focused for the next thought
+  }
+  function trayDelete(id){
+    state.tray = state.tray.filter(function(t){ return t.id !== id; });
+    saveTray();
+    renderTray();
+  }
+
+  // =========================================================
+  // CHUNK 6 (§4.10): the settings surface, behind the header ⋯. Holds the
+  // app-wide destructive control (Clear all app data — today's Reset);
+  // Export/Import join it in chunk 8. Lane-scoped Completed clearing stays put.
+  // =========================================================
+  function clearAllAppData(){
+    // A true clear: every gtd_ key (data + injected-flag bookkeeping). gtddev_
+    // keys (snapshot, drag-log settings) survive, like Reset always has.
+    Storage.keys().forEach(function(key){ if (key.indexOf("gtd_") === 0) Storage.remove(key); });
+    window.location.reload();
+  }
+  function openSettings(){
+    qs("#dialog-root").innerHTML =
+      '<div class="choice-dialog-backdrop"><div class="choice-dialog settings-sheet">' +
+        '<div class="settings-title">Settings</div>' +
+        '<button type="button" class="settings-row danger" data-action="clear-all-data">🗑 Clear all app data</button>' +
+        '<div class="choice-dialog-btns"><button type="button" data-action="settings-close">Close</button></div>' +
+      '</div></div>';
+    const backdrop = qs(".choice-dialog-backdrop");
+    backdrop.addEventListener("click", function(e){ if (e.target === backdrop) closeDialog(); });
+    qs('[data-action="settings-close"]').addEventListener("click", closeDialog);
+    qs('[data-action="clear-all-data"]').addEventListener("click", function(){
+      openConfirmDialog("Clear all app data and start fresh? This can’t be undone.", [
+        { label: "Clear everything", style: "danger", action: clearAllAppData },
+        { label: "Cancel", action: function(){} }
+      ]);
+    });
+  }
+
   function boot(){
     renderShell();
     bindEvents();
@@ -4413,12 +4511,14 @@
     state.habitDone = loadHabitDone();
     state.habitDoneOrder = loadHabitDoneOrder();
     state.habitRuns = loadHabitRuns();
+    state.tray = loadTray();
     processHabitBoundaries();
     KINDS.forEach(renderLane);
     updateLaneVisibility();
     updateQaTimeReadout();
     dragLogInit();
     updateDragLogUI();
+    openTray(); // §4.8a: auto-open on launch — capture is the first job
   }
 
   document.addEventListener("DOMContentLoaded", boot);

@@ -111,6 +111,12 @@ def test_quota_exceeded_is_surfaced_not_thrown(browser, candidate_url):
         page.evaluate("() => localStorage.clear()")
         page.reload(wait_until="load")
 
+        # Chunk 6 (§4.8a): the capture drawer auto-opens on launch and overlays
+        # the lanes/FAB. Dismiss it before driving the create flow below.
+        if page.query_selector(".tray-drawer"):
+            page.click('[data-action="close-tray"]')
+            page.wait_for_timeout(120)
+
         # Track any uncaught page errors — the failure mode we're guarding against.
         errors = []
         page.on("pageerror", lambda e: errors.append(str(e)))
