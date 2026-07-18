@@ -971,6 +971,9 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 .note-chip-completed{ border-color:var(--moss); background:rgba(107,158,107,0.16); }
 .note-chip-deleted{ border-style:dashed; border-color:var(--red); color:var(--red); background:transparent; } /* tombstone (§4.9) */
 .note-chip-more{ border-color:rgba(255,255,255,0.22); background:rgba(255,255,255,0.06); color:var(--text-soft); } /* "+n" overflow badge (user) */
+/* Tag chip (§4.9b): one flat style — tags have no live/completed/deleted states.
+   Distinct hue (amber) from the teal project chips so the two read apart. */
+.note-chip-tag{ border-color:var(--brass); color:var(--text-primary); background:rgba(197,160,89,0.14); }
 .note-chip[data-action]{ cursor:pointer; }
 .note-chip .chip-x{ border:none; background:transparent; color:inherit; font-size:15px; line-height:1; padding:0 0 0 1px; cursor:pointer; }
 .note-add-link{ font-size:12px; padding:4px 10px; border-radius:20px; border:1px dashed rgba(255,255,255,0.3); background:transparent; color:var(--text-soft); }

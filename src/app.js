@@ -71,7 +71,9 @@
     tray: [],       // chunk 6 (§4.8a): captured stray thoughts
     trayOpen: false,
     notes: [],      // chunk 6 (§4.9): { id, title, body, projectLinks:[{id,name}], tagIds:[], editedAt }
-    notesFilter: null, // chunk 6 (§4.9): transient project-id filter on the Notes lane
+    tags: [],       // chunk 6 (§4.9b): notes-only tag registry, { id, name } — mirrors gtd_contexts
+    notesFilter: null, // chunk 6 (§4.9): transient project-OR-tag-id filter on the Notes lane
+    notesFilterMenuOpen: false,
     qaTimeOffset: 0 // dev-only: MINUTES added to boundaryNow() (chunk 0c: hour/minute granular, not just whole days — the midnight-4am window (§4.14b) can only be tested by landing the clock inside it) — see the QA time-jump buttons
   };
 
@@ -3810,6 +3812,12 @@
         if (s){ syncNoteBodyDraft(); s.draft.projectLinks = (s.draft.projectLinks || []).filter(function(l){ return l.id !== id; }); renderScreen(); }
         return;
       }
+      const noteUntagBtn = e.target.closest('[data-action="note-untag"]');
+      if (noteUntagBtn){
+        const s = state.screen; const id = noteUntagBtn.getAttribute("data-id");
+        if (s){ syncNoteBodyDraft(); s.draft.tagIds = (s.draft.tagIds || []).filter(function(t){ return t !== id; }); renderScreen(); }
+        return;
+      }
       const filterNotesBtn = e.target.closest('[data-action="filter-notes"]');
       if (filterNotesBtn){ state.notesFilter = filterNotesBtn.getAttribute("data-id"); state.notesFilterMenuOpen = false; renderLane("notes"); return; }
       // Check clear (the ✕) before the toggle button that wraps it.
@@ -4662,6 +4670,10 @@
   function loadNotes(){ return Storage.getJSON("gtd_notes", []); }
   function saveNotes(){ Storage.setJSON("gtd_notes", state.notes); }
   function findNote(id){ return state.notes.find(function(n){ return n.id === id; }) || null; }
+  // ---- Tags registry (§4.9b) — notes-only, mirrors gtd_contexts -----------
+  function loadTags(){ return Storage.getJSON("gtd_tags", []); }
+  function saveTags(){ Storage.setJSON("gtd_tags", state.tags); }
+  function findTag(id){ return (state.tags || []).find(function(t){ return t.id === id; }) || null; }
   // A project a note links to, wherever it now lives. Drives the chip's
   // state: live (still a project), completed (in the archive → green), or
   // deleted (found nowhere → tombstone, frozen denormalised name §4.9).
@@ -4685,12 +4697,20 @@
       (removable ? '<button type="button" class="chip-x" data-action="note-unlink" data-id="' + link.id + '" title="Remove">&times;</button>' : "") +
     '</span>';
   }
-  // Tag chips for a note. Tags (§4.9b registry) are not built yet — this
-  // returns [] until they are, so the card/page chip rows already account for
-  // them (the two-chip cap in noteCardHtml is over projects+tags combined) and
-  // nothing needs re-plumbing when the registry lands. `removable` mirrors the
-  // project-chip API (draft ✕ on the note page).
-  function noteTagChips(note, removable){ return []; }
+  // Tag chips for a note (§4.9b). One flat visual — tags never carry the
+  // live/completed/deleted states project chips do. A tagId with no surviving
+  // registry entry is simply dropped (delete-a-tag is unlink, no tombstone).
+  // On the note page chips are removable (draft ✕); on a card they filter.
+  function noteTagChips(noteLike, removable){
+    return ((noteLike && noteLike.tagIds) || []).map(function(id){
+      const t = findTag(id);
+      if (!t) return null;
+      const filterAttr = (!removable) ? ' data-action="filter-notes" data-id="' + id + '"' : '';
+      return '<span class="note-chip note-chip-tag"' + filterAttr + '>#' + escapeHtml(t.name) +
+        (removable ? '<button type="button" class="chip-x" data-action="note-untag" data-id="' + id + '" title="Remove">&times;</button>' : "") +
+      '</span>';
+    }).filter(Boolean);
+  }
   // ---- Rich-text note body (§4.9, user: proper markup) --------------------
   // The body is HTML now, not plain text. It is authored in a contenteditable
   // and constrained to a small allowlist: emphasis (b/strong, i/em, u), one
@@ -4991,6 +5011,7 @@
     state.habitRuns = loadHabitRuns();
     state.tray = loadTray();
     state.notes = loadNotes();
+    state.tags = loadTags();
     processHabitBoundaries();
     ALL_LANES.forEach(renderLane);
     updateLaneVisibility();
