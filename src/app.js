@@ -3806,6 +3806,15 @@
         if (s){ s.draft.projectPicker = false; renderScreen(); }
         return;
       }
+      const notePickTagBtn = e.target.closest('[data-action="note-pick-tag"]');
+      if (notePickTagBtn){
+        const s = state.screen; const id = notePickTagBtn.getAttribute("data-id");
+        if (s && findTag(id) && !(s.draft.tagIds || []).some(function(t){ return t === id; })){
+          (s.draft.tagIds = s.draft.tagIds || []).push(id); // tags referenced by ID (§4.9b) — rename propagates for free
+        }
+        if (s){ s.draft.projectPicker = false; renderScreen(); }
+        return;
+      }
       const noteUnlinkBtn = e.target.closest('[data-action="note-unlink"]');
       if (noteUnlinkBtn){
         const s = state.screen; const id = noteUnlinkBtn.getAttribute("data-id");
@@ -4964,19 +4973,35 @@
     }
     return '<div class="screen-body note-screen-body">' + fields + '</div>';
   }
-  // The link picker (§4.9b): LIVE projects only — deleted and completed
-  // projects never appear (the chip row still shows their frozen/green chips).
+  // The add picker (§4.9b): TWO sections. Projects — LIVE projects only
+  // (deleted/completed never appear; the chip row still shows their
+  // frozen/green chips). Tags — every registry tag not already on the note,
+  // choose-only. Plus "Manage tags →", which opens the Tags page as a
+  // create-only draft sub-view without tearing down this note draft.
   function noteProjectPickerHtml(s){
     const linked = new Set((s.draft.projectLinks || []).map(function(l){ return l.id; }));
     const projects = state.tasks.current.concat(state.tasks.future)
       .filter(function(t){ return !t.isGroup && !linked.has(t.id); });
-    const items = projects.length
+    const projItems = projects.length
       ? projects.map(function(p){ return '<button type="button" class="screen-hook-pick-item" data-action="note-pick-project" data-id="' + p.id + '">' + escapeHtml(p.title) + '</button>'; }).join("")
       : '<div class="empty-note">No projects to link yet — create one on the Projects tab.</div>';
+
+    const tagged = new Set((s.draft.tagIds || []));
+    const tags = (state.tags || []).filter(function(t){ return !tagged.has(t.id); })
+      .slice().sort(function(a, b){ return a.name.localeCompare(b.name); });
+    const tagItems = tags.length
+      ? tags.map(function(t){ return '<button type="button" class="screen-hook-pick-item" data-action="note-pick-tag" data-id="' + t.id + '">#' + escapeHtml(t.name) + '</button>'; }).join("")
+      : '<div class="empty-note">No tags yet — add some with “Manage tags”.</div>';
+
     return '<div class="screen-body">' +
       '<div class="screen-hook-pick-label">Link a project</div>' +
-      '<div class="screen-hook-pick-list">' + items + '</div>' +
-      '<div class="screen-row" style="margin-top:8px;"><button type="button" class="btn btn-ghost btn-small" data-action="note-cancel-pick">Back</button></div>' +
+      '<div class="screen-hook-pick-list">' + projItems + '</div>' +
+      '<div class="screen-hook-pick-label" style="margin-top:12px;">Tags</div>' +
+      '<div class="screen-hook-pick-list">' + tagItems + '</div>' +
+      '<div class="screen-row" style="margin-top:10px; justify-content:space-between;">' +
+        '<button type="button" class="btn btn-ghost btn-small" data-action="note-cancel-pick">Back</button>' +
+        '<button type="button" class="btn btn-ghost btn-small" data-action="note-manage-tags">Manage tags →</button>' + // wired in the Tags-page commit
+      '</div>' +
     '</div>';
   }
   function saveNoteScreen(s){
