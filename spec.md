@@ -565,7 +565,7 @@ Ruled once, here, so each chunk touches it exactly once.
   | Current Projects | *New project* · *New list* |
   | Future / Someday | *New project* · *New list* |
   | Habits | **no menu** — the badge creates a habit directly, one tap, exactly as today |
-  | Notes (chunk 6) | *New note* · *New tag* — **the second option navigates to the Tags page** (§4.9b); it does not open an inline row |
+  | Notes (chunk 6) | **⭐ REVISED (user, BUILT): *New checklist* · *New note*** (checklist on top; each opens the note page — checklist-seeded or blank). **A third option, *New tag*, joins with §4.9b and navigates to the Tags page** (not an inline row). *(Was "New note · New tag" before the checklist ruling.)* |
   | Calendar (chunk 7) | **RULED — the calendar has NO `+` badge.** Its creation affordance is the bottom creation row (§4.15a). Do not add one |
 
 - **No menu on Habits.** Habits have neither contexts nor lists (§4.3d); a menu with one live
@@ -808,9 +808,14 @@ actually lives.* This gives the tray two jobs, and they are built as two things.
   box is the first thing you see. **It auto-opens even when empty** — an empty tray showing a
   capture box is exactly right, and per the info text an empty tray is a small reward, not a wasted
   screen. Launch only; **never** on tab-switch back to the app.
-- **Opens by tapping 📥. NOT by a left-edge swipe** — on Android the left-edge swipe *is* the system
-  back gesture, and an app that fights it loses. Tapping keeps one-tap-from-anywhere without picking
-  that fight.
+- **Opens by tapping 📥.** *(Originally: "NOT by a left-edge swipe" — on Android the left-edge swipe
+  is the system back gesture, and an app that fights it loses.)* **⭐ REVERSED (user): the drawer is
+  now swipeable too** — swipe **right to open, left to close.** Tapping 📥 remains the primary open
+  path; swipe is additive. **Mitigation for the back-gesture collision:** the open-swipe is accepted
+  anywhere in the **left third** of the screen, not just the OS edge band, so a slightly-inset swipe
+  still opens even if the OS claims the outermost pixels. **Accepted residual cost:** a hard
+  edge-swipe may still register as system-back on some Android setups. **Lanes-only:** swipe never
+  fires over an edit/create page or a dialog, and it yields to an in-progress card-reorder drag.
 - **Closing it is a cancel.** Nothing on the main screen changes as a result of opening or closing
   it. **Back closes the drawer first** (§4.6's Back ruling).
 - Top: one large capture input + "+". Speed-first, no other fields. Nothing else competes with it.
@@ -996,8 +1001,21 @@ title + auto-growing body. No Complete, no dates.
 
 **The page.** Two fields, nothing else:
 - **Title — required.** Empty on save → dashed outline, per the validation convention. No popup.
-- **Body — a large auto-growing text box, optional.** Explicitly a scratchpad; it is the one place
-  in the app where writing nothing structured is the point.
+- **Body — a large text box, optional.** Explicitly a scratchpad; it is the one place in the app
+  where writing nothing structured is the point. **⭐ RICH TEXT (user ruling this round, BUILT):** the
+  body is a `contenteditable` rich-text editor, not a plain textarea — the author uses bold/underline
+  constantly for section headings and important lines, and visible markdown marks in edit mode were
+  the dealbreaker. Toolbar: **Bold · Italic · Underline · Heading · Bullet list · Checklist**, plus
+  the **⊞** button that opens the add-a-tag/linked-project picker (one entry point; gains the Tags
+  section with §4.9b). The body is stored as **HTML**, run through a **strict tag allow-list**
+  (`b/strong/i/em/u/h2/ul/ol/li/br/p/div`, plus `class="checklist"` on `<ul>` and `class="checked"`
+  on `<li>`, **zero other attributes**) on every save and defensively on render — it is the one
+  untrusted-input surface (imported backups, chunk 8; pastes). Card preview strips tags to one line.
+- **Checklist note type (user ruling this round, BUILT).** The Notes **+** badge menu is **New
+  checklist · New note** (checklist on top; **New tag** joins with §4.9b). *New checklist* seeds the
+  body with one empty checklist item so the page is a checklist from the first keystroke. A checklist
+  is a `<ul class="checklist">`; the checkbox and its ticked state are pure CSS on the class (nothing
+  to sanitise-validate). Tap the left checkbox zone to tick; tap the text to edit.
 - **Linked projects — a repeatable picker, tag-style.**
 
 **Linked projects are MANY, and this is the app's first many-link field.** Actions link to *one*
@@ -1054,6 +1072,14 @@ draft-isolated, committed on Save.
   single-selection, no parent field, no drag semantics, no collapse state, and it cannot hide
   anything — the unfiltered lane is always the complete set. ~90% of what a project-grouped lane
   promised, for ~5% of the machinery. *(Tombstone chips are inert: nothing to filter to.)*
+- **⭐ FILTER BUTTON (user ruling this round, BUILT).** Chip-tap alone was not enough: there is now a
+  **filter button at the top of the lane, under the header**, opening a single-select menu ("All
+  notes" + a **Projects** section of every project any note links to; a **Tags** section joins with
+  §4.9b — the menu already renders sections). Same single-selection filter model as the chip; the two
+  share state. Deleted/tombstoned projects are excluded (inert). The active filter self-heals if its
+  project vanishes.
+- **Card chip row shows at most TWO chips, then a "+n" badge (user ruling this round, BUILT).** The
+  cap is over the combined project+tag list; the card is a preview, not the full set.
 - **The + badge on Notes opens the two-option menu — *New note* · *New tag*** (§4.3e; the second
   option navigates to the Tags page, §4.9b). *(Corrected this round: this bullet used to read "a
   direct one-tap create — no menu … because there is no second thing to create here." It was written
