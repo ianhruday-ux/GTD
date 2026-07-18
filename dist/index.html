@@ -6119,33 +6119,44 @@ function injectChunkMap(){
       '</div>'
     );
   }
-  // Distinct filter options — every project (live or completed) that at least
-  // one note links to, newest names sorted alphabetically. Tombstoned
-  // (deleted) projects are excluded: §4.9 makes their chips inert, so there is
-  // nothing to filter to. Tags become a second section here once §4.9b lands —
-  // the menu already renders sections, so that is an insert, not a rework.
+  // Filter options in two groups: projects any note links to (live/completed),
+  // and tags any note carries. IDs are globally unique, so a single filter id
+  // discriminates project vs tag without a kind flag at match time.
   function noteFilterOptions(){
-    const seen = {};
-    const opts = [];
+    const seenP = {}, seenT = {}, projects = [], tags = [];
     state.notes.forEach(function(n){
       (n.projectLinks || []).forEach(function(l){
-        if (seen[l.id]) return;
+        if (seenP[l.id]) return;
         const f = findProjectAnywhere(l.id);
         if (!f) return; // deleted → tombstone, not filterable
-        seen[l.id] = 1;
-        opts.push({ id: l.id, name: f.task.title, kind: "project" });
+        seenP[l.id] = 1;
+        projects.push({ id: l.id, name: f.task.title, kind: "project" });
+      });
+      (n.tagIds || []).forEach(function(id){
+        if (seenT[id]) return;
+        const t = findTag(id);
+        if (!t) return;
+        seenT[id] = 1;
+        tags.push({ id: id, name: t.name, kind: "tag" });
       });
     });
-    opts.sort(function(a, b){ return a.name.localeCompare(b.name); });
-    return opts;
+    projects.sort(function(a, b){ return a.name.localeCompare(b.name); });
+    tags.sort(function(a, b){ return a.name.localeCompare(b.name); });
+    return { projects: projects, tags: tags };
+  }
+  // Display name for the active filter id, project OR tag (self-heals to null).
+  function noteFilterName(id){
+    const f = findProjectAnywhere(id);
+    if (f) return f.task.title;
+    const t = findTag(id);
+    return t ? "#" + t.name : null;
   }
   function notesFilterBarHtml(){
-    // The active filter's display name (or null if the filtered project has
-    // since vanished — self-heal by clearing).
+    // Active filter name (project OR tag; self-heal to null if it vanished).
     let activeName = null;
     if (state.notesFilter){
-      const f = findProjectAnywhere(state.notesFilter);
-      if (f) activeName = f.task.title; else state.notesFilter = null;
+      activeName = noteFilterName(state.notesFilter);
+      if (!activeName) state.notesFilter = null;
     }
     const opts = noteFilterOptions();
     const btnLabel = activeName
@@ -6153,12 +6164,13 @@ function injectChunkMap(){
       : 'Filter';
     let menu = "";
     if (state.notesFilterMenuOpen){
-      const items = ['<button type="button" class="notes-filter-item' + (state.notesFilter ? "" : " current") + '" data-action="notes-filter-pick" data-id="">All notes</button>']
-        .concat(opts.length
-          ? ['<div class="notes-filter-section">Projects</div>'].concat(opts.map(function(o){
-              return '<button type="button" class="notes-filter-item' + (o.id === state.notesFilter ? " current" : "") + '" data-action="notes-filter-pick" data-id="' + o.id + '">' + escapeHtml(o.name) + '</button>';
-            }))
-          : ['<div class="notes-filter-empty">No linked projects yet — link a note to a project to filter by it.</div>']);
+      const pickItem = function(o){
+        return '<button type="button" class="notes-filter-item' + (o.id === state.notesFilter ? " current" : "") + '" data-action="notes-filter-pick" data-id="' + o.id + '">' + escapeHtml(o.kind === "tag" ? "#" + o.name : o.name) + '</button>';
+      };
+      let items = ['<button type="button" class="notes-filter-item' + (state.notesFilter ? "" : " current") + '" data-action="notes-filter-pick" data-id="">All notes</button>'];
+      if (opts.projects.length) items = items.concat('<div class="notes-filter-section">Projects</div>', opts.projects.map(pickItem));
+      if (opts.tags.length) items = items.concat('<div class="notes-filter-section">Tags</div>', opts.tags.map(pickItem));
+      if (!opts.projects.length && !opts.tags.length) items.push('<div class="notes-filter-empty">Nothing to filter by yet — link a note to a project or add a tag.</div>');
       menu = '<div class="notes-filter-menu">' + items.join("") + '</div>';
     }
     return '<div class="notes-filter-bar">' +
@@ -6175,8 +6187,12 @@ function injectChunkMap(){
     // Filter (§4.9): transient, single-selection, never hides the real total.
     let notes = all;
     if (state.notesFilter){
-      if (findProjectAnywhere(state.notesFilter)){
-        notes = all.filter(function(n){ return (n.projectLinks || []).some(function(l){ return l.id === state.notesFilter; }); });
+      const fid = state.notesFilter;
+      // The id is a project or a tag (globally unique) — match either.
+      if (noteFilterName(fid)){
+        notes = all.filter(function(n){
+          return (n.projectLinks || []).some(function(l){ return l.id === fid; }) || (n.tagIds || []).indexOf(fid) !== -1;
+        });
       } else { state.notesFilter = null; }
     }
     const rootEl = laneEl.querySelector(".cards-root");
