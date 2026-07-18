@@ -4565,7 +4565,7 @@
   // off to the next chunk.
   // =========================================================
   function injectQAChecklist(){
-    const FLAG = "gtd_qa_checklist_chunk6_v2"; // bumped: covers this round's Notes tweaks (swipe, rich text, checklist, filter)
+    const FLAG = "gtd_qa_checklist_chunk6_v3"; // bumped: adds the tag-system checks (§4.9b)
     if (Storage.get(FLAG)) return;
     Storage.set(FLAG, "1");
 
@@ -4626,7 +4626,16 @@
       { title: "Removing a chip only sticks if you Save", notes: "Remove a chip with its \u2715, then leave the note with \u2715 (cancel) \u2014 the chip should still be there. Remove it again and Save (\u2190) \u2014 now it's gone." },
       { title: "A chip turns green when the project is completed, a tombstone if it's deleted", notes: "Complete a linked project \u2014 its chip on the note goes green. Delete a project \u2014 the chip becomes a dashed outline keeping the project's name (a \u2018tombstone\u2019). The note itself is never lost. (Restoring the project turns the chip normal again.)" },
       { title: "A card shows at most two chips, then a \u2018+n\u2019 badge", notes: "Link a note to three or more projects \u2014 its card shows two chips and a \u2018+2\u2019-style badge for the rest." },
-      { title: "The Filter button narrows the list", notes: "At the top of the Notes list, tap the Filter button. A menu lists \u2018All notes\u2019 and each project your notes link to. Pick one \u2014 the list narrows to that project's notes. Clear it with the \u2715 on the button (or pick \u2018All notes\u2019). Tapping a chip on a card filters the same way." }
+      { title: "The Filter button narrows the list", notes: "At the top of the Notes list, tap the Filter button. A menu lists \u2018All notes\u2019, each project your notes link to, and each tag your notes carry. Pick one \u2014 the list narrows. Clear it with the \u2715 on the button (or pick \u2018All notes\u2019). Tapping a chip on a card filters the same way." }
+    ]);
+
+    addGroupWithItems("\u2705 QA \u2014 Chunk 6: Tags", [
+      { title: "Three ways to make a tag", notes: "Tags are for notes only. You can create them from: the Notes + badge \u2192 \u2018New tag\u2019 (top of the menu); Settings (\u22ef) \u2192 \u2018Manage tags\u2019; and, while writing a note, the \u229e button \u2192 \u2018Manage tags \u2192\u2019." },
+      { title: "Add a tag to a note with \u229e", notes: "On a note, tap \u229e. The picker has two sections \u2014 Projects and Tags. Tap a tag to attach it; it shows as an amber #chip. Removing a chip only sticks if you Save (like project links)." },
+      { title: "The Tags page: add, rename, remove", notes: "Open Settings \u2192 Manage tags. Projects show at the top, greyed and read-only (names already taken). Add a tag with \u2018+ Add tag\u2019, rename by typing, remove a tag with its \u2715. Nothing changes until you Save (\u2190); \u2715 discards your edits." },
+      { title: "You can\u2019t name a tag after a project", notes: "On the Tags page, try to add a tag with the exact name of one of your projects \u2014 it\u2019s blocked with a dashed outline (you can see the project right there). If the name matches a project you\u2019ve completed (hidden from the list), it also shows a one-line reason. Naming a project after a tag is always allowed." },
+      { title: "Deleting a tag that\u2019s in use warns you", notes: "Remove a tag that\u2019s on some notes and Save \u2014 it asks you to confirm and tells you how many notes it\u2019ll come off. Confirm, and the tag disappears from those notes (no leftover marker). Renaming a tag updates it everywhere at once." },
+      { title: "Filter by a tag", notes: "Give a couple of notes a tag, then use the Filter button at the top of the Notes list \u2014 the tag appears under a \u2018Tags\u2019 section. Pick it to see just those notes." }
     ]);
 
     saveTasksLocal("next");
