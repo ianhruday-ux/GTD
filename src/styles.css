@@ -701,7 +701,18 @@ footer{ text-align:center; color:var(--text-soft); font-size:11.5px; padding:30p
    field style below is unchanged from index-47 and owned by other chunks.
 ============================================================================ */
 .screen-overlay{
-  position:fixed; inset:0; z-index:200;
+  /* Sized to the VISUAL viewport, not the layout viewport (user: the mobile
+     keyboard bug). On iOS the virtual keyboard shrinks the visual viewport but
+     NOT the layout viewport, so a 100vh/inset:0 overlay stays full-height and
+     the browser scrolls the whole overlay to reveal the caret — dragging the
+     fixed header off the top. --vv-height/--vv-top track window.visualViewport
+     (set in JS); the overlay then exactly fills the visible area, the header
+     stays put, and only the flex body scrolls. Fallbacks: 100dvh, then 100vh. */
+  position:fixed; left:0; right:0;
+  top:var(--vv-top, 0px);
+  height:100vh;
+  height:var(--vv-height, 100dvh);
+  z-index:200;
   /* Drafting pages carry the same dark wood grain as the lanes (user round) --
      the overlay is opaque and full-screen, so it gets its own copy of the
      texture rather than letting the lanes show through. Shared --wood token,
@@ -913,7 +924,9 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 /* ----------------------------------------------------------------------------
    CHUNK 6 — capture drawer (intray, §4.8a) + settings sheet (§4.10)
 ---------------------------------------------------------------------------- */
-.tray-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:210; }
+.tray-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:210; opacity:0; transition:opacity .2s ease; pointer-events:none; }
+.tray-backdrop.open{ opacity:1; pointer-events:auto; } /* only intercepts taps while open — the fading-out copy lets taps through */
+.tray-scroll{ display:flex; flex-direction:column; }
 .tray-drawer{
   position:fixed; top:0; left:0; bottom:0; z-index:211; width:min(360px, 86vw);
   background:var(--desk) var(--wood); background-size:260px 260px; background-repeat:repeat;

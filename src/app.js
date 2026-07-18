@@ -28,8 +28,10 @@
   const FAB_MENU_LABELS = {
     next: ["New action", "New context"], waiting: ["New action", "New context"],
     current: ["New project", "New list"], future: ["New project", "New list"],
-    // Notes (user): checklist sits ABOVE the plain note. New tag joins later (§4.9b).
-    notes: ["New checklist", "New note"]
+    // Notes (user): the menu is column-reversed, so item[0] renders NEAREST the
+    // badge (bottom). New note is the common one → bottom; checklist above it;
+    // New tag joins on top with §4.9b. DOM order here is primary-first (bottom-up).
+    notes: ["New note", "New checklist"]
   };
   const TITLE_PLACEHOLDER = {
     next: "Next action\u2026", waiting: "What are you waiting on\u2026",
@@ -41,7 +43,7 @@
   const RECURRENCE_LABELS = { none: "Does not repeat", daily: "Daily", weekly: "Weekly", monthly: "Monthly", yearly: "Yearly" };
   const KIND_BADGE_LABEL = {
     next: "Next Action", waiting: "Waiting Action", current: "Current Project",
-    future: "Future Project", habit: "Habit", notes: "Note"
+    future: "Future Project", habit: "Habit", notes: "Note", tags: "Tags"
   };
 
   const state = {
@@ -2950,7 +2952,7 @@
   // Border/text color for the Make-Waiting/Next/Current/Future pill —
   // tinted with the *destination* kind's accent, per the guide.
   function accentVarForKind(kind){
-    return kind === "next" ? "--red" : kind === "waiting" ? "--yellow" : kind === "current" ? "--moss" : kind === "future" ? "--dusty" : kind === "notes" ? "--teal" : "--purple";
+    return kind === "next" ? "--red" : kind === "waiting" ? "--yellow" : kind === "current" ? "--moss" : kind === "future" ? "--dusty" : kind === "notes" ? "--teal" : kind === "tags" ? "--brass" : "--purple";
   }
   // DRAFT ISOLATION (§13.0 Chunk A): armed renders a filled pill reading
   // "Converting to X on save", the same "nothing has happened yet, but
@@ -3630,7 +3632,7 @@
       if (fabPrimary){
         const menu = qs("#fab-menu");
         if (menu) menu.hidden = true;
-        if (state.activeKind === "notes"){ openNoteScreen(null, { checklist: true }); return; } // top item
+        if (state.activeKind === "notes"){ openNoteScreen(null); return; } // primary = New note (bottom, nearest thumb)
         openScreen(state.activeKind, null);
         return;
       }
@@ -3638,7 +3640,7 @@
       if (fabSecondary){
         const menu = qs("#fab-menu");
         if (menu) menu.hidden = true;
-        if (state.activeKind === "notes"){ openNoteScreen(null); return; } // plain note
+        if (state.activeKind === "notes"){ openNoteScreen(null, { checklist: true }); return; } // secondary = New checklist (above)
         openInlineNameRow(state.activeKind);
         return;
       }
@@ -4450,6 +4452,22 @@
       }
     });
 
+    // CHUNK 6 (user: mobile keyboard bug). Mirror the visual viewport into CSS
+    // vars so .screen-overlay can size to the VISIBLE area, not the layout
+    // viewport the on-screen keyboard doesn't shrink. Kept current continuously;
+    // only the drafting overlay reads them, so updating while no screen is open
+    // is harmless.
+    if (window.visualViewport){
+      const syncVv = function(){
+        const vv = window.visualViewport;
+        document.documentElement.style.setProperty("--vv-height", vv.height + "px");
+        document.documentElement.style.setProperty("--vv-top", vv.offsetTop + "px");
+      };
+      window.visualViewport.addEventListener("resize", syncVv);
+      window.visualViewport.addEventListener("scroll", syncVv);
+      syncVv();
+    }
+
     // CHUNK 2 (spec 4.10b) -- collapsing tab bar. rAF-debounced scroll
     // listener toggles body.tabs-collapsed on scroll direction; gated on
     // drag-active so an in-progress drag's auto-scroll can never flip it
@@ -4594,13 +4612,22 @@
       '<button type="button" class="icon-btn" data-action="tray-delete" data-id="' + item.id + '" title="Discard">&times;</button>' +
     '</div>';
   }
+  function trayListHtml(){
+    const cards = (state.tray || []).map(trayCardHtml).join("");
+    return cards
+      ? '<div class="tray-list">' + cards + '</div>'
+      : '<div class="tray-empty">Empty for now — nothing slipping through the cracks.</div>';
+  }
+  // Update just the card list in an already-open drawer — adding/removing a
+  // capture must not rebuild (and re-slide) the whole drawer (user: the jump).
+  function refreshTrayList(){
+    const wrap = qs(".tray-scroll");
+    if (wrap) wrap.innerHTML = trayListHtml(); else renderTray();
+  }
   function renderTray(){
     const root = qs("#tray-root");
     if (!root) return;
-    const cards = (state.tray || []).map(trayCardHtml).join("");
-    const list = cards
-      ? '<div class="tray-list">' + cards + '</div>'
-      : '<div class="tray-empty">Empty for now — nothing slipping through the cracks.</div>';
+    const list = '<div class="tray-scroll">' + trayListHtml() + '</div>';
     root.innerHTML =
       '<div class="tray-backdrop" data-action="close-tray"></div>' +
       '<div class="tray-drawer">' +
@@ -4617,28 +4644,40 @@
         '</div>' +
         list +
       '</div>';
-    requestAnimationFrame(function(){
-      const d = qs(".tray-drawer"); if (d) d.classList.add("open");
-    });
+    // Force the -100% start state to commit BEFORE adding .open, or the
+    // browser collapses both into one paint and the drawer snaps open with no
+    // slide (worst at launch auto-open, user). The reflow read guarantees it.
+    const backdrop = qs(".tray-backdrop"), drawer = qs(".tray-drawer");
+    if (drawer){ void drawer.offsetWidth; drawer.classList.add("open"); }
+    if (backdrop) backdrop.classList.add("open");
   }
   function openTray(){
     state.trayOpen = true;
     renderTray();
     const input = qs("#tray-input"); if (input) input.focus();
   }
-  function closeTray(){ state.trayOpen = false; const r = qs("#tray-root"); if (r) r.innerHTML = ""; }
+  function closeTray(){
+    state.trayOpen = false;
+    const r = qs("#tray-root");
+    const drawer = qs(".tray-drawer"), backdrop = qs(".tray-backdrop");
+    if (!drawer){ if (r) r.innerHTML = ""; return; }
+    drawer.classList.remove("open");            // slide out
+    if (backdrop) backdrop.classList.remove("open");
+    setTimeout(function(){ if (r && !state.trayOpen) r.innerHTML = ""; }, 220); // matches the .2s transition
+  }
   function trayAdd(text){
     text = (text || "").trim();
     if (!text) return;
     state.tray.unshift({ id: genId(), text: text, createdAt: Date.now() });
     saveTray();
-    renderTray();
-    const ni = qs("#tray-input"); if (ni) ni.focus(); // capture clears, stays focused for the next thought
+    const inp = qs("#tray-input"); if (inp) inp.value = ""; // clear the box in place — no full re-render/re-slide
+    refreshTrayList();
+    if (inp) inp.focus(); // stays focused for the next thought
   }
   function trayDelete(id){
     state.tray = state.tray.filter(function(t){ return t.id !== id; });
     saveTray();
-    renderTray();
+    refreshTrayList();
   }
 
   // =========================================================
@@ -5005,8 +5044,19 @@
     '</div>';
   }
   function saveNoteScreen(s){
+    syncNoteBodyDraft(); // flush the live editor into the draft before we inspect it
     const title = (s.draft.title || "").trim();
-    if (!title){ s.invalidField = "title"; renderScreen(); return; }
+    if (!title){
+      // Uniform with every other drafting page (§4.6, user): ← on an EMPTY page
+      // is a silent cancel, not a title nag. "Empty" for a note = no title, no
+      // body text, no links, no tags. A note that HAS content but no title
+      // still asks for a title — silently discarding a written body would break
+      // "data destruction is never accidental".
+      const probe = document.createElement("div"); probe.innerHTML = sanitizeNoteHtml(s.draft.body || "");
+      const hasContent = !isNoteBodyEmpty(probe) || (s.draft.projectLinks || []).length || (s.draft.tagIds || []).length;
+      if (!hasContent){ closeScreen(); return; }
+      s.invalidField = "title"; renderScreen(); return;
+    }
     const body = sanitizeNoteHtml(s.draft.body || ""); // untrusted-input surface (§4.9) — sanitise at the commit
     if (s.noteId){
       const n = findNote(s.noteId);
