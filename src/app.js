@@ -3819,6 +3819,14 @@
         if (s){ s.draft.projectPicker = false; renderScreen(); }
         return;
       }
+      if (e.target.closest('[data-action="note-manage-tags"]')){
+        if (state.screen){
+          syncNoteBodyDraft();                 // don't lose in-progress body text
+          state.screenStack.push(state.screen); // stash the note draft; ←/✕ on the Tags page pops back to it
+          openTagsScreen(true);                // create-only
+        }
+        return;
+      }
       const notePickTagBtn = e.target.closest('[data-action="note-pick-tag"]');
       if (notePickTagBtn){
         const s = state.screen; const id = notePickTagBtn.getAttribute("data-id");
@@ -5150,9 +5158,13 @@
     const c = state.notes.filter(function(n){ return (n.tagIds || []).indexOf(id) !== -1; }).length;
     return c + " note" + (c === 1 ? "" : "s");
   }
-  function openTagsScreen(){
+  // createOnly (§4.9b): the "Manage tags →" sub-view opened from inside a note
+  // draft. Existing tags show read-only (no rename/delete of shared state from
+  // an open note draft); only NEW rows are addable. The note screen is stashed
+  // on the stack by the caller, so ←/✕ here pop back to it, note draft intact.
+  function openTagsScreen(createOnly){
     const rows = (state.tags || []).map(function(t){ return { id: t.id, name: t.name }; });
-    state.screen = { kind: "tags", tagsView: true, taskId: null, draft: { rows: rows, rowErrors: {} } };
+    state.screen = { kind: "tags", tagsView: true, taskId: null, draft: { rows: rows, rowErrors: {}, manage: !createOnly } };
     renderScreen();
   }
   function tagsPageBodyHtml(s){
@@ -5182,7 +5194,7 @@
     html += '</div>';
     html += '<button type="button" class="tags-add-btn" data-action="tag-add-row">+ Add tag</button>';
     if (!manage){
-      html += '<div class="screen-row" style="margin-top:12px;"><button type="button" class="btn btn-ghost btn-small" data-action="note-cancel-pick">Back</button></div>';
+      html += '<div class="tags-createonly-hint">Adding tags here — ← saves them and returns to your note. Rename or delete tags from Settings → Manage tags.</div>';
     }
     html += '</div>';
     return html;
