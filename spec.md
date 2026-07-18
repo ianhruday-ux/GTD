@@ -1104,7 +1104,21 @@ not reach for sections.
    than teal+jade+moss competing. Both items are recorded here so a later session does not treat
    them as settled either way.
 
-### 4.9b Tags (chunk 6) — RULED
+### 4.9b Tags (chunk 6) — RULED · ✅ BUILT
+
+**✅ BUILT this round.** `gtd_tags` registry ({id,name}, mirrors contexts); tag chips (flat amber,
+no live/completed/deleted states); the two-section add picker (Projects + Tags) on the note page;
+the Tags page with the one-way duplicate check (dashed outline for a visible tag/live project;
+dashed + inline reason for a hidden completed project) and the in-use delete confirm firing once at
+Save (unlink, no tombstone); filter-by-tag; and all THREE entry points — badge → *New tag*, Settings
+→ *Manage tags*, and the picker's *Manage tags →*.
+- **⚑ One flagged divergence from the literal spec, take it or change it:** the *Manage tags →*
+  create-only view is implemented as a **stacked screen** (the note screen is pushed on the chunk-1
+  screen stack, draft intact, and ←/✕ pop back to it) rather than an in-draft sub-view toggled on
+  `state.screen.draft`. This is *more* draft-safe, not less — the note draft is never mutated while
+  managing tags, and ✕ on the Tags page returns to the note rather than discarding it. Existing tags
+  render **read-only** in create-only mode (only new rows are addable), which honours "add rows, no
+  deletes" and also blocks rename of shared state from inside an open note draft.
 
 **Why tags exist: they are the answer to "no search" (user ruling).** With no search in the sprint
 (and none planned), a flat notes pile needs *some* retrieval handle. Project links are one kind of

@@ -4494,13 +4494,16 @@
     // only the drafting overlay reads them, so updating while no screen is open
     // is harmless.
     if (window.visualViewport){
+      // Only react to RESIZE (keyboard open/close), and only drive HEIGHT. The
+      // earlier version also tracked offsetTop and listened to 'scroll', which
+      // updated the overlay every frame during momentum scroll and the keyboard
+      // transition — that was the viewport "jump" the user saw. The body is
+      // position:fixed while a screen is open, so offsetTop stays 0 and top:0
+      // is correct; dropping both removes the jitter. (Device-confirm pending.)
       const syncVv = function(){
-        const vv = window.visualViewport;
-        document.documentElement.style.setProperty("--vv-height", vv.height + "px");
-        document.documentElement.style.setProperty("--vv-top", vv.offsetTop + "px");
+        document.documentElement.style.setProperty("--vv-height", window.visualViewport.height + "px");
       };
       window.visualViewport.addEventListener("resize", syncVv);
-      window.visualViewport.addEventListener("scroll", syncVv);
       syncVv();
     }
 
@@ -4699,7 +4702,7 @@
     if (!drawer){ if (r) r.innerHTML = ""; return; }
     drawer.classList.remove("open");            // slide out
     if (backdrop) backdrop.classList.remove("open");
-    setTimeout(function(){ if (r && !state.trayOpen) r.innerHTML = ""; }, 220); // matches the .2s transition
+    setTimeout(function(){ if (r && !state.trayOpen) r.innerHTML = ""; }, 300); // clears after the .28s slide-out
   }
   function trayAdd(text){
     text = (text || "").trim();

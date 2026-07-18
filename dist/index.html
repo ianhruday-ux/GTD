@@ -944,7 +944,7 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 /* ----------------------------------------------------------------------------
    CHUNK 6 — capture drawer (intray, §4.8a) + settings sheet (§4.10)
 ---------------------------------------------------------------------------- */
-.tray-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:210; opacity:0; transition:opacity .2s ease; pointer-events:none; }
+.tray-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:210; opacity:0; transition:opacity .28s ease; pointer-events:none; }
 .tray-backdrop.open{ opacity:1; pointer-events:auto; } /* only intercepts taps while open — the fading-out copy lets taps through */
 .tray-scroll{ display:flex; flex-direction:column; }
 .tray-drawer{
@@ -952,7 +952,7 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
   background:var(--desk) var(--wood); background-size:260px 260px; background-repeat:repeat;
   box-shadow:6px 0 24px rgba(0,0,0,0.5); display:flex; flex-direction:column; overflow-y:auto;
   padding:calc(env(safe-area-inset-top) + 14px) 16px calc(env(safe-area-inset-bottom) + 16px) calc(env(safe-area-inset-left) + 16px);
-  transform:translateX(-100%); transition:transform .2s ease;
+  transform:translateX(-100%); transition:transform .28s ease; /* .2s read too fast on desktop (user) */
 }
 .tray-drawer.open{ transform:translateX(0); }
 .tray-head{ display:flex; align-items:center; gap:8px; margin-bottom:10px; }
@@ -5758,13 +5758,16 @@ function injectChunkMap(){
     // only the drafting overlay reads them, so updating while no screen is open
     // is harmless.
     if (window.visualViewport){
+      // Only react to RESIZE (keyboard open/close), and only drive HEIGHT. The
+      // earlier version also tracked offsetTop and listened to 'scroll', which
+      // updated the overlay every frame during momentum scroll and the keyboard
+      // transition — that was the viewport "jump" the user saw. The body is
+      // position:fixed while a screen is open, so offsetTop stays 0 and top:0
+      // is correct; dropping both removes the jitter. (Device-confirm pending.)
       const syncVv = function(){
-        const vv = window.visualViewport;
-        document.documentElement.style.setProperty("--vv-height", vv.height + "px");
-        document.documentElement.style.setProperty("--vv-top", vv.offsetTop + "px");
+        document.documentElement.style.setProperty("--vv-height", window.visualViewport.height + "px");
       };
       window.visualViewport.addEventListener("resize", syncVv);
-      window.visualViewport.addEventListener("scroll", syncVv);
       syncVv();
     }
 
@@ -5963,7 +5966,7 @@ function injectChunkMap(){
     if (!drawer){ if (r) r.innerHTML = ""; return; }
     drawer.classList.remove("open");            // slide out
     if (backdrop) backdrop.classList.remove("open");
-    setTimeout(function(){ if (r && !state.trayOpen) r.innerHTML = ""; }, 220); // matches the .2s transition
+    setTimeout(function(){ if (r && !state.trayOpen) r.innerHTML = ""; }, 300); // clears after the .28s slide-out
   }
   function trayAdd(text){
     text = (text || "").trim();
