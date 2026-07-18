@@ -948,6 +948,54 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 .tray-card{ display:flex; align-items:center; gap:8px; background:var(--paper-2); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:10px 12px; }
 .tray-card-text{ flex:1; font-size:14px; color:var(--text-primary); word-break:break-word; }
 .tray-empty{ color:var(--text-soft); font-size:13.5px; text-align:center; padding:24px 10px; font-style:italic; }
+
+/* Chunk 6b (§4.8b): the drawer's Review button + the review surface. */
+.tray-review-btn{ display:flex; align-items:center; justify-content:center; gap:8px; width:100%;
+  border:1px solid var(--brass); background:rgba(217,166,44,0.12); color:var(--text-primary);
+  border-radius:8px; padding:11px 13px; font-size:14.5px; font-weight:600; margin-bottom:14px; cursor:pointer; }
+.tray-review-btn:hover{ background:rgba(217,166,44,0.2); }
+.tray-review-count{ min-width:20px; height:20px; padding:0 6px; border-radius:10px; background:var(--brass);
+  color:var(--dark-on-accent); font-size:12px; font-weight:700; display:inline-flex; align-items:center; justify-content:center; }
+
+.review-body{ gap:14px; }
+.review-toolbar{ display:flex; align-items:center; justify-content:space-between; }
+.review-remaining{ font-family:var(--font-mono); font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:var(--text-soft); }
+.review-card{ background:var(--paper-2); border:1px solid rgba(255,255,255,0.12); border-radius:10px; padding:14px 15px; display:flex; flex-direction:column; gap:12px; }
+.review-card-open{ display:flex; flex-direction:column; gap:8px; text-align:left; width:100%; background:transparent; border:none; padding:0; cursor:pointer; color:inherit; }
+.review-card-title{ font-family:var(--font-body); font-weight:600; font-size:16px; color:var(--text-primary); word-break:break-word; }
+.review-card-note{ font-size:12.5px; color:var(--text-soft); }
+/* The passed chip sits past the bar's end (deadline-bar); in a full-width
+   review card that would overflow, so shorten the bar to leave it room. */
+.review-card .deadline-bar{ margin-right:56px; }
+.review-card-note.cue-orphaned-text{ color:var(--red); }
+.review-menu{ display:flex; flex-direction:column; gap:7px; }
+.review-menu-row{ display:flex; }
+.review-menu-btn{ text-align:left; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.05);
+  color:var(--text-primary); border-radius:8px; padding:10px 12px; font-size:14px; cursor:pointer; }
+.review-menu-btn:hover{ background:rgba(255,255,255,0.1); }
+.review-menu-btn.danger{ color:var(--red); border-color:rgba(194,74,61,0.45); }
+.review-menu-btn.review-notnow{ color:var(--text-soft); border-style:dashed; }
+.review-sort-chips{ display:flex; flex-wrap:wrap; gap:7px; }
+.review-sort-chips .review-menu-btn{ flex:1 0 auto; text-align:center; padding:9px 14px; }
+.review-inline-form{ display:flex; flex-direction:column; gap:8px; }
+.review-form-input{ border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.06); color:var(--text-primary);
+  border-radius:8px; padding:10px 12px; font-size:15px; }
+.review-form-input:focus{ outline:2px solid var(--brass); outline-offset:1px; }
+.review-form-input.field-invalid{ outline:1.5px dashed var(--red); outline-offset:2px; }
+.review-inline-form-btns{ display:flex; gap:8px; }
+.review-inline-form-btns .review-menu-btn{ flex:1; text-align:center; }
+/* Redaction: visible-but-sealed. You can see one more loop exists and count
+   them; you cannot read or tap it (§4.8b). */
+.review-redaction{ height:56px; border-radius:10px; border:1px solid rgba(255,255,255,0.08);
+  background:repeating-linear-gradient(45deg, rgba(255,255,255,0.06) 0 10px, rgba(255,255,255,0.03) 10px 20px);
+  pointer-events:none; }
+.review-info-panel{ font-size:12.5px; color:var(--text-soft); background:rgba(255,255,255,0.05); border-radius:8px; padding:11px 13px; line-height:1.5; display:flex; flex-direction:column; gap:10px; }
+.review-info-panel[hidden]{ display:none; } /* the attribute must win over display:flex */
+.review-info-block b{ color:var(--text-primary); }
+.review-end{ text-align:center; padding:48px 16px; display:flex; flex-direction:column; gap:8px; }
+.review-end-big{ font-family:var(--font-display); font-weight:700; font-size:22px; color:var(--text-primary); }
+.review-end-sub{ font-size:13.5px; color:var(--text-soft); line-height:1.5; }
+
 .settings-sheet{ align-items:stretch; }
 .settings-title{ font-family:var(--font-display); font-weight:700; font-size:17px; }
 .settings-row{ display:block; width:100%; text-align:left; padding:12px 14px; border:1px solid rgba(255,255,255,0.14); border-radius:8px; background:rgba(255,255,255,0.04); color:var(--text-primary); font-size:14px; }

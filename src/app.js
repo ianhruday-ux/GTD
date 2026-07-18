@@ -76,6 +76,8 @@
     tags: [],       // chunk 6 (§4.9b): notes-only tag registry, { id, name } — mirrors gtd_contexts
     notesFilter: null, // chunk 6 (§4.9): transient project-OR-tag-id filter on the Notes lane
     notesFilterMenuOpen: false,
+    reviewShowAll: false, // chunk 6b (§4.8b): reveal-one-at-a-time vs "Show all"
+    reviewDeferred: null, // chunk 6b (§4.8b): { date, ids[] } — session-scoped "Not now", stamped with the app-day
     qaTimeOffset: 0 // dev-only: MINUTES added to boundaryNow() (chunk 0c: hour/minute granular, not just whole days — the midnight-4am window (§4.14b) can only be tested by landing the clock inside it) — see the QA time-jump buttons
   };
 
@@ -1055,6 +1057,15 @@
     });
     return out;
   }
+  // §4.3b: a Current project has a "way forward" if it has any linked action —
+  // a next action OR a waiting action both count (linkedActionsForProject
+  // already spans both). Extracted so the lane-card stalled flag (§4.3b) and
+  // the review's stalled query (§4.8b) share ONE definition and can never
+  // disagree. ⚑ Chunk 7 adds linked events/appointments as a third kind of
+  // forward motion here (§4.3b/§4.8b) — that is the only edit this needs.
+  function projectHasWayForward(projectId){
+    return linkedActionsForProject(projectId).length > 0;
+  }
 
   // Project "Complete" — per 4.6 as refined in 9: Next Actions complete
   // silently; linked Waiting actions are temporarily archived instead of
@@ -1284,7 +1295,7 @@
     // linked action — surface that on the lane card itself, beneath the
     // title (overnight notes), not just inside the project's page.
     let projectFlagBlock = "";
-    if (kind === "current" && !linkedActionsForProject(task.id).length){
+    if (kind === "current" && !projectHasWayForward(task.id)){
       projectFlagBlock = '<div class="card-project-flag">\u26A0 no linked actions</div>';
     }
     let checkboxHtml;
@@ -2060,6 +2071,7 @@
     const convertTo = (!willComplete && taskId) ? (s.draft.convertTo || null) : null;
     const p = s.taskId ? updateTask(s.kind, s.taskId, data) : createTask(s.kind, data);
     Promise.resolve(p).then(function(){
+      consumeCaptureForScreen(s); // §4.8b: a capture sorted to Next/Waiting is now filed
       // Armed completion (strict-uniformity ruling): the edits above land
       // FIRST, then the archive happens — so a rename made in the same
       // draft is what shows in the Completed list. completeTask /
@@ -2157,6 +2169,7 @@
       if (convertTo === "future" && s.kind === "current"){ demoteProjectToFuture(s.taskId); return; }
       changeKind(s.kind, convertTo, s.taskId).then(closeScreen); return;
     }
+    consumeCaptureForScreen(s); // §4.8b: a capture sorted to Project is now filed
     closeScreen();
   }
   function deleteScreenItem(){
@@ -2955,7 +2968,7 @@
   // Border/text color for the Make-Waiting/Next/Current/Future pill —
   // tinted with the *destination* kind's accent, per the guide.
   function accentVarForKind(kind){
-    return kind === "next" ? "--red" : kind === "waiting" ? "--yellow" : kind === "current" ? "--moss" : kind === "future" ? "--dusty" : kind === "notes" ? "--teal" : kind === "tags" ? "--brass" : "--purple";
+    return kind === "next" ? "--red" : kind === "waiting" ? "--yellow" : kind === "current" ? "--moss" : kind === "future" ? "--dusty" : kind === "notes" ? "--teal" : kind === "tags" ? "--brass" : kind === "review" ? "--brass" : "--purple";
   }
   // DRAFT ISOLATION (§13.0 Chunk A): armed renders a filled pill reading
   // "Converting to X on save", the same "nothing has happened yet, but
@@ -3290,10 +3303,12 @@
     const root = qs("#screen-root");
     lockBodyScroll(!!s);
     if (!s){ root.innerHTML = ""; return; }
-    const key = (s.completedView ? "completed:" : "") + s.kind + ":" + (s.taskId || "new");
+    const key = (s.completedView ? "completed:" : s.reviewView ? "review:" : "") + s.kind + ":" + (s.taskId || "new");
     const inner = s.completedView
       ? completedHeaderHtml(s) + completedBodyHtml(s)
-      : screenHeaderHtml(s) + screenBodyHtml(s);
+      : s.reviewView
+        ? reviewHeaderHtml() + reviewBodyHtml(s)
+        : screenHeaderHtml(s) + screenBodyHtml(s);
     const existing = root.querySelector(".screen-overlay");
     if (existing && existing.getAttribute("data-screen-key") === key){
       // Same item re-rendering (hook added, day chip toggled, Complete
@@ -3564,6 +3579,16 @@
       }
       if (e.key !== "Enter") return;
       if (e.target && e.target.id === "tray-input"){ e.preventDefault(); trayAdd(e.target.value); return; }
+      if (e.target && e.target.id === "review-form-input"){ // chunk 6b (§4.8b)
+        e.preventDefault();
+        const s = state.screen, type = s && s.reviewForm && s.reviewForm.type;
+        if (type === "date") reviewSavePushDate();
+        else { // text form — dispatch by which kind opened it
+          const kind = reviewFindLoopKind(s.reviewForm.key);
+          if (kind === "stalled") reviewSaveAddNext(); else reviewSaveFreeText();
+        }
+        return;
+      }
       const row = e.target.closest && e.target.closest(".add-row-mini");
       if (row && e.target.matches("input[type=text]")){ e.preventDefault(); submitAddMini(row); }
       const quickAddInput = e.target.closest && e.target.closest("[data-quickadd]");
@@ -3591,6 +3616,43 @@
       if (e.target.closest('[data-action="tray-info"]')){
         const panel = qs(".tray-info-panel"); if (panel) panel.hidden = !panel.hidden; return;
       }
+
+      // CHUNK 6b (§4.8b): the daily review surface.
+      if (e.target.closest('[data-action="open-review"]')){ closeTray(); openReviewScreen(); return; }
+      if (e.target.closest('[data-action="review-close"]')){ closeScreen(); return; }
+      if (e.target.closest('[data-action="review-info"]')){
+        const panel = qs(".review-info-panel"); if (panel) panel.hidden = !panel.hidden; return;
+      }
+      if (e.target.closest('[data-action="review-toggle-all"]')){ state.reviewShowAll = !state.reviewShowAll; renderScreen(); return; }
+      const revDefer = e.target.closest('[data-action="review-defer"]');
+      if (revDefer){ deferReviewItem(revDefer.getAttribute("data-key")); if (state.screen) state.screen.reviewForm = null; renderScreen(); return; }
+      const revOpen = e.target.closest('[data-action="review-open"]');
+      if (revOpen){
+        const lane = revOpen.getAttribute("data-lane"), id = revOpen.getAttribute("data-id");
+        reviewOpenChild(function(){ openScreen(lane, id); });
+        return;
+      }
+      const revFormStart = e.target.closest('[data-action="review-form-start"]');
+      if (revFormStart){
+        if (state.screen) state.screen.reviewForm = { key: revFormStart.getAttribute("data-key"), type: revFormStart.getAttribute("data-type"), invalid: false };
+        renderScreen();
+        const inp = qs("#review-form-input"); if (inp) inp.focus();
+        return;
+      }
+      if (e.target.closest('[data-action="review-form-cancel"]')){ if (state.screen) state.screen.reviewForm = null; renderScreen(); return; }
+      if (e.target.closest('[data-action="review-pushdate-save"]')){ reviewSavePushDate(); return; }
+      if (e.target.closest('[data-action="review-addnext-save"]')){ reviewSaveAddNext(); return; }
+      if (e.target.closest('[data-action="review-freetext-save"]')){ reviewSaveFreeText(); return; }
+      const revComplete = e.target.closest('[data-action="review-complete"]');
+      if (revComplete){ reviewComplete(revComplete.getAttribute("data-lane"), revComplete.getAttribute("data-id")); return; }
+      const revDelete = e.target.closest('[data-action="review-delete"]');
+      if (revDelete){ reviewDelete(revDelete.getAttribute("data-lane"), revDelete.getAttribute("data-id")); return; }
+      const revSomeday = e.target.closest('[data-action="review-someday"]');
+      if (revSomeday){ changeKind("current", "future", revSomeday.getAttribute("data-id")).then(function(){ renderScreen(); }); return; }
+      const revPromote = e.target.closest('[data-action="review-promote"]');
+      if (revPromote){ moveItem("waiting", "next", revPromote.getAttribute("data-id"), false); renderScreen(); return; }
+      const revSort = e.target.closest('[data-action="review-sort"]');
+      if (revSort){ reviewSortCapture(revSort.getAttribute("data-target"), revSort.getAttribute("data-key")); return; }
 
       // CHUNK 2 (spec 4.3e) -- close the FAB menu on any click that isn't
       // the FAB itself or one of its own items. A side effect, not a
@@ -3994,6 +4056,13 @@
         qsa(".field-invalid").forEach(function(n){ n.classList.remove("field-invalid"); });
       }
       const field = el.getAttribute("data-field");
+      // chunk 6b (§4.8b): review inline form — clear its outline in place, no
+      // re-render (state.screen.draft is unused by the review).
+      if (field === "reviewForm"){
+        if (state.screen.reviewForm) state.screen.reviewForm.invalid = false;
+        el.classList.remove("field-invalid");
+        return;
+      }
       const draft = state.screen.draft;
       if (field === "title"){ draft.title = el.value; }
       else if (field === "noteTitle"){ draft.title = el.value; } // chunk 6
@@ -4565,7 +4634,7 @@
   // off to the next chunk.
   // =========================================================
   function injectQAChecklist(){
-    const FLAG = "gtd_qa_checklist_chunk6_v3"; // bumped: adds the tag-system checks (§4.9b)
+    const FLAG = "gtd_qa_checklist_chunk6b_v1"; // chunk 6b (§4.8b): the daily review — replaces chunk 6's groups
     if (Storage.get(FLAG)) return;
     Storage.set(FLAG, "1");
 
@@ -4596,46 +4665,16 @@
       });
     }
 
-    addGroupWithItems("\u2705 QA \u2014 Chunk 6: The intray (capture drawer)", [
-      { title: "The intray opens by itself when you launch the app", notes: "Reload the app. A drawer should slide in from the left with a capture box \u2014 even when it's empty. (It only auto-opens on launch, not when you switch back to the app.)" },
-      { title: "The \ud83d\udce5 icon opens it any time; closing changes nothing else", notes: "Tap the \ud83d\udce5 icon in the header to open the drawer. Close it by tapping outside it, the \u2715, or Back. Nothing on the main screen should change from opening or closing it." },
-      { title: "You can SWIPE the drawer open and closed", notes: "From a lane, swipe right starting near the left edge \u2014 the drawer opens. Swipe left \u2014 it closes. (Tapping \ud83d\udce5 still works too.) While you're on a note or an edit page, swiping should NOT open it." },
-      { title: "Type a thought and it's captured as a card", notes: "Type into the box and press Enter (or the +). It becomes a card in the drawer and the box clears, ready for the next thought. Captured thoughts stay until you sort them later." },
-      { title: "You can discard a captured card, and the \u2139 explains the intray", notes: "Each card has an \u2715 to throw it away. The \u2139 button explains what the intray is for." }
-    ]);
-
-    addGroupWithItems("\u2705 QA \u2014 Chunk 6: Settings", [
-      { title: "The \u22ef menu opens Settings with \u2018Restore app to defaults\u2019", notes: "Tap the \u22ef icon in the header. A Settings sheet opens with a \u2018Restore app to defaults\u2019 option." },
-      { title: "Restore app to defaults wipes everything after a confirm", notes: "Tap \u2018Restore app to defaults\u2019. It should warn you that everything you\u2019ve entered will be erased and replaced with the sample data, ask you to confirm, and only then do it. (Careful \u2014 this really does erase your data.)" }
-    ]);
-
-    addGroupWithItems("\u2705 QA \u2014 Chunk 6: Notes \u2014 the basics", [
-      { title: "There's a Notes tab (teal), newest-edited first", notes: "A sixth tab, \u2018Notes\u2019, in teal, next to Habits. Saved notes appear with their title and a short preview, most-recently-edited at the top. Tap one to reopen; the trash can deletes it (with a confirm). Notes have no Complete and no dates." },
-      { title: "The + badge gives a menu: New checklist / New note", notes: "Tap + on the Notes tab. A small menu appears with \u2018New checklist\u2019 on top and \u2018New note\u2019 below. Each opens the note page \u2014 blank, or already a checklist." },
-      { title: "A note needs a title", notes: "Trying to save a note with no title is blocked with a dashed outline (no popup). Add a title and it saves." }
-    ]);
-
-    addGroupWithItems("\u2705 QA \u2014 Chunk 6: Notes \u2014 rich text & checklists", [
-      { title: "The body has a formatting toolbar", notes: "Open a note. Above the body is a toolbar: B (bold), I (italic), U (underline), H (heading), a bullet list, a checkbox, and \u229e. Select some text and tap Bold or Underline \u2014 it formats right there, with no stray symbols showing." },
-      { title: "Bold/underline survive save and reopen", notes: "Format some text, Save (\u2190), then reopen the note \u2014 the formatting is still there." },
-      { title: "Checklists: tick the boxes", notes: "Make a checklist (either \u2018New checklist\u2019 from the + menu, or the \u2610 button on the toolbar turns the current line into one). Type a few items. Tap a checkbox \u2014 it ticks and the line gets a line through it; tap again to untick. Save and reopen \u2014 the ticks are remembered." }
-    ]);
-
-    addGroupWithItems("\u2705 QA \u2014 Chunk 6: Notes \u2014 projects & filtering", [
-      { title: "Link a note to projects with the \u229e button", notes: "On a note, tap \u229e on the toolbar and pick a project \u2014 it becomes a chip. You can add several. The picker only offers projects you can still work on." },
-      { title: "Removing a chip only sticks if you Save", notes: "Remove a chip with its \u2715, then leave the note with \u2715 (cancel) \u2014 the chip should still be there. Remove it again and Save (\u2190) \u2014 now it's gone." },
-      { title: "A chip turns green when the project is completed, a tombstone if it's deleted", notes: "Complete a linked project \u2014 its chip on the note goes green. Delete a project \u2014 the chip becomes a dashed outline keeping the project's name (a \u2018tombstone\u2019). The note itself is never lost. (Restoring the project turns the chip normal again.)" },
-      { title: "A card shows at most two chips, then a \u2018+n\u2019 badge", notes: "Link a note to three or more projects \u2014 its card shows two chips and a \u2018+2\u2019-style badge for the rest." },
-      { title: "The Filter button narrows the list", notes: "At the top of the Notes list, tap the Filter button. A menu lists \u2018All notes\u2019, each project your notes link to, and each tag your notes carry. Pick one \u2014 the list narrows. Clear it with the \u2715 on the button (or pick \u2018All notes\u2019). Tapping a chip on a card filters the same way." }
-    ]);
-
-    addGroupWithItems("\u2705 QA \u2014 Chunk 6: Tags", [
-      { title: "Two ways to make a tag", notes: "Tags are for notes only. You can create them from: the Notes + badge \u2192 \u2018New tag\u2019 (top of the menu); and, while writing a note, the \u229e button \u2192 \u2018Manage tags \u2192\u2019." },
-      { title: "Add a tag to a note with \u229e", notes: "On a note, tap \u229e. The picker has two sections \u2014 Tags at the top, then Link a project. Tap a tag to attach it; it shows as an amber #chip. Removing a chip only sticks if you Save (like project links)." },
-      { title: "The Tags page: add, rename, remove", notes: "Open the Notes + badge \u2192 \u2018New tag\u2019. Your tags are at the top; add one with \u2018+ Add tag\u2019, rename by typing, remove a tag with its \u2715. Projects show below, read-only (names already taken). Nothing changes until you Save (\u2190); \u2715 discards your edits." },
-      { title: "You can\u2019t name a tag after a project", notes: "On the Tags page, try to add a tag with the exact name of one of your projects \u2014 it\u2019s blocked with a dashed outline (the projects are listed right there). If the name matches a project you\u2019ve completed (hidden from the list), it also shows a one-line reason. Naming a project after a tag is always allowed." },
-      { title: "Deleting a tag that\u2019s in use warns you", notes: "Remove a tag that\u2019s on some notes and Save \u2014 it asks you to confirm and tells you how many notes it\u2019ll come off. Confirm, and the tag disappears from those notes (no leftover marker). Renaming a tag updates it everywhere at once." },
-      { title: "Filter by a tag", notes: "Give a couple of notes a tag, then use the Filter button at the top of the Notes list \u2014 the tag appears under a \u2018Tags\u2019 section. Pick it to see just those notes." }
+    addGroupWithItems("\u2705 QA \u2014 Chunk 6b: The daily review", [
+      { title: "The intray has a Review button", notes: "Open the intray (\ud83d\udce5). Below the capture box is a \u2018\ud83d\udd0d Review\u2019 button with a small number \u2014 that\u2019s how many open loops are waiting for you. Tap it to open the review." },
+      { title: "One card at a time; the rest are sealed", notes: "The review shows just the top item in full; the others are sealed bars you can count but can\u2019t read or tap. Tap \u2018Show all\u2019 to reveal them all, and \u2018One at a time\u2019 to go back. This is on purpose \u2014 you decide on them in order, and watching the stack shrink is the reward." },
+      { title: "A stalled project shows up with choices", notes: "The sample project \u2018Website relaunch\u2019 has no next action, so it appears in the review. It offers: add a next action (type it right there), move to Someday/Maybe, complete it, or delete it \u2014 then Not now. Add a next action and it drops out of the review." },
+      { title: "Overdue items come first", notes: "Give any Next Action a deadline in the past (e.g. yesterday) and reopen the review \u2014 it sits at the very top with a red \u2018passed\u2019 bar. Its choices are: push the date (a date box opens right there), complete it, delete it, or Not now. Handle it and it drops out." },
+      { title: "A waiting item whose condition vanished shows up", notes: "Make a Waiting item wait on a specific action, then delete that action. The waiting item now appears in the review as \u2018orphaned\u2019, with choices: re-point it, replace it with a note to yourself, promote it to Next, complete, or delete." },
+      { title: "Captures get sorted into a lane", notes: "A thought you captured appears in the review with buttons: Next, Waiting, Project, Future, Note. Tap one \u2014 it opens a create page with your text already filled in. Save it and the capture is filed (gone from the intray); cancel (\u2715) and the capture stays put." },
+      { title: "\u2018Not now\u2019 defers until tomorrow", notes: "Tap \u2018Not now\u2019 on any card \u2014 it drops out of this review and won\u2019t come back today. When nothing\u2019s left you\u2019ll see either \u2018All clear\u2019 (nothing slipping through the cracks) or \u2018N deferred\u2019. Deferred items return tomorrow. There\u2019s no penalty and no \u2018skipped\u2019 counter." },
+      { title: "Tapping a card opens its real page and returns", notes: "Tap the title of a review card \u2014 its full page opens, wherever that item lives. Save (\u2190) and you land back in the review, which updates: anything you fixed drops out." },
+      { title: "The \u2139 button explains the choices", notes: "Tap the \u2139 at the top of the review \u2014 it explains what each sort button (Next/Waiting/Project/Future/Note) and each decision (past-due, stalled project, orphaned waiting) does." }
     ]);
 
     saveTasksLocal("next");
@@ -4660,11 +4699,21 @@
       '<button type="button" class="icon-btn" data-action="tray-delete" data-id="' + item.id + '" title="Discard">&times;</button>' +
     '</div>';
   }
+  // The drawer's Review button (chunk 6b, §4.8b) — the entry point to the
+  // review surface. The badge counts open loops still awaiting review this
+  // session (deferred ones excluded), across all lanes, not just captures.
+  function trayReviewBtnHtml(){
+    const n = reviewActiveLoops().length;
+    return '<button type="button" class="tray-review-btn" data-action="open-review">' +
+      '<span>&#128269; Review</span>' + (n ? '<span class="tray-review-count">' + n + '</span>' : '') +
+    '</button>';
+  }
   function trayListHtml(){
     const cards = (state.tray || []).map(trayCardHtml).join("");
-    return cards
+    const list = cards
       ? '<div class="tray-list">' + cards + '</div>'
       : '<div class="tray-empty">Empty for now — nothing slipping through the cracks.</div>';
+    return trayReviewBtnHtml() + list;
   }
   // Update just the card list in an already-open drawer — adding/removing a
   // capture must not rebuild (and re-slide) the whole drawer (user: the jump).
@@ -4726,6 +4775,338 @@
     state.tray = state.tray.filter(function(t){ return t.id !== id; });
     saveTray();
     refreshTrayList();
+  }
+  // Silent capture removal (no drawer re-render) — used when a sort chip's
+  // create page saves. trayDelete would call refreshTrayList/renderTray and,
+  // with the drawer closed, re-open it; this just mutates the store.
+  function removeCapture(id){
+    state.tray = state.tray.filter(function(t){ return t.id !== id; });
+    saveTray();
+  }
+  function consumeCaptureForScreen(s){
+    if (s && s.fromCaptureId){ removeCapture(s.fromCaptureId); s.fromCaptureId = null; }
+  }
+
+  // =========================================================
+  // CHUNK 6b (§4.8b): the daily REVIEW — open loops, one at a time.
+  // A redacted, one-at-a-time QUEUE (a lens, not a container) over four kinds
+  // of open loop, on its own full-screen surface reached from the drawer's
+  // Review button. Items stay in their lanes; tapping a revealed card opens
+  // its real page and save-exiting returns here (screenStack). The queue is
+  // DERIVED — recomputed on every render, never snapshotted (or we'd triage
+  // ghosts, §4.8b). ⛔ Fence: no progress bar, no Next/Skip, no complete
+  // screen, no streaks/reminders/snooze, no deferral history. The past-due
+  // kind ships in its DEADLINE shape only; chunk 7 slots in the pseudo-action
+  // CHECKBOX shape + the Calendar chip + the "it moved" banner.
+  // =========================================================
+  function isWaitingOrphaned(task){
+    if (!task || !task.conditionId) return false;
+    const pool = task.conditionKind === "next" ? state.tasks.next : state.tasks.waiting;
+    return !pool.some(function(t){ return t.id === task.conditionId && !t.isGroup; });
+  }
+  // Dev scaffolding (the chunk-map roadmap, the QA checklist) is injected as
+  // groups tagged devContext and is deliberately unlinked/actionless — the
+  // LANE flag on those is expected (chunkMap.js), but they are NOT real open
+  // loops and must never flood the user's review. Exclude an item whose own
+  // group parent carries a devContext.
+  function isDevScaffold(task){
+    if (!task) return false;
+    if (task.devContext) return true;
+    if (!task.parent) return false;
+    const groups = state.tasks.current.concat(state.tasks.next, state.tasks.waiting, state.tasks.future);
+    const parent = groups.find(function(t){ return t.id === task.parent && t.isGroup; });
+    return !!(parent && parent.devContext);
+  }
+  // The ordered queue. Past-due FIRST (§4.8b: sorts to top, revealed first),
+  // then the derived kinds, then captures. De-duped by id so an item that is
+  // both past-due and stalled surfaces once (past-due wins, being first).
+  function computeOpenLoops(){
+    const loops = [];
+    ["next", "current"].forEach(function(k){
+      state.tasks[k].forEach(function(t){
+        if (t.isGroup || isDevScaffold(t)) return;
+        const st = deadlineBarState(t);
+        if (st && st.passed) loops.push({ key: t.id, kind: "pastdue", laneKind: k, id: t.id, task: t });
+      });
+    });
+    state.tasks.current.forEach(function(t){
+      if (!t.isGroup && !isDevScaffold(t) && !projectHasWayForward(t.id)) loops.push({ key: t.id, kind: "stalled", laneKind: "current", id: t.id, task: t });
+    });
+    state.tasks.waiting.forEach(function(t){
+      if (!t.isGroup && !isDevScaffold(t) && isWaitingOrphaned(t)) loops.push({ key: t.id, kind: "orphaned", laneKind: "waiting", id: t.id, task: t });
+    });
+    (state.tray || []).forEach(function(c){ loops.push({ key: c.id, kind: "capture", id: c.id, text: c.text }); });
+    const seen = {};
+    return loops.filter(function(l){ if (seen[l.key]) return false; seen[l.key] = 1; return true; });
+  }
+
+  // --- "Not now" deferral: session-scoped, stamped with the app-day. On read,
+  //     a stamp for an earlier app-day is empty — the 4 AM boundary ends the
+  //     session even if the app never closed (§4.8b judgment call, adopted).
+  function reviewDeferred(){
+    if (!state.reviewDeferred || state.reviewDeferred.date !== todayStr()){
+      const raw = Storage.getJSON("gtd_review_deferred", null);
+      state.reviewDeferred = (raw && raw.date === todayStr()) ? { date: raw.date, ids: raw.ids || [] } : { date: todayStr(), ids: [] };
+    }
+    return state.reviewDeferred;
+  }
+  function reviewDeferredSet(){ const ids = reviewDeferred().ids; const s = {}; ids.forEach(function(i){ s[i] = 1; }); return s; }
+  function deferReviewItem(key){
+    const d = reviewDeferred();
+    if (d.ids.indexOf(key) === -1) d.ids.push(key);
+    Storage.setJSON("gtd_review_deferred", d);
+  }
+  function clearReviewDeferrals(){
+    state.reviewDeferred = { date: todayStr(), ids: [] };
+    Storage.setJSON("gtd_review_deferred", state.reviewDeferred);
+  }
+  function reviewActiveLoops(){
+    const deferred = reviewDeferredSet();
+    return computeOpenLoops().filter(function(l){ return !deferred[l.key]; });
+  }
+
+  function openReviewScreen(){
+    state.reviewShowAll = false;
+    state.screen = { kind: "review", reviewView: true, taskId: null, draft: {}, reviewForm: null };
+    renderScreen();
+  }
+  // Push the review onto the stack and open a child screen, so save-exiting
+  // that child returns here and the queue recomputes (§4.8b navigation).
+  function reviewOpenChild(fn){
+    state.screenStack.push(state.screen);
+    state.screen = null;
+    fn();
+  }
+
+  function reviewHeaderHtml(){
+    return (
+      '<div class="screen-header">' +
+        '<span class="screen-chrome-btn" style="visibility:hidden">&#8592;</span>' +
+        '<span class="screen-kind-badge">Review</span>' +
+        '<div class="screen-header-right">' +
+          '<button type="button" class="screen-chrome-btn" data-action="review-info" title="What do these do?">&#9432;</button>' +
+          '<button type="button" class="screen-chrome-btn" data-action="review-close" title="Close">&#10005;</button>' +
+        '</div>' +
+      '</div>'
+    );
+  }
+  const REVIEW_MENU_INFO = {
+    pastdue: "This was due and the moment has passed. Push it to a new date, tick it if it's actually done, delete it if it's dead — or Not now to see it again next time.",
+    stalled: "A project with no next action, no waiting item — no way forward. Name the very next physical step, move it to Someday/Maybe (an honest answer, not a failure), finish it, or delete it.",
+    orphaned: "This was waiting on something that no longer exists. Point it at something else, replace it with a note to yourself, promote it if you can act now, or close it out.",
+    capture: "A stray thought you haven't filed yet. Send it to a lane — or Not now to leave it for later."
+  };
+  function reviewInfoPanelHtml(){
+    return (
+      '<div class="review-info-panel" hidden>' +
+        '<div class="review-info-block"><b>Sorting a capture</b><br>' +
+          '<b>Next:</b> ' + escapeHtml(LANE_INFO.next) + '<br>' +
+          '<b>Waiting:</b> ' + escapeHtml(LANE_INFO.waiting) + '<br>' +
+          '<b>Project:</b> ' + escapeHtml(LANE_INFO.current) + '<br>' +
+          '<b>Future:</b> ' + escapeHtml(LANE_INFO.future) + '<br>' +
+          '<b>Note:</b> ' + escapeHtml(LANE_INFO.notes) +
+        '</div>' +
+        '<div class="review-info-block"><b>Deciding on an open loop</b><br>' +
+          '<b>Past-due:</b> ' + escapeHtml(REVIEW_MENU_INFO.pastdue) + '<br>' +
+          '<b>Stalled project:</b> ' + escapeHtml(REVIEW_MENU_INFO.stalled) + '<br>' +
+          '<b>Orphaned waiting:</b> ' + escapeHtml(REVIEW_MENU_INFO.orphaned) +
+        '</div>' +
+      '</div>'
+    );
+  }
+
+  // A redacted card: visible (you can see one more loop exists and count them)
+  // but not readable and NOT tappable — cherry-picking blind would make the
+  // discipline decorative (§4.8b).
+  function reviewRedactionHtml(){ return '<div class="review-redaction" aria-hidden="true"></div>'; }
+
+  function reviewMenuBtn(action, label, extra, danger){
+    return '<button type="button" class="review-menu-btn' + (danger ? " danger" : "") + '" data-action="' + action + '"' + (extra || "") + '>' + label + '</button>';
+  }
+  function reviewNotNowBtn(key){
+    return '<button type="button" class="review-menu-btn review-notnow" data-action="review-defer" data-key="' + key + '">Not now</button>';
+  }
+  // The active inline sub-form (Push date / Add next action / Free text) for
+  // this card, if any. One at a time, held on the screen (draft-free — these
+  // are review decisions, applied immediately, not armed edits).
+  function reviewFormFor(s, key){ return (s.reviewForm && s.reviewForm.key === key) ? s.reviewForm : null; }
+  function reviewInlineFormHtml(placeholder, type, saveAction, saveLabel, value, invalid){
+    const isDate = type === "date";
+    return (
+      '<div class="review-inline-form">' +
+        (isDate
+          ? '<input type="date" id="review-form-input" data-field="reviewForm" class="review-form-input' + (invalid ? " field-invalid" : "") + '" value="' + escapeHtml(value || "") + '" style="color-scheme:dark">'
+          : '<input type="text" id="review-form-input" data-field="reviewForm" class="review-form-input' + (invalid ? " field-invalid" : "") + '" placeholder="' + escapeHtml(placeholder) + '" value="' + escapeHtml(value || "") + '" autocomplete="off">') +
+        '<div class="review-inline-form-btns">' +
+          '<button type="button" class="review-menu-btn" data-action="' + saveAction + '">' + saveLabel + '</button>' +
+          '<button type="button" class="review-menu-btn" data-action="review-form-cancel">Cancel</button>' +
+        '</div>' +
+      '</div>'
+    );
+  }
+
+  function reviewCardHtml(l, s){
+    const invalid = !!(s.reviewForm && s.reviewForm.key === l.key && s.reviewForm.invalid);
+    let bodyHtml = "", menuHtml = "";
+    if (l.kind === "capture"){
+      bodyHtml = '<div class="review-card-title">' + escapeHtml(l.text) + '</div>';
+      menuHtml =
+        '<div class="review-sort-chips">' +
+          reviewMenuBtn("review-sort", "Next", ' data-target="next" data-key="' + l.key + '"') +
+          reviewMenuBtn("review-sort", "Waiting", ' data-target="waiting" data-key="' + l.key + '"') +
+          reviewMenuBtn("review-sort", "Project", ' data-target="current" data-key="' + l.key + '"') +
+          reviewMenuBtn("review-sort", "Future", ' data-target="future" data-key="' + l.key + '"') +
+          reviewMenuBtn("review-sort", "Note", ' data-target="notes" data-key="' + l.key + '"') +
+        '</div>' +
+        '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + '</div>';
+      return '<div class="review-card review-card-capture">' + bodyHtml + menuHtml + '</div>';
+    }
+    // Derived kinds share a tap-through title (opens the real page) + a
+    // context line, then a per-kind decision menu.
+    const openAttr = ' data-action="review-open" data-lane="' + l.laneKind + '" data-id="' + l.id + '"';
+    bodyHtml = '<button type="button" class="review-card-open"' + openAttr + '>' +
+      '<span class="review-card-title">' + escapeHtml(l.task.title || "") + '</span>';
+    if (l.kind === "pastdue"){
+      bodyHtml += deadlineBarHtml(l.task);
+    } else if (l.kind === "stalled"){
+      bodyHtml += '<span class="review-card-note">⚠ no way forward</span>';
+    } else if (l.kind === "orphaned"){
+      bodyHtml += '<span class="review-card-note cue-orphaned-text">🪝 After ' + escapeHtml(l.task.conditionLabel || "a deleted item") + '</span>';
+    }
+    bodyHtml += '</button>';
+
+    const form = reviewFormFor(s, l.key);
+    if (l.kind === "pastdue"){
+      if (form && form.type === "date"){
+        menuHtml = reviewInlineFormHtml("", "date", "review-pushdate-save", "Save", (l.task.deadline && l.task.deadline.date) || "", invalid);
+      } else {
+        menuHtml =
+          reviewMenuBtn("review-form-start", "Push the date", ' data-key="' + l.key + '" data-type="date"') +
+          reviewMenuBtn("review-complete", "Complete it", ' data-lane="' + l.laneKind + '" data-id="' + l.id + '"') +
+          reviewMenuBtn("review-delete", "Delete it", ' data-lane="' + l.laneKind + '" data-id="' + l.id + '"', true) +
+          reviewNotNowBtn(l.key);
+      }
+    } else if (l.kind === "stalled"){
+      if (form && form.type === "text"){
+        menuHtml = reviewInlineFormHtml("What's the very next physical action?", "text", "review-addnext-save", "Add", "", invalid);
+      } else {
+        menuHtml =
+          reviewMenuBtn("review-form-start", "Add a next action", ' data-key="' + l.key + '" data-type="text"') +
+          reviewMenuBtn("review-someday", "Move to Someday/Maybe", ' data-id="' + l.id + '"') +
+          reviewMenuBtn("review-complete", "Complete it", ' data-lane="current" data-id="' + l.id + '"') +
+          reviewMenuBtn("review-delete", "Delete it", ' data-lane="current" data-id="' + l.id + '"', true) +
+          reviewNotNowBtn(l.key);
+      }
+    } else if (l.kind === "orphaned"){
+      if (form && form.type === "text"){
+        menuHtml = reviewInlineFormHtml("Waiting for…", "text", "review-freetext-save", "Save", "", invalid);
+      } else {
+        menuHtml =
+          reviewMenuBtn("review-open", "Re-point the condition →", ' data-lane="waiting" data-id="' + l.id + '"') +
+          reviewMenuBtn("review-form-start", "Replace with free text", ' data-key="' + l.key + '" data-type="text"') +
+          reviewMenuBtn("review-promote", "Promote to Next", ' data-id="' + l.id + '"') +
+          reviewMenuBtn("review-complete", "Complete", ' data-lane="waiting" data-id="' + l.id + '"') +
+          reviewMenuBtn("review-delete", "Delete", ' data-lane="waiting" data-id="' + l.id + '"', true) +
+          reviewNotNowBtn(l.key);
+      }
+    }
+    return '<div class="review-card review-card-' + l.kind + '">' + bodyHtml + '<div class="review-menu">' + menuHtml + '</div></div>';
+  }
+
+  function reviewBodyHtml(s){
+    const active = reviewActiveLoops();
+    const deferredCount = computeOpenLoops().length - active.length;
+    let html = '<div class="screen-body review-body">' + reviewInfoPanelHtml();
+    if (!active.length){
+      html += (deferredCount > 0)
+        ? '<div class="review-end review-end-deferred"><div class="review-end-big">' + deferredCount + ' deferred.</div>' +
+            '<div class="review-end-sub">You saw everything. These are waiting on you — they’ll be back tomorrow.</div></div>'
+        : '<div class="review-end review-end-empty"><div class="review-end-big">All clear.</div>' +
+            '<div class="review-end-sub">Nothing slipping through the cracks.</div></div>';
+      return html + '</div>';
+    }
+    const showAll = !!state.reviewShowAll;
+    if (active.length > 1){
+      html += '<div class="review-toolbar"><span class="review-remaining">' + active.length + ' to review</span>' +
+        '<button type="button" class="btn btn-ghost btn-small" data-action="review-toggle-all">' + (showAll ? "One at a time" : "Show all") + '</button></div>';
+    }
+    active.forEach(function(l, i){
+      html += (showAll || i === 0) ? reviewCardHtml(l, s) : reviewRedactionHtml();
+    });
+    return html + '</div>';
+  }
+
+  // --- Review decision actions. Each mutates live state then re-renders the
+  //     review, which recomputes the derived queue (§4.8b: resolved items drop
+  //     out, edited-but-unfixed stay). No queue snapshot.
+  function reviewFindTask(id){
+    const kinds = ["next", "waiting", "current", "future"];
+    for (let i = 0; i < kinds.length; i++){
+      const t = state.tasks[kinds[i]].find(function(x){ return x.id === id; });
+      if (t) return { kind: kinds[i], task: t };
+    }
+    return null;
+  }
+  // Which text sub-form is open: a Current project → "Add a next action";
+  // a Waiting action → "Replace with free text".
+  function reviewFindLoopKind(id){
+    const found = reviewFindTask(id);
+    return (found && found.kind === "current") ? "stalled" : "orphaned";
+  }
+  function reviewFormInput(){ return qs("#review-form-input"); }
+  function reviewMarkFormInvalid(){ if (state.screen && state.screen.reviewForm){ state.screen.reviewForm.invalid = true; renderScreen(); const inp = reviewFormInput(); if (inp) inp.focus(); } }
+  function reviewSavePushDate(){
+    const s = state.screen; if (!s || !s.reviewForm) return;
+    const inp = reviewFormInput(); const val = inp ? inp.value : "";
+    if (!val){ reviewMarkFormInvalid(); return; }
+    const found = reviewFindTask(s.reviewForm.key);
+    if (found){
+      const time = (found.task.deadline && found.task.deadline.time) || null;
+      found.task.deadline = { date: val, time: time }; // keep the time; push only the day (§4.8b inline exec)
+      saveTasksLocal(found.kind); renderLane(found.kind);
+    }
+    s.reviewForm = null; renderScreen();
+  }
+  function reviewSaveAddNext(){
+    const s = state.screen; if (!s || !s.reviewForm) return;
+    const inp = reviewFormInput(); const val = (inp ? inp.value : "").trim();
+    if (!val){ reviewMarkFormInvalid(); return; }
+    const pid = s.reviewForm.key;
+    createTask("next", { title: val, linkedProjectId: pid }).then(function(){ s.reviewForm = null; renderScreen(); });
+  }
+  function reviewSaveFreeText(){
+    const s = state.screen; if (!s || !s.reviewForm) return;
+    const inp = reviewFormInput(); const val = (inp ? inp.value : "").trim();
+    if (!val){ reviewMarkFormInvalid(); return; }
+    const found = reviewFindTask(s.reviewForm.key);
+    if (found && found.kind === "waiting"){
+      found.task.whenText = val;
+      found.task.conditionId = null; found.task.conditionKind = null; found.task.conditionLabel = null;
+      saveTasksLocal("waiting"); renderLane("waiting");
+    }
+    s.reviewForm = null; renderScreen();
+  }
+  function reviewComplete(lane, id){
+    if (lane === "current") completeProject("current", id); else completeTask(lane, id);
+    if (state.screen) state.screen.reviewForm = null;
+    renderScreen();
+  }
+  function reviewDelete(lane, id){
+    const found = reviewFindTask(id);
+    const title = found ? (found.task.title || "this") : "this";
+    openConfirmDialog("Delete “" + title + "” for good?", [
+      { label: "Delete", style: "danger", action: function(){ deleteTask(lane, id); if (state.screen) state.screen.reviewForm = null; renderScreen(); } },
+      { label: "Cancel", action: function(){} }
+    ]);
+  }
+  function reviewSortCapture(target, key){
+    const capture = (state.tray || []).find(function(t){ return t.id === key; });
+    if (!capture) { renderScreen(); return; }
+    const text = capture.text;
+    reviewOpenChild(function(){
+      if (target === "notes"){ openNoteScreen(null, { title: text, fromCaptureId: key }); }
+      else { openScreen(target, null, { title: text }); if (state.screen) state.screen.fromCaptureId = key; }
+    });
   }
 
   // =========================================================
@@ -4975,9 +5356,10 @@
       // "New checklist" (user) seeds the body with one empty checklist item so
       // the page IS a checklist from the first keystroke; "New note" is blank.
       const body = (opts && opts.checklist) ? '<ul class="checklist"><li></li></ul>' : "";
-      draft = { title: "", body: body, projectLinks: [], tagIds: [] };
+      draft = { title: (opts && opts.title) || "", body: body, projectLinks: [], tagIds: [] };
     }
     state.screen = { kind: "notes", taskId: noteId || null, noteId: noteId || null, noteView: true, draft: draft };
+    if (opts && opts.fromCaptureId) state.screen.fromCaptureId = opts.fromCaptureId; // §4.8b: remove the capture when this note saves
     renderScreen();
   }
   // The rich-text toolbar (§4.9, user). B/I/U are the emphasis the author uses
@@ -5130,6 +5512,7 @@
     }
     saveNotes();
     renderLane("notes");
+    consumeCaptureForScreen(s); // §4.8b: a capture sorted to Note is now filed
     closeScreen();
   }
   function deleteNote(noteId){
