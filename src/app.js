@@ -4406,7 +4406,7 @@
   // off to the next chunk.
   // =========================================================
   function injectQAChecklist(){
-    const FLAG = "gtd_qa_checklist_chunk5";
+    const FLAG = "gtd_qa_checklist_chunk6";
     if (Storage.get(FLAG)) return;
     Storage.set(FLAG, "1");
 
@@ -4437,20 +4437,29 @@
       });
     }
 
-    addGroupWithItems("\u2705 QA \u2014 Chunk 5: A project's actions save WITH the project", [
-      { title: "Actions you add on a project's page aren't saved until you save the project", notes: "Open a Current Project, add a next action in its quick-add row. It appears in the project's list, but it should NOT show up in the Next Actions lane until you save the project (\u2190)." },
-      { title: "Cancelling a project warns you, and Discard undoes everything", notes: "Add or change an action on a project, then tap \u2715. You should get an \u2018Are you sure?\u2019 warning. \u2018Keep editing\u2019 stays; \u2018Discard changes\u2019 throws away everything you did \u2014 the action should exist nowhere." },
-      { title: "Add-then-remove on the same visit leaves no trace", notes: "Add an action on a project, then open it and delete it, all before saving. Now tap \u2715 \u2014 there should be NO warning (nothing actually changed), and nothing is left behind." },
-      { title: "Saving the project saves its actions too, all at once", notes: "Add an action and tap \u2190 to save the project. Now the action should appear in the Next Actions (or Waiting On) lane, linked to the project." },
-      { title: "A new Current project won't save without at least one action", notes: "Make a brand-new Current Project (the + button, first menu option) and try to save it with no actions. Save should be blocked with a dashed red outline. Add an action and it should save." }
+    addGroupWithItems("\u2705 QA \u2014 Chunk 6: The intray (capture drawer)", [
+      { title: "The intray opens by itself when you launch the app", notes: "Reload the app. A drawer should slide in from the left with a capture box \u2014 even when it's empty. (It only auto-opens on launch, not when you switch back to the app.)" },
+      { title: "The \ud83d\udce5 icon opens it any time; closing changes nothing else", notes: "Tap the \ud83d\udce5 icon in the header to open the drawer. Close it by tapping outside it, the \u2715, or Back. Nothing on the main screen should change from opening or closing it." },
+      { title: "Type a thought and it's captured as a card", notes: "Type into the box and press Enter (or the +). It becomes a card in the drawer and the box clears, ready for the next thought. Captured thoughts stay until you sort them later." },
+      { title: "You can discard a captured card, and the \u2139 explains the intray", notes: "Each card has an \u2715 to throw it away. The \u2139 button explains what the intray is for." }
     ]);
 
-    addGroupWithItems("\u2705 QA \u2014 Chunk 5: Linking and hooking on the project page", [
-      { title: "An action opened FROM its project can't be un-linked there", notes: "Open a project, tap one of its actions. Its project-link box should be greyed out (disabled) with a note to remove it from the project's list instead. Open the SAME action from its own lane and the link box should be editable." },
-      { title: "The Waiting quick-add uses a hook, not a +", notes: "On a project, the Waiting action row has a hook icon (goal net), greyed until you type. Type a title, tap the hook, and pick what it waits on \u2014 the waiting action is created right there, no extra page. (The \u270e pencil still opens the full editor for free-text \u2018waiting for\u2019.)" },
-      { title: "The hook picker shows this project's own actions first", notes: "When you pick what a waiting action waits on, the project's own actions appear at the top under \u2018This project\u2019, with everything else below." },
-      { title: "You can wait on an action you just added", notes: "Add a next action, then add a waiting action and hook it \u2014 the next action you just added should be pickable. After saving, the waiting action really is waiting on it." },
-      { title: "Deleting something another action waits on doesn't lose the other", notes: "Add a next action and a waiting action hooked to it, then delete the next action (before saving). The waiting action should stay \u2014 now shown as waiting on a deleted item \u2014 and still save." }
+    addGroupWithItems("\u2705 QA \u2014 Chunk 6: Settings", [
+      { title: "The \u22ef menu opens Settings with \u2018Clear all app data\u2019", notes: "Tap the \u22ef icon in the header. A Settings sheet opens with a \u2018Clear all app data\u2019 option." },
+      { title: "Clear all app data wipes everything after a confirm", notes: "Tap \u2018Clear all app data\u2019. It should ask you to confirm, and only then clear everything and start fresh. (Careful \u2014 this really does erase your data.)" }
+    ]);
+
+    addGroupWithItems("\u2705 QA \u2014 Chunk 6: Notes", [
+      { title: "There's a new Notes tab (teal)", notes: "A sixth tab, \u2018Notes\u2019, in teal, next to Habits. Tapping it shows the Notes list." },
+      { title: "A note needs a title, and has an optional big body", notes: "Tap + on Notes to make one. Saving with no title is blocked with a dashed outline. The body is a large free-writing box. Notes have no Complete and no dates." },
+      { title: "Notes list newest-edited first, with a preview", notes: "Saved notes appear with their title and a short preview of the body, most-recently-edited at the top. Tap one to reopen and edit; the trash can deletes it (with a confirm)." }
+    ]);
+
+    addGroupWithItems("\u2705 QA \u2014 Chunk 6: Linking notes to projects", [
+      { title: "A note can link to any number of projects", notes: "On a note, tap \u2018+ Link a project\u2019 and pick one \u2014 it becomes a chip. You can add several. The picker only offers projects you can still work on." },
+      { title: "Removing a chip only sticks if you Save", notes: "Remove a chip with its \u2715, then leave the note with \u2715 (cancel) \u2014 the chip should still be there. Remove it again and Save (\u2190) \u2014 now it's gone." },
+      { title: "A chip turns green when the project is completed, and a tombstone if it's deleted", notes: "Complete a linked project \u2014 its chip on the note goes green. Delete a project \u2014 the chip becomes a dashed outline keeping the project's name (a \u2018tombstone\u2019). The note itself is never lost. (Restoring the project turns the chip normal again.)" },
+      { title: "Tapping a chip filters the Notes list to that project", notes: "On a note card, tap a project chip \u2014 the Notes list filters to just that project's notes, with a banner to clear the filter. (Tombstone chips don't filter \u2014 there's nothing to filter to.)" }
     ]);
 
     saveTasksLocal("next");
