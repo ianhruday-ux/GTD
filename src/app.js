@@ -3599,19 +3599,7 @@
         const trailing = zone.querySelector(":scope > .add-row-mini");
         if (trailing) ref = trailing;
       }
-      if (drag.touch){
-        // Touch path (Chrome Android): moving the touched node mid-drag makes
-        // the browser fire touchcancel and kill the gesture (confirmed by the
-        // drag log — the drag dies right after the first live reorder). So
-        // don't move it here; record the target and defer the real DOM move to
-        // commit (touchend). The dragged card stays dimmed in place while the
-        // drop indicator shows where it will land.
-        if (drag.dropZone !== zone || drag.dropRef !== ref){
-          dlog("drop-target", "before " + (ref ? dragDesc(ref) : "end"));
-        }
-        drag.dropZone = zone;
-        drag.dropRef = ref;
-      } else if (ref !== el && el.nextSibling !== ref){
+      if (ref !== el && el.nextSibling !== ref){
         zone.insertBefore(el, ref);
       }
       // Drop indicator: a rule before the card we'd land in front of, else
@@ -3626,14 +3614,6 @@
     }
     function commitLiveMove(drag){
       const el = drag.el;
-      // Touch path deferred the DOM move (see applyLiveMove) to avoid
-      // cancelling the touch mid-drag. The touch is over now, so place the
-      // element at the recorded target before reading its final position.
-      if (drag.touch && drag.dropZone){
-        let ref = drag.dropRef;
-        if (ref && ref.parentElement !== drag.dropZone) ref = null;
-        if (ref !== el && el.nextSibling !== ref) drag.dropZone.insertBefore(el, ref);
-      }
       const laneEl = el.closest(".lane");
       if (!laneEl) return;
       const kind = laneEl.getAttribute("data-kind");
@@ -3698,28 +3678,6 @@
     function touchDragCleanup(){
       if (touchDrag && touchDrag.timer) clearTimeout(touchDrag.timer);
       touchDrag = null;
-    }
-    // Manual lane scrolling for touches that START on a drag title. The real
-    // fix for Chrome's long-press stealing the hold (§3, confirmed by the
-    // drag log: HOLD FIRED then a raw touchcancel ~200ms later) is
-    // `touch-action:none` on the titles — but that also stops the browser
-    // from scrolling the page when a swipe begins on a title (titles cover
-    // most of a card). So a swipe that moves before the hold completes is
-    // treated as a scroll and driven here, with a light inertial fling on
-    // release, matching native feel closely enough. Touches that start off a
-    // title keep native scrolling untouched.
-    let touchScroll = null; // { lastY, lastT, vy }
-    let momentumRAF = null;
-    function cancelMomentum(){ if (momentumRAF){ cancelAnimationFrame(momentumRAF); momentumRAF = null; } }
-    function startMomentum(vyPerMs){
-      cancelMomentum();
-      let v = vyPerMs * 16; // velocity was px/ms; a frame is ~16ms
-      if (Math.abs(v) < 0.6) return;
-      (function step(){
-        window.scrollBy(0, v);
-        v *= 0.92; // decay
-        momentumRAF = (Math.abs(v) >= 0.6) ? requestAnimationFrame(step) : null;
-      })();
     }
     // Some mobile browsers (seen on DuckDuckGo for Android — its own
     // native text-selection toolbar, screenshot-confirmed) can still grab
@@ -3799,8 +3757,6 @@
     document.addEventListener("visibilitychange", function(){ if (document.hidden) forceCancelTouchDrag("page-hidden"); });
     document.addEventListener("touchstart", function(e){
       if (e.touches.length !== 1) return;
-      cancelMomentum(); // a new touch stops any in-flight fling
-      touchScroll = null;
       const titleEl = e.target.closest(".card-title, .group-title");
       if (dragLogOn && e.target.closest && e.target.closest(".card, .group")){
         dlog("touchstart", dragDesc(e.target) + (titleEl ? "  [IS a drag title]" : "  [NOT a drag title — no drag]"));
@@ -3820,7 +3776,7 @@
         touchDrag.active = true;
         dlog("HOLD FIRED → drag now active");
         el.classList.add("dragging");
-        liveDrag = { el: el, kind: kind, isGroup: isGroup, touch: true };
+        liveDrag = { el: el, kind: kind, isGroup: isGroup };
         document.body.classList.add("drag-active"); // freeze the collapsing tab bar (spec 4.10b, known issue 2)
         dragPointer = { x: touchDrag.startX, y: touchDrag.startY };
         startAutoScroll();
@@ -3829,30 +3785,14 @@
       }, TOUCH_LONG_PRESS_MS);
     }, { passive: true });
     document.addEventListener("touchmove", function(e){
-      const touch = e.touches[0];
-      // Manual scroll takeover: once a title-touch is deemed a scroll, drive
-      // the page ourselves (touch-action:none means the browser won't). Runs
-      // before the touchDrag guard because we've cleared touchDrag by now.
-      if (touchScroll){
-        const now = Date.now();
-        const moveY = touchScroll.lastY - touch.clientY;
-        window.scrollBy(0, moveY);
-        const dt = now - touchScroll.lastT;
-        if (dt > 0) touchScroll.vy = moveY / dt; // px per ms
-        touchScroll.lastY = touch.clientY;
-        touchScroll.lastT = now;
-        return;
-      }
       if (!touchDrag) return;
+      const touch = e.touches[0];
       if (!touchDrag.active){
         const dx = Math.abs(touch.clientX - touchDrag.startX);
         const dy = Math.abs(touch.clientY - touchDrag.startY);
         if (dx > TOUCH_MOVE_CANCEL_PX || dy > TOUCH_MOVE_CANCEL_PX){
-          // Moved before the hold completed → a scroll, not a drag. Drop the
-          // pending drag and take the scroll over (native scroll is off here).
-          dlog("scroll-takeover", "moved " + Math.round(Math.max(dx, dy)) + "px before hold");
+          dlog("cancel", "moved " + Math.round(Math.max(dx, dy)) + "px before the hold completed (scroll, not drag)");
           touchDragCleanup();
-          touchScroll = { lastY: touch.clientY, lastT: Date.now(), vy: 0 };
         }
         return;
       }
@@ -3864,14 +3804,6 @@
       applyLiveMove(liveDrag, resolved.el, resolved.y);
     }, { passive: false });
     document.addEventListener("touchend", function(e){
-      if (touchScroll){
-        // Fling only if the finger was still moving at release (a pause-then-
-        // lift shouldn't coast). vy is px/ms from the last move.
-        const vy = (Date.now() - touchScroll.lastT < 90) ? touchScroll.vy : 0;
-        startMomentum(vy);
-        touchScroll = null;
-        return;
-      }
       if (!touchDrag) return;
       if (touchDrag.active){
         dlog("touchend", "was dragging → commit the move");
@@ -3891,7 +3823,6 @@
     });
     document.addEventListener("touchcancel", function(){
       if (dragLogOn) dlog("touchcancel", touchDrag ? ("active=" + touchDrag.active) : "(no touchDrag)");
-      touchScroll = null;
       if (touchDrag && touchDrag.active){
         const kind = touchDrag.kind;
         liveDrag = null;
