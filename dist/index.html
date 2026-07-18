@@ -5720,7 +5720,7 @@ function injectChunkMap(){
   // off to the next chunk.
   // =========================================================
   function injectQAChecklist(){
-    const FLAG = "gtd_qa_checklist_chunk6";
+    const FLAG = "gtd_qa_checklist_chunk6_v2"; // bumped: covers this round's Notes tweaks (swipe, rich text, checklist, filter)
     if (Storage.get(FLAG)) return;
     Storage.set(FLAG, "1");
 
@@ -5754,6 +5754,7 @@ function injectChunkMap(){
     addGroupWithItems("\u2705 QA \u2014 Chunk 6: The intray (capture drawer)", [
       { title: "The intray opens by itself when you launch the app", notes: "Reload the app. A drawer should slide in from the left with a capture box \u2014 even when it's empty. (It only auto-opens on launch, not when you switch back to the app.)" },
       { title: "The \ud83d\udce5 icon opens it any time; closing changes nothing else", notes: "Tap the \ud83d\udce5 icon in the header to open the drawer. Close it by tapping outside it, the \u2715, or Back. Nothing on the main screen should change from opening or closing it." },
+      { title: "You can SWIPE the drawer open and closed", notes: "From a lane, swipe right starting near the left edge \u2014 the drawer opens. Swipe left \u2014 it closes. (Tapping \ud83d\udce5 still works too.) While you're on a note or an edit page, swiping should NOT open it." },
       { title: "Type a thought and it's captured as a card", notes: "Type into the box and press Enter (or the +). It becomes a card in the drawer and the box clears, ready for the next thought. Captured thoughts stay until you sort them later." },
       { title: "You can discard a captured card, and the \u2139 explains the intray", notes: "Each card has an \u2715 to throw it away. The \u2139 button explains what the intray is for." }
     ]);
@@ -5763,17 +5764,24 @@ function injectChunkMap(){
       { title: "Restore app to defaults wipes everything after a confirm", notes: "Tap \u2018Restore app to defaults\u2019. It should warn you that everything you\u2019ve entered will be erased and replaced with the sample data, ask you to confirm, and only then do it. (Careful \u2014 this really does erase your data.)" }
     ]);
 
-    addGroupWithItems("\u2705 QA \u2014 Chunk 6: Notes", [
-      { title: "There's a new Notes tab (teal)", notes: "A sixth tab, \u2018Notes\u2019, in teal, next to Habits. Tapping it shows the Notes list." },
-      { title: "A note needs a title, and has an optional big body", notes: "Tap + on Notes to make one. Saving with no title is blocked with a dashed outline. The body is a large free-writing box. Notes have no Complete and no dates." },
-      { title: "Notes list newest-edited first, with a preview", notes: "Saved notes appear with their title and a short preview of the body, most-recently-edited at the top. Tap one to reopen and edit; the trash can deletes it (with a confirm)." }
+    addGroupWithItems("\u2705 QA \u2014 Chunk 6: Notes \u2014 the basics", [
+      { title: "There's a Notes tab (teal), newest-edited first", notes: "A sixth tab, \u2018Notes\u2019, in teal, next to Habits. Saved notes appear with their title and a short preview, most-recently-edited at the top. Tap one to reopen; the trash can deletes it (with a confirm). Notes have no Complete and no dates." },
+      { title: "The + badge gives a menu: New checklist / New note", notes: "Tap + on the Notes tab. A small menu appears with \u2018New checklist\u2019 on top and \u2018New note\u2019 below. Each opens the note page \u2014 blank, or already a checklist." },
+      { title: "A note needs a title", notes: "Trying to save a note with no title is blocked with a dashed outline (no popup). Add a title and it saves." }
     ]);
 
-    addGroupWithItems("\u2705 QA \u2014 Chunk 6: Linking notes to projects", [
-      { title: "A note can link to any number of projects", notes: "On a note, tap \u2018+ Link a project\u2019 and pick one \u2014 it becomes a chip. You can add several. The picker only offers projects you can still work on." },
+    addGroupWithItems("\u2705 QA \u2014 Chunk 6: Notes \u2014 rich text & checklists", [
+      { title: "The body has a formatting toolbar", notes: "Open a note. Above the body is a toolbar: B (bold), I (italic), U (underline), H (heading), a bullet list, a checkbox, and \u229e. Select some text and tap Bold or Underline \u2014 it formats right there, with no stray symbols showing." },
+      { title: "Bold/underline survive save and reopen", notes: "Format some text, Save (\u2190), then reopen the note \u2014 the formatting is still there." },
+      { title: "Checklists: tick the boxes", notes: "Make a checklist (either \u2018New checklist\u2019 from the + menu, or the \u2610 button on the toolbar turns the current line into one). Type a few items. Tap a checkbox \u2014 it ticks and the line gets a line through it; tap again to untick. Save and reopen \u2014 the ticks are remembered." }
+    ]);
+
+    addGroupWithItems("\u2705 QA \u2014 Chunk 6: Notes \u2014 projects & filtering", [
+      { title: "Link a note to projects with the \u229e button", notes: "On a note, tap \u229e on the toolbar and pick a project \u2014 it becomes a chip. You can add several. The picker only offers projects you can still work on." },
       { title: "Removing a chip only sticks if you Save", notes: "Remove a chip with its \u2715, then leave the note with \u2715 (cancel) \u2014 the chip should still be there. Remove it again and Save (\u2190) \u2014 now it's gone." },
-      { title: "A chip turns green when the project is completed, and a tombstone if it's deleted", notes: "Complete a linked project \u2014 its chip on the note goes green. Delete a project \u2014 the chip becomes a dashed outline keeping the project's name (a \u2018tombstone\u2019). The note itself is never lost. (Restoring the project turns the chip normal again.)" },
-      { title: "Tapping a chip filters the Notes list to that project", notes: "On a note card, tap a project chip \u2014 the Notes list filters to just that project's notes, with a banner to clear the filter. (Tombstone chips don't filter \u2014 there's nothing to filter to.)" }
+      { title: "A chip turns green when the project is completed, a tombstone if it's deleted", notes: "Complete a linked project \u2014 its chip on the note goes green. Delete a project \u2014 the chip becomes a dashed outline keeping the project's name (a \u2018tombstone\u2019). The note itself is never lost. (Restoring the project turns the chip normal again.)" },
+      { title: "A card shows at most two chips, then a \u2018+n\u2019 badge", notes: "Link a note to three or more projects \u2014 its card shows two chips and a \u2018+2\u2019-style badge for the rest." },
+      { title: "The Filter button narrows the list", notes: "At the top of the Notes list, tap the Filter button. A menu lists \u2018All notes\u2019 and each project your notes link to. Pick one \u2014 the list narrows to that project's notes. Clear it with the \u2715 on the button (or pick \u2018All notes\u2019). Tapping a chip on a card filters the same way." }
     ]);
 
     saveTasksLocal("next");
