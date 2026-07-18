@@ -947,6 +947,16 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 .tray-list{ display:flex; flex-direction:column; gap:8px; }
 .tray-card{ display:flex; align-items:center; gap:8px; background:var(--paper-2); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:10px 12px; }
 .tray-card-text{ flex:1; font-size:14px; color:var(--text-primary); word-break:break-word; }
+/* Redacted capture: a sealed pitch-black bar (user follow-up), same footprint
+   as a revealed card, unreadable and with no discard button. */
+.tray-card-redacted{ background:#000; border-color:#000; }
+.tray-card-redaction{ flex:1; height:18px; }
+.tray-list-head{ display:flex; justify-content:flex-end; margin-bottom:8px; }
+.tray-reveal-btn{ display:inline-flex; align-items:center; gap:6px; background:transparent;
+  border:1px solid rgba(255,255,255,0.18); color:var(--text-soft); border-radius:8px;
+  padding:6px 10px; font-size:12.5px; cursor:pointer; }
+.tray-reveal-btn:hover{ color:var(--text-primary); background:rgba(255,255,255,0.06); }
+.tray-reveal-btn svg{ display:block; }
 .tray-empty{ color:var(--text-soft); font-size:13.5px; text-align:center; padding:24px 10px; font-style:italic; }
 
 /* Chunk 6b (§4.8b): the drawer's Review button + the review surface. */
@@ -987,8 +997,7 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 /* Redaction: visible-but-sealed. You can see one more loop exists and count
    them; you cannot read or tap it (§4.8b). */
 .review-redaction{ height:56px; border-radius:10px; border:1px solid rgba(255,255,255,0.08);
-  background:repeating-linear-gradient(45deg, rgba(255,255,255,0.06) 0 10px, rgba(255,255,255,0.03) 10px 20px);
-  pointer-events:none; }
+  background:#000; pointer-events:none; }
 .review-info-panel{ font-size:12.5px; color:var(--text-soft); background:rgba(255,255,255,0.05); border-radius:8px; padding:11px 13px; line-height:1.5; display:flex; flex-direction:column; gap:10px; }
 .review-info-panel[hidden]{ display:none; } /* the attribute must win over display:flex */
 .review-info-block b{ color:var(--text-primary); }

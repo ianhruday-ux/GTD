@@ -967,6 +967,16 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 .tray-list{ display:flex; flex-direction:column; gap:8px; }
 .tray-card{ display:flex; align-items:center; gap:8px; background:var(--paper-2); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:10px 12px; }
 .tray-card-text{ flex:1; font-size:14px; color:var(--text-primary); word-break:break-word; }
+/* Redacted capture: a sealed pitch-black bar (user follow-up), same footprint
+   as a revealed card, unreadable and with no discard button. */
+.tray-card-redacted{ background:#000; border-color:#000; }
+.tray-card-redaction{ flex:1; height:18px; }
+.tray-list-head{ display:flex; justify-content:flex-end; margin-bottom:8px; }
+.tray-reveal-btn{ display:inline-flex; align-items:center; gap:6px; background:transparent;
+  border:1px solid rgba(255,255,255,0.18); color:var(--text-soft); border-radius:8px;
+  padding:6px 10px; font-size:12.5px; cursor:pointer; }
+.tray-reveal-btn:hover{ color:var(--text-primary); background:rgba(255,255,255,0.06); }
+.tray-reveal-btn svg{ display:block; }
 .tray-empty{ color:var(--text-soft); font-size:13.5px; text-align:center; padding:24px 10px; font-style:italic; }
 
 /* Chunk 6b (§4.8b): the drawer's Review button + the review surface. */
@@ -1007,8 +1017,7 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 /* Redaction: visible-but-sealed. You can see one more loop exists and count
    them; you cannot read or tap it (§4.8b). */
 .review-redaction{ height:56px; border-radius:10px; border:1px solid rgba(255,255,255,0.08);
-  background:repeating-linear-gradient(45deg, rgba(255,255,255,0.06) 0 10px, rgba(255,255,255,0.03) 10px 20px);
-  pointer-events:none; }
+  background:#000; pointer-events:none; }
 .review-info-panel{ font-size:12.5px; color:var(--text-soft); background:rgba(255,255,255,0.05); border-radius:8px; padding:11px 13px; line-height:1.5; display:flex; flex-direction:column; gap:10px; }
 .review-info-panel[hidden]{ display:none; } /* the attribute must win over display:flex */
 .review-info-block b{ color:var(--text-primary); }
@@ -1394,7 +1403,8 @@ function injectChunkMap(){
     notesFilter: null, // chunk 6 (§4.9): transient project-OR-tag-id filter on the Notes lane
     notesFilterMenuOpen: false,
     reviewShowAll: false, // chunk 6b (§4.8b): reveal-one-at-a-time vs "Show all"
-    reviewDeferred: null, // chunk 6b (§4.8b): { date, ids[] } — session-scoped "Not now", stamped with the app-day
+    reviewDeferred: {}, // chunk 6b (§4.8b, user follow-up): in-memory "Not now" set — scoped to the CURRENTLY-OPEN review, cleared on every fresh open (not the app-day)
+    trayReveal: false, // chunk 6b (user follow-up): captures are redacted in the drawer by default; this un-seals them for one drawer session
     qaTimeOffset: 0 // dev-only: MINUTES added to boundaryNow() (chunk 0c: hour/minute granular, not just whole days — the midnight-4am window (§4.14b) can only be tested by landing the clock inside it) — see the QA time-jump buttons
   };
 
@@ -3272,6 +3282,7 @@ function injectChunkMap(){
           const run = ensureHabitRun(newId);
           run.schedule = d.schedule.slice();
           saveHabitRuns();
+          consumeCaptureForScreen(s); // §4.8b: a capture sorted to Habit is now filed
           applyPendingReplacements(d, hooks, newId);
           // Re-render AFTER the run's schedule lands: addHabit's own
           // render ran before it existed, so hook liveness on any card
@@ -4930,6 +4941,7 @@ function injectChunkMap(){
       }
       const trayDelBtn = e.target.closest('[data-action="tray-delete"]');
       if (trayDelBtn){ trayDelete(trayDelBtn.getAttribute("data-id")); return; }
+      if (e.target.closest('[data-action="tray-reveal"]')){ state.trayReveal = !state.trayReveal; refreshTrayList(); return; }
       if (e.target.closest('[data-action="tray-info"]')){
         const panel = qs(".tray-info-panel"); if (panel) panel.hidden = !panel.hidden; return;
       }
@@ -5988,10 +6000,12 @@ function injectChunkMap(){
       { title: "A stalled project shows up with choices", notes: "The sample project \u2018Website relaunch\u2019 has no next action, so it appears in the review. It offers: add a next action (type it right there), move to Someday/Maybe, complete it, or delete it \u2014 then Not now. Add a next action and it drops out of the review." },
       { title: "Overdue items come first", notes: "Give any Next Action a deadline in the past (e.g. yesterday) and reopen the review \u2014 it sits at the very top with a red \u2018passed\u2019 bar. Its choices are: push the date (a date box opens right there), complete it, delete it, or Not now. Handle it and it drops out." },
       { title: "A waiting item whose condition vanished shows up", notes: "Make a Waiting item wait on a specific action, then delete that action. The waiting item now appears in the review as \u2018orphaned\u2019, with choices: re-point it, replace it with a note to yourself, promote it to Next, complete, or delete." },
-      { title: "Captures get sorted into a lane", notes: "A thought you captured appears in the review with buttons: Next, Waiting, Project, Future, Note. Tap one \u2014 it opens a create page with your text already filled in. Save it and the capture is filed (gone from the intray); cancel (\u2715) and the capture stays put." },
-      { title: "\u2018Not now\u2019 defers until tomorrow", notes: "Tap \u2018Not now\u2019 on any card \u2014 it drops out of this review and won\u2019t come back today. When nothing\u2019s left you\u2019ll see either \u2018All clear\u2019 (nothing slipping through the cracks) or \u2018N deferred\u2019. Deferred items return tomorrow. There\u2019s no penalty and no \u2018skipped\u2019 counter." },
+      { title: "Stalled projects and orphaned waiting items sit at the bottom", notes: "In the review, overdue items come first and your captures next; stalled projects and orphaned waiting items \u2014 the ones that need real thought \u2014 fall to the very bottom, so you clear the quick wins first." },
+      { title: "Captures can be sorted into any lane \u2014 including Habits", notes: "A thought you captured appears in the review with buttons: Next, Waiting, Project, Future, Habit, Note. Tap one \u2014 it opens a create page with your text already filled in. Save it and the capture is filed (gone from the intray); cancel (\u2715) and the capture stays put." },
+      { title: "\u2018Not now\u2019 defers until the next review", notes: "Tap \u2018Not now\u2019 on any card \u2014 it drops out of this review for now. When nothing\u2019s left you\u2019ll see either \u2018All clear\u2019 (nothing slipping through the cracks) or \u2018N deferred\u2019. Close the review and open it again and the deferred items are back \u2014 deferring buys you the rest of this one sitting, not the whole day. There\u2019s no penalty and no \u2018skipped\u2019 counter." },
+      { title: "Captures are redacted in the intray until you reveal them", notes: "Open the intray. Your captures show as solid black bars \u2014 unreadable at a glance if someone\u2019s looking over your shoulder. Tap the crossed-eye button (\u2018Reveal\u2019) above the list to un-black them; tap it again (\u2018Hide\u2019) to seal them. Closing and reopening the intray always starts sealed." },
       { title: "Tapping a card opens its real page and returns", notes: "Tap the title of a review card \u2014 its full page opens, wherever that item lives. Save (\u2190) and you land back in the review, which updates: anything you fixed drops out." },
-      { title: "The \u2139 button explains the choices", notes: "Tap the \u2139 at the top of the review \u2014 it explains what each sort button (Next/Waiting/Project/Future/Note) and each decision (past-due, stalled project, orphaned waiting) does." }
+      { title: "The \u2139 button explains the choices", notes: "Tap the \u2139 at the top of the review \u2014 it explains what each sort button (Next/Waiting/Project/Future/Habit/Note) and each decision (past-due, stalled project, orphaned waiting) does." }
     ]);
 
     saveTasksLocal("next");
@@ -6010,26 +6024,50 @@ function injectChunkMap(){
   const TRAY_INFO = "A holding pen for stray thoughts. Try sorting through it once a day — an empty intray means nothing's slipping through the cracks.";
   function loadTray(){ return Storage.getJSON("gtd_tray", []); }
   function saveTray(){ Storage.setJSON("gtd_tray", state.tray); }
-  function trayCardHtml(item){
+  // The eye toggle glyph (user follow-up). Crossed eye = captures are hidden
+  // (tap to reveal); open eye = revealed (tap to hide). Inline SVG so the
+  // "eye with a cross through it" renders identically everywhere — no emoji
+  // eye-off exists cross-platform.
+  function eyeIconHtml(revealed){
+    const base = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12Z"/><circle cx="12" cy="12" r="3"/>';
+    return base + (revealed ? "" : '<line x1="3" y1="3" x2="21" y2="21"/>') + '</svg>';
+  }
+  // A tray card. Captures are REDACTED by default (user follow-up): a sealed
+  // pitch-black bar, unreadable and with no discard ✕, exactly like the
+  // review's redaction. The drawer's reveal toggle un-seals them.
+  function trayCardHtml(item, revealed){
+    if (!revealed) return '<div class="tray-card tray-card-redacted"><span class="tray-card-redaction" aria-hidden="true"></span></div>';
     return '<div class="tray-card">' +
       '<span class="tray-card-text">' + escapeHtml(item.text) + '</span>' +
       '<button type="button" class="icon-btn" data-action="tray-delete" data-id="' + item.id + '" title="Discard">&times;</button>' +
     '</div>';
   }
   // The drawer's Review button (chunk 6b, §4.8b) — the entry point to the
-  // review surface. The badge counts open loops still awaiting review this
-  // session (deferred ones excluded), across all lanes, not just captures.
+  // review surface. The badge counts EVERY open loop across all lanes (not
+  // just captures). It does NOT subtract "Not now" deferrals: those now reset
+  // the moment the review reopens (user follow-up), so the badge reflects what
+  // the next open will actually show.
   function trayReviewBtnHtml(){
-    const n = reviewActiveLoops().length;
+    const n = computeOpenLoops().length;
     return '<button type="button" class="tray-review-btn" data-action="open-review">' +
       '<span>&#128269; Review</span>' + (n ? '<span class="tray-review-count">' + n + '</span>' : '') +
     '</button>';
   }
   function trayListHtml(){
-    const cards = (state.tray || []).map(trayCardHtml).join("");
-    const list = cards
-      ? '<div class="tray-list">' + cards + '</div>'
-      : '<div class="tray-empty">Empty for now — nothing slipping through the cracks.</div>';
+    const items = state.tray || [];
+    const revealed = !!state.trayReveal;
+    let list;
+    if (items.length){
+      const cards = items.map(function(it){ return trayCardHtml(it, revealed); }).join("");
+      const toggle = '<div class="tray-list-head">' +
+        '<button type="button" class="tray-reveal-btn" data-action="tray-reveal" title="' + (revealed ? "Hide captures" : "Reveal captures") + '">' +
+          eyeIconHtml(revealed) + '<span>' + (revealed ? "Hide" : "Reveal") + '</span>' +
+        '</button></div>';
+      list = toggle + '<div class="tray-list">' + cards + '</div>';
+    } else {
+      list = '<div class="tray-empty">Empty for now — nothing slipping through the cracks.</div>';
+    }
     return trayReviewBtnHtml() + list;
   }
   // Update just the card list in an already-open drawer — adding/removing a
@@ -6067,6 +6105,7 @@ function injectChunkMap(){
   }
   function openTray(){
     state.trayOpen = true;
+    state.trayReveal = false; // captures start sealed every time the drawer opens (user follow-up)
     renderTray();
     const input = qs("#tray-input"); if (input) input.focus();
   }
@@ -6135,8 +6174,11 @@ function injectChunkMap(){
     return !!(parent && parent.devContext);
   }
   // The ordered queue. Past-due FIRST (§4.8b: sorts to top, revealed first),
-  // then the derived kinds, then captures. De-duped by id so an item that is
-  // both past-due and stalled surfaces once (past-due wins, being first).
+  // then captures, then the two derived open-loop kinds LAST — stalled
+  // projects and orphaned waiting actions sink to the bottom (user follow-up:
+  // they're the "think about it" items, so you clear the quick wins first).
+  // De-duped by id so an item that is both past-due and stalled surfaces once
+  // (past-due wins, being first).
   function computeOpenLoops(){
     const loops = [];
     ["next", "current"].forEach(function(k){
@@ -6146,43 +6188,32 @@ function injectChunkMap(){
         if (st && st.passed) loops.push({ key: t.id, kind: "pastdue", laneKind: k, id: t.id, task: t });
       });
     });
+    (state.tray || []).forEach(function(c){ loops.push({ key: c.id, kind: "capture", id: c.id, text: c.text }); });
     state.tasks.current.forEach(function(t){
       if (!t.isGroup && !isDevScaffold(t) && !projectHasWayForward(t.id)) loops.push({ key: t.id, kind: "stalled", laneKind: "current", id: t.id, task: t });
     });
     state.tasks.waiting.forEach(function(t){
       if (!t.isGroup && !isDevScaffold(t) && isWaitingOrphaned(t)) loops.push({ key: t.id, kind: "orphaned", laneKind: "waiting", id: t.id, task: t });
     });
-    (state.tray || []).forEach(function(c){ loops.push({ key: c.id, kind: "capture", id: c.id, text: c.text }); });
     const seen = {};
     return loops.filter(function(l){ if (seen[l.key]) return false; seen[l.key] = 1; return true; });
   }
 
-  // --- "Not now" deferral: session-scoped, stamped with the app-day. On read,
-  //     a stamp for an earlier app-day is empty — the 4 AM boundary ends the
-  //     session even if the app never closed (§4.8b judgment call, adopted).
-  function reviewDeferred(){
-    if (!state.reviewDeferred || state.reviewDeferred.date !== todayStr()){
-      const raw = Storage.getJSON("gtd_review_deferred", null);
-      state.reviewDeferred = (raw && raw.date === todayStr()) ? { date: raw.date, ids: raw.ids || [] } : { date: todayStr(), ids: [] };
-    }
-    return state.reviewDeferred;
-  }
-  function reviewDeferredSet(){ const ids = reviewDeferred().ids; const s = {}; ids.forEach(function(i){ s[i] = 1; }); return s; }
-  function deferReviewItem(key){
-    const d = reviewDeferred();
-    if (d.ids.indexOf(key) === -1) d.ids.push(key);
-    Storage.setJSON("gtd_review_deferred", d);
-  }
-  function clearReviewDeferrals(){
-    state.reviewDeferred = { date: todayStr(), ids: [] };
-    Storage.setJSON("gtd_review_deferred", state.reviewDeferred);
-  }
+  // --- "Not now" deferral: scoped to the currently-OPEN review (user
+  //     follow-up, supersedes the §4.8b day-scoped model). A deferred item
+  //     drops out for the rest of THIS viewing; closing the review and opening
+  //     it again brings everything back — "defer until the next review", not
+  //     "until tomorrow". The set is in-memory only; openReviewScreen clears
+  //     it, so nothing needs to persist or be stamped with the app-day.
+  function reviewDeferredSet(){ return state.reviewDeferred || (state.reviewDeferred = {}); }
+  function deferReviewItem(key){ reviewDeferredSet()[key] = 1; }
   function reviewActiveLoops(){
     const deferred = reviewDeferredSet();
     return computeOpenLoops().filter(function(l){ return !deferred[l.key]; });
   }
 
   function openReviewScreen(){
+    state.reviewDeferred = {}; // a fresh review always starts with everything on the table
     state.reviewShowAll = false;
     state.screen = { kind: "review", reviewView: true, taskId: null, draft: {}, reviewForm: null };
     renderScreen();
@@ -6221,6 +6252,7 @@ function injectChunkMap(){
           '<b>Waiting:</b> ' + escapeHtml(LANE_INFO.waiting) + '<br>' +
           '<b>Project:</b> ' + escapeHtml(LANE_INFO.current) + '<br>' +
           '<b>Future:</b> ' + escapeHtml(LANE_INFO.future) + '<br>' +
+          '<b>Habit:</b> ' + escapeHtml(LANE_INFO.habit) + '<br>' +
           '<b>Note:</b> ' + escapeHtml(LANE_INFO.notes) +
         '</div>' +
         '<div class="review-info-block"><b>Deciding on an open loop</b><br>' +
@@ -6273,6 +6305,7 @@ function injectChunkMap(){
           reviewMenuBtn("review-sort", "Waiting", ' data-target="waiting" data-key="' + l.key + '"') +
           reviewMenuBtn("review-sort", "Project", ' data-target="current" data-key="' + l.key + '"') +
           reviewMenuBtn("review-sort", "Future", ' data-target="future" data-key="' + l.key + '"') +
+          reviewMenuBtn("review-sort", "Habit", ' data-target="habit" data-key="' + l.key + '"') +
           reviewMenuBtn("review-sort", "Note", ' data-target="notes" data-key="' + l.key + '"') +
         '</div>' +
         '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + '</div>';
@@ -6337,7 +6370,7 @@ function injectChunkMap(){
     if (!active.length){
       html += (deferredCount > 0)
         ? '<div class="review-end review-end-deferred"><div class="review-end-big">' + deferredCount + ' deferred.</div>' +
-            '<div class="review-end-sub">You saw everything. These are waiting on you — they’ll be back tomorrow.</div></div>'
+            '<div class="review-end-sub">You saw everything. These are waiting on you — they’ll be back next time you open the review.</div></div>'
         : '<div class="review-end review-end-empty"><div class="review-end-big">All clear.</div>' +
             '<div class="review-end-sub">Nothing slipping through the cracks.</div></div>';
       return html + '</div>';
