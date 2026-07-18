@@ -967,6 +967,7 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
   border:1px solid var(--teal); color:var(--text-primary); background:rgba(79,179,166,0.14); }
 .note-chip-completed{ border-color:var(--moss); background:rgba(107,158,107,0.16); }
 .note-chip-deleted{ border-style:dashed; border-color:var(--red); color:var(--red); background:transparent; } /* tombstone (§4.9) */
+.note-chip-more{ border-color:rgba(255,255,255,0.22); background:rgba(255,255,255,0.06); color:var(--text-soft); } /* "+n" overflow badge (user) */
 .note-chip[data-action]{ cursor:pointer; }
 .note-chip .chip-x{ border:none; background:transparent; color:inherit; font-size:15px; line-height:1; padding:0 0 0 1px; cursor:pointer; }
 .note-add-link{ font-size:12px; padding:4px 10px; border-radius:20px; border:1px dashed rgba(255,255,255,0.3); background:transparent; color:var(--text-soft); }
@@ -5828,11 +5829,26 @@ function injectChunkMap(){
       (removable ? '<button type="button" class="chip-x" data-action="note-unlink" data-id="' + link.id + '" title="Remove">&times;</button>' : "") +
     '</span>';
   }
+  // Tag chips for a note. Tags (§4.9b registry) are not built yet — this
+  // returns [] until they are, so the card/page chip rows already account for
+  // them (the two-chip cap in noteCardHtml is over projects+tags combined) and
+  // nothing needs re-plumbing when the registry lands. `removable` mirrors the
+  // project-chip API (draft ✕ on the note page).
+  function noteTagChips(note, removable){ return []; }
   function noteCardHtml(note){
     const preview = (note.body || "").trim().split("\n")[0].slice(0, 120);
-    const chips = (note.projectLinks || []).length
-      ? '<div class="note-chips">' + note.projectLinks.map(function(l){ return noteChipHtml(l, false); }).join("") + '</div>'
-      : "";
+    // Card chip row is a PREVIEW, not the full set (user): show at most two,
+    // then a "+n" badge for the remainder. Tags join projects here once §4.9b
+    // ships — the cap is over the combined list. Order: projects, then tags.
+    const allChips = (note.projectLinks || []).map(function(l){ return { html: noteChipHtml(l, false) }; })
+      .concat(noteTagChips(note, false).map(function(h){ return { html: h }; }));
+    let chips = "";
+    if (allChips.length){
+      const shown = allChips.slice(0, 2).map(function(c){ return c.html; }).join("");
+      const extra = allChips.length - 2;
+      const more = extra > 0 ? '<span class="note-chip note-chip-more">+' + extra + '</span>' : "";
+      chips = '<div class="note-chips">' + shown + more + '</div>';
+    }
     return (
       '<div class="card note-card">' +
         '<div class="card-top"><div class="card-title" data-action="open-note" data-id="' + note.id + '">' + escapeHtml(note.title || "Untitled") + '</div></div>' +

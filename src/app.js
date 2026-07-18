@@ -4639,11 +4639,26 @@
       (removable ? '<button type="button" class="chip-x" data-action="note-unlink" data-id="' + link.id + '" title="Remove">&times;</button>' : "") +
     '</span>';
   }
+  // Tag chips for a note. Tags (§4.9b registry) are not built yet — this
+  // returns [] until they are, so the card/page chip rows already account for
+  // them (the two-chip cap in noteCardHtml is over projects+tags combined) and
+  // nothing needs re-plumbing when the registry lands. `removable` mirrors the
+  // project-chip API (draft ✕ on the note page).
+  function noteTagChips(note, removable){ return []; }
   function noteCardHtml(note){
     const preview = (note.body || "").trim().split("\n")[0].slice(0, 120);
-    const chips = (note.projectLinks || []).length
-      ? '<div class="note-chips">' + note.projectLinks.map(function(l){ return noteChipHtml(l, false); }).join("") + '</div>'
-      : "";
+    // Card chip row is a PREVIEW, not the full set (user): show at most two,
+    // then a "+n" badge for the remainder. Tags join projects here once §4.9b
+    // ships — the cap is over the combined list. Order: projects, then tags.
+    const allChips = (note.projectLinks || []).map(function(l){ return { html: noteChipHtml(l, false) }; })
+      .concat(noteTagChips(note, false).map(function(h){ return { html: h }; }));
+    let chips = "";
+    if (allChips.length){
+      const shown = allChips.slice(0, 2).map(function(c){ return c.html; }).join("");
+      const extra = allChips.length - 2;
+      const more = extra > 0 ? '<span class="note-chip note-chip-more">+' + extra + '</span>' : "";
+      chips = '<div class="note-chips">' + shown + more + '</div>';
+    }
     return (
       '<div class="card note-card">' +
         '<div class="card-top"><div class="card-title" data-action="open-note" data-id="' + note.id + '">' + escapeHtml(note.title || "Untitled") + '</div></div>' +
