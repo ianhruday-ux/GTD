@@ -4961,8 +4961,8 @@
           ? '<input type="date" id="review-form-input" data-field="reviewForm" class="review-form-input' + (invalid ? " field-invalid" : "") + '" value="' + escapeHtml(value || "") + '" style="color-scheme:dark">'
           : '<input type="text" id="review-form-input" data-field="reviewForm" class="review-form-input' + (invalid ? " field-invalid" : "") + '" placeholder="' + escapeHtml(placeholder) + '" value="' + escapeHtml(value || "") + '" autocomplete="off">') +
         '<div class="review-inline-form-btns">' +
-          '<button type="button" class="review-menu-btn" data-action="' + saveAction + '">' + saveLabel + '</button>' +
           '<button type="button" class="review-menu-btn" data-action="review-form-cancel">Cancel</button>' +
+          '<button type="button" class="review-menu-btn" data-action="' + saveAction + '">' + saveLabel + '</button>' +
         '</div>' +
       '</div>'
     );
