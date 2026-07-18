@@ -2,4 +2,4 @@ __pycache__/
 .pytest_cache/
 *.pyc
 dist/index.baseline.html
-drag log.txt
+drag log*.txt

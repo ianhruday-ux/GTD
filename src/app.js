@@ -3599,7 +3599,19 @@
         const trailing = zone.querySelector(":scope > .add-row-mini");
         if (trailing) ref = trailing;
       }
-      if (ref !== el && el.nextSibling !== ref){
+      if (drag.touch){
+        // Touch path (Chrome Android): moving the touched node mid-drag makes
+        // the browser fire touchcancel and kill the gesture (confirmed by the
+        // drag log — the drag dies right after the first live reorder). So
+        // don't move it here; record the target and defer the real DOM move to
+        // commit (touchend). The dragged card stays dimmed in place while the
+        // drop indicator shows where it will land.
+        if (drag.dropZone !== zone || drag.dropRef !== ref){
+          dlog("drop-target", "before " + (ref ? dragDesc(ref) : "end"));
+        }
+        drag.dropZone = zone;
+        drag.dropRef = ref;
+      } else if (ref !== el && el.nextSibling !== ref){
         zone.insertBefore(el, ref);
       }
       // Drop indicator: a rule before the card we'd land in front of, else
@@ -3614,6 +3626,14 @@
     }
     function commitLiveMove(drag){
       const el = drag.el;
+      // Touch path deferred the DOM move (see applyLiveMove) to avoid
+      // cancelling the touch mid-drag. The touch is over now, so place the
+      // element at the recorded target before reading its final position.
+      if (drag.touch && drag.dropZone){
+        let ref = drag.dropRef;
+        if (ref && ref.parentElement !== drag.dropZone) ref = null;
+        if (ref !== el && el.nextSibling !== ref) drag.dropZone.insertBefore(el, ref);
+      }
       const laneEl = el.closest(".lane");
       if (!laneEl) return;
       const kind = laneEl.getAttribute("data-kind");
@@ -3800,7 +3820,7 @@
         touchDrag.active = true;
         dlog("HOLD FIRED → drag now active");
         el.classList.add("dragging");
-        liveDrag = { el: el, kind: kind, isGroup: isGroup };
+        liveDrag = { el: el, kind: kind, isGroup: isGroup, touch: true };
         document.body.classList.add("drag-active"); // freeze the collapsing tab bar (spec 4.10b, known issue 2)
         dragPointer = { x: touchDrag.startX, y: touchDrag.startY };
         startAutoScroll();
