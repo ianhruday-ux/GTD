@@ -2049,6 +2049,7 @@
         staged.edits[s.taskId] = ed;
       }
     }
+    if (s.staging.parent.invalidField === "projectActions") s.staging.parent.invalidField = null;
     closeScreen();
   }
   // Save a project page (§12.1): write the project's own fields, apply its
@@ -2056,6 +2057,15 @@
   // match), then complete/convert if armed.
   function saveProjectScreen(s, data){
     const d = s.draft;
+    // §4.3 (chunk 5): a NEW Current project needs at least one staged action.
+    // Drafting-page-only, Current-only, at-creation-only — the calendar row and
+    // the QA/chunk-map injectors deliberately make actionless projects and go
+    // nowhere near this handler. Standard dashed-outline block.
+    if (s.kind === "current" && !s.taskId && projectDraftLinked(s).length === 0){
+      s.invalidField = "projectActions";
+      renderScreen();
+      return;
+    }
     const willComplete = !!d.willComplete;
     const convertTo = (!willComplete && s.taskId) ? (d.convertTo || null) : null;
     const projData = {
@@ -2209,6 +2219,7 @@
       isGroup: false, parent: null, deadline: null, contextId: null, whenText: null,
       conditionId: null, conditionKind: null, conditionLabel: null, bundleText: null, createdAt: Date.now()
     });
+    if (s.invalidField === "projectActions") s.invalidField = null;
     renderScreen();
   }
   // (screenSuggestHabit removed in chunk 3 -- the "make it a habit" bubble
@@ -2471,7 +2482,21 @@
       '<div class="linked-actions-list">' + html + '</div>'
     );
   }
-  function linkRowHtml(draft){
+  // `locked` (chunk 5, §12.1): when an action is opened as a child of the
+  // project it is a member of, its project link is shown-but-disabled — you
+  // remove it from the project's own list instead. Keyed to membership, not
+  // provenance (§12.1, §4.15d).
+  function linkRowHtml(draft, locked){
+    if (locked){
+      return (
+        '<div class="screen-row">' +
+          '<div class="screen-boxed-row screen-row-disabled" title="Linked to this project — remove it from the project&#39;s list instead">' +
+            '<span class="field-icon">&#128279;</span>' +
+            '<select class="screen-link-select" data-field="linkedProjectId" disabled>' + projectOptionsHtml(draft.linkedProjectId) + '</select>' +
+          '</div>' +
+        '</div>'
+      );
+    }
     // Wrapped in .screen-row like every other .screen-boxed-row use — without
     // it, .screen-boxed-row's flex:1 was being read against .screen-body's
     // *column* axis (height) instead of a row's (width), so the box grew to
@@ -2881,6 +2906,9 @@
   }
   function screenBodyHtml(s){
     const draft = s.draft, kind = s.kind;
+    // §12.1: lock the project link when this action is opened as a child of
+    // the project it actually belongs to (membership, not provenance).
+    const linkLocked = !!(s.staging && draft.linkedProjectId && draft.linkedProjectId === s.staging.projectId);
 
     if (kind === "habit" && draft.hookPicker){
       return '<div class="screen-body">' +
@@ -2899,7 +2927,7 @@
 
     if (kind === "next"){
       fields += '<textarea class="screen-field-desc" data-field="notesClean" placeholder="Description (optional)\u2026">' + escapeHtml(draft.notesClean) + '</textarea>';
-      fields += linkRowHtml(draft);
+      fields += linkRowHtml(draft, linkLocked);
       fields += contextRowHtml(draft);
       fields += deadlineFieldsHtml(draft, kind);
       if (s.taskId){
@@ -2918,7 +2946,7 @@
       // after the title" per 4.2.
       if (draft.conditionId) fields += conditionPillHtml(draft);
       fields += '<textarea class="screen-field-desc" data-field="notesClean" placeholder="Description (optional)\u2026">' + escapeHtml(draft.notesClean) + '</textarea>';
-      fields += linkRowHtml(draft);
+      fields += linkRowHtml(draft, linkLocked);
       fields += contextRowHtml(draft);
       fields += waitingForRowHtml(draft, s.invalidField === "waitingFor");
       if (s.taskId) fields += makeKindBtnHtml("next", "Make Next Action", "left", draft.convertTo === "next", !!draft.willComplete);
@@ -2933,7 +2961,7 @@
           // Quick-add rows (doc 4.3's design, pulled forward by the
           // overnight notes): type + Enter/+ creates without leaving this
           // page; the ✎ opens the full drafting page and returns here.
-          fields += '<div class="quick-add-row">' +
+          fields += '<div class="quick-add-row' + (s.invalidField === "projectActions" ? " field-invalid" : "") + '">' +
             '<input type="text" data-quickadd="next" placeholder="Next action\u2026">' +
             '<button type="button" data-action="quick-add-submit" data-gen-kind="next" title="Add">+</button>' +
             '<button type="button" data-action="generate-action" data-gen-kind="next" title="Open full editor">&#9998;</button>' +
