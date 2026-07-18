@@ -3778,7 +3778,9 @@
       const openNoteEl = e.target.closest('[data-action="open-note"]');
       if (openNoteEl){ openNoteScreen(openNoteEl.getAttribute("data-id")); return; }
       // Note project-link picker (§4.9), all draft-isolated.
-      if (e.target.closest('[data-action="note-add-link"]')){ if (state.screen){ state.screen.draft.projectPicker = true; renderScreen(); } return; }
+      const mdBtn = e.target.closest("[data-md]");
+      if (mdBtn){ applyNoteFormat(mdBtn.getAttribute("data-md")); return; }
+      if (e.target.closest('[data-action="note-add-link"]')){ if (state.screen){ syncNoteBodyDraft(); state.screen.draft.projectPicker = true; renderScreen(); } return; }
       if (e.target.closest('[data-action="note-cancel-pick"]')){ if (state.screen){ state.screen.draft.projectPicker = false; renderScreen(); } return; }
       const notePickBtn = e.target.closest('[data-action="note-pick-project"]');
       if (notePickBtn){
@@ -3793,7 +3795,7 @@
       const noteUnlinkBtn = e.target.closest('[data-action="note-unlink"]');
       if (noteUnlinkBtn){
         const s = state.screen; const id = noteUnlinkBtn.getAttribute("data-id");
-        if (s){ s.draft.projectLinks = (s.draft.projectLinks || []).filter(function(l){ return l.id !== id; }); renderScreen(); }
+        if (s){ syncNoteBodyDraft(); s.draft.projectLinks = (s.draft.projectLinks || []).filter(function(l){ return l.id !== id; }); renderScreen(); }
         return;
       }
       const filterNotesBtn = e.target.closest('[data-action="filter-notes"]');
@@ -3928,7 +3930,12 @@
       const draft = state.screen.draft;
       if (field === "title"){ draft.title = el.value; }
       else if (field === "noteTitle"){ draft.title = el.value; } // chunk 6
-      else if (field === "noteBody"){ draft.body = el.value; el.style.height = "auto"; el.style.height = (el.scrollHeight + 2) + "px"; }
+      else if (field === "noteBody"){
+        // contenteditable rich body (§4.9): read HTML out, never write it back
+        // here — re-rendering a contenteditable mid-keystroke resets the caret.
+        draft.body = el.innerHTML;
+        el.classList.toggle("is-empty", !(el.textContent || "").trim());
+      }
       else if (field === "notesClean"){ draft.notesClean = el.value; el.style.height = "auto"; el.style.height = (el.scrollHeight + 2) + "px"; }
       else if (field === "cueText"){
         const row = state.screen.draft.cueRows && state.screen.draft.cueRows[Number(el.getAttribute("data-row"))];
@@ -4348,6 +4355,14 @@
       touchDragCleanup();
     });
 
+    // CHUNK 6 (user): keep the note editor's selection alive when a formatting
+    // button is pressed. A toolbar button would otherwise steal focus from the
+    // contenteditable on mousedown and collapse the selection before the click
+    // runs execCommand. preventDefault on the button's own mousedown holds it.
+    document.addEventListener("mousedown", function(e){
+      if (e.target.closest(".note-tool[data-md]")) e.preventDefault();
+    });
+
     // CHUNK 6 tweak (user): SWIPE the capture drawer open / closed.
     // §4.8a originally ruled swipe-to-open OUT — a right-swipe from the left
     // edge IS Android's system back gesture, and a drawer that fights it loses.
@@ -4645,8 +4660,50 @@
   // nothing needs re-plumbing when the registry lands. `removable` mirrors the
   // project-chip API (draft ✕ on the note page).
   function noteTagChips(note, removable){ return []; }
+  // ---- Rich-text note body (§4.9, user: proper markup) --------------------
+  // The body is HTML now, not plain text. It is authored in a contenteditable
+  // and constrained to a small allowlist: emphasis (b/strong, i/em, u), one
+  // heading level (h2), and lists (ul/ol/li), plus br and paragraph wrappers.
+  // Everything else — scripts, styles, images, inline styles, links, spans,
+  // colours, foreign tags pasted from other apps or arriving in an imported
+  // backup (chunk 8) — is stripped. This is the ONE untrusted-input surface in
+  // a local app, so sanitise on every save and defensively on render.
+  const NOTE_ALLOWED_TAGS = { B:1, STRONG:1, I:1, EM:1, U:1, H2:1, UL:1, OL:1, LI:1, BR:1, P:1, DIV:1 };
+  function sanitizeNoteHtml(html){
+    const root = document.createElement("div");
+    root.innerHTML = html || "";
+    (function clean(node){
+      let child = node.firstChild;
+      while (child){
+        let next = child.nextSibling;
+        if (child.nodeType === 3){
+          /* text node — keep */
+        } else if (child.nodeType === 1 && NOTE_ALLOWED_TAGS[child.tagName]){
+          while (child.attributes.length) child.removeAttribute(child.attributes[0].name); // no styles/classes/handlers/hrefs
+          clean(child);
+        } else if (child.nodeType === 1){
+          // disallowed element: unwrap (keep children, drop the wrapper), then
+          // re-process the moved-up children starting from the first of them.
+          const firstMoved = child.firstChild;
+          while (child.firstChild) node.insertBefore(child.firstChild, child);
+          node.removeChild(child);
+          if (firstMoved) next = firstMoved;
+        } else {
+          node.removeChild(child); // comment / other
+        }
+        child = next;
+      }
+    })(root);
+    return root.innerHTML;
+  }
+  // One-line plain-text reduction for the card preview.
+  function noteBodyToText(html){
+    const d = document.createElement("div");
+    d.innerHTML = html || "";
+    return (d.textContent || "").replace(/\s+/g, " ").trim();
+  }
   function noteCardHtml(note){
-    const preview = (note.body || "").trim().split("\n")[0].slice(0, 120);
+    const preview = noteBodyToText(note.body || "").slice(0, 120);
     // Card chip row is a PREVIEW, not the full set (user): show at most two,
     // then a "+n" badge for the remainder. Tags join projects here once §4.9b
     // ships — the cap is over the combined list. Order: projects, then tags.
@@ -4700,18 +4757,72 @@
     state.screen = { kind: "notes", taskId: noteId || null, noteId: noteId || null, noteView: true, draft: draft };
     renderScreen();
   }
+  // The rich-text toolbar (§4.9, user). B/I/U are the emphasis the author uses
+  // for headings + important lines; H2 for section titles; bulleted list; and
+  // the ⊞ opens the add-a-tag/linked-project picker (one entry point — the
+  // picker gains a Tags section when §4.9b lands; today it links projects).
+  // Every button produces only allow-listed tags with no attributes, so it
+  // survives sanitizeNoteHtml untouched. `data-md` buttons fire execCommand;
+  // the mousedown-preventDefault (bindEvents) keeps the caret in the editable.
+  function noteToolbarHtml(){
+    return '<div class="note-toolbar">' +
+      '<button type="button" class="note-tool" data-md="bold" title="Bold"><b>B</b></button>' +
+      '<button type="button" class="note-tool" data-md="italic" title="Italic"><i>I</i></button>' +
+      '<button type="button" class="note-tool" data-md="underline" title="Underline"><span style="text-decoration:underline">U</span></button>' +
+      '<button type="button" class="note-tool" data-md="h2" title="Heading">H</button>' +
+      '<button type="button" class="note-tool" data-md="ul" title="Bullet list">&#8226;</button>' +
+      '<span class="note-tool-sep"></span>' +
+      '<button type="button" class="note-tool" data-action="note-add-link" title="Add a tag or linked project">&#8862;</button>' +
+    '</div>';
+  }
+  // The contenteditable owns its DOM while you type (the input handler only
+  // reads out of it). Before ANY renderScreen that would rebuild the body from
+  // draft.body — opening the picker, removing a chip — pull the live HTML into
+  // the draft first, or in-progress typing since the last input event is lost.
+  function syncNoteBodyDraft(){
+    if (!state.screen || !state.screen.draft) return;
+    const el = qs('.note-body[contenteditable]');
+    if (el) state.screen.draft.body = el.innerHTML;
+  }
+  // Toolbar formatting. execCommand is deprecated-but-universally-supported and
+  // the pragmatic choice for a small local editor (§4.9 build note); if a
+  // browser ever drops it the notes are still valid HTML, only the buttons
+  // break. Every command yields allow-listed tags, so nothing here can outrun
+  // sanitizeNoteHtml. H2 toggles back to a plain block when already a heading.
+  function applyNoteFormat(cmd){
+    const el = qs('.note-body[contenteditable]');
+    if (!el) return;
+    el.focus();
+    try {
+      if (cmd === "bold") document.execCommand("bold");
+      else if (cmd === "italic") document.execCommand("italic");
+      else if (cmd === "underline") document.execCommand("underline");
+      else if (cmd === "ul") document.execCommand("insertUnorderedList");
+      else if (cmd === "h2"){
+        const cur = (document.queryCommandValue("formatBlock") || "").toLowerCase();
+        document.execCommand("formatBlock", false, (cur === "h2" || cur === "<h2>") ? "div" : "h2");
+      }
+    } catch (err){ /* execCommand unsupported — leave the body untouched */ }
+    if (state.screen && state.screen.draft){
+      state.screen.draft.body = el.innerHTML;
+      el.classList.toggle("is-empty", !(el.textContent || "").trim());
+    }
+  }
   function noteBodyHtml(s){
     const d = s.draft;
     if (d.projectPicker) return noteProjectPickerHtml(s);
     let fields = '<input type="text" class="screen-field-title' + (s.invalidField === "title" ? " field-invalid" : "") + '" data-field="noteTitle" placeholder="Note title…" value="' + escapeHtml(d.title) + '">';
-    fields += '<textarea class="screen-field-desc note-body" data-field="noteBody" placeholder="Write anything…">' + escapeHtml(d.body) + '</textarea>';
-    // Linked projects — many-valued (§4.9), draft-isolated: chips commit on Save.
-    fields += '<div class="screen-hook-pick-label">Linked projects</div>';
-    fields += '<div class="note-chips">' +
-      (d.projectLinks || []).map(function(l){ return noteChipHtml(l, true); }).join("") +
-      '<button type="button" class="note-add-link" data-action="note-add-link">+ Link a project</button>' +
-    '</div>';
-    return '<div class="screen-body">' + fields + '</div>';
+    fields += noteToolbarHtml();
+    const bodyHtml = sanitizeNoteHtml(d.body);
+    fields += '<div class="screen-field-desc note-body' + (noteBodyToText(bodyHtml) ? "" : " is-empty") + '" contenteditable="true" data-field="noteBody" data-placeholder="Write anything…">' + bodyHtml + '</div>';
+    // Attached chips — projects now (many-valued, §4.9), tags too once §4.9b
+    // lands. Draft-isolated: add/remove stage on the draft, commit on Save.
+    const attached = (d.projectLinks || []).map(function(l){ return noteChipHtml(l, true); })
+      .concat(noteTagChips({ tagIds: d.tagIds }, true));
+    if (attached.length){
+      fields += '<div class="note-chips note-attached">' + attached.join("") + '</div>';
+    }
+    return '<div class="screen-body note-screen-body">' + fields + '</div>';
   }
   // The link picker (§4.9b): LIVE projects only — deleted and completed
   // projects never appear (the chip row still shows their frozen/green chips).
@@ -4731,11 +4842,12 @@
   function saveNoteScreen(s){
     const title = (s.draft.title || "").trim();
     if (!title){ s.invalidField = "title"; renderScreen(); return; }
+    const body = sanitizeNoteHtml(s.draft.body || ""); // untrusted-input surface (§4.9) — sanitise at the commit
     if (s.noteId){
       const n = findNote(s.noteId);
-      if (n){ n.title = title; n.body = s.draft.body || ""; n.projectLinks = s.draft.projectLinks || []; n.tagIds = s.draft.tagIds || []; n.editedAt = Date.now(); }
+      if (n){ n.title = title; n.body = body; n.projectLinks = s.draft.projectLinks || []; n.tagIds = s.draft.tagIds || []; n.editedAt = Date.now(); }
     } else {
-      state.notes.unshift({ id: genId(), title: title, body: s.draft.body || "", projectLinks: s.draft.projectLinks || [], tagIds: s.draft.tagIds || [], editedAt: Date.now() });
+      state.notes.unshift({ id: genId(), title: title, body: body, projectLinks: s.draft.projectLinks || [], tagIds: s.draft.tagIds || [], editedAt: Date.now() });
     }
     saveNotes();
     renderLane("notes");

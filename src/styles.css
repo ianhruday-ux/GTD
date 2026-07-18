@@ -941,7 +941,22 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 .note-card{ cursor:pointer; }
 .note-preview{ font-size:12.5px; color:var(--text-soft); margin-top:3px; line-height:1.45;
   display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-.note-body{ min-height:180px; }
+/* Rich-text note body (§4.9, user): a taller contenteditable scratchpad with
+   a formatting toolbar. Extends well down the page; scrolls inside itself once
+   it outgrows its min-height rather than pushing the chip row off-screen. */
+.note-toolbar{ display:flex; align-items:center; gap:4px; flex-wrap:wrap; margin-bottom:6px; }
+.note-tool{ min-width:30px; height:30px; padding:0 7px; border:1px solid rgba(255,255,255,0.16);
+  background:rgba(255,255,255,0.05); color:var(--text-primary); border-radius:6px; font-size:14px;
+  line-height:1; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; }
+.note-tool:active{ background:rgba(255,255,255,0.14); }
+.note-tool-sep{ width:1px; align-self:stretch; margin:2px 3px; background:rgba(255,255,255,0.16); }
+.note-body{ min-height:45vh; max-height:62vh; overflow-y:auto; resize:none; cursor:text; }
+.note-body.is-empty:before{ content:attr(data-placeholder); color:var(--text-soft); pointer-events:none; }
+.note-body h2{ font-family:var(--font-display); font-size:16px; font-weight:700; margin:10px 0 4px; }
+.note-body ul,.note-body ol{ margin:4px 0 4px 22px; }
+.note-body li{ margin:2px 0; }
+.note-body:focus{ outline:2px solid var(--lane-accent, var(--teal)); outline-offset:1px; }
+.note-attached{ margin-top:10px; }
 .note-chips{ display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; align-items:center; }
 .note-chip{ display:inline-flex; align-items:center; gap:5px; font-size:12px; padding:4px 9px; border-radius:20px;
   border:1px solid var(--teal); color:var(--text-primary); background:rgba(79,179,166,0.14); }

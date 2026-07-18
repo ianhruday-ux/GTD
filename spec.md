@@ -1065,6 +1065,19 @@ flat lane will read as an undifferentiated pile and the chips will be carrying t
 fix if it arrives is a **sort-by-project toggle** — still not grouping, still no parent field. Do
 not reach for sections.
 
+**⚑ UNDER REVIEW — NOT DECIDED (user, awaiting human input; do not implement without a ruling):**
+1. **A darker (slate-black) background for the note page specifically**, for reading/writing
+   contrast, distinct from the dark-wood lanes. Leaning yes, but as a deliberate "ink on paper"
+   contrast that still keeps the teal accent — not a jarring theme break.
+2. **A whole-app aesthetic shift toward a Chinese visual language** — black lacquer ground with
+   jade + goldleaf highlights around borders, replacing the current dark wood. Attractive and more
+   distinctive than the generic dark-wood, but it is an app-wide CSS-variable change and should be
+   its own coordinated theming pass, not folded into a feature chunk. Cautions on record: keep gold
+   for **borders/accents/iconography, not body copy** (gold-on-dark fails contrast at text sizes);
+   decide whether **jade replaces teal as the single accent** so the palette stays unified rather
+   than teal+jade+moss competing. Both items are recorded here so a later session does not treat
+   them as settled either way.
+
 ### 4.9b Tags (chunk 6) — RULED
 
 **Why tags exist: they are the answer to "no search" (user ruling).** With no search in the sprint
