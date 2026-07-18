@@ -3469,6 +3469,10 @@
       if (!btn) return;
       state.activeKind = btn.getAttribute("data-kind");
       qsa("#lane-switcher button").forEach(function(b){ b.classList.toggle("active", b === btn); });
+      // Notes chips are DERIVED from project state (live/completed/tombstone),
+      // so refresh them every time the lane is shown — a project may have been
+      // completed, deleted, or renamed since it last rendered (§4.9).
+      if (state.activeKind === "notes") renderLane("notes");
       updateLaneVisibility();
     });
 
@@ -3773,6 +3777,28 @@
 
       const openNoteEl = e.target.closest('[data-action="open-note"]');
       if (openNoteEl){ openNoteScreen(openNoteEl.getAttribute("data-id")); return; }
+      // Note project-link picker (§4.9), all draft-isolated.
+      if (e.target.closest('[data-action="note-add-link"]')){ if (state.screen){ state.screen.draft.projectPicker = true; renderScreen(); } return; }
+      if (e.target.closest('[data-action="note-cancel-pick"]')){ if (state.screen){ state.screen.draft.projectPicker = false; renderScreen(); } return; }
+      const notePickBtn = e.target.closest('[data-action="note-pick-project"]');
+      if (notePickBtn){
+        const s = state.screen; const id = notePickBtn.getAttribute("data-id");
+        const p = state.tasks.current.find(function(t){ return t.id === id; }) || state.tasks.future.find(function(t){ return t.id === id; });
+        if (s && p && !(s.draft.projectLinks || []).some(function(l){ return l.id === id; })){
+          (s.draft.projectLinks = s.draft.projectLinks || []).push({ id: id, name: p.title }); // denormalise the name (§4.9)
+        }
+        if (s){ s.draft.projectPicker = false; renderScreen(); }
+        return;
+      }
+      const noteUnlinkBtn = e.target.closest('[data-action="note-unlink"]');
+      if (noteUnlinkBtn){
+        const s = state.screen; const id = noteUnlinkBtn.getAttribute("data-id");
+        if (s){ s.draft.projectLinks = (s.draft.projectLinks || []).filter(function(l){ return l.id !== id; }); renderScreen(); }
+        return;
+      }
+      const filterNotesBtn = e.target.closest('[data-action="filter-notes"]');
+      if (filterNotesBtn){ state.notesFilter = filterNotesBtn.getAttribute("data-id"); renderLane("notes"); return; }
+      if (e.target.closest('[data-action="clear-notes-filter"]')){ state.notesFilter = null; renderLane("notes"); return; }
 
       const openEditEl = e.target.closest('[data-action="open-edit"]');
       if (openEditEl){ openScreen(openEditEl.getAttribute("data-kind"), openEditEl.getAttribute("data-id")); return; }
@@ -4534,24 +4560,62 @@
   function loadNotes(){ return Storage.getJSON("gtd_notes", []); }
   function saveNotes(){ Storage.setJSON("gtd_notes", state.notes); }
   function findNote(id){ return state.notes.find(function(n){ return n.id === id; }) || null; }
+  // A project a note links to, wherever it now lives. Drives the chip's
+  // state: live (still a project), completed (in the archive → green), or
+  // deleted (found nowhere → tombstone, frozen denormalised name §4.9).
+  function findProjectAnywhere(id){
+    let p = state.tasks.current.find(function(t){ return t.id === id; }) || state.tasks.future.find(function(t){ return t.id === id; });
+    if (p) return { task: p, state: "live" };
+    p = (state.completed.current || []).find(function(t){ return t.id === id; }) || (state.completed.future || []).find(function(t){ return t.id === id; });
+    if (p) return { task: p, state: "completed" };
+    return null;
+  }
+  function noteLinkState(link){ const f = findProjectAnywhere(link.id); return f ? f.state : "deleted"; }
+  // A note's project chip. On the note page it's removable (draft ✕); on a
+  // card it filters the lane (tombstones are inert — nothing to filter to).
+  function noteChipHtml(link, removable){
+    const st = noteLinkState(link);
+    const f = st !== "deleted" ? findProjectAnywhere(link.id) : null;
+    const name = f ? f.task.title : (link.name || "a deleted project"); // live name refreshes; tombstone uses the frozen one
+    const filterAttr = (!removable && st !== "deleted") ? ' data-action="filter-notes" data-id="' + link.id + '"' : '';
+    return '<span class="note-chip note-chip-' + st + '"' + filterAttr + '>' +
+      escapeHtml(name) +
+      (removable ? '<button type="button" class="chip-x" data-action="note-unlink" data-id="' + link.id + '" title="Remove">&times;</button>' : "") +
+    '</span>';
+  }
   function noteCardHtml(note){
     const preview = (note.body || "").trim().split("\n")[0].slice(0, 120);
+    const chips = (note.projectLinks || []).length
+      ? '<div class="note-chips">' + note.projectLinks.map(function(l){ return noteChipHtml(l, false); }).join("") + '</div>'
+      : "";
     return (
-      '<div class="card note-card" data-action="open-note" data-id="' + note.id + '">' +
-        '<div class="card-top"><div class="card-title">' + escapeHtml(note.title || "Untitled") + '</div></div>' +
-        (preview ? '<div class="note-preview">' + escapeHtml(preview) + '</div>' : "") +
+      '<div class="card note-card">' +
+        '<div class="card-top"><div class="card-title" data-action="open-note" data-id="' + note.id + '">' + escapeHtml(note.title || "Untitled") + '</div></div>' +
+        (preview ? '<div class="note-preview" data-action="open-note" data-id="' + note.id + '">' + escapeHtml(preview) + '</div>' : "") +
+        chips +
       '</div>'
     );
   }
   function renderNotesLane(laneEl){
-    const notes = state.notes.slice().sort(function(a, b){ return (b.editedAt || 0) - (a.editedAt || 0); });
-    laneEl.querySelector(".count").textContent = notes.length;
+    const all = state.notes.slice().sort(function(a, b){ return (b.editedAt || 0) - (a.editedAt || 0); });
+    laneEl.querySelector(".count").textContent = all.length;
     const tabCountEl = qs('.tab[data-kind="notes"] .tab-count');
-    if (tabCountEl) tabCountEl.textContent = notes.length;
+    if (tabCountEl) tabCountEl.textContent = all.length;
+    // Chip filter (§4.9): transient, single-project, never hides the real total.
+    let filterBanner = "";
+    let notes = all;
+    if (state.notesFilter){
+      const f = findProjectAnywhere(state.notesFilter);
+      if (f){
+        notes = all.filter(function(n){ return (n.projectLinks || []).some(function(l){ return l.id === state.notesFilter; }); });
+        filterBanner = '<div class="notes-filter-banner">Filtered: ' + escapeHtml(f.task.title) +
+          '<button type="button" class="chip-x" data-action="clear-notes-filter" title="Clear filter">&times;</button></div>';
+      } else { state.notesFilter = null; }
+    }
     const rootEl = laneEl.querySelector(".cards-root");
-    rootEl.innerHTML = notes.length
+    rootEl.innerHTML = filterBanner + (notes.length
       ? notes.map(noteCardHtml).join("")
-      : '<div class="empty-note">No notes yet.</div>';
+      : '<div class="empty-note">' + (state.notesFilter ? "No notes for this project." : "No notes yet.") + '</div>');
   }
   function openNoteScreen(noteId){
     let draft;
@@ -4567,9 +4631,31 @@
   }
   function noteBodyHtml(s){
     const d = s.draft;
+    if (d.projectPicker) return noteProjectPickerHtml(s);
     let fields = '<input type="text" class="screen-field-title' + (s.invalidField === "title" ? " field-invalid" : "") + '" data-field="noteTitle" placeholder="Note title…" value="' + escapeHtml(d.title) + '">';
     fields += '<textarea class="screen-field-desc note-body" data-field="noteBody" placeholder="Write anything…">' + escapeHtml(d.body) + '</textarea>';
+    // Linked projects — many-valued (§4.9), draft-isolated: chips commit on Save.
+    fields += '<div class="screen-hook-pick-label">Linked projects</div>';
+    fields += '<div class="note-chips">' +
+      (d.projectLinks || []).map(function(l){ return noteChipHtml(l, true); }).join("") +
+      '<button type="button" class="note-add-link" data-action="note-add-link">+ Link a project</button>' +
+    '</div>';
     return '<div class="screen-body">' + fields + '</div>';
+  }
+  // The link picker (§4.9b): LIVE projects only — deleted and completed
+  // projects never appear (the chip row still shows their frozen/green chips).
+  function noteProjectPickerHtml(s){
+    const linked = new Set((s.draft.projectLinks || []).map(function(l){ return l.id; }));
+    const projects = state.tasks.current.concat(state.tasks.future)
+      .filter(function(t){ return !t.isGroup && !linked.has(t.id); });
+    const items = projects.length
+      ? projects.map(function(p){ return '<button type="button" class="screen-hook-pick-item" data-action="note-pick-project" data-id="' + p.id + '">' + escapeHtml(p.title) + '</button>'; }).join("")
+      : '<div class="empty-note">No projects to link yet — create one on the Projects tab.</div>';
+    return '<div class="screen-body">' +
+      '<div class="screen-hook-pick-label">Link a project</div>' +
+      '<div class="screen-hook-pick-list">' + items + '</div>' +
+      '<div class="screen-row" style="margin-top:8px;"><button type="button" class="btn btn-ghost btn-small" data-action="note-cancel-pick">Back</button></div>' +
+    '</div>';
   }
   function saveNoteScreen(s){
     const title = (s.draft.title || "").trim();
