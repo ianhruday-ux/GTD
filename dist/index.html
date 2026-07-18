@@ -1007,6 +1007,23 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 /* Tag chip (§4.9b): one flat style — tags have no live/completed/deleted states.
    Distinct hue (amber) from the teal project chips so the two read apart. */
 .note-chip-tag{ border-color:var(--brass); color:var(--text-primary); background:rgba(197,160,89,0.14); }
+
+/* Tags page (§4.9b) */
+.tags-proj-list{ display:flex; flex-wrap:wrap; gap:6px; }
+.tags-proj-chip{ font-size:12px; padding:4px 9px; border-radius:20px; border:1px solid rgba(255,255,255,0.16);
+  background:rgba(255,255,255,0.04); color:var(--text-soft); } /* read-only — names already taken */
+.tags-rows{ display:flex; flex-direction:column; gap:7px; }
+.tags-row-wrap{ display:flex; flex-direction:column; gap:3px; }
+.tags-row{ display:flex; align-items:center; gap:8px; }
+.tags-row-input{ flex:1; border:1px solid rgba(255,255,255,0.16); background:rgba(255,255,255,0.05);
+  color:var(--text-primary); border-radius:8px; padding:10px 12px; font-size:14px; }
+.tags-row-input:focus{ outline:2px solid var(--brass); outline-offset:1px; }
+.tags-row-input[readonly]{ opacity:0.6; }
+.tags-row-x{ border:none; background:transparent; color:var(--text-soft); font-size:19px; line-height:1; padding:2px 6px; cursor:pointer; }
+.tags-row-x:hover{ color:var(--red); }
+.tags-row-reason{ font-size:11.5px; color:var(--red); padding-left:2px; } /* off-screen collision explainer (§4.9b) */
+.tags-add-btn{ align-self:flex-start; margin-top:10px; font-size:13px; padding:8px 12px; border-radius:8px;
+  border:1px dashed rgba(255,255,255,0.3); background:transparent; color:var(--text-soft); cursor:pointer; }
 .note-chip[data-action]{ cursor:pointer; }
 .note-chip .chip-x{ border:none; background:transparent; color:inherit; font-size:15px; line-height:1; padding:0 0 0 1px; cursor:pointer; }
 .note-add-link{ font-size:12px; padding:4px 10px; border-radius:20px; border:1px dashed rgba(255,255,255,0.3); background:transparent; color:var(--text-soft); }
@@ -3143,6 +3160,7 @@ function injectChunkMap(){
     // The completed page is read-only (§12.2): its ← is a plain back with no
     // side effects — there is no draft to commit.
     if (s.completedView){ closeScreen(); return; }
+    if (s.tagsView){ saveTagsScreen(s); return; } // chunk 6 (§4.9b)
     if (s.noteView){ saveNoteScreen(s); return; } // chunk 6 (§4.9)
     let title = (s.draft.title || "").trim();
     if (!title){
@@ -4286,6 +4304,7 @@ function injectChunkMap(){
     return '<div class="screen-body">' + fields + '</div>';
   }
   function screenBodyHtml(s){
+    if (s.tagsView) return tagsPageBodyHtml(s); // chunk 6 (§4.9b)
     if (s.noteView) return noteBodyHtml(s); // chunk 6 (§4.9)
     const draft = s.draft, kind = s.kind;
     // §12.1: lock the project link when this action is opened as a child of
@@ -5068,6 +5087,17 @@ function injectChunkMap(){
         if (s){ syncNoteBodyDraft(); s.draft.projectLinks = (s.draft.projectLinks || []).filter(function(l){ return l.id !== id; }); renderScreen(); }
         return;
       }
+      if (e.target.closest('[data-action="tag-add-row"]')){
+        if (state.screen){ (state.screen.draft.rows = state.screen.draft.rows || []).push({ id: null, name: "" }); renderScreen();
+          const inputs = qsa(".tags-row-input"); const last = inputs[inputs.length - 1]; if (last) last.focus(); }
+        return;
+      }
+      const tagRemoveBtn = e.target.closest('[data-action="tag-remove-row"]');
+      if (tagRemoveBtn){
+        const s = state.screen; const idx = Number(tagRemoveBtn.getAttribute("data-row"));
+        if (s && s.draft.rows){ s.draft.rows.splice(idx, 1); if (s.draft.rowErrors) s.draft.rowErrors = {}; renderScreen(); }
+        return;
+      }
       const noteUntagBtn = e.target.closest('[data-action="note-untag"]');
       if (noteUntagBtn){
         const s = state.screen; const id = noteUntagBtn.getAttribute("data-id");
@@ -5212,6 +5242,12 @@ function injectChunkMap(){
       const draft = state.screen.draft;
       if (field === "title"){ draft.title = el.value; }
       else if (field === "noteTitle"){ draft.title = el.value; } // chunk 6
+      else if (field === "tagRow"){ // chunk 6 (§4.9b) Tags page
+        const idx = Number(el.getAttribute("data-row"));
+        if (draft.rows && draft.rows[idx]) draft.rows[idx].name = el.value;
+        if (draft.rowErrors && draft.rowErrors[idx] != null){ delete draft.rowErrors[idx]; el.classList.remove("field-invalid");
+          const wrap = el.closest(".tags-row-wrap"); const reason = wrap && wrap.querySelector(".tags-row-reason"); if (reason) reason.remove(); }
+      }
       else if (field === "noteBody"){
         // contenteditable rich body (§4.9): read HTML out, never write it back
         // here — re-rendering a contenteditable mid-keystroke resets the caret.
@@ -5940,12 +5976,14 @@ function injectChunkMap(){
     qs("#dialog-root").innerHTML =
       '<div class="choice-dialog-backdrop"><div class="choice-dialog settings-sheet">' +
         '<div class="settings-title">Settings</div>' +
+        '<button type="button" class="settings-row" data-action="open-tags">🏷 Manage tags</button>' +
         '<button type="button" class="settings-row danger" data-action="clear-all-data">↺ Restore app to defaults</button>' +
         '<div class="choice-dialog-btns"><button type="button" data-action="settings-close">Close</button></div>' +
       '</div></div>';
     const backdrop = qs(".choice-dialog-backdrop");
     backdrop.addEventListener("click", function(e){ if (e.target === backdrop) closeDialog(); });
     qs('[data-action="settings-close"]').addEventListener("click", closeDialog);
+    qs('[data-action="open-tags"]').addEventListener("click", function(){ closeDialog(); openTagsScreen(); });
     qs('[data-action="clear-all-data"]').addEventListener("click", function(){
       openConfirmDialog("Restore the app to its default state? Everything you’ve entered — notes, actions, projects, habits — will be permanently erased and replaced with the sample data. This can’t be undone.", [
         { label: "Erase & restore defaults", style: "danger", action: clearAllAppData },
@@ -6317,6 +6355,118 @@ function injectChunkMap(){
     state.notes = state.notes.filter(function(n){ return n.id !== noteId; });
     saveNotes();
     renderLane("notes");
+  }
+
+  // =========================================================
+  // TAGS PAGE (§4.9b). Reached from the settings surface, the badge → New tag,
+  // and the note picker's "Manage tags →" (create-only sub-view, next commit).
+  // Chrome is ←(save)/✕(discard) with NO page 🗑 (the page is not an item);
+  // tags are removed by the row ✕, which STAGES the removal — draft-isolated,
+  // committed on Save, with the in-use delete confirm firing once AT save (§7).
+  // =========================================================
+  function tagNorm(s){ return (s || "").trim().toLowerCase(); }
+  function liveProjectTitles(){
+    return state.tasks.current.concat(state.tasks.future).filter(function(t){ return !t.isGroup; }).map(function(t){ return t.title; });
+  }
+  function completedProjectTitles(){
+    return (state.completed.current || []).concat(state.completed.future || []).map(function(t){ return t.title; });
+  }
+  // ONE-WAY check (§4.9b): a tag is blocked by an existing tag row, a live
+  // project (visible → dashed only), or a COMPLETED project (hidden but
+  // restorable → dashed + inline reason). Deleted projects are NOT checked
+  // (their names are genuinely free). Returns null | "dup" | "completed".
+  function tagNameCollision(name, selfIdx, rows){
+    const n = tagNorm(name);
+    if (!n) return null;
+    for (let i = 0; i < rows.length; i++){ if (i !== selfIdx && tagNorm(rows[i].name) === n) return "dup"; }
+    if (liveProjectTitles().some(function(t){ return tagNorm(t) === n; })) return "dup";
+    if (completedProjectTitles().some(function(t){ return tagNorm(t) === n; })) return "completed";
+    return null;
+  }
+  function noteCountForTag(id){
+    const c = state.notes.filter(function(n){ return (n.tagIds || []).indexOf(id) !== -1; }).length;
+    return c + " note" + (c === 1 ? "" : "s");
+  }
+  function openTagsScreen(){
+    const rows = (state.tags || []).map(function(t){ return { id: t.id, name: t.name }; });
+    state.screen = { kind: "tags", tagsView: true, taskId: null, draft: { rows: rows, rowErrors: {} } };
+    renderScreen();
+  }
+  function tagsPageBodyHtml(s){
+    const d = s.draft;
+    const manage = d.manage !== false;
+    const projects = state.tasks.current.concat(state.tasks.future).filter(function(t){ return !t.isGroup; });
+    let html = '<div class="screen-body">';
+    // Projects appear first, READ-ONLY — this is what makes duplicates visible.
+    html += '<div class="screen-hook-pick-label">Projects (names already taken)</div>';
+    html += '<div class="tags-proj-list">' + (projects.length
+      ? projects.map(function(p){ return '<span class="tags-proj-chip">' + escapeHtml(p.title) + '</span>'; }).join("")
+      : '<span class="empty-note">No projects yet.</span>') + '</div>';
+    html += '<div class="screen-hook-pick-label" style="margin-top:14px;">Tags</div>';
+    html += '<div class="tags-rows">';
+    (d.rows || []).forEach(function(r, i){
+      const err = d.rowErrors && d.rowErrors[i];
+      const editable = manage || !r.id; // create-only: existing tags are read-only
+      const removable = manage || !r.id;
+      html += '<div class="tags-row-wrap">' +
+        '<div class="tags-row">' +
+          '<input type="text" class="tags-row-input' + (err ? " field-invalid" : "") + '" data-field="tagRow" data-row="' + i + '" value="' + escapeHtml(r.name) + '" placeholder="tag name…"' + (editable ? "" : " readonly") + '>' +
+          (removable ? '<button type="button" class="tags-row-x" data-action="tag-remove-row" data-row="' + i + '" title="Remove">&times;</button>' : "") +
+        '</div>' +
+        (err === "completed" ? '<div class="tags-row-reason">A completed project already uses this name.</div>' : "") +
+      '</div>';
+    });
+    html += '</div>';
+    html += '<button type="button" class="tags-add-btn" data-action="tag-add-row">+ Add tag</button>';
+    if (!manage){
+      html += '<div class="screen-row" style="margin-top:12px;"><button type="button" class="btn btn-ghost btn-small" data-action="note-cancel-pick">Back</button></div>';
+    }
+    html += '</div>';
+    return html;
+  }
+  function saveTagsScreen(s){
+    const rows = s.draft.rows || [];
+    // Validate every non-empty row; empties are simply dropped, no error.
+    s.draft.rowErrors = {};
+    let hasErr = false;
+    rows.forEach(function(r, i){
+      const name = (r.name || "").trim();
+      if (!name) return;
+      const col = tagNameCollision(name, i, rows);
+      if (col){ s.draft.rowErrors[i] = col; hasErr = true; }
+    });
+    if (hasErr){ renderScreen(); return; }
+    // Staged deletions = existing tags whose row is gone.
+    const survivingIds = new Set(rows.filter(function(r){ return r.id; }).map(function(r){ return r.id; }));
+    const deleted = (state.tags || []).filter(function(t){ return !survivingIds.has(t.id); });
+    const inUse = deleted.filter(function(t){ return state.notes.some(function(n){ return (n.tagIds || []).indexOf(t.id) !== -1; }); });
+    const commit = function(){
+      const delIds = new Set(deleted.map(function(t){ return t.id; }));
+      if (delIds.size){
+        state.tags = state.tags.filter(function(t){ return !delIds.has(t.id); });
+        state.notes.forEach(function(n){ if (n.tagIds) n.tagIds = n.tagIds.filter(function(id){ return !delIds.has(id); }); }); // unlink, no tombstone
+        saveNotes();
+      }
+      rows.forEach(function(r){
+        const name = (r.name || "").trim();
+        if (!name) return;
+        if (r.id){ const t = findTag(r.id); if (t) t.name = name; } // rename propagates by ID
+        else state.tags.unshift({ id: genId(), name: name });
+      });
+      saveTags();
+      renderLane("notes");
+      closeScreen();
+    };
+    if (inUse.length){
+      // The in-use delete confirm fires ONCE, at Save (§7 linked-actions pattern).
+      const msg = inUse.length === 1
+        ? "Delete “" + inUse[0].name + "”? It will be removed from " + noteCountForTag(inUse[0].id) + "."
+        : "Delete " + inUse.length + " tags? They’ll be removed from the notes that use them.";
+      openConfirmDialog(msg, [
+        { label: "Delete", style: "danger", action: commit },
+        { label: "Cancel", action: function(){} }
+      ]);
+    } else commit();
   }
 
   function boot(){
