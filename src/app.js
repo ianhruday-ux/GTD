@@ -4630,10 +4630,10 @@
     ]);
 
     addGroupWithItems("\u2705 QA \u2014 Chunk 6: Tags", [
-      { title: "Three ways to make a tag", notes: "Tags are for notes only. You can create them from: the Notes + badge \u2192 \u2018New tag\u2019 (top of the menu); Settings (\u22ef) \u2192 \u2018Manage tags\u2019; and, while writing a note, the \u229e button \u2192 \u2018Manage tags \u2192\u2019." },
-      { title: "Add a tag to a note with \u229e", notes: "On a note, tap \u229e. The picker has two sections \u2014 Projects and Tags. Tap a tag to attach it; it shows as an amber #chip. Removing a chip only sticks if you Save (like project links)." },
-      { title: "The Tags page: add, rename, remove", notes: "Open Settings \u2192 Manage tags. Projects show at the top, greyed and read-only (names already taken). Add a tag with \u2018+ Add tag\u2019, rename by typing, remove a tag with its \u2715. Nothing changes until you Save (\u2190); \u2715 discards your edits." },
-      { title: "You can\u2019t name a tag after a project", notes: "On the Tags page, try to add a tag with the exact name of one of your projects \u2014 it\u2019s blocked with a dashed outline (you can see the project right there). If the name matches a project you\u2019ve completed (hidden from the list), it also shows a one-line reason. Naming a project after a tag is always allowed." },
+      { title: "Two ways to make a tag", notes: "Tags are for notes only. You can create them from: the Notes + badge \u2192 \u2018New tag\u2019 (top of the menu); and, while writing a note, the \u229e button \u2192 \u2018Manage tags \u2192\u2019." },
+      { title: "Add a tag to a note with \u229e", notes: "On a note, tap \u229e. The picker has two sections \u2014 Tags at the top, then Link a project. Tap a tag to attach it; it shows as an amber #chip. Removing a chip only sticks if you Save (like project links)." },
+      { title: "The Tags page: add, rename, remove", notes: "Open the Notes + badge \u2192 \u2018New tag\u2019. Your tags are at the top; add one with \u2018+ Add tag\u2019, rename by typing, remove a tag with its \u2715. Projects show below, read-only (names already taken). Nothing changes until you Save (\u2190); \u2715 discards your edits." },
+      { title: "You can\u2019t name a tag after a project", notes: "On the Tags page, try to add a tag with the exact name of one of your projects \u2014 it\u2019s blocked with a dashed outline (the projects are listed right there). If the name matches a project you\u2019ve completed (hidden from the list), it also shows a one-line reason. Naming a project after a tag is always allowed." },
       { title: "Deleting a tag that\u2019s in use warns you", notes: "Remove a tag that\u2019s on some notes and Save \u2014 it asks you to confirm and tells you how many notes it\u2019ll come off. Confirm, and the tag disappears from those notes (no leftover marker). Renaming a tag updates it everywhere at once." },
       { title: "Filter by a tag", notes: "Give a couple of notes a tag, then use the Filter button at the top of the Notes list \u2014 the tag appears under a \u2018Tags\u2019 section. Pick it to see just those notes." }
     ]);
@@ -4743,14 +4743,12 @@
     qs("#dialog-root").innerHTML =
       '<div class="choice-dialog-backdrop"><div class="choice-dialog settings-sheet">' +
         '<div class="settings-title">Settings</div>' +
-        '<button type="button" class="settings-row" data-action="open-tags">🏷 Manage tags</button>' +
         '<button type="button" class="settings-row danger" data-action="clear-all-data">↺ Restore app to defaults</button>' +
         '<div class="choice-dialog-btns"><button type="button" data-action="settings-close">Close</button></div>' +
       '</div></div>';
     const backdrop = qs(".choice-dialog-backdrop");
     backdrop.addEventListener("click", function(e){ if (e.target === backdrop) closeDialog(); });
     qs('[data-action="settings-close"]').addEventListener("click", closeDialog);
-    qs('[data-action="open-tags"]').addEventListener("click", function(){ closeDialog(); openTagsScreen(); });
     qs('[data-action="clear-all-data"]').addEventListener("click", function(){
       openConfirmDialog("Restore the app to its default state? Everything you’ve entered — notes, actions, projects, habits — will be permanently erased and replaced with the sample data. This can’t be undone.", [
         { label: "Erase & restore defaults", style: "danger", action: clearAllAppData },
@@ -5099,10 +5097,10 @@
       : '<div class="empty-note">No tags yet — add some with “Manage tags”.</div>';
 
     return '<div class="screen-body">' +
-      '<div class="screen-hook-pick-label">Link a project</div>' +
-      '<div class="screen-hook-pick-list">' + projItems + '</div>' +
-      '<div class="screen-hook-pick-label" style="margin-top:12px;">Tags</div>' +
+      '<div class="screen-hook-pick-label">Tags</div>' +
       '<div class="screen-hook-pick-list">' + tagItems + '</div>' +
+      '<div class="screen-hook-pick-label" style="margin-top:12px;">Link a project</div>' +
+      '<div class="screen-hook-pick-list">' + projItems + '</div>' +
       '<div class="screen-row" style="margin-top:10px; justify-content:space-between;">' +
         '<button type="button" class="btn btn-ghost btn-small" data-action="note-cancel-pick">Back</button>' +
         '<button type="button" class="btn btn-ghost btn-small" data-action="note-manage-tags">Manage tags →</button>' + // wired in the Tags-page commit
@@ -5141,8 +5139,8 @@
   }
 
   // =========================================================
-  // TAGS PAGE (§4.9b). Reached from the settings surface, the badge → New tag,
-  // and the note picker's "Manage tags →" (create-only sub-view, next commit).
+  // TAGS PAGE (§4.9b). Reached from the badge → New tag (full manage mode)
+  // and the note picker's "Manage tags →" (create-only sub-view).
   // Chrome is ←(save)/✕(discard) with NO page 🗑 (the page is not an item);
   // tags are removed by the row ✕, which STAGES the removal — draft-isolated,
   // committed on Save, with the in-use delete confirm firing once AT save (§7).
@@ -5184,12 +5182,9 @@
     const manage = d.manage !== false;
     const projects = state.tasks.current.concat(state.tasks.future).filter(function(t){ return !t.isGroup; });
     let html = '<div class="screen-body">';
-    // Projects appear first, READ-ONLY — this is what makes duplicates visible.
-    html += '<div class="screen-hook-pick-label">Projects (names already taken)</div>';
-    html += '<div class="tags-proj-list">' + (projects.length
-      ? projects.map(function(p){ return '<span class="tags-proj-chip">' + escapeHtml(p.title) + '</span>'; }).join("")
-      : '<span class="empty-note">No projects yet.</span>') + '</div>';
-    html += '<div class="screen-hook-pick-label" style="margin-top:14px;">Tags</div>';
+    // Tags first (user round) — this is the page's subject; the read-only
+    // project list sits below it as the duplicate-name reference.
+    html += '<div class="screen-hook-pick-label">Tags</div>';
     html += '<div class="tags-rows">';
     (d.rows || []).forEach(function(r, i){
       const err = d.rowErrors && d.rowErrors[i];
@@ -5206,8 +5201,13 @@
     html += '</div>';
     html += '<button type="button" class="tags-add-btn" data-action="tag-add-row">+ Add tag</button>';
     if (!manage){
-      html += '<div class="tags-createonly-hint">Adding tags here — ← saves them and returns to your note. Rename or delete tags from Settings → Manage tags.</div>';
+      html += '<div class="tags-createonly-hint">Adding tags here — ← saves them and returns to your note. Rename or delete tags from the Notes + badge → New tag.</div>';
     }
+    // Projects below, READ-ONLY — the reference that makes duplicates visible.
+    html += '<div class="screen-hook-pick-label" style="margin-top:18px;">Projects (names already taken)</div>';
+    html += '<div class="tags-proj-list">' + (projects.length
+      ? projects.map(function(p){ return '<span class="tags-proj-chip">' + escapeHtml(p.title) + '</span>'; }).join("")
+      : '<span class="empty-note">No projects yet.</span>') + '</div>';
     html += '</div>';
     return html;
   }
