@@ -986,9 +986,25 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 .note-chip[data-action]{ cursor:pointer; }
 .note-chip .chip-x{ border:none; background:transparent; color:inherit; font-size:15px; line-height:1; padding:0 0 0 1px; cursor:pointer; }
 .note-add-link{ font-size:12px; padding:4px 10px; border-radius:20px; border:1px dashed rgba(255,255,255,0.3); background:transparent; color:var(--text-soft); }
-.notes-filter-banner{ display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--teal);
-  background:rgba(79,179,166,0.1); border:1px solid rgba(79,179,166,0.4); border-radius:8px; padding:7px 11px; margin-bottom:10px; }
-.notes-filter-banner .chip-x{ margin-left:auto; border:none; background:transparent; color:inherit; font-size:16px; cursor:pointer; }
+/* Notes filter (§4.9, user): a real filter button under the header, opening a
+   single-select menu of linked projects (Tags section joins it with §4.9b). */
+.notes-filter-bar{ position:relative; margin-bottom:10px; }
+.notes-filter-btn{ display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--text-soft);
+  background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.16); border-radius:8px; padding:7px 11px; cursor:pointer; }
+.notes-filter-btn.active{ color:var(--teal); border-color:rgba(79,179,166,0.5); background:rgba(79,179,166,0.1); }
+.notes-filter-btn .funnel{ font-size:11px; opacity:0.8; transition:transform .15s ease; }
+.notes-filter-btn.open .funnel{ transform:rotate(180deg); }
+.notes-filter-active{ font-weight:600; }
+.notes-filter-btn .chip-x{ border:none; background:transparent; color:inherit; font-size:15px; line-height:1; cursor:pointer; padding:0 0 0 2px; }
+.notes-filter-menu{ position:absolute; top:100%; left:0; margin-top:5px; z-index:20; min-width:190px; max-width:min(280px,80vw);
+  max-height:52vh; overflow-y:auto; background:var(--paper); border:1px solid rgba(255,255,255,0.16); border-radius:9px;
+  box-shadow:var(--paper-shadow); padding:5px; display:flex; flex-direction:column; gap:2px; }
+.notes-filter-item{ text-align:left; border:none; background:transparent; color:var(--text-primary); border-radius:6px;
+  padding:9px 10px; font-size:13px; cursor:pointer; }
+.notes-filter-item:hover{ background:rgba(255,255,255,0.08); }
+.notes-filter-item.current{ color:var(--teal); font-weight:600; background:rgba(79,179,166,0.12); }
+.notes-filter-section{ font-size:10.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-soft); padding:7px 10px 3px; }
+.notes-filter-empty{ font-size:12px; color:var(--text-soft); padding:9px 10px; font-style:italic; line-height:1.4; }
 
 /* ----------------------------------------------------------------------------
    REDUCED MOTION — honor the OS preference (quality floor).
@@ -5004,8 +5020,14 @@ function injectChunkMap(){
         return;
       }
       const filterNotesBtn = e.target.closest('[data-action="filter-notes"]');
-      if (filterNotesBtn){ state.notesFilter = filterNotesBtn.getAttribute("data-id"); renderLane("notes"); return; }
-      if (e.target.closest('[data-action="clear-notes-filter"]')){ state.notesFilter = null; renderLane("notes"); return; }
+      if (filterNotesBtn){ state.notesFilter = filterNotesBtn.getAttribute("data-id"); state.notesFilterMenuOpen = false; renderLane("notes"); return; }
+      // Check clear (the ✕) before the toggle button that wraps it.
+      if (e.target.closest('[data-action="clear-notes-filter"]')){ state.notesFilter = null; state.notesFilterMenuOpen = false; renderLane("notes"); return; }
+      if (e.target.closest('[data-action="notes-filter-toggle"]')){ state.notesFilterMenuOpen = !state.notesFilterMenuOpen; renderLane("notes"); return; }
+      const notesFilterPick = e.target.closest('[data-action="notes-filter-pick"]');
+      if (notesFilterPick){ state.notesFilter = notesFilterPick.getAttribute("data-id") || null; state.notesFilterMenuOpen = false; renderLane("notes"); return; }
+      // Outside-click closes an open filter menu (mirrors the FAB-menu pattern).
+      if (state.notesFilterMenuOpen && !e.target.closest(".notes-filter-bar")){ state.notesFilterMenuOpen = false; renderLane("notes"); }
 
       const openEditEl = e.target.closest('[data-action="open-edit"]');
       if (openEditEl){ openScreen(openEditEl.getAttribute("data-kind"), openEditEl.getAttribute("data-id")); return; }
@@ -5929,26 +5951,70 @@ function injectChunkMap(){
       '</div>'
     );
   }
+  // Distinct filter options — every project (live or completed) that at least
+  // one note links to, newest names sorted alphabetically. Tombstoned
+  // (deleted) projects are excluded: §4.9 makes their chips inert, so there is
+  // nothing to filter to. Tags become a second section here once §4.9b lands —
+  // the menu already renders sections, so that is an insert, not a rework.
+  function noteFilterOptions(){
+    const seen = {};
+    const opts = [];
+    state.notes.forEach(function(n){
+      (n.projectLinks || []).forEach(function(l){
+        if (seen[l.id]) return;
+        const f = findProjectAnywhere(l.id);
+        if (!f) return; // deleted → tombstone, not filterable
+        seen[l.id] = 1;
+        opts.push({ id: l.id, name: f.task.title, kind: "project" });
+      });
+    });
+    opts.sort(function(a, b){ return a.name.localeCompare(b.name); });
+    return opts;
+  }
+  function notesFilterBarHtml(){
+    // The active filter's display name (or null if the filtered project has
+    // since vanished — self-heal by clearing).
+    let activeName = null;
+    if (state.notesFilter){
+      const f = findProjectAnywhere(state.notesFilter);
+      if (f) activeName = f.task.title; else state.notesFilter = null;
+    }
+    const opts = noteFilterOptions();
+    const btnLabel = activeName
+      ? '<span class="notes-filter-active">' + escapeHtml(activeName) + '</span><button type="button" class="chip-x" data-action="clear-notes-filter" title="Clear filter">&times;</button>'
+      : 'Filter';
+    let menu = "";
+    if (state.notesFilterMenuOpen){
+      const items = ['<button type="button" class="notes-filter-item' + (state.notesFilter ? "" : " current") + '" data-action="notes-filter-pick" data-id="">All notes</button>']
+        .concat(opts.length
+          ? ['<div class="notes-filter-section">Projects</div>'].concat(opts.map(function(o){
+              return '<button type="button" class="notes-filter-item' + (o.id === state.notesFilter ? " current" : "") + '" data-action="notes-filter-pick" data-id="' + o.id + '">' + escapeHtml(o.name) + '</button>';
+            }))
+          : ['<div class="notes-filter-empty">No linked projects yet — link a note to a project to filter by it.</div>']);
+      menu = '<div class="notes-filter-menu">' + items.join("") + '</div>';
+    }
+    return '<div class="notes-filter-bar">' +
+      '<button type="button" class="notes-filter-btn' + (activeName ? " active" : "") + (state.notesFilterMenuOpen ? " open" : "") + '" data-action="notes-filter-toggle">' +
+        '<span class="funnel">&#9662;</span>' + btnLabel +
+      '</button>' + menu +
+    '</div>';
+  }
   function renderNotesLane(laneEl){
     const all = state.notes.slice().sort(function(a, b){ return (b.editedAt || 0) - (a.editedAt || 0); });
     laneEl.querySelector(".count").textContent = all.length;
     const tabCountEl = qs('.tab[data-kind="notes"] .tab-count');
     if (tabCountEl) tabCountEl.textContent = all.length;
-    // Chip filter (§4.9): transient, single-project, never hides the real total.
-    let filterBanner = "";
+    // Filter (§4.9): transient, single-selection, never hides the real total.
     let notes = all;
     if (state.notesFilter){
-      const f = findProjectAnywhere(state.notesFilter);
-      if (f){
+      if (findProjectAnywhere(state.notesFilter)){
         notes = all.filter(function(n){ return (n.projectLinks || []).some(function(l){ return l.id === state.notesFilter; }); });
-        filterBanner = '<div class="notes-filter-banner">Filtered: ' + escapeHtml(f.task.title) +
-          '<button type="button" class="chip-x" data-action="clear-notes-filter" title="Clear filter">&times;</button></div>';
       } else { state.notesFilter = null; }
     }
     const rootEl = laneEl.querySelector(".cards-root");
-    rootEl.innerHTML = filterBanner + (notes.length
+    rootEl.innerHTML = notesFilterBarHtml() + (notes.length
       ? notes.map(noteCardHtml).join("")
-      : '<div class="empty-note">' + (state.notesFilter ? "No notes for this project." : "No notes yet.") + '</div>');
+      : '<div class="empty-note">' + (state.notesFilter ? "No notes for this filter." : "No notes yet.") + '</div>');
   }
   function openNoteScreen(noteId){
     let draft;

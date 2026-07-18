@@ -3799,8 +3799,14 @@
         return;
       }
       const filterNotesBtn = e.target.closest('[data-action="filter-notes"]');
-      if (filterNotesBtn){ state.notesFilter = filterNotesBtn.getAttribute("data-id"); renderLane("notes"); return; }
-      if (e.target.closest('[data-action="clear-notes-filter"]')){ state.notesFilter = null; renderLane("notes"); return; }
+      if (filterNotesBtn){ state.notesFilter = filterNotesBtn.getAttribute("data-id"); state.notesFilterMenuOpen = false; renderLane("notes"); return; }
+      // Check clear (the ✕) before the toggle button that wraps it.
+      if (e.target.closest('[data-action="clear-notes-filter"]')){ state.notesFilter = null; state.notesFilterMenuOpen = false; renderLane("notes"); return; }
+      if (e.target.closest('[data-action="notes-filter-toggle"]')){ state.notesFilterMenuOpen = !state.notesFilterMenuOpen; renderLane("notes"); return; }
+      const notesFilterPick = e.target.closest('[data-action="notes-filter-pick"]');
+      if (notesFilterPick){ state.notesFilter = notesFilterPick.getAttribute("data-id") || null; state.notesFilterMenuOpen = false; renderLane("notes"); return; }
+      // Outside-click closes an open filter menu (mirrors the FAB-menu pattern).
+      if (state.notesFilterMenuOpen && !e.target.closest(".notes-filter-bar")){ state.notesFilterMenuOpen = false; renderLane("notes"); }
 
       const openEditEl = e.target.closest('[data-action="open-edit"]');
       if (openEditEl){ openScreen(openEditEl.getAttribute("data-kind"), openEditEl.getAttribute("data-id")); return; }
@@ -4724,26 +4730,70 @@
       '</div>'
     );
   }
+  // Distinct filter options — every project (live or completed) that at least
+  // one note links to, newest names sorted alphabetically. Tombstoned
+  // (deleted) projects are excluded: §4.9 makes their chips inert, so there is
+  // nothing to filter to. Tags become a second section here once §4.9b lands —
+  // the menu already renders sections, so that is an insert, not a rework.
+  function noteFilterOptions(){
+    const seen = {};
+    const opts = [];
+    state.notes.forEach(function(n){
+      (n.projectLinks || []).forEach(function(l){
+        if (seen[l.id]) return;
+        const f = findProjectAnywhere(l.id);
+        if (!f) return; // deleted → tombstone, not filterable
+        seen[l.id] = 1;
+        opts.push({ id: l.id, name: f.task.title, kind: "project" });
+      });
+    });
+    opts.sort(function(a, b){ return a.name.localeCompare(b.name); });
+    return opts;
+  }
+  function notesFilterBarHtml(){
+    // The active filter's display name (or null if the filtered project has
+    // since vanished — self-heal by clearing).
+    let activeName = null;
+    if (state.notesFilter){
+      const f = findProjectAnywhere(state.notesFilter);
+      if (f) activeName = f.task.title; else state.notesFilter = null;
+    }
+    const opts = noteFilterOptions();
+    const btnLabel = activeName
+      ? '<span class="notes-filter-active">' + escapeHtml(activeName) + '</span><button type="button" class="chip-x" data-action="clear-notes-filter" title="Clear filter">&times;</button>'
+      : 'Filter';
+    let menu = "";
+    if (state.notesFilterMenuOpen){
+      const items = ['<button type="button" class="notes-filter-item' + (state.notesFilter ? "" : " current") + '" data-action="notes-filter-pick" data-id="">All notes</button>']
+        .concat(opts.length
+          ? ['<div class="notes-filter-section">Projects</div>'].concat(opts.map(function(o){
+              return '<button type="button" class="notes-filter-item' + (o.id === state.notesFilter ? " current" : "") + '" data-action="notes-filter-pick" data-id="' + o.id + '">' + escapeHtml(o.name) + '</button>';
+            }))
+          : ['<div class="notes-filter-empty">No linked projects yet — link a note to a project to filter by it.</div>']);
+      menu = '<div class="notes-filter-menu">' + items.join("") + '</div>';
+    }
+    return '<div class="notes-filter-bar">' +
+      '<button type="button" class="notes-filter-btn' + (activeName ? " active" : "") + (state.notesFilterMenuOpen ? " open" : "") + '" data-action="notes-filter-toggle">' +
+        '<span class="funnel">&#9662;</span>' + btnLabel +
+      '</button>' + menu +
+    '</div>';
+  }
   function renderNotesLane(laneEl){
     const all = state.notes.slice().sort(function(a, b){ return (b.editedAt || 0) - (a.editedAt || 0); });
     laneEl.querySelector(".count").textContent = all.length;
     const tabCountEl = qs('.tab[data-kind="notes"] .tab-count');
     if (tabCountEl) tabCountEl.textContent = all.length;
-    // Chip filter (§4.9): transient, single-project, never hides the real total.
-    let filterBanner = "";
+    // Filter (§4.9): transient, single-selection, never hides the real total.
     let notes = all;
     if (state.notesFilter){
-      const f = findProjectAnywhere(state.notesFilter);
-      if (f){
+      if (findProjectAnywhere(state.notesFilter)){
         notes = all.filter(function(n){ return (n.projectLinks || []).some(function(l){ return l.id === state.notesFilter; }); });
-        filterBanner = '<div class="notes-filter-banner">Filtered: ' + escapeHtml(f.task.title) +
-          '<button type="button" class="chip-x" data-action="clear-notes-filter" title="Clear filter">&times;</button></div>';
       } else { state.notesFilter = null; }
     }
     const rootEl = laneEl.querySelector(".cards-root");
-    rootEl.innerHTML = filterBanner + (notes.length
+    rootEl.innerHTML = notesFilterBarHtml() + (notes.length
       ? notes.map(noteCardHtml).join("")
-      : '<div class="empty-note">' + (state.notesFilter ? "No notes for this project." : "No notes yet.") + '</div>');
+      : '<div class="empty-note">' + (state.notesFilter ? "No notes for this filter." : "No notes yet.") + '</div>');
   }
   function openNoteScreen(noteId){
     let draft;
