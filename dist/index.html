@@ -846,6 +846,11 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 .linked-action-item:hover{ background:rgba(255,255,255,0.1); }
 .linked-action-item.indented{ margin-left:22px; }
 .linked-action-kind{ font-size:10px; font-family:var(--font-mono); color:var(--text-soft); flex:0 0 auto; }
+/* Coloured kind bullets (user tweak): red next, yellow waiting, cream event. */
+.kind-dot{ display:inline-block; width:8px; height:8px; border-radius:50%; flex:0 0 auto; }
+.kind-dot.kind-next{ background:var(--red); }
+.kind-dot.kind-waiting{ background:var(--yellow); }
+.kind-dot.kind-event{ background:var(--text-primary); }
 
 /* Habit page: hook pill, condition pill, run track, schedule chips … (= carried over =) */
 .screen-when-field-row{ display:flex; gap:6px; align-items:center; }
@@ -859,8 +864,11 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 .screen-row-disabled input{ cursor:not-allowed; }
 .screen-waitfor-input{ flex:1.4; min-width:110px; }
 .screen-hook-pick-list{ display:flex; flex-direction:column; gap:6px; max-height:50vh; overflow-y:auto; }
-.screen-hook-pick-item{ text-align:left; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.12); color:var(--text-primary); padding:9px 11px; border-radius:6px; font-size:13px; }
-.screen-hook-pick-item:hover{ background:rgba(255,255,255,0.11); }
+/* Opaque picker items (user tweak): the old rgba(…,0.05) fill let whatever sat
+   behind the picker read through, so item text looked like it floated over the
+   list. A solid paper fill makes each row read as its own surface. */
+.screen-hook-pick-item{ text-align:left; background:var(--paper-2); border:1px solid rgba(255,255,255,0.14); color:var(--text-primary); padding:9px 11px; border-radius:6px; font-size:13px; display:flex; align-items:center; gap:8px; }
+.screen-hook-pick-item:hover{ background:var(--paper); }
 .screen-hook-pick-none{ color:var(--text-soft); font-style:italic; }
 .screen-hook-pick-label{ font-family:var(--font-mono); font-size:10.5px; letter-spacing:0.09em; text-transform:uppercase; color:var(--text-soft); margin-bottom:-2px; }
 .screen-hook-pick-section{ font-family:var(--font-mono); font-size:9.5px; letter-spacing:0.1em; text-transform:uppercase; color:var(--text-soft); opacity:0.75; margin:4px 0 -1px; }
@@ -3663,6 +3671,10 @@ function injectChunkMap(){
       '</div>'
     );
   }
+  // A small coloured bullet standing in for a kind label (user tweak): red =
+  // next, yellow = waiting, cream = event/calendar (chunk 7). Used in the
+  // project's linked list and the condition picker.
+  function kindDot(kind){ return '<span class="kind-dot kind-' + kind + '" aria-hidden="true"></span>'; }
   // The project page's linked-actions list (overnight notes): every Next /
   // Waiting action linked to this project, read-only, tap to open (as a
   // child screen, so you come back here). Waiting items conditioned on
@@ -3686,9 +3698,8 @@ function injectChunkMap(){
     function itemHtml(l, depth){
       if (rendered[l.task.id]) return;
       rendered[l.task.id] = true;
-      const kindTag = l.kind === "next" ? "NEXT" : "WAIT";
       html += '<button type="button" class="linked-action-item' + (depth > 0 ? " indented" : "") + '" data-action="open-linked-action" data-kind="' + l.kind + '" data-id="' + l.task.id + '"' + (depth > 1 ? ' style="margin-left:' + (depth * 22) + 'px;"' : '') + '>' +
-        '<span class="linked-action-kind">' + kindTag + '</span>' + escapeHtml(l.task.title) +
+        kindDot(l.kind) + escapeHtml(l.task.title) +
       '</button>';
       (dependents[l.task.id] || []).forEach(function(dep){ itemHtml(dep, Math.min(depth + 1, 4)); });
     }
@@ -4013,7 +4024,7 @@ function injectChunkMap(){
     const ctx = conditionContext(s);
     function itemBtn(t){
       return '<button type="button" class="screen-hook-pick-item" data-action="screen-pick-condition" data-id="' + t.id + '" data-kind="' + t.kind + '">' +
-        '<span class="linked-action-kind">' + (t.kind === "next" ? "NEXT" : "WAIT") + '</span>' + escapeHtml(t.title) + '</button>';
+        kindDot(t.kind) + escapeHtml(t.title) + '</button>';
     }
     function group(label, arr){ return arr.length ? '<div class="screen-hook-pick-label">' + label + '</div><div class="screen-hook-pick-list">' + arr.map(itemBtn).join("") + '</div>' : ""; }
     let body;

@@ -2533,6 +2533,10 @@
       '</div>'
     );
   }
+  // A small coloured bullet standing in for a kind label (user tweak): red =
+  // next, yellow = waiting, cream = event/calendar (chunk 7). Used in the
+  // project's linked list and the condition picker.
+  function kindDot(kind){ return '<span class="kind-dot kind-' + kind + '" aria-hidden="true"></span>'; }
   // The project page's linked-actions list (overnight notes): every Next /
   // Waiting action linked to this project, read-only, tap to open (as a
   // child screen, so you come back here). Waiting items conditioned on
@@ -2556,9 +2560,8 @@
     function itemHtml(l, depth){
       if (rendered[l.task.id]) return;
       rendered[l.task.id] = true;
-      const kindTag = l.kind === "next" ? "NEXT" : "WAIT";
       html += '<button type="button" class="linked-action-item' + (depth > 0 ? " indented" : "") + '" data-action="open-linked-action" data-kind="' + l.kind + '" data-id="' + l.task.id + '"' + (depth > 1 ? ' style="margin-left:' + (depth * 22) + 'px;"' : '') + '>' +
-        '<span class="linked-action-kind">' + kindTag + '</span>' + escapeHtml(l.task.title) +
+        kindDot(l.kind) + escapeHtml(l.task.title) +
       '</button>';
       (dependents[l.task.id] || []).forEach(function(dep){ itemHtml(dep, Math.min(depth + 1, 4)); });
     }
@@ -2883,7 +2886,7 @@
     const ctx = conditionContext(s);
     function itemBtn(t){
       return '<button type="button" class="screen-hook-pick-item" data-action="screen-pick-condition" data-id="' + t.id + '" data-kind="' + t.kind + '">' +
-        '<span class="linked-action-kind">' + (t.kind === "next" ? "NEXT" : "WAIT") + '</span>' + escapeHtml(t.title) + '</button>';
+        kindDot(t.kind) + escapeHtml(t.title) + '</button>';
     }
     function group(label, arr){ return arr.length ? '<div class="screen-hook-pick-label">' + label + '</div><div class="screen-hook-pick-list">' + arr.map(itemBtn).join("") + '</div>' : ""; }
     let body;
