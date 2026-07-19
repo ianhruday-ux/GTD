@@ -458,9 +458,17 @@ function projectLinkedEventRowsHtml(projectId){
   return evs.map(function(ev){
     const d = dateStrToDate(effDate(ev, ev.date));
     const when = d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) + (effTime(ev, ev.date) ? " · " + effTime(ev, ev.date) : "");
-    return '<button type="button" class="linked-action-item" data-action="open-event" data-id="' + ev.id + '">' +
+    let row = '<button type="button" class="linked-action-item" data-action="open-event" data-id="' + ev.id + '">' +
       '<span class="kind-dot kind-event" aria-hidden="true"></span>' + escapeHtml(effTitle(ev, ev.date)) +
       ' <span class="cal-agenda-kind">' + escapeHtml(when) + '</span></button>';
+    // §4.15d: a Waiting action hooked to this linked event nests beneath it,
+    // the same as one hooked to a linked action (chunk 8 event-conditioning).
+    state.tasks.waiting.forEach(function(t){
+      if (t.isGroup || t.conditionId !== ev.taskId) return;
+      row += '<button type="button" class="linked-action-item indented" data-action="open-edit" data-kind="waiting" data-id="' + t.id + '">' +
+        '<span class="kind-dot kind-waiting" aria-hidden="true"></span>' + escapeHtml(t.title) + '</button>';
+    });
+    return row;
   }).join("");
 }
 

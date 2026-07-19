@@ -2696,12 +2696,27 @@
         (dependents[l.task.conditionId] = dependents[l.task.conditionId] || []).push(l);
       }
     });
+    // chunk 8 (§4.15d): a Waiting action hooked to a project-linked item shows
+    // nested beneath it EVEN when its only tie to the project is the dependency
+    // (it carries no project link of its own). No stalled-project guardrail is
+    // needed — it can only nest under an anchor the project already has, which
+    // already makes the project non-stalled (§4.3b). Marked `external` so it
+    // opens its own page, not as a staged child of this project.
+    state.tasks.waiting.forEach(function(t){
+      if (t.isGroup || byId[t.id]) return; // already in the linked list
+      if (t.conditionId && byId[t.conditionId]){
+        (dependents[t.conditionId] = dependents[t.conditionId] || []).push({ kind: "waiting", task: t, external: true });
+      }
+    });
     const rendered = {};
     let html = "";
     function itemHtml(l, depth){
       if (rendered[l.task.id]) return;
       rendered[l.task.id] = true;
-      html += '<button type="button" class="linked-action-item' + (depth > 0 ? " indented" : "") + '" data-action="open-linked-action" data-kind="' + l.kind + '" data-id="' + l.task.id + '"' + (depth > 1 ? ' style="margin-left:' + (depth * 22) + 'px;"' : '') + '>' +
+      const open = l.external
+        ? 'data-action="open-edit" data-kind="waiting" data-id="' + l.task.id + '"'
+        : 'data-action="open-linked-action" data-kind="' + l.kind + '" data-id="' + l.task.id + '"';
+      html += '<button type="button" class="linked-action-item' + (depth > 0 ? " indented" : "") + '" ' + open + (depth > 1 ? ' style="margin-left:' + (depth * 22) + 'px;"' : '') + '>' +
         kindDot(l.kind) + escapeHtml(l.task.title) +
       '</button>';
       (dependents[l.task.id] || []).forEach(function(dep){ itemHtml(dep, Math.min(depth + 1, 4)); });
