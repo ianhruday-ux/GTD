@@ -1111,6 +1111,137 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 .notes-filter-empty{ font-size:12px; color:var(--text-soft); padding:9px 10px; font-style:italic; line-height:1.4; }
 
 /* ----------------------------------------------------------------------------
+   CHUNK 7 — CALENDAR · EVENTS · RECURRENCE (§4.13–§4.15)
+   Dark-only, like the rest of the desk. Reuses .deadline-bar for the
+   pseudo-action bar (§4.14c) so nothing here restyles that.
+---------------------------------------------------------------------------- */
+.cal-tabs{ display:flex; gap:4px; }
+.cal-tab{
+  border:1px solid rgba(255,255,255,0.14); background:transparent; color:var(--text-soft);
+  font-family:var(--font-body); font-weight:600; font-size:12.5px; padding:6px 14px; border-radius:8px;
+}
+.cal-tab.active{ background:var(--brass); border-color:var(--brass); color:var(--dark-on-accent); }
+.cal-body{ padding-bottom:calc(20px + env(safe-area-inset-bottom)); }
+.cal-monthnav, .cal-daynav{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px; }
+.cal-monthlabel{ font-family:var(--font-display); font-weight:700; font-size:16px; color:var(--text-primary); text-align:center; flex:1; }
+.cal-navbtn{
+  flex:0 0 auto; width:34px; height:34px; border-radius:8px; border:1px solid rgba(255,255,255,0.16);
+  background:rgba(255,255,255,0.04); color:var(--text-primary); font-size:18px; line-height:1;
+}
+.cal-navbtn:hover{ background:rgba(255,255,255,0.1); }
+.cal-swipe-viewport{ overflow:hidden; width:100%; }
+.cal-swipe-track{ display:flex; width:300%; will-change:transform; }
+.cal-swipe-panel{ width:33.3333%; flex:0 0 33.3333%; }
+.cal-grid{ user-select:none; }
+.cal-dow-row, .cal-cells{ display:grid; grid-template-columns:repeat(7, 1fr); }
+.cal-dow-row{ margin-bottom:4px; }
+.cal-dow{ text-align:center; font-family:var(--font-mono); font-size:10px; color:var(--text-soft); padding:2px 0; }
+.cal-cells{ gap:3px; }
+.cal-cell{
+  position:relative; aspect-ratio:1/1.15; border:1px solid rgba(255,255,255,0.07);
+  background:rgba(255,255,255,0.02); border-radius:7px; padding:4px 0 0 0;
+  display:flex; flex-direction:column; align-items:center; gap:3px; color:var(--text-primary);
+}
+.cal-cell-blank{ border:none; background:transparent; }
+.cal-cell:hover{ background:rgba(255,255,255,0.06); }
+.cal-daynum{ font-size:12px; font-weight:500; line-height:1; }
+.cal-cell.cal-today .cal-daynum{ color:var(--brass); font-weight:700; }
+.cal-cell.cal-selected{ background:rgba(198,138,62,0.22); border-color:var(--brass); }
+.cal-marks{ display:flex; flex-wrap:wrap; gap:2px; justify-content:center; align-items:center; padding:0 2px; }
+.cal-mark{ display:inline-block; width:6px; height:6px; border-radius:50%; }
+.cal-mark-appt{ background:var(--yellow); }
+.cal-mark-event{ background:var(--text-primary); }
+.cal-mark-dl-next, .cal-mark-dl-current{ width:11px; height:3px; border-radius:1px; }
+.cal-mark-dl-next{ background:var(--red); }
+.cal-mark-dl-current{ background:var(--moss); }
+.cal-mark-proj.cal-mark-appt{ background:transparent; border:1.5px solid var(--yellow); }
+.cal-mark-proj.cal-mark-event{ background:transparent; border:1.5px solid var(--text-soft); }
+.cal-mark-done{ opacity:0.4; }
+.cal-mark-overflow{ font-family:var(--font-mono); font-size:9px; color:var(--text-soft); line-height:1; }
+.cal-agenda{ display:flex; flex-direction:column; gap:5px; }
+.cal-agenda-row{
+  display:flex; align-items:center; gap:9px; text-align:left; width:100%;
+  border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.04);
+  color:var(--text-primary); border-radius:8px; padding:9px 11px; font-size:13.5px;
+}
+.cal-agenda-row:hover{ background:rgba(255,255,255,0.09); }
+.cal-agenda-done{ opacity:0.5; }
+.cal-agenda-dot{ flex:0 0 auto; width:8px; height:8px; border-radius:50%; }
+.cal-agenda-dot.cal-mark-dl-next, .cal-agenda-dot.cal-mark-dl-current{ width:11px; height:3px; border-radius:1px; }
+.cal-agenda-when{ flex:0 0 auto; font-family:var(--font-mono); font-size:11px; color:var(--text-soft); min-width:52px; }
+.cal-agenda-title{ flex:1; }
+.cal-agenda-kind{ font-family:var(--font-mono); font-size:10px; color:var(--text-soft); }
+.cal-day-empty{ color:var(--text-soft); font-size:13px; text-align:center; padding:24px 0; }
+.cal-tickler-tag{ font-family:var(--font-mono); font-size:9px; color:var(--dusty); border:1px solid rgba(110,144,172,0.5); border-radius:6px; padding:0 5px; }
+.cal-create{
+  position:sticky; bottom:0; margin-top:12px; padding-top:10px;
+  background:linear-gradient(to top, var(--paper) 78%, rgba(38,36,32,0));
+  display:flex; flex-direction:column; gap:8px;
+}
+.cal-seg{ display:flex; gap:0; border:1px solid rgba(255,255,255,0.16); border-radius:8px; overflow:hidden; align-self:flex-start; }
+.cal-seg-btn{ background:transparent; color:var(--text-soft); border:none; font-family:var(--font-body); font-weight:600; font-size:12px; padding:6px 16px; }
+.cal-seg-btn.active{ background:var(--brass); color:var(--dark-on-accent); }
+.cal-seg-small .cal-seg-btn{ padding:5px 12px; font-size:11.5px; }
+.cal-create-main{ display:flex; gap:6px; }
+.cal-name{
+  flex:1; min-width:0; border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.06);
+  color:var(--text-primary); border-radius:8px; padding:10px 12px; font-size:14px;
+}
+.cal-name::placeholder{ color:var(--text-soft); }
+.cal-name:focus{ outline:2px solid var(--brass); outline-offset:1px; }
+.cal-add-btn{
+  flex:0 0 auto; border:none; background:var(--brass); color:var(--dark-on-accent);
+  font-weight:700; font-size:13.5px; border-radius:8px; padding:0 18px;
+}
+.cal-create-controls{ display:flex; flex-direction:column; gap:7px; }
+.cal-boxed{
+  display:flex; align-items:center; gap:6px; border:1px solid rgba(255,255,255,0.14);
+  background:rgba(255,255,255,0.04); border-radius:8px; padding:0 10px; min-height:34px;
+}
+.cal-boxed .field-icon{ font-size:13px; opacity:0.8; flex:0 0 auto; }
+.cal-boxed input, .cal-boxed select{ border:none; background:transparent; color:var(--text-primary); font-size:12.5px; padding:8px 0; min-width:0; }
+.cal-boxed select{ flex:1; }
+.cal-boxed input:focus, .cal-boxed select:focus{ outline:none; }
+.cal-hint{ font-size:10.5px; color:var(--text-soft); flex:0 0 auto; }
+.cal-interval{ width:42px; text-align:center; flex:0 0 auto; border:1px solid rgba(255,255,255,0.16)!important; border-radius:6px!important; }
+.cal-desc{
+  border:1px solid rgba(255,255,255,0.14); background:rgba(255,255,255,0.04); color:var(--text-primary);
+  border-radius:8px; padding:8px 11px; font-size:12.5px;
+}
+.cal-desc::placeholder{ color:var(--text-soft); }
+.cal-tickler-row{ display:flex; align-items:center; gap:8px; font-size:12px; color:var(--text-soft); }
+.cal-tickler-row input{ flex:0 0 auto; }
+.cal-habit-bubble{
+  align-self:flex-start; border:1px dashed var(--purple); background:rgba(142,111,176,0.12);
+  color:var(--purple); border-radius:8px; padding:7px 12px; font-size:12px; font-weight:600; text-align:left;
+}
+.cal-habit-bubble:hover{ background:rgba(142,111,176,0.2); }
+.screen-pause-btn{
+  align-self:stretch; border:1px solid var(--dusty); background:transparent; color:var(--dusty);
+  border-radius:8px; padding:9px 12px; font-size:13px; font-weight:600; text-align:center;
+}
+.screen-pause-btn.armed{ background:var(--dusty); border-color:var(--dusty); color:var(--dark-on-accent); }
+.cal-widget{
+  display:flex; align-items:flex-start; gap:10px; text-align:left; width:100%;
+  border:1px solid var(--yellow); background:rgba(217,166,44,0.08);
+  border-radius:10px; padding:10px 12px; margin-bottom:10px; color:var(--text-primary);
+}
+.cal-widget:hover{ background:rgba(217,166,44,0.14); }
+.cal-widget-icon{ flex:0 0 auto; font-size:16px; }
+.cal-widget-list{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:3px; font-size:12.5px; min-width:0; }
+.cal-widget-list li{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cal-widget-when{ font-family:var(--font-mono); font-size:11px; color:var(--yellow); }
+.cal-widget-empty{ color:var(--text-soft); }
+.completed-series-count{ font-family:var(--font-mono); font-size:11px; color:var(--text-soft); }
+.it-moved-banner{
+  position:fixed; left:50%; bottom:calc(28px + env(safe-area-inset-bottom)); transform:translate(-50%, 18px);
+  z-index:60; background:var(--paper-2); color:var(--text-primary); border:1px solid var(--brass);
+  border-radius:20px; padding:10px 18px; font-size:13px; font-weight:600; box-shadow:0 6px 18px rgba(0,0,0,0.5);
+  opacity:0; transition:opacity .28s ease, transform .28s ease; pointer-events:none; max-width:88vw; text-align:center;
+}
+.it-moved-banner.show{ opacity:1; transform:translate(-50%, 0); }
+
+/* ----------------------------------------------------------------------------
    REDUCED MOTION — honor the OS preference (quality floor).
 ---------------------------------------------------------------------------- */
 @media (prefers-reduced-motion: reduce){
@@ -1369,7 +1500,7 @@ function injectChunkMap(){
   const RECURRENCE_LABELS = { none: "Does not repeat", daily: "Daily", weekly: "Weekly", monthly: "Monthly", yearly: "Yearly" };
   const KIND_BADGE_LABEL = {
     next: "Next Action", waiting: "Waiting Action", current: "Current Project",
-    future: "Future Project", habit: "Habit", notes: "Note", tags: "Tags"
+    future: "Future Project", habit: "Habit", notes: "Note", tags: "Tags", event: "Event"
   };
 
   const state = {
@@ -1398,6 +1529,8 @@ function injectChunkMap(){
     screenStack: [],
     tray: [],       // chunk 6 (§4.8a): captured stray thoughts
     trayOpen: false,
+    events: [],     // chunk 7 (§4.13): calendar events/appointments — gtd_events, NOT a lane
+
     notes: [],      // chunk 6 (§4.9): { id, title, body, projectLinks:[{id,name}], tagIds:[], editedAt }
     tags: [],       // chunk 6 (§4.9b): notes-only tag registry, { id, name } — mirrors gtd_contexts
     notesFilter: null, // chunk 6 (§4.9): transient project-OR-tag-id filter on the Notes lane
@@ -1666,6 +1799,11 @@ function injectChunkMap(){
   function restoreTask(kind, taskId){
     const idx = state.completed[kind].findIndex(function(t){ return t.id === taskId; });
     if (idx === -1) return;
+    const peek = state.completed[kind][idx];
+    // chunk 7 (§4.15c): un-completing a series occurrence only rolls back inside
+    // the 10-minute window; outside it the archive entry stands and the series
+    // has moved on — leave it archived rather than duplicating the rolled row.
+    if (peek && peek.eventId && !onPseudoActionRestored(peek)) return;
     const task = state.completed[kind].splice(idx, 1)[0];
     delete task.completedAt;
     sanitizeRestoredParentage(kind, task);
@@ -1735,16 +1873,36 @@ function injectChunkMap(){
       { id: genId(), title: "Learn woodworking", notesClean: "", linkedProjectId: null, isGroup: false, parent: null }
     ];
 
-    const waterHabitId = genId();
-    const stretchHabitId = genId();
+    // §4.16: the three seeded habits ARE the GTD routine — capture daily,
+    // review daily, review projects weekly — taught by practising, not reading.
+    // The middle one is HOOKED to the first (a live demo of habit-stacking in
+    // the correct GTD order); the descriptions model a good answer to the
+    // identity prompt; "Review my projects" is Friday (weekly review = one
+    // scheduled weekday). This set is only *correct* once the calendar exists
+    // (the middle habit references it), which is why it ships here in chunk 7.
+    const sortTrayId = genId();
+    const reviewCalId = genId();
+    const reviewProjId = genId();
     state.tasks.habit = [
-      { id: waterHabitId, title: "Drink a glass of water", notesClean: "", linkedProjectId: null, isGroup: false, parent: null,
-        whenTexts: ["Right when I wake up"], hooks: [] },
-      { id: stretchHabitId, title: "Stretch for 5 minutes", notesClean: "", linkedProjectId: null, isGroup: false, parent: null,
-        whenTexts: [], hooks: [{ id: waterHabitId, label: "Drink a glass of water" }] }
+      { id: sortTrayId, title: "Sort my tray", linkedProjectId: null, isGroup: false, parent: null,
+        notesClean: "Someone who doesn’t carry their to-do list around in their head.",
+        whenTexts: ["When I sit down at my desk"], hooks: [] },
+      { id: reviewCalId, title: "Review my calendar and waiting actions", linkedProjectId: null, isGroup: false, parent: null,
+        notesClean: "Someone who knows what’s coming, instead of being surprised by it.",
+        whenTexts: [], hooks: [{ id: sortTrayId, label: "Sort my tray" }] },
+      { id: reviewProjId, title: "Review my projects", linkedProjectId: null, isGroup: false, parent: null,
+        notesClean: "Someone who finishes what they start.",
+        whenTexts: ["After my Friday coffee"], hooks: [] }
     ];
+    // "Review my projects" runs Fridays only; the other two every day. Seed the
+    // run schedules through storage so boot()'s loadHabitRuns() picks them up
+    // (boot reloads gtd_habit_runs after seedData runs).
+    const seededRuns = {};
+    seededRuns[reviewProjId] = Object.assign(defaultHabitRun(), { schedule: [5] });
+    Storage.setJSON("gtd_habit_runs", seededRuns);
 
     KINDS.forEach(saveTasksLocal);
+    seedEvents(); // chunk 7 (§4.13): sample events/appointments in their own store
   }
   function initLocalData(){
     let anyMissing = false;
@@ -2103,16 +2261,25 @@ function injectChunkMap(){
     // New Completed archive: the finished item moves to the top of
     // state.completed[kind] rather than disappearing for good — kept
     // forever per the retention ruling (§4.12b).
+    let completedTask = null;
     function archiveCompleted(){
       const task = state.tasks[kind].find(function(t){ return t.id === taskId; });
       if (task){
-        state.completed[kind].unshift(Object.assign({}, task, { completedAt: todayStr() }));
+        completedTask = task;
+        // chunk 7: a completed pseudo-action archives with its series identity
+        // so the Completed section can collapse repeats ("Pay rent ×6", §4.15b).
+        const ev = task.eventId ? findEvent(task.eventId) : null;
+        const extra = ev ? { completedAt: todayStr(), seriesId: ev.seriesId || null } : { completedAt: todayStr() };
+        state.completed[kind].unshift(Object.assign({}, task, extra));
         saveCompletedLocal(kind);
       }
     }
     archiveCompleted();
     state.tasks[kind] = state.tasks[kind].filter(function(t){ return t.id !== taskId; });
     saveTasksLocal(kind);
+    // chunk 7 (§4.14a): completing a pseudo-action writes back to its event —
+    // records the occurrence and (for a series) arms the 10-minute roll.
+    if (completedTask && completedTask.eventId){ onPseudoActionCompleted(completedTask); renderLane("waiting"); }
     renderLane(kind);
     refreshProjectFlags(kind);
     promoteDependents();
@@ -2391,7 +2558,7 @@ function injectChunkMap(){
   // disagree. ⚑ Chunk 7 adds linked events/appointments as a third kind of
   // forward motion here (§4.3b/§4.8b) — that is the only edit this needs.
   function projectHasWayForward(projectId){
-    return linkedActionsForProject(projectId).length > 0;
+    return linkedActionsForProject(projectId).length > 0 || projectHasLinkedEvent(projectId);
   }
 
   // Project "Complete" — per 4.6 as refined in 9: Next Actions complete
@@ -2646,8 +2813,15 @@ function injectChunkMap(){
     // deadline (\u00a74.1) get the progress bar (\u00a74.4b/c/d) directly under the
     // title; everything else renders the title as a bare flex:1 child, same
     // as before.
-    const titleHtml = '<div class="card-title' + (done ? " done" : "") + '" data-action="open-edit" data-kind="' + kind + '" data-id="' + task.id + '" title="Tap to open \u2014 press and hold to reorder">' + escapeHtml(task.title) + '</div>';
-    const deadlineBarBlock = (kind === "next" || kind === "current") ? deadlineBarHtml(task) : "";
+    // chunk 7 (\u00a74.14): a pseudo-action displays as a Next Action but taps
+    // through to the EVENT page, not an action page, and carries the event/
+    // appointment progress bar (\u00a74.14c), not a deadline bar.
+    const isPseudo = kind === "next" && isPseudoAction(task);
+    const titleOpen = isPseudo
+      ? 'data-action="open-event" data-id="' + task.eventId + '"'
+      : 'data-action="open-edit" data-kind="' + kind + '" data-id="' + task.id + '"';
+    const titleHtml = '<div class="card-title' + (done ? " done" : "") + '" ' + titleOpen + ' title="Tap to open \u2014 press and hold to reorder">' + escapeHtml(task.title) + '</div>';
+    const deadlineBarBlock = isPseudo ? pseudoBarHtml(task) : (kind === "next" || kind === "current") ? deadlineBarHtml(task) : "";
     const titleBlock = deadlineBarBlock ? ('<div style="flex:1">' + titleHtml + deadlineBarBlock + '</div>') : titleHtml;
     return (
       '<div class="card" draggable="true" data-drag-id="' + task.id + '" data-drag-parent="' + (task.parent || "") + '" data-drag-group="0">' +
@@ -2689,11 +2863,12 @@ function injectChunkMap(){
   // un-completes on tap — mirroring the live checkbox, teaching that the
   // control that completed the item restores it (§4.12b) — and a tappable
   // title that opens the read-only completed page.
-  function completedItemHtml(kind, task){
+  function completedItemHtml(kind, task, count){
+    const badge = (count && count > 1) ? ' <span class="completed-series-count">×' + count + '</span>' : "";
     return (
       '<div class="completed-item">' +
         '<button type="button" class="check checked" data-action="restore" data-kind="' + kind + '" data-id="' + task.id + '" title="Restore to the active list">&#10003;</button>' +
-        '<span class="completed-item-title" data-action="open-completed" data-kind="' + kind + '" data-id="' + task.id + '" title="Tap to view">' + escapeHtml(task.title) + '</span>' +
+        '<span class="completed-item-title" data-action="open-completed" data-kind="' + kind + '" data-id="' + task.id + '" title="Tap to view">' + escapeHtml(task.title) + badge + '</span>' +
       '</div>'
     );
   }
@@ -2810,7 +2985,11 @@ function injectChunkMap(){
         html += contextGroupHtml(kind, ctx, members);
       });
       activeHtml = html || '<div class="empty-note">Nothing here yet.</div>';
-      completedHtml = completedSectionHtml(kind, state.completed[kind] || [], function(t){ return completedItemHtml(kind, t); });
+      // chunk 7 (§4.15b): collapse repeated completions of one series into a
+      // single "Title ×N" row. Only items carrying a seriesId collapse; plain
+      // completed actions/waitings (no seriesId) stay individual.
+      const collapsed = collapseCompletedSeries(state.completed[kind] || []);
+      completedHtml = completedSectionHtml(kind, collapsed, function(entry){ return completedItemHtml(kind, entry.task, entry.count); });
     } else {
       const byParent = buildTree(kind);
       const roots = byParent[""] || [];
@@ -2819,7 +2998,11 @@ function injectChunkMap(){
         : '<div class="empty-note">Nothing here yet.</div>';
       completedHtml = completedSectionHtml(kind, state.completed[kind] || [], function(t){ return completedItemHtml(kind, t); });
     }
-    rootEl.innerHTML = activeHtml + completedHtml;
+    // chunk 7 (§4.13b): a yellow-bordered calendar widget rides at the top of
+    // the Waiting lane — this is how events "belong" in Waiting without living
+    // there. Tapping anywhere on it opens the calendar.
+    const widget = kind === "waiting" ? waitingWidgetHtml() : "";
+    rootEl.innerHTML = widget + activeHtml + completedHtml;
   }
   function laneShellHtml(k){
     return (
@@ -3240,6 +3423,7 @@ function injectChunkMap(){
     if (s.completedView){ closeScreen(); return; }
     if (s.tagsView){ saveTagsScreen(s); return; } // chunk 6 (§4.9b)
     if (s.noteView){ saveNoteScreen(s); return; } // chunk 6 (§4.9)
+    if (s.eventView){ saveEventScreen(s); return; } // chunk 7 (§4.15a)
     let title = (s.draft.title || "").trim();
     if (!title){
       if (!s.taskId){ closeScreen(); return; } // silent discard on create
@@ -3284,6 +3468,17 @@ function injectChunkMap(){
           saveHabitRuns();
           consumeCaptureForScreen(s); // §4.8b: a capture sorted to Habit is now filed
           applyPendingReplacements(d, hooks, newId);
+          // chunk 7 (§4.15b): "Make this a habit instead" — the word "instead"
+          // is either/or, so on save the source event is removed (no warning),
+          // and the now-stale event page underneath is popped so we don't land
+          // back on a deleted event.
+          if (d.fromEventId){
+            const ev = findEvent(d.fromEventId);
+            if (ev) deleteEventEntirely(ev);
+            if (state.screenStack.length && state.screenStack[state.screenStack.length - 1] && state.screenStack[state.screenStack.length - 1].eventView){
+              state.screenStack.pop();
+            }
+          }
           // Re-render AFTER the run's schedule lands: addHabit's own
           // render ran before it existed, so hook liveness on any card
           // pointing at (or from) this habit would be computed against
@@ -3503,6 +3698,7 @@ function injectChunkMap(){
   function deleteScreenItem(){
     const s = state.screen;
     if (!s || !s.taskId) return;
+    if (s.eventView){ deleteEventFromPage(); return; } // chunk 7 (§4.15b: Skip / Delete series / Cancel)
     if (s.noteView){ // chunk 6 (§4.9)
       openConfirmDialog("Delete this note for good?", [
         { label: "Delete", style: "danger", action: function(){ deleteNote(s.noteId); closeScreen(); } },
@@ -3915,7 +4111,14 @@ function injectChunkMap(){
   // straight from storage.
   function linkedActionsListHtml(s){
     const linked = projectDraftLinked(s);
-    if (!linked.length) return "";
+    // chunk 7 (§4.15d): linked events/appointments display as actions here,
+    // sorted nearest→farthest and ABOVE the undated actions ("dated beats the
+    // grouping"). A recurring event shows exactly one instance — the live one.
+    // ⚑ Simplification: events sit as a dated band above the action sub-tree
+    // rather than being interleaved with deadlined actions; nested dependents
+    // on events are chunk 8.
+    const eventRows = projectLinkedEventRowsHtml(s.draft && s.draft.projectId);
+    if (!linked.length) return eventRows ? ('<div class="screen-hook-pick-label">Linked actions</div><div class="linked-actions-list">' + eventRows + '</div>') : "";
     const byId = {};
     linked.forEach(function(l){ byId[l.task.id] = l; });
     const dependents = {};
@@ -3944,7 +4147,7 @@ function injectChunkMap(){
     linked.forEach(function(l){ if (!rendered[l.task.id]) itemHtml(l, 0); });
     return (
       '<div class="screen-hook-pick-label">Linked actions</div>' +
-      '<div class="linked-actions-list">' + html + '</div>'
+      '<div class="linked-actions-list">' + eventRows + html + '</div>'
     );
   }
   // `locked` (chunk 5, §12.1): when an action is opened as a child of the
@@ -4282,10 +4485,13 @@ function injectChunkMap(){
   }
   function screenHeaderHtml(s){
     const showDelete = !!s.taskId;
+    // Event pages read "Appointment" once a time is set (§4.14 — the time is
+    // the only thing that distinguishes the two; they are not separate types).
+    const badge = s.eventView ? (s.draft && s.draft.time ? "Appointment" : "Event") : KIND_BADGE_LABEL[s.kind];
     return (
       '<div class="screen-header">' +
         '<button type="button" class="screen-chrome-btn" data-action="screen-save" title="Save and go back">&#8592;</button>' +
-        '<span class="screen-kind-badge">' + escapeHtml(KIND_BADGE_LABEL[s.kind]) + '</span>' +
+        '<span class="screen-kind-badge">' + escapeHtml(badge) + '</span>' +
         '<div class="screen-header-right">' +
           (showDelete ? '<button type="button" class="screen-chrome-btn danger" data-action="screen-delete" title="Delete">&#128465;</button>' : '') +
           '<button type="button" class="screen-chrome-btn" data-action="screen-cancel" title="Cancel">&#10005;</button>' +
@@ -4296,7 +4502,7 @@ function injectChunkMap(){
   // Border/text color for the Make-Waiting/Next/Current/Future pill —
   // tinted with the *destination* kind's accent, per the guide.
   function accentVarForKind(kind){
-    return kind === "next" ? "--red" : kind === "waiting" ? "--yellow" : kind === "current" ? "--moss" : kind === "future" ? "--dusty" : kind === "notes" ? "--teal" : kind === "tags" ? "--brass" : kind === "review" ? "--brass" : "--purple";
+    return kind === "next" ? "--red" : kind === "waiting" ? "--yellow" : kind === "current" ? "--moss" : kind === "future" ? "--dusty" : kind === "notes" ? "--teal" : kind === "tags" ? "--brass" : kind === "review" ? "--brass" : kind === "event" ? "--yellow" : kind === "calendar" ? "--brass" : "--purple";
   }
   // DRAFT ISOLATION (§13.0 Chunk A): armed renders a filled pill reading
   // "Converting to X on save", the same "nothing has happened yet, but
@@ -4387,6 +4593,7 @@ function injectChunkMap(){
   function screenBodyHtml(s){
     if (s.tagsView) return tagsPageBodyHtml(s); // chunk 6 (§4.9b)
     if (s.noteView) return noteBodyHtml(s); // chunk 6 (§4.9)
+    if (s.eventView) return eventBodyHtml(s); // chunk 7 (§4.14/§4.15) — NOT the action template
     const draft = s.draft, kind = s.kind;
     // §12.1: lock the project link when this action is opened as a child of
     // the project it actually belongs to (membership, not provenance).
@@ -4631,12 +4838,14 @@ function injectChunkMap(){
     const root = qs("#screen-root");
     lockBodyScroll(!!s);
     if (!s){ root.innerHTML = ""; return; }
-    const key = (s.completedView ? "completed:" : s.reviewView ? "review:" : "") + s.kind + ":" + (s.taskId || "new");
+    const key = (s.completedView ? "completed:" : s.reviewView ? "review:" : s.calendarView ? "calendar:" : "") + s.kind + ":" + (s.taskId || "new");
     const inner = s.completedView
       ? completedHeaderHtml(s) + completedBodyHtml(s)
       : s.reviewView
         ? reviewHeaderHtml() + reviewBodyHtml(s)
-        : screenHeaderHtml(s) + screenBodyHtml(s);
+        : s.calendarView
+          ? calendarHeaderHtml(s) + calendarBodyHtml(s)
+          : screenHeaderHtml(s) + screenBodyHtml(s);
     const existing = root.querySelector(".screen-overlay");
     if (existing && existing.getAttribute("data-screen-key") === key){
       // Same item re-rendering (hook added, day chip toggled, Complete
@@ -4649,6 +4858,7 @@ function injectChunkMap(){
       const newBody = existing.querySelector(".screen-body");
       if (newBody) newBody.scrollTop = scrollTop;
       autoGrowAll();
+      if (s.calendarView) bindCalendarSwipe();
       return;
     }
     // Fresh open, or navigation to a different item (child screens,
@@ -4661,6 +4871,7 @@ function injectChunkMap(){
       if (titleInput && !s.taskId && !s.draft.hookPicker) titleInput.focus();
     });
     autoGrowAll();
+    if (s.calendarView) bindCalendarSwipe();
   }
   function autoGrowAll(){
     qsa(".screen-field-desc").forEach(function(ta){
@@ -4729,6 +4940,7 @@ function injectChunkMap(){
   function applyQaTimeJump(minutes){
     state.qaTimeOffset = (state.qaTimeOffset || 0) + minutes;
     processHabitBoundaries();
+    processEventBoundaries(); // chunk 7: roll events + mint pseudo-actions across the jumped boundary
     // Re-render EVERY lane, not just habits: deadline progress bars (§4.4,
     // Next + Current) read the clock at render time too, so a time jump has
     // to refresh them or they sit stale until you open/close a page.
@@ -4932,6 +5144,12 @@ function injectChunkMap(){
         if (act !== "screen-pick-hook" && act !== "screen-pick-condition") playNavClick();
       }
 
+      // CHUNK 7 (§4.13–§4.15): the calendar view, the event page, pseudo-action
+      // taps, and the header/widget 📅. Runs early and short-circuits its own
+      // actions; returns false for the generic screen-save/cancel/delete so
+      // those still handle the event page below.
+      if (eventsHandleClick(e)) return;
+
       // CHUNK 6 (§4.8a / §4.10): the intray drawer and the settings surface.
       if (e.target.closest('[data-action="open-tray"]')){ openTray(); return; }
       if (e.target.closest('[data-action="close-tray"]')){ closeTray(); return; }
@@ -4961,6 +5179,8 @@ function injectChunkMap(){
         reviewOpenChild(function(){ openScreen(lane, id); });
         return;
       }
+      const revOpenEv = e.target.closest('[data-action="review-open-event"]'); // chunk 7: past-due pseudo-action → event page
+      if (revOpenEv){ reviewOpenChild(function(){ openEventScreen(revOpenEv.getAttribute("data-id")); }); return; }
       const revFormStart = e.target.closest('[data-action="review-form-start"]');
       if (revFormStart){
         if (state.screen) state.screen.reviewForm = { key: revFormStart.getAttribute("data-key"), type: revFormStart.getAttribute("data-type"), invalid: false };
@@ -5376,6 +5596,11 @@ function injectChunkMap(){
 
     // Full-screen field edits update the in-memory draft as the user types.
     document.addEventListener("input", function(e){
+      // chunk 7: calendar creation-row + event-page fields have their own
+      // handler (data-calfield, plus the event-* data-field cases).
+      if (state.screen && (state.screen.calendarView || state.screen.eventView)){
+        if (eventsHandleFieldInput(e)) return;
+      }
       const el = e.target.closest("[data-field]");
       if (!el || !state.screen) return;
       // Any edit clears a blocked-save outline without a full re-render
@@ -5425,6 +5650,9 @@ function injectChunkMap(){
       else if (field === "deadline-time"){ if (draft.deadline) draft.deadline.time = el.value; }
     });
     document.addEventListener("change", function(e){
+      if (state.screen && (state.screen.calendarView || state.screen.eventView)){
+        if (eventsHandleFieldInput(e)) return;
+      }
       const el = e.target.closest("[data-field]");
       if (!el || !state.screen) return;
       const field = el.getAttribute("data-field");
@@ -5963,7 +6191,7 @@ function injectChunkMap(){
   // off to the next chunk.
   // =========================================================
   function injectQAChecklist(){
-    const FLAG = "gtd_qa_checklist_chunk6b_v1"; // chunk 6b (§4.8b): the daily review — replaces chunk 6's groups
+    const FLAG = "gtd_qa_checklist_chunk7_v1"; // chunk 7 (§4.13–§4.15): calendar & events — replaces chunk 6b's groups
     if (Storage.get(FLAG)) return;
     Storage.set(FLAG, "1");
 
@@ -5994,18 +6222,25 @@ function injectChunkMap(){
       });
     }
 
-    addGroupWithItems("\u2705 QA \u2014 Chunk 6b: The daily review", [
-      { title: "The intray has a Review button", notes: "Open the intray (\ud83d\udce5). Below the capture box is a \u2018\ud83d\udd0d Review\u2019 button with a small number \u2014 that\u2019s how many open loops are waiting for you. Tap it to open the review." },
-      { title: "One card at a time; the rest are sealed", notes: "The review shows just the top item in full; the others are sealed bars you can count but can\u2019t read or tap. Tap \u2018Show all\u2019 to reveal them all, and \u2018One at a time\u2019 to go back. This is on purpose \u2014 you decide on them in order, and watching the stack shrink is the reward." },
-      { title: "A stalled project shows up with choices", notes: "The sample project \u2018Website relaunch\u2019 has no next action, so it appears in the review. It offers: add a next action (type it right there), move to Someday/Maybe, complete it, or delete it \u2014 then Not now. Add a next action and it drops out of the review." },
-      { title: "Overdue items come first", notes: "Give any Next Action a deadline in the past (e.g. yesterday) and reopen the review \u2014 it sits at the very top with a red \u2018passed\u2019 bar. Its choices are: push the date (a date box opens right there), complete it, delete it, or Not now. Handle it and it drops out." },
-      { title: "A waiting item whose condition vanished shows up", notes: "Make a Waiting item wait on a specific action, then delete that action. The waiting item now appears in the review as \u2018orphaned\u2019, with choices: re-point it, replace it with a note to yourself, promote it to Next, complete, or delete." },
-      { title: "Stalled projects and orphaned waiting items sit at the bottom", notes: "In the review, overdue items come first and your captures next; stalled projects and orphaned waiting items \u2014 the ones that need real thought \u2014 fall to the very bottom, so you clear the quick wins first." },
-      { title: "Captures can be sorted into any lane \u2014 including Habits", notes: "A thought you captured appears in the review with buttons: Next, Waiting, Project, Future, Habit, Note. Tap one \u2014 it opens a create page with your text already filled in. Save it and the capture is filed (gone from the intray); cancel (\u2715) and the capture stays put." },
-      { title: "\u2018Not now\u2019 defers until the next review", notes: "Tap \u2018Not now\u2019 on any card \u2014 it drops out of this review for now. When nothing\u2019s left you\u2019ll see either \u2018All clear\u2019 (nothing slipping through the cracks) or \u2018N deferred\u2019. Close the review and open it again and the deferred items are back \u2014 deferring buys you the rest of this one sitting, not the whole day. There\u2019s no penalty and no \u2018skipped\u2019 counter." },
-      { title: "Captures are redacted in the intray until you reveal them", notes: "Open the intray. Your captures show as solid black bars \u2014 unreadable at a glance if someone\u2019s looking over your shoulder. Tap the crossed-eye button (\u2018Reveal\u2019) above the list to un-black them; tap it again (\u2018Hide\u2019) to seal them. Closing and reopening the intray always starts sealed." },
-      { title: "Tapping a card opens its real page and returns", notes: "Tap the title of a review card \u2014 its full page opens, wherever that item lives. Save (\u2190) and you land back in the review, which updates: anything you fixed drops out." },
-      { title: "The \u2139 button explains the choices", notes: "Tap the \u2139 at the top of the review \u2014 it explains what each sort button (Next/Waiting/Project/Future/Habit/Note) and each decision (past-due, stalled project, orphaned waiting) does." }
+    addGroupWithItems("\u2705 QA \u2014 Chunk 7: Calendar & events", [
+      { title: "Two ways into the calendar", notes: "Tap the \ud83d\udcc5 in the top-right header \u2014 the calendar opens full-screen. Also open Waiting On: a yellow-bordered box sits at the top listing what\u2019s coming in the next 7 days; tapping anywhere on it opens the same calendar." },
+      { title: "Month grid shows marks", notes: "In Month view, days with something on them show small marks: a yellow dot = an appointment (has a time), a white dot = an all-day event, a red line = a Next Action deadline, a green line = a Project deadline. Faint/hollow dots are future repeats of a repeating event. A day never shows more than three marks \u2014 after that you\u2019ll see a \u2018+\u2019." },
+      { title: "Move between months \u2014 arrows AND swipe", notes: "Use the \u2039 \u203a arrows above the grid, or swipe the grid left/right with your finger: the month should follow your finger as you drag and snap into place when you let go. (This is the finger-follow swipe we\u2019re trialling here \u2014 note anything that feels wrong on your phone.)" },
+      { title: "Tap a day, then tap again for Day view", notes: "Tap any day to select it (it highlights). Tap the already-selected day again \u2014 or the \u2018Day\u2019 tab up top \u2014 to see everything on that day in a list: all-day items first, then timed ones in order." },
+      { title: "Create an event from the bottom row", notes: "At the bottom of the calendar is a creation row. With \u2018Event\u2019 selected, type a name and tap Add \u2014 a white dot appears on the selected day. Add a time first and it becomes an appointment (yellow dot) instead. Leaving the name blank flashes the box; a name that already exists flashes it too." },
+      { title: "An event on TODAY shows up in Next Actions", notes: "Select today in the calendar and add an event. Now open Next Actions \u2014 the event is sitting at the top as a card with a progress bar (an appointment\u2019s bar fills toward its time; an all-day event\u2019s bar is full all day). Tapping the card opens the EVENT page, not a normal action page. Its checkbox completes it like any card." },
+      { title: "Repeating events + \u2018make this a habit instead\u2019", notes: "On the creation row or the event page, set a repeat of Daily/Weekly/Monthly/Yearly (with an \u2018every N\u2019 box for, say, every 2 weeks). When you pick Daily or Weekly a suggestion appears: \u2018Make this a habit instead \u2192\u2019. Tapping it opens a new habit with the title and schedule filled in; saving the habit removes the event, and cancelling brings you back to the event with nothing lost." },
+      { title: "Complete or delete a repeating event", notes: "Complete a repeating event\u2019s card (or on its page) \u2014 it archives and the series rolls to the next date. In the Completed section, repeats of one series collapse into a single \u2018Title \u00d7N\u2019 row. Deleting a repeating event from its page asks: Skip this one (jump to the next date), Delete series, or Cancel." },
+      { title: "Tickler \u2014 set-and-forget reminders", notes: "When creating or editing an event, tick \u2018Tickler\u2019. A tickler stays OFF the month grid and OFF the Waiting On box \u2014 it won\u2019t clutter anything \u2014 but it still appears in Day view, and it still shows up in Next Actions on its day so you actually deal with it. Good for \u2018renew the passport in 6 months\u2019 (the sample \u2018Renew passport\u2019 is one)." },
+      { title: "Deadlines can be born in the calendar", notes: "On the creation row, switch the toggle to \u2018Deadline\u2019 and choose Action or Project. Adding one creates a Next Action (or Current Project) due on the selected day \u2014 you\u2019ll see its red/green line on the grid. (A project made this way has no actions yet, so it\u2019s \u2018stalled\u2019 by design and shows in the review \u2014 that\u2019s expected.)" },
+      { title: "The review handles past-due events and a Calendar chip", notes: "If an event\u2019s day passes without completing it, it shows up in the daily review at the top \u2014 but as a simple checkbox (\u2018Mark done\u2019), not the push-a-date menu a deadline gets. Also: when sorting a captured thought, there\u2019s now a sixth chip, \u2018Calendar\u2019, which opens the calendar with your text ready to place." },
+      { title: "Three sample habits teach the routine", notes: "Open Habits: \u2018Sort my tray\u2019 (every day), \u2018Review my calendar and waiting actions\u2019 (every day, hooked to the first one), and \u2018Review my projects\u2019 (Fridays). They\u2019re ordinary habits \u2014 edit or delete them freely; Reset brings them back." }
+    ]);
+
+    addGroupWithItems("\u2705 QA \u2014 Recheck chunk 6b", [
+      { title: "The review still walks open loops one at a time", notes: "Open the intray\u2019s \ud83d\udd0d Review. Stalled projects, orphaned waiting items, past-due deadlines, and captures still appear one card at a time (the rest sealed), with \u2018Show all\u2019 / \u2018One at a time\u2019 and \u2018Not now\u2019 working as before. Adding the calendar shouldn\u2019t have changed any of that." },
+      { title: "Deadlines in the past still get the full menu", notes: "Give a normal Next Action a deadline of yesterday and open the review \u2014 it still offers Push the date / Complete / Delete / Not now (the menu), which is different from an event\u2019s checkbox. Both kinds can appear together at the top." },
+      { title: "Captures still file into every lane", notes: "A captured thought still sorts to Next / Waiting / Project / Future / Habit / Note (now plus Calendar), opening a prefilled page; saving files it, cancelling leaves it in the intray." }
     ]);
 
     saveTasksLocal("next");
@@ -6184,6 +6419,11 @@ function injectChunkMap(){
     ["next", "current"].forEach(function(k){
       state.tasks[k].forEach(function(t){
         if (t.isGroup || isDevScaffold(t)) return;
+        // chunk 7: a past-due pseudo-action is a past-due open loop too, but in
+        // its CHECKBOX shape (§4.8b / §2) — not the deadline's push/complete/
+        // delete menu. deadlineBarState is null for it (no deadline field), so
+        // it needs its own past-due test.
+        if (t.eventId){ if (pseudoPassed(t)) loops.push({ key: t.id, kind: "pastdue", laneKind: k, id: t.id, task: t, pseudo: true }); return; }
         const st = deadlineBarState(t);
         if (st && st.passed) loops.push({ key: t.id, kind: "pastdue", laneKind: k, id: t.id, task: t });
       });
@@ -6307,17 +6547,21 @@ function injectChunkMap(){
           reviewMenuBtn("review-sort", "Future", ' data-target="future" data-key="' + l.key + '"') +
           reviewMenuBtn("review-sort", "Habit", ' data-target="habit" data-key="' + l.key + '"') +
           reviewMenuBtn("review-sort", "Note", ' data-target="notes" data-key="' + l.key + '"') +
+          reviewMenuBtn("review-sort", "Calendar", ' data-target="calendar" data-key="' + l.key + '"') + // chunk 7 (§4.8b): the sixth chip
         '</div>' +
         '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + '</div>';
       return '<div class="review-card review-card-capture">' + bodyHtml + menuHtml + '</div>';
     }
     // Derived kinds share a tap-through title (opens the real page) + a
-    // context line, then a per-kind decision menu.
-    const openAttr = ' data-action="review-open" data-lane="' + l.laneKind + '" data-id="' + l.id + '"';
+    // context line, then a per-kind decision menu. A pseudo-action taps
+    // through to its EVENT page (§4.14/§4.15), not an action page.
+    const openAttr = (l.pseudo)
+      ? ' data-action="review-open-event" data-id="' + l.task.eventId + '"'
+      : ' data-action="review-open" data-lane="' + l.laneKind + '" data-id="' + l.id + '"';
     bodyHtml = '<button type="button" class="review-card-open"' + openAttr + '>' +
       '<span class="review-card-title">' + escapeHtml(l.task.title || "") + '</span>';
     if (l.kind === "pastdue"){
-      bodyHtml += deadlineBarHtml(l.task);
+      bodyHtml += l.pseudo ? pseudoBarHtml(l.task) : deadlineBarHtml(l.task);
     } else if (l.kind === "stalled"){
       bodyHtml += '<span class="review-card-note">⚠ no way forward</span>';
     } else if (l.kind === "orphaned"){
@@ -6326,7 +6570,14 @@ function injectChunkMap(){
     bodyHtml += '</button>';
 
     const form = reviewFormFor(s, l.key);
-    if (l.kind === "pastdue"){
+    if (l.kind === "pastdue" && l.pseudo){
+      // §2: the pseudo-action shape of the past-due kind is a CHECKBOX, not the
+      // deadline menu — you cannot "push" an event's date from here (it is
+      // rescheduled on its own page), only tick it done or defer it.
+      menuHtml =
+        '<button type="button" class="review-menu-btn" data-action="review-complete" data-lane="' + l.laneKind + '" data-id="' + l.id + '">&#10003; Mark done</button>' +
+        reviewNotNowBtn(l.key);
+    } else if (l.kind === "pastdue"){
       if (form && form.type === "date"){
         menuHtml = reviewInlineFormHtml("", "date", "review-pushdate-save", "Save", (l.task.deadline && l.task.deadline.date) || "", invalid);
       } else {
@@ -6454,7 +6705,9 @@ function injectChunkMap(){
     if (!capture) { renderScreen(); return; }
     const text = capture.text;
     reviewOpenChild(function(){
-      if (target === "notes"){ openNoteScreen(null, { title: text, fromCaptureId: key }); }
+      if (target === "calendar"){ // chunk 7 (§4.8b): open the calendar prefilled, today selected
+        openCalendarScreen({ name: text, fromCaptureId: key });
+      } else if (target === "notes"){ openNoteScreen(null, { title: text, fromCaptureId: key }); }
       else { openScreen(target, null, { title: text }); if (state.screen) state.screen.fromCaptureId = key; }
     });
   }
@@ -7002,7 +7255,12 @@ function injectChunkMap(){
     state.tray = loadTray();
     state.notes = loadNotes();
     state.tags = loadTags();
+    // chunk 7 (§4.13): events load into their own store. A missing store on
+    // fresh/legacy data seeds nothing here — seedData() owns the samples; an
+    // existing-but-empty install just has no events, which is correct.
+    { const loadedEvents = loadEvents(); if (loadedEvents) state.events = loadedEvents; }
     processHabitBoundaries();
+    processEventBoundaries(); // §7 edge case: boundaries crossed while closed are swept on open, like habits
     ALL_LANES.forEach(renderLane);
     updateLaneVisibility();
     updateQaTimeReadout();
@@ -7012,6 +7270,1036 @@ function injectChunkMap(){
   }
 
   document.addEventListener("DOMContentLoaded", boot);
+
+// =========================================================
+// CALENDAR · EVENTS · RECURRENCE (chunk 7, spec.md §4.13–§4.15)
+//
+// An EVENT is a calendar entity that never lives in a lane (§4.13). It is
+// created in the calendar, lives in gtd_events, and what appears in the
+// lanes is a *view* of it: a bulleted widget at the top of Waiting (§4.13b)
+// and, on its day, a PSEUDO-ACTION at the top of Next Actions (§4.14).
+//
+// Concatenated AFTER app.js in build.py, so every helper this module leans
+// on (state, Storage, genId, escapeHtml, dateStrToDate, boundaryNow,
+// openScreen, renderScreen, renderLane, saveTasksLocal, openConfirmDialog…)
+// is a hoisted declaration in the same IIFE and resolves at call time. app.js
+// likewise calls into the hoisted functions here (processEventBoundaries,
+// openCalendarScreen, eventsHandleClick, saveEventScreen…).
+//
+// THE LOAD-BEARING INVARIANTS (each has a build-trap note in the spec):
+//  · The pseudo-action's task ID is minted ON THE EVENT at creation, not at
+//    first appearance (§4.14a) — event.taskId. This is what lets chunk 8 hook
+//    a condition onto an event before its day with a plain task ID.
+//  · The pseudo-action is a REAL stored row in state.tasks.next (drag pos,
+//    context, completion), never a render-time projection (§4.14a).
+//  · A recurring series is ONE live event that rolls forward — no spawning.
+//    Its pseudo-action is REPLACED, not accumulated, and keeps the same task
+//    ID across every roll (§4.15b, §4.14a).
+// =========================================================
+
+const RECUR_OPTIONS = [
+  { v: "none", label: "Does not repeat" },
+  { v: "daily", label: "Daily" },
+  { v: "weekly", label: "Weekly" },
+  { v: "monthly", label: "Monthly" },
+  { v: "yearly", label: "Yearly" }
+];
+const RECUR_LABEL = { none: "Does not repeat", daily: "Daily", weekly: "Weekly", monthly: "Monthly", yearly: "Yearly" };
+const CAL_UNDO_WINDOW_MS = 10 * 60 * 1000; // §4.15c: un-complete a series occurrence within 10 minutes
+
+function loadEvents(){ return Storage.getJSON("gtd_events", null); }
+function saveEvents(){ Storage.setJSON("gtd_events", state.events); }
+function findEvent(id){ return (state.events || []).find(function(e){ return e.id === id; }) || null; }
+function findEventByTaskId(taskId){ return (state.events || []).find(function(e){ return e.taskId === taskId; }) || null; }
+function eventIsAppointment(ev){ return !!(ev && ev.time); }
+
+// The clock, matching deadlineBarState() — real time plus the dev QA offset.
+function nowInstant(){ return Date.now() + (state.qaTimeOffset || 0) * 60000; }
+
+// The instant an occurrence "happens" (and, once past, goes overdue). A timed
+// occurrence passes at its time; an UNTIMED one has no moment to converge on,
+// so it passes at the 4 AM boundary that ENDS its app-day (§4.4d/§4.14c).
+function occDueInstant(dateStr, timeStr){
+  const d = dateStrToDate(dateStr);
+  if (timeStr){ const p = timeStr.split(":").map(Number); d.setHours(p[0] || 0, p[1] || 0, 0, 0); return d.getTime(); }
+  d.setHours(0, 0, 0, 0);
+  return d.getTime() + 28 * 3600 * 1000; // next civil day, 4 AM
+}
+// The 4 AM boundary that BEGINS the app-day containing an occurrence — the
+// pseudo-action's appearance moment and its progress-bar origin (§4.14b/c).
+// Untimed occurrences are anchored at noon so the -4h shift can't drag them
+// into the previous civil day (only 00:00–03:59 timed events do that, §4.14b).
+function occAppearanceInstant(dateStr, timeStr){
+  const d = dateStrToDate(dateStr);
+  if (timeStr){ const p = timeStr.split(":").map(Number); d.setHours(p[0] || 0, p[1] || 0, 0, 0); }
+  else d.setHours(12, 0, 0, 0);
+  const shifted = new Date(d.getTime() - 4 * 3600 * 1000);
+  return new Date(shifted.getFullYear(), shifted.getMonth(), shifted.getDate(), 4, 0, 0, 0).getTime();
+}
+function occAppearanceCivil(dateStr, timeStr){ return dateToStr(new Date(occAppearanceInstant(dateStr, timeStr))); }
+function occPassed(dateStr, timeStr){ return nowInstant() >= occDueInstant(dateStr, timeStr); }
+
+// Next occurrence of a recurrence rule from a given date. Interval (the
+// "every N" advanced option, user ruling A1) defaults to 1. Weekly is a
+// single weekday (the date's own) for the sprint — multi-weekday weekly is
+// deferred and flagged in the handoff.
+function nextOccurrenceDate(dateStr, recurrence, interval){
+  const d = dateStrToDate(dateStr);
+  const n = Math.max(1, interval || 1);
+  if (recurrence === "daily") d.setDate(d.getDate() + n);
+  else if (recurrence === "weekly") d.setDate(d.getDate() + 7 * n);
+  else if (recurrence === "monthly") d.setMonth(d.getMonth() + n);
+  else if (recurrence === "yearly") d.setFullYear(d.getFullYear() + n);
+  else return null;
+  return dateToStr(d);
+}
+function prevOccurrenceDate(dateStr, recurrence, interval){
+  const d = dateStrToDate(dateStr);
+  const n = Math.max(1, interval || 1);
+  if (recurrence === "daily") d.setDate(d.getDate() - n);
+  else if (recurrence === "weekly") d.setDate(d.getDate() - 7 * n);
+  else if (recurrence === "monthly") d.setMonth(d.getMonth() - n);
+  else if (recurrence === "yearly") d.setFullYear(d.getFullYear() - n);
+  else return null;
+  return dateToStr(d);
+}
+function isRecurring(ev){ return ev && ev.recurrence && ev.recurrence !== "none"; }
+
+// §4.3b/§4.8b (chunk 7): a linked event/appointment is forward motion — a
+// project planned around "act after the conference on the 14th" is NOT
+// stalled. A recurring series always counts; a one-shot counts until it is
+// completed (a long-past, done event no longer keeps a project alive).
+function projectHasLinkedEvent(projectId){
+  return (state.events || []).some(function(ev){
+    if (ev.linkedProjectId !== projectId) return false;
+    if (isRecurring(ev)) return true;
+    return (ev.completedOccs || []).indexOf(ev.date) === -1;
+  });
+}
+
+// =========================================================
+// THE PSEUDO-ACTION (§4.14) — an event that displays as a Next Action.
+// =========================================================
+function isPseudoAction(task){ return !!(task && task.eventId); }
+
+// The stored row. It carries the event's OWN occurrence date/time (occDate/
+// occTime), independent of the live event.date, so it can sit in the lane as
+// a past-due missed occurrence AFTER the series has already rolled its
+// projection forward — and only flip to the new occurrence when that
+// occurrence's app-day begins (§4.15b: "replaced at the 4 AM boundary of the
+// next occurrence's app-day").
+function makePseudoActionRow(ev){
+  return {
+    id: ev.taskId, eventId: ev.id, isGroup: false, parent: null,
+    title: ev.title, notesClean: ev.notesClean || "",
+    contextId: ev.contextId || null, linkedProjectId: ev.linkedProjectId || null,
+    occDate: ev.date, occTime: ev.time || null,
+    deadline: null, whenText: null, conditionId: null, conditionKind: null, conditionLabel: null,
+    bundleText: null, createdAt: Date.now()
+  };
+}
+function findPseudoRow(eventId){ return state.tasks.next.find(function(t){ return t.eventId === eventId; }) || null; }
+
+// Drop a fresh pseudo-action at the top of its inherited context (or the top
+// of the lane when it has none) — the §4.15b "lands at the top of that
+// context" rule, reused for first appearance too.
+function insertPseudoAtTop(row){
+  const ctx = row.contextId;
+  if (ctx){
+    const idx = state.tasks.next.findIndex(function(t){ return !t.isGroup && t.contextId === ctx; });
+    if (idx !== -1){ state.tasks.next.splice(idx, 0, row); return; }
+  }
+  state.tasks.next.unshift(row);
+}
+
+// The whole boundary sweep for events — mirrors processHabitBoundaries(), and
+// like it is idempotent and safe to run on every boot/QA-jump. Returns true
+// if anything changed (so the caller can persist + re-render).
+function processEventBoundaries(){
+  const today = todayStr();
+  let changed = false;
+  (state.events || []).forEach(function(ev){
+    // A completed NON-recurring occurrence keeps its (dimmed) calendar mark
+    // but has no live pseudo-action — nothing to sweep. A completed RECURRING
+    // occurrence rolls once its 10-minute undo window closes (below).
+    if (ev.paused){
+      // Paused: stops rolling AND stops projecting (§4.15b). Any pseudo-action
+      // already in the lane is left exactly where it is.
+      return;
+    }
+    if (isRecurring(ev)){
+      // (1) COMPLETION-DRIVEN roll: 10 minutes after the pseudo-action was
+      //     completed, the series moves on (§4.15b/§4.15c). Before the window
+      //     closes, un-completing rolls it back (restorePseudoAction).
+      if (ev.completedAt != null && nowInstant() >= ev.completedAt + CAL_UNDO_WINDOW_MS){
+        const nd = nextOccurrenceDate(ev.completedFrom || ev.date, ev.recurrence, ev.interval);
+        if (nd){ ev.date = nd; }
+        ev.completedAt = null; ev.completedFrom = null;
+        changed = true;
+      }
+      // (2) PASS-DRIVEN roll: an uncompleted occurrence whose whole app-day is
+      //     already behind us is a stale miss — advance the projection past it
+      //     (one live entity, no accumulation). The occurrence whose app-day is
+      //     TODAY stays put, even if its time already passed today, so a missed
+      //     appointment still shows as past-due until tomorrow's boundary.
+      let guard = 0;
+      while (ev.completedAt == null && guard++ < 400){
+        const appearCivil = occAppearanceCivil(ev.date, ev.time);
+        if (appearCivil < today && occPassed(ev.date, ev.time)){
+          const nd = nextOccurrenceDate(ev.date, ev.recurrence, ev.interval);
+          if (!nd) break;
+          ev.date = nd; changed = true;
+        } else break;
+      }
+    }
+    // (3) APPEARANCE / REPLACEMENT. Once the live occurrence's app-day has
+    //     begun, make sure exactly one pseudo-action exists for it. A row that
+    //     still shows an earlier occurrence is REPLACED IN PLACE — same task
+    //     ID, inherited context, moved to the top of that context (§4.15b).
+    if (ev.completedAt != null) return; // completed occurrence: no live row until it rolls
+    const appearCivil = occAppearanceCivil(ev.date, ev.time);
+    if (today < appearCivil) return; // not its day yet — leave any past-due row alone
+    const row = findPseudoRow(ev.id);
+    if (!row){
+      const fresh = makePseudoActionRow(ev);
+      insertPseudoAtTop(fresh);
+      changed = true;
+    } else if (row.occDate !== ev.date){
+      row.occDate = ev.date; row.occTime = ev.time || null;
+      row.title = ev.title; row.notesClean = ev.notesClean || "";
+      row.linkedProjectId = ev.linkedProjectId || null;
+      // Inherit the previous occurrence's context and re-file at its top; if
+      // that context was deleted meanwhile, null it and land at the lane top
+      // (the §7 EMERGENCY RULE, applied to the roll — §4.15b).
+      if (row.contextId && !findContext(row.contextId)) row.contextId = null;
+      state.tasks.next = state.tasks.next.filter(function(t){ return t.id !== row.id; });
+      insertPseudoAtTop(row);
+      changed = true;
+    }
+  });
+  if (changed){ saveTasksLocal("next"); saveEvents(); } // rolls/clears mutate BOTH stores
+  return changed;
+}
+
+// Completing a pseudo-action (from the lane checkbox, its event page, or the
+// review) archives the card like any Next Action AND writes back to the event
+// (§4.14a). For a recurring series this arms the 10-minute roll; for a
+// one-shot it just records the completed occurrence (kept, dimmed, on the
+// calendar — user ruling #6). Called from completeTask() after it archives.
+function onPseudoActionCompleted(task){
+  const ev = findEvent(task.eventId);
+  if (!ev) return;
+  const occ = task.occDate || ev.date;
+  ev.completedOccs = ev.completedOccs || [];
+  if (ev.completedOccs.indexOf(occ) === -1) ev.completedOccs.push(occ);
+  if (isRecurring(ev)){
+    ev.completedAt = nowInstant();
+    ev.completedFrom = occ;
+  }
+  saveEvents();
+}
+// Un-completing (restoreTask) within the 10-minute window rolls a series back
+// and returns the pseudo-action; outside it, the archive entry stands and the
+// series has moved on (§4.15c). Called from restoreTask BEFORE it unshifts the
+// row back into the lane; returns true if the restore should proceed normally.
+function onPseudoActionRestored(task){
+  const ev = findEventByTaskId(task.id) || findEvent(task.eventId);
+  if (!ev) return true; // event deleted meanwhile: restore as a plain orphaned row
+  const occ = task.occDate || ev.date;
+  if (isRecurring(ev)){
+    // Inside the 10-minute window (§4.15c): roll the series back and let the
+    // pseudo-action return. Outside it: the archive entry stands and the series
+    // has moved on — REFUSE the restore so it can't duplicate the rolled row.
+    if (ev.completedAt != null && nowInstant() < ev.completedAt + CAL_UNDO_WINDOW_MS){
+      ev.completedAt = null; ev.completedFrom = null;
+    } else {
+      return false;
+    }
+  }
+  // A live row with this task ID would collide (belt-and-braces).
+  if (findPseudoRow(ev.id) && findPseudoRow(ev.id).id === task.id) return false;
+  ev.completedOccs = (ev.completedOccs || []).filter(function(d){ return d !== occ; });
+  saveEvents();
+  return true;
+}
+
+// =========================================================
+// THE PSEUDO-ACTION PROGRESS BAR (§4.14c / §4.4d) — different origin than a
+// deadline's. Appointment: appearance → time (~20–28h, linear, red final 15%).
+// Untimed event: FULL for the whole day, then red + passed at day-end.
+// =========================================================
+function pseudoBarState(dateStr, timeStr){
+  const now = nowInstant();
+  if (timeStr){
+    const due = occDueInstant(dateStr, timeStr);
+    if (now >= due) return { full: true, red: true, passed: true, fillPercent: 100 };
+    const origin = occAppearanceInstant(dateStr, timeStr);
+    const total = due - origin;
+    if (total <= 0) return { full: true, red: false, passed: false, fillPercent: 100 };
+    const frac = Math.max(0, Math.min(1, (now - origin) / total));
+    return { full: false, red: frac >= 0.85, passed: false, fillPercent: Math.round(frac * 100) };
+  }
+  const dueEnd = occDueInstant(dateStr, null);
+  if (now >= dueEnd) return { full: true, red: true, passed: true, fillPercent: 100 };
+  return { full: true, red: false, passed: false, fillPercent: 100 };
+}
+function pseudoBarHtml(task){
+  const s = pseudoBarState(task.occDate, task.occTime);
+  const classes = "deadline-bar" + (s.full ? " full" : "") + (s.red ? " red" : "") + (s.passed ? " passed" : "");
+  const chip = s.passed ? '<span class="deadline-passed-chip">passed</span>' : "";
+  return '<div class="' + classes + '" style="--fill:' + s.fillPercent + '%"><div class="deadline-bar-fill"></div>' + chip + '</div>';
+}
+// Is this pseudo-action past-due? Used by the review's past-due kind (§4.8b,
+// pseudo-action shape) — mirrors deadlineBarState().passed for real deadlines.
+function pseudoPassed(task){ return pseudoBarState(task.occDate, task.occTime).passed; }
+
+// The descriptor in front of the date on the card/detail — "event" or
+// "appointment", NEVER "deadline" (§4.14).
+function pseudoDescriptor(task){ return task.occTime ? "appointment" : "event"; }
+
+// =========================================================
+// DUPLICATE-TITLE SCOPE FOR EVENTS (§7). An event is not in a lane, so
+// "per-lane" doesn't define its scope: check gtd_events AND the Next Actions
+// lane, because on its day the event mints a pseudo-action THERE, through a
+// 4 AM sweep no save-time check can intercept. Prevent where it is cheap.
+// =========================================================
+function eventTitleClashes(title, exceptEventId){
+  const n = (title || "").trim().toLowerCase();
+  if (!n) return false;
+  const inEvents = (state.events || []).some(function(e){
+    return e.id !== exceptEventId && (e.title || "").trim().toLowerCase() === n;
+  });
+  if (inEvents) return true;
+  return state.tasks.next.some(function(t){
+    // Skip the event's own pseudo-action — it legitimately shares the title.
+    if (t.isGroup || (t.eventId && t.eventId === exceptEventId)) return false;
+    return (t.title || "").trim().toLowerCase() === n;
+  });
+}
+
+// Sample events seeded alongside the sample tasks (§4.16 references a calendar,
+// so the seed set gives it something to show). Each mints its taskId now.
+function seedEvents(){
+  const t = boundaryNow();
+  function iso(offsetDays){ const d = new Date(t.getFullYear(), t.getMonth(), t.getDate()); d.setDate(d.getDate() + offsetDays); return dateToStr(d); }
+  state.events = [
+    { id: genId(), taskId: genId(), title: "Dentist", date: iso(2), time: "14:30",
+      notesClean: "Cleaning + check-up", recurrence: "none", interval: 1, paused: false,
+      contextId: null, linkedProjectId: null, seriesId: null, tickler: false, completedOccs: [] },
+    { id: genId(), taskId: genId(), title: "Pay rent", date: iso(5), time: null,
+      notesClean: "", recurrence: "monthly", interval: 1, paused: false,
+      contextId: null, linkedProjectId: null, seriesId: genId(), tickler: false, completedOccs: [] },
+    { id: genId(), taskId: genId(), title: "Renew passport", date: iso(20), time: null,
+      notesClean: "Set-and-forget — off the calendar until it's due", recurrence: "none", interval: 1, paused: false,
+      contextId: null, linkedProjectId: null, seriesId: null, tickler: true, completedOccs: [] }
+  ];
+  saveEvents();
+}
+
+// =========================================================
+// THE WAITING-LANE WIDGET (§4.13b) — a yellow-bordered box atop Waiting with a
+// bulleted list of events/appointments within 7 days. Not interactive beyond
+// opening the calendar. Ticklers are excluded (user addition: set-and-forget
+// reminders stay off the calendar list until their day).
+// =========================================================
+function upcomingWidgetEvents(){
+  const today = todayStr();
+  const horizon = dateToStr(addDaysToDate(dateStrToDate(today), 7));
+  const out = [];
+  (state.events || []).forEach(function(ev){
+    if (ev.tickler || ev.paused) return;
+    // The live occurrence, plus any projected recurrences, that fall in-window.
+    let d = ev.date, guard = 0;
+    while (guard++ < 60){
+      if (d > horizon) break;
+      if (d >= today) out.push({ date: d, time: ev.time, title: ev.title });
+      if (!isRecurring(ev)) break;
+      const nd = nextOccurrenceDate(d, ev.recurrence, ev.interval);
+      if (!nd || nd <= d) break;
+      d = nd;
+    }
+  });
+  out.sort(function(a, b){ return (a.date + (a.time || "99:99")).localeCompare(b.date + (b.time || "99:99")); });
+  return out.slice(0, 8);
+}
+function waitingWidgetHtml(){
+  const items = upcomingWidgetEvents();
+  const bullets = items.length
+    ? items.map(function(it){
+        const d = dateStrToDate(it.date);
+        const ds = d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+        const when = it.time ? ds + " · " + it.time : ds;
+        return '<li><span class="cal-widget-when">' + escapeHtml(when) + '</span> ' + escapeHtml(it.title) + '</li>';
+      }).join("")
+    : '<li class="cal-widget-empty">Nothing in the next 7 days.</li>';
+  return (
+    '<div class="cal-widget" data-action="open-calendar" title="Open the calendar">' +
+      '<div class="cal-widget-icon">&#128197;</div>' +
+      '<ul class="cal-widget-list">' + bullets + '</ul>' +
+    '</div>'
+  );
+}
+
+// Collapse repeated completions of one recurring series into a single row
+// (§4.15b: "Pay rent ×6"). Order-preserving: only items with a truthy seriesId
+// fold together (at their most-recent occurrence); everything else stays a
+// singleton, so plain completed actions are untouched.
+function collapseCompletedSeries(items){
+  const out = [];
+  const bySeries = {};
+  (items || []).forEach(function(t){
+    if (t.seriesId && bySeries[t.seriesId]){ bySeries[t.seriesId].count++; return; }
+    const entry = { task: t, count: 1 };
+    if (t.seriesId) bySeries[t.seriesId] = entry;
+    out.push(entry);
+  });
+  return out;
+}
+
+// Linked-event rows for a project page (§4.15d) — displays-as-an-action,
+// nearest→farthest. Tapping opens the event page as a child screen.
+function projectLinkedEventRowsHtml(projectId){
+  if (!projectId) return "";
+  const evs = (state.events || []).filter(function(ev){ return ev.linkedProjectId === projectId; });
+  if (!evs.length) return "";
+  evs.sort(function(a, b){ return (a.date + (a.time || "99:99")).localeCompare(b.date + (b.time || "99:99")); });
+  return evs.map(function(ev){
+    const d = dateStrToDate(ev.date);
+    const when = d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) + (ev.time ? " · " + ev.time : "");
+    return '<button type="button" class="linked-action-item" data-action="open-event" data-id="' + ev.id + '">' +
+      '<span class="kind-dot kind-event" aria-hidden="true"></span>' + escapeHtml(ev.title) +
+      ' <span class="cal-agenda-kind">' + escapeHtml(when) + '</span></button>';
+  }).join("");
+}
+
+// =========================================================
+// THE CALENDAR VIEW (§4.15) — full-screen, Month · Day tabs, a creation row.
+// Its own screen view (like the review), pushed so opening an item's real page
+// returns here.
+// =========================================================
+function openCalendarScreen(prefill){
+  const today = todayStr();
+  const sel = (prefill && prefill.date) || today;
+  const d = dateStrToDate(sel);
+  state.screen = {
+    calendarView: true, kind: "calendar", taskId: null, draft: {},
+    calTab: "month", calY: d.getFullYear(), calM: d.getMonth(), calSel: sel,
+    calKind: "event", calName: (prefill && prefill.name) || "", calTime: "", calDesc: "",
+    calRecur: "none", calInterval: 1, calDeadlineFor: "next", calTickler: false,
+    calInvalid: false, calFromCaptureId: (prefill && prefill.fromCaptureId) || null
+  };
+  renderScreen();
+}
+const DOW_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+// Every mark that lands on a given civil day, in truncation-priority order:
+// appointments → deadlines → events → projected recurrences (§4.15). Each is
+// { cls, kind } where kind drives the shape/colour.
+function marksForDay(dateStr){
+  const appts = [], events = [], projected = [];
+  (state.events || []).forEach(function(ev){
+    if (ev.tickler) return; // set-and-forget: no month-grid mark (user addition)
+    const completed = (ev.completedOccs || []).indexOf(dateStr) !== -1;
+    // Live occurrence (solid) vs a projected recurrence (dimmed).
+    if (ev.date === dateStr){
+      (ev.time ? appts : events).push({ kind: ev.time ? "appt" : "event", cls: "cal-mark-" + (ev.time ? "appt" : "event") + (completed ? " cal-mark-done" : "") });
+      return;
+    }
+    if (isRecurring(ev) && !ev.paused){
+      // Does a projected occurrence fall on this day? Walk forward and back a
+      // bounded number of steps from the live date.
+      if (occursOn(ev, dateStr)){
+        projected.push({ kind: "proj", cls: "cal-mark-" + (ev.time ? "appt" : "event") + " cal-mark-proj" + (completed ? " cal-mark-done" : "") });
+      } else if (completed){
+        // A past completed occurrence that is no longer the live date: keep its
+        // dimmed historical dot (§4.15, user #6 — the grid is also a log).
+        events.push({ kind: "event", cls: "cal-mark-" + (ev.time ? "appt" : "event") + " cal-mark-done" });
+      }
+    } else if (completed){
+      events.push({ kind: "event", cls: "cal-mark-" + (ev.time ? "appt" : "event") + " cal-mark-done" });
+    }
+  });
+  const deadlines = [];
+  state.tasks.next.forEach(function(t){
+    if (t.isGroup || t.eventId) return; // pseudo-actions draw via gtd_events, not here
+    if (t.deadline && t.deadline.date === dateStr) deadlines.push({ kind: "dl", cls: "cal-mark-dl-next" });
+  });
+  state.tasks.current.forEach(function(t){
+    if (t.isGroup) return;
+    if (t.deadline && t.deadline.date === dateStr) deadlines.push({ kind: "dl", cls: "cal-mark-dl-current" });
+  });
+  return appts.concat(deadlines, events, projected);
+}
+// Whether a recurring event has a (non-live) projected occurrence exactly on
+// dateStr, within a bounded search from its live date.
+function occursOn(ev, dateStr){
+  if (!isRecurring(ev)) return ev.date === dateStr;
+  if (dateStr === ev.date) return true;
+  let d = ev.date, guard = 0;
+  if (dateStr > ev.date){
+    while (guard++ < 400){ const nd = nextOccurrenceDate(d, ev.recurrence, ev.interval); if (!nd || nd > dateStr) break; d = nd; if (d === dateStr) return true; }
+  } else {
+    while (guard++ < 400){ const pd = prevOccurrenceDate(d, ev.recurrence, ev.interval); if (!pd || pd < dateStr) break; d = pd; if (d === dateStr) return true; }
+  }
+  return false;
+}
+
+function calMarksHtml(dateStr){
+  const marks = marksForDay(dateStr);
+  if (!marks.length) return "";
+  const shown = marks.slice(0, 3);
+  const overflow = marks.length > 3;
+  let html = '<div class="cal-marks">';
+  shown.forEach(function(m){ html += '<span class="cal-mark ' + m.cls + '"></span>'; });
+  if (overflow) html += '<span class="cal-mark-overflow">+</span>';
+  return html + '</div>';
+}
+
+function calMonthGridHtml(y, m){
+  const today = todayStr();
+  const first = new Date(y, m, 1);
+  const startDow = first.getDay(); // Sunday start (user #7)
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  let cells = "";
+  for (let i = 0; i < startDow; i++) cells += '<div class="cal-cell cal-cell-blank"></div>';
+  for (let day = 1; day <= daysInMonth; day++){
+    const ds = dateToStr(new Date(y, m, day));
+    const isToday = ds === today;
+    const isSel = ds === state.screen.calSel;
+    cells += '<button type="button" class="cal-cell' + (isToday ? " cal-today" : "") + (isSel ? " cal-selected" : "") + '" data-action="cal-select" data-date="' + ds + '">' +
+      '<span class="cal-daynum">' + day + '</span>' + calMarksHtml(ds) +
+    '</button>';
+  }
+  const head = DOW_SHORT.map(function(d){ return '<div class="cal-dow">' + d + '</div>'; }).join("");
+  return '<div class="cal-grid"><div class="cal-dow-row">' + head + '</div><div class="cal-cells">' + cells + '</div></div>';
+}
+
+// Everything on the selected day, no truncation (§4.15). Agenda list: untimed
+// first, then timed nearest→farthest (user ruling #4). Ticklers DO show in Day
+// view — only the month grid and the widget hide them (user addition).
+function calDayAgendaHtml(dateStr){
+  const rows = [];
+  (state.events || []).forEach(function(ev){
+    if (!occursOn(ev, dateStr)) return;
+    const done = (ev.completedOccs || []).indexOf(dateStr) !== -1;
+    rows.push({
+      sort: (ev.time ? "1" + ev.time : "0"), timed: !!ev.time,
+      html: '<button type="button" class="cal-agenda-row' + (done ? " cal-agenda-done" : "") + '" data-action="cal-open-event" data-id="' + ev.id + '">' +
+        '<span class="cal-agenda-dot ' + (ev.time ? "cal-mark-appt" : "cal-mark-event") + '"></span>' +
+        '<span class="cal-agenda-when">' + (ev.time ? escapeHtml(ev.time) : "All day") + '</span>' +
+        '<span class="cal-agenda-title">' + escapeHtml(ev.title) + (ev.tickler ? ' <span class="cal-tickler-tag">tickler</span>' : "") + '</span>' +
+      '</button>'
+    });
+  });
+  function deadlineRow(t, laneKind){
+    if (!(t.deadline && t.deadline.date === dateStr) || t.isGroup || t.eventId) return;
+    rows.push({
+      sort: (t.deadline.time ? "1" + t.deadline.time : "0"), timed: !!t.deadline.time,
+      html: '<button type="button" class="cal-agenda-row" data-action="cal-open-task" data-lane="' + laneKind + '" data-id="' + t.id + '">' +
+        '<span class="cal-agenda-dot cal-mark-dl-' + (laneKind === "current" ? "current" : "next") + '"></span>' +
+        '<span class="cal-agenda-when">' + (t.deadline.time ? escapeHtml(t.deadline.time) : "Due") + '</span>' +
+        '<span class="cal-agenda-title">' + escapeHtml(t.title) + ' <span class="cal-agenda-kind">' + (laneKind === "current" ? "project" : "action") + ' deadline</span></span>' +
+      '</button>'
+    });
+  }
+  state.tasks.next.forEach(function(t){ deadlineRow(t, "next"); });
+  state.tasks.current.forEach(function(t){ deadlineRow(t, "current"); });
+  rows.sort(function(a, b){ return a.sort.localeCompare(b.sort); });
+  if (!rows.length) return '<div class="cal-day-empty">Nothing on this day.</div>';
+  return '<div class="cal-agenda">' + rows.map(function(r){ return r.html; }).join("") + '</div>';
+}
+
+// The creation row (§4.15a) — Event · Deadline segmented toggle swaps the
+// controls beneath, quick-add rulings apply (dup check, dashed-empty).
+function calCreateRowHtml(s){
+  const isEvent = s.calKind === "event";
+  const seg =
+    '<div class="cal-seg">' +
+      '<button type="button" class="cal-seg-btn' + (isEvent ? " active" : "") + '" data-action="cal-kind" data-kind="event">Event</button>' +
+      '<button type="button" class="cal-seg-btn' + (!isEvent ? " active" : "") + '" data-action="cal-kind" data-kind="deadline">Deadline</button>' +
+    '</div>';
+  let controls;
+  if (isEvent){
+    const habitBubble = (s.calRecur === "daily" || s.calRecur === "weekly")
+      ? '<button type="button" class="cal-habit-bubble" data-action="cal-make-habit">Recurring chore? Make this a habit instead &#8594;</button>' : "";
+    controls =
+      '<div class="cal-create-controls">' +
+        '<div class="cal-boxed"><span class="field-icon">&#128337;</span>' +
+          '<input type="time" class="screen-time" data-calfield="time" value="' + escapeHtml(s.calTime || "") + '" style="color-scheme:dark" title="Optional — a time makes it an appointment">' +
+          '<span class="cal-hint">time makes it an appointment</span>' +
+        '</div>' +
+        '<input type="text" class="cal-desc" data-calfield="desc" placeholder="Description (optional)…" value="' + escapeHtml(s.calDesc || "") + '">' +
+        '<div class="cal-boxed"><span class="field-icon">&#128260;</span>' +
+          '<select class="screen-link-select" data-calfield="recur">' +
+            RECUR_OPTIONS.map(function(o){ return '<option value="' + o.v + '"' + (o.v === s.calRecur ? " selected" : "") + '>' + o.label + '</option>'; }).join("") +
+          '</select>' +
+          (s.calRecur !== "none" ? '<span class="cal-hint">every</span><input type="number" min="1" class="cal-interval" data-calfield="interval" value="' + (s.calInterval || 1) + '">' : "") +
+        '</div>' +
+        habitBubble +
+        '<label class="cal-tickler-row"><input type="checkbox" data-calfield="tickler"' + (s.calTickler ? " checked" : "") + '> Tickler — keep off the calendar &amp; reminders until its day</label>' +
+      '</div>';
+  } else {
+    controls =
+      '<div class="cal-create-controls">' +
+        '<div class="cal-boxed"><span class="field-icon">&#128337;</span>' +
+          '<input type="time" class="screen-time" data-calfield="time" value="' + escapeHtml(s.calTime || "") + '" style="color-scheme:dark" title="Optional">' +
+        '</div>' +
+        '<input type="text" class="cal-desc" data-calfield="desc" placeholder="Description (optional)…" value="' + escapeHtml(s.calDesc || "") + '">' +
+        '<div class="cal-seg cal-seg-small">' +
+          '<button type="button" class="cal-seg-btn' + (s.calDeadlineFor === "next" ? " active" : "") + '" data-action="cal-dlfor" data-for="next">Action</button>' +
+          '<button type="button" class="cal-seg-btn' + (s.calDeadlineFor === "current" ? " active" : "") + '" data-action="cal-dlfor" data-for="current">Project</button>' +
+        '</div>' +
+      '</div>';
+  }
+  const sel = dateStrToDate(s.calSel);
+  const selLabel = sel.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+  return (
+    '<div class="cal-create">' +
+      seg +
+      '<div class="cal-create-main">' +
+        '<input type="text" class="cal-name' + (s.calInvalid ? " field-invalid" : "") + '" data-calfield="name" placeholder="' + (isEvent ? "Event on " : "Due ") + escapeHtml(selLabel) + '…" value="' + escapeHtml(s.calName || "") + '" autocomplete="off">' +
+        '<button type="button" class="cal-add-btn" data-action="cal-add">Add</button>' +
+      '</div>' +
+      controls +
+    '</div>'
+  );
+}
+
+function calendarHeaderHtml(s){
+  return (
+    '<div class="screen-header">' +
+      '<span class="screen-chrome-btn" style="visibility:hidden">&#8592;</span>' +
+      '<div class="cal-tabs">' +
+        '<button type="button" class="cal-tab' + (s.calTab === "month" ? " active" : "") + '" data-action="cal-tab" data-tab="month">Month</button>' +
+        '<button type="button" class="cal-tab' + (s.calTab === "day" ? " active" : "") + '" data-action="cal-tab" data-tab="day">Day</button>' +
+      '</div>' +
+      '<div class="screen-header-right">' +
+        '<button type="button" class="screen-chrome-btn" data-action="cal-close" title="Close">&#10005;</button>' +
+      '</div>' +
+    '</div>'
+  );
+}
+function calendarBodyHtml(s){
+  let body;
+  if (s.calTab === "month"){
+    const nav =
+      '<div class="cal-monthnav">' +
+        '<button type="button" class="cal-navbtn" data-action="cal-month" data-dir="-1">&#8249;</button>' +
+        '<span class="cal-monthlabel">' + MONTHS[s.calM] + " " + s.calY + '</span>' +
+        '<button type="button" class="cal-navbtn" data-action="cal-month" data-dir="1">&#8250;</button>' +
+      '</div>';
+    // Three-panel swipe track (prev · current · next) — translateX follows the
+    // finger, snaps on release (user #7: test the finger-follow swipe here).
+    const prev = prevMonth(s.calY, s.calM), next = nextMonthYM(s.calY, s.calM);
+    const track =
+      '<div class="cal-swipe-viewport">' +
+        '<div class="cal-swipe-track" id="cal-swipe-track">' +
+          '<div class="cal-swipe-panel">' + calMonthGridHtml(prev.y, prev.m) + '</div>' +
+          '<div class="cal-swipe-panel">' + calMonthGridHtml(s.calY, s.calM) + '</div>' +
+          '<div class="cal-swipe-panel">' + calMonthGridHtml(next.y, next.m) + '</div>' +
+        '</div>' +
+      '</div>';
+    body = nav + track;
+  } else {
+    const sel = dateStrToDate(s.calSel);
+    const label = sel.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+    body = '<div class="cal-daynav"><button type="button" class="cal-navbtn" data-action="cal-dayshift" data-dir="-1">&#8249;</button>' +
+      '<span class="cal-monthlabel">' + escapeHtml(label) + '</span>' +
+      '<button type="button" class="cal-navbtn" data-action="cal-dayshift" data-dir="1">&#8250;</button></div>' +
+      calDayAgendaHtml(s.calSel);
+  }
+  return '<div class="screen-body cal-body">' + body + calCreateRowHtml(s) + '</div>';
+}
+function prevMonth(y, m){ return m === 0 ? { y: y - 1, m: 11 } : { y: y, m: m - 1 }; }
+function nextMonthYM(y, m){ return m === 11 ? { y: y + 1, m: 0 } : { y: y, m: m + 1 }; }
+
+// =========================================================
+// THE EVENT PAGE (§4.15a controls, edited via the event page §4.14/§4.15). A
+// screen of kind "event" — NOT built from the action template, so it carries
+// no "Make Waiting" (§4.13a, an absence not a disable). Renders through
+// screenBodyHtml's kind==="event" branch (eventBodyHtml below).
+// =========================================================
+function openEventScreen(eventId){
+  const ev = findEvent(eventId);
+  if (!ev) return;
+  state.screen = {
+    kind: "event", eventView: true, taskId: eventId, eventId: eventId,
+    draft: {
+      title: ev.title, notesClean: ev.notesClean || "", time: ev.time || null,
+      date: ev.date, recurrence: ev.recurrence || "none", interval: ev.interval || 1,
+      paused: !!ev.paused, contextId: ev.contextId || null, linkedProjectId: ev.linkedProjectId || null,
+      tickler: !!ev.tickler, willComplete: false
+    }
+  };
+  renderScreen();
+}
+function eventBodyHtml(s){
+  const d = s.draft;
+  const ev = findEvent(s.eventId) || {};
+  const isAppt = !!d.time;
+  const doneToday = (ev.completedOccs || []).indexOf(d.date) !== -1;
+  let fields = '<input type="text" class="screen-field-title' + (s.invalidField === "title" ? " field-invalid" : "") + '" data-field="title" placeholder="Event title…" value="' + escapeHtml(d.title) + '">';
+  fields += '<textarea class="screen-field-desc" data-field="notesClean" placeholder="Description (optional)…">' + escapeHtml(d.notesClean) + '</textarea>';
+  // Time
+  fields += '<div class="screen-row"><div class="screen-boxed-row"><span class="field-icon">&#128337;</span>' +
+    '<input type="time" class="screen-time" data-field="event-time" value="' + escapeHtml(d.time || "") + '" style="color-scheme:dark">' +
+    '<span class="cal-hint">' + (isAppt ? "appointment" : "a time makes it an appointment") + '</span>' +
+    (d.time ? '<button type="button" class="screen-clear-x" data-action="event-clear-time" title="Clear time">&times;</button>' : "") +
+    '</div></div>';
+  // Recurrence
+  fields += '<div class="screen-row"><div class="screen-boxed-row"><span class="field-icon">&#128260;</span>' +
+    '<select class="screen-link-select" data-field="event-recurrence">' +
+      RECUR_OPTIONS.map(function(o){ return '<option value="' + o.v + '"' + (o.v === d.recurrence ? " selected" : "") + '>' + o.label + '</option>'; }).join("") +
+    '</select>' +
+    (d.recurrence !== "none" ? '<span class="cal-hint">every</span><input type="number" min="1" class="cal-interval" data-field="event-interval" value="' + (d.interval || 1) + '">' : "") +
+    '</div></div>';
+  // "Make this a habit instead" (§4.15b) — daily/weekly only, load-bearing.
+  if (d.recurrence === "daily" || d.recurrence === "weekly"){
+    fields += '<button type="button" class="cal-habit-bubble" data-action="event-make-habit">Recurring chore? Make this a habit instead &#8594;</button>';
+  }
+  // Context (edit-only, §4.15a) + project link (§4.15d)
+  fields += contextRowHtml(d);
+  fields += '<div class="screen-row"><div class="screen-boxed-row"><span class="field-icon">&#128279;</span>' +
+    '<select class="screen-link-select" data-field="linkedProjectId">' + projectOptionsHtml(d.linkedProjectId) + '</select></div></div>';
+  // Tickler toggle (user addition)
+  fields += '<label class="cal-tickler-row"><input type="checkbox" data-field="event-tickler"' + (d.tickler ? " checked" : "") + '> Tickler — keep off the calendar &amp; reminders until its day</label>';
+  // Pause — recurring only, draft-only + armed (§4.15b, golden-rule sibling)
+  if (isRecurring({ recurrence: d.recurrence })){
+    fields += '<button type="button" class="btn screen-pause-btn' + (d.paused ? " armed" : "") + '" data-action="event-toggle-pause">' +
+      (d.paused ? "&#9208; Paused — resume on save" : "&#9208; Pause series") + '</button>';
+  }
+  // Complete — draft-only, arms on save (§4.14: completes like a Next Action)
+  const armed = !!d.willComplete;
+  fields += '<button type="button" class="btn screen-complete-pill' + (armed ? " armed" : "") + '" data-action="event-complete">' +
+    (armed ? "&#10003; Completing on save" : (doneToday ? "&#10003; Completed today — tap to reopen on save" : "Mark complete")) + '</button>';
+  return '<div class="screen-body">' + fields + '</div>';
+}
+
+// Save the event page (§4.14a: on a recurring series the pseudo-action keeps
+// its task ID; the ID lives on the event, so it survives all edits here).
+function saveEventScreen(s){
+  const d = s.draft;
+  const ev = findEvent(s.eventId);
+  if (!ev){ closeScreen(); return; }
+  let title = (d.title || "").trim();
+  if (!title){ title = ev.title; } // edit: empty title keeps the old one (house rule)
+  if (eventTitleClashes(title, ev.id)){ s.invalidField = "title"; renderScreen(); return; }
+  ev.title = title;
+  ev.notesClean = d.notesClean || "";
+  ev.time = d.time || null;
+  ev.recurrence = d.recurrence || "none";
+  ev.interval = Math.max(1, d.interval || 1);
+  ev.contextId = d.contextId || null;
+  ev.linkedProjectId = d.linkedProjectId || null;
+  ev.tickler = !!d.tickler;
+  ev.paused = !!d.paused;
+  if (ev.recurrence !== "none" && !ev.seriesId) ev.seriesId = genId();
+  // Keep the live pseudo-action's denormalised fields in step with the edit.
+  const row = findPseudoRow(ev.id);
+  if (row){
+    row.title = ev.title; row.notesClean = ev.notesClean;
+    row.linkedProjectId = ev.linkedProjectId; row.contextId = ev.contextId;
+    if (row.occDate === ev.date) row.occTime = ev.time || null;
+    saveTasksLocal("next");
+  }
+  // Draft-only Complete: arm → archive the occurrence now (mirrors a card tick).
+  if (d.willComplete && row){
+    saveEvents();
+    completeTask("next", row.id); // archives + calls onPseudoActionCompleted
+  } else if (d.willComplete){
+    // Completing a future event (opened from the calendar, no live row yet):
+    // archive a synthesised occurrence and arm the roll, same as a card tick.
+    const synth = makePseudoActionRow(ev);
+    state.completed.next.unshift(Object.assign({}, synth, { completedAt: todayStr(), seriesId: ev.seriesId || null }));
+    saveCompletedLocal("next");
+    onPseudoActionCompleted(synth);
+    saveEvents();
+    processEventBoundaries();
+    renderLane("next");
+  } else {
+    saveEvents();
+    processEventBoundaries();
+    renderLane("next");
+  }
+  renderLane("waiting");
+  closeScreen();
+}
+
+// Delete on the event page. Recurring → Skip this one · Delete series · Cancel
+// (§4.15b); one-shot → a plain confirm.
+function deleteEventFromPage(){
+  const s = state.screen; if (!s || !s.eventView) return;
+  const ev = findEvent(s.eventId); if (!ev){ closeScreen(); return; }
+  if (isRecurring(ev)){
+    openConfirmDialog("This event repeats. What would you like to do?", [
+      { label: "Skip this one", action: function(){ skipOccurrence(ev); closeScreen(); } },
+      { label: "Delete series", style: "danger", action: function(){ deleteEventEntirely(ev); closeScreen(); } },
+      { label: "Cancel", action: function(){} }
+    ]);
+  } else {
+    openConfirmDialog("Delete “" + escapeHtml(ev.title) + "”?", [
+      { label: "Delete", style: "danger", action: function(){ deleteEventEntirely(ev); closeScreen(); } },
+      { label: "Cancel", action: function(){} }
+    ]);
+  }
+}
+function removePseudoRow(eventId){
+  const before = state.tasks.next.length;
+  state.tasks.next = state.tasks.next.filter(function(t){ return t.eventId !== eventId; });
+  if (state.tasks.next.length !== before) saveTasksLocal("next");
+}
+// "Skip this one" = advance to the next occurrence (§4.15b). Same task ID rolls
+// forward, so a dependent simply now waits on the next occurrence.
+function skipOccurrence(ev){
+  const nd = nextOccurrenceDate(ev.date, ev.recurrence, ev.interval);
+  if (nd){ ev.date = nd; }
+  ev.completedAt = null; ev.completedFrom = null;
+  removePseudoRow(ev.id);
+  saveEvents();
+  processEventBoundaries();
+  renderLane("next"); renderLane("waiting");
+}
+function deleteEventEntirely(ev){
+  removePseudoRow(ev.id);
+  state.events = state.events.filter(function(e){ return e.id !== ev.id; });
+  saveEvents();
+  renderLane("next"); renderLane("waiting");
+}
+
+// "Make this a habit instead" (§4.15b, user #5). Opens the habit create page
+// prefilled from the event; on save the event is removed (the word "instead"
+// signals either/or, so no warning). Cancelling returns to the event page
+// (nothing was confirmed). Works from the event page and the creation row.
+function makeHabitFromEvent(ev){
+  // Weekly recurrence → a single scheduled weekday (the event's own); daily →
+  // every day. Anything else → every day, since habits have no monthly cadence.
+  const dow = dateStrToDate(ev.date).getDay();
+  const schedule = ev.recurrence === "weekly" ? [dow] : [0, 1, 2, 3, 4, 5, 6];
+  state.screenStack.push(state.screen);
+  state.screen = null;
+  openScreen("habit", null, { title: ev.title, schedule: schedule, fromEventId: ev.id });
+}
+
+// =========================================================
+// CLICK DELEGATION for the calendar view and the event page. Called EARLY from
+// app.js's document click listener; returns true when it handled the event
+// (so the generic screen handlers below it don't also fire). Generic
+// screen-save / screen-cancel / screen-delete still run for the event page —
+// saveScreen / deleteScreenItem branch on kind==="event".
+// =========================================================
+function eventsHandleClick(e){
+  const s = state.screen;
+  // ---- pseudo-action card tap → the event page (from any lane) ----
+  const openEv = e.target.closest('[data-action="open-event"]');
+  if (openEv){
+    if (s){ state.screenStack.push(s); state.screen = null; }
+    openEventScreen(openEv.getAttribute("data-id"));
+    return true;
+  }
+  // ---- the Waiting widget / header 📅 ----
+  if (e.target.closest('[data-action="open-calendar"]')){ closeTrayIfOpen(); openCalendarScreen(); return true; }
+
+  if (!s) return false;
+
+  // ---- calendar view ----
+  if (s.calendarView){
+    const tab = e.target.closest('[data-action="cal-tab"]');
+    if (tab){ s.calTab = tab.getAttribute("data-tab"); renderScreen(); return true; }
+    if (e.target.closest('[data-action="cal-close"]')){ closeScreen(); return true; }
+    const mv = e.target.closest('[data-action="cal-month"]');
+    if (mv){ shiftMonth(Number(mv.getAttribute("data-dir"))); return true; }
+    const ds = e.target.closest('[data-action="cal-dayshift"]');
+    if (ds){ shiftSelectedDay(Number(ds.getAttribute("data-dir"))); return true; }
+    const cell = e.target.closest('[data-action="cal-select"]');
+    if (cell){
+      const dt = cell.getAttribute("data-date");
+      // Second tap on the already-selected day opens Day view (§4.15).
+      if (s.calSel === dt && s.calTab === "month"){ s.calTab = "day"; } else { s.calSel = dt; }
+      renderScreen(); return true;
+    }
+    const kb = e.target.closest('[data-action="cal-kind"]');
+    if (kb){ s.calKind = kb.getAttribute("data-kind"); renderScreen(); return true; }
+    const dlf = e.target.closest('[data-action="cal-dlfor"]');
+    if (dlf){ s.calDeadlineFor = dlf.getAttribute("data-for"); renderScreen(); return true; }
+    if (e.target.closest('[data-action="cal-add"]')){ calAdd(); return true; }
+    if (e.target.closest('[data-action="cal-make-habit"]')){ calMakeHabit(); return true; }
+    const openEvt = e.target.closest('[data-action="cal-open-event"]');
+    if (openEvt){ state.screenStack.push(s); state.screen = null; openEventScreen(openEvt.getAttribute("data-id")); return true; }
+    const openTask = e.target.closest('[data-action="cal-open-task"]');
+    if (openTask){ state.screenStack.push(s); state.screen = null; openScreen(openTask.getAttribute("data-lane"), openTask.getAttribute("data-id")); return true; }
+    return false;
+  }
+
+  // ---- event page ----
+  if (s.eventView){
+    if (e.target.closest('[data-action="event-clear-time"]')){ s.draft.time = null; renderScreen(); return true; }
+    if (e.target.closest('[data-action="event-toggle-pause"]')){ s.draft.paused = !s.draft.paused; renderScreen(); return true; }
+    if (e.target.closest('[data-action="event-complete"]')){ s.draft.willComplete = !s.draft.willComplete; renderScreen(); return true; }
+    if (e.target.closest('[data-action="event-make-habit"]')){ const ev = findEvent(s.eventId); if (ev) makeHabitFromEvent(ev); return true; }
+    return false;
+  }
+  return false;
+}
+function closeTrayIfOpen(){ if (state.trayOpen && typeof closeTray === "function") closeTray(); }
+
+function shiftMonth(dir){
+  const s = state.screen;
+  const nm = dir < 0 ? prevMonth(s.calY, s.calM) : nextMonthYM(s.calY, s.calM);
+  s.calY = nm.y; s.calM = nm.m;
+  renderScreen();
+}
+function shiftSelectedDay(dir){
+  const s = state.screen;
+  const d = addDaysToDate(dateStrToDate(s.calSel), dir);
+  s.calSel = dateToStr(d); s.calY = d.getFullYear(); s.calM = d.getMonth();
+  renderScreen();
+}
+
+// Creation-row Add (§4.15a). Quick-add rulings: dashed-empty + dup check (for
+// events, the gtd_events-AND-Next-Actions scope, §7).
+function calAdd(){
+  const s = state.screen;
+  const name = (s.calName || "").trim();
+  if (!name){ s.calInvalid = true; renderScreen(); const el = qs(".cal-name"); if (el) el.focus(); return; }
+  if (s.calKind === "event"){
+    if (eventTitleClashes(name, null)){ s.calInvalid = true; renderScreen(); const el = qs(".cal-name"); if (el) el.focus(); return; }
+    const ev = {
+      id: genId(), taskId: genId(), title: name, date: s.calSel, time: s.calTime || null,
+      notesClean: s.calDesc || "", recurrence: s.calRecur || "none", interval: Math.max(1, s.calInterval || 1),
+      paused: false, contextId: null, linkedProjectId: null,
+      seriesId: (s.calRecur && s.calRecur !== "none") ? genId() : null, tickler: !!s.calTickler, completedOccs: []
+    };
+    state.events.push(ev);
+    saveEvents();
+    processEventBoundaries();
+    renderLane("next"); renderLane("waiting");
+    consumeCalCapture();
+  } else {
+    // Deadline → a Next Action or Current Project due that day (§4.15a).
+    const kind = s.calDeadlineFor === "current" ? "current" : "next";
+    const dupe = state.tasks[kind].some(function(t){ return !t.isGroup && (t.title || "").trim().toLowerCase() === name.toLowerCase(); });
+    if (dupe){ s.calInvalid = true; renderScreen(); const el = qs(".cal-name"); if (el) el.focus(); return; }
+    createTask(kind, { title: name, notesClean: s.calDesc || "", deadline: { date: s.calSel, time: s.calTime || null } });
+    consumeCalCapture();
+  }
+  // Reset the row for the next entry, keep the toggles where they are.
+  s.calName = ""; s.calDesc = ""; s.calTime = ""; s.calInvalid = false;
+  renderScreen();
+}
+// A capture sorted to Calendar (§4.8b Calendar chip) is filed once something
+// is created from it; fire the "it moved" banner (§4.15e).
+function consumeCalCapture(dateStr){
+  const s = state.screen;
+  if (!s || !s.calFromCaptureId) return;
+  removeCapture(s.calFromCaptureId);
+  s.calFromCaptureId = null;
+  // §4.15e "it moved" banner — the capture came from the review, so this save
+  // moved it off the surface the user was on.
+  const d = dateStrToDate(dateStr || s.calSel);
+  showItMovedBanner("Scheduled for " + d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) + " — in your calendar");
+}
+// A brief bottom banner (§4.15e). Auto-dismisses; one at a time.
+function showItMovedBanner(text){
+  const old = document.getElementById("it-moved-banner"); if (old) old.remove();
+  const el = document.createElement("div");
+  el.id = "it-moved-banner"; el.className = "it-moved-banner"; el.textContent = text;
+  document.body.appendChild(el);
+  requestAnimationFrame(function(){ el.classList.add("show"); });
+  setTimeout(function(){ el.classList.remove("show"); setTimeout(function(){ if (el.parentNode) el.remove(); }, 300); }, 2600);
+}
+function calMakeHabit(){
+  const s = state.screen;
+  const name = (s.calName || "").trim();
+  const pseudoEv = { title: name || "New habit", date: s.calSel, recurrence: s.calRecur, interval: s.calInterval, id: null };
+  const dow = dateStrToDate(s.calSel).getDay();
+  const schedule = s.calRecur === "weekly" ? [dow] : [0, 1, 2, 3, 4, 5, 6];
+  state.screenStack.push(s);
+  state.screen = null;
+  openScreen("habit", null, { title: pseudoEv.title, schedule: schedule });
+}
+
+// Field input/change for the calendar creation row and the event page. Called
+// from app.js's input/change listeners.
+function eventsHandleFieldInput(e){
+  const s = state.screen;
+  if (!s) return false;
+  const calEl = e.target.closest("[data-calfield]");
+  if (calEl && s.calendarView){
+    const f = calEl.getAttribute("data-calfield");
+    if (f === "name"){ s.calName = calEl.value; s.calInvalid = false; calEl.classList.remove("field-invalid"); }
+    else if (f === "desc"){ s.calDesc = calEl.value; }
+    else if (f === "time"){ s.calTime = calEl.value; }
+    else if (f === "interval"){ s.calInterval = Math.max(1, Number(calEl.value) || 1); }
+    else if (f === "recur"){ s.calRecur = calEl.value; renderScreen(); }
+    else if (f === "tickler"){ s.calTickler = calEl.checked; }
+    return true;
+  }
+  const evEl = e.target.closest("[data-field]");
+  if (evEl && s.eventView){
+    const f = evEl.getAttribute("data-field");
+    if (f === "event-time"){ s.draft.time = evEl.value || null; renderScreen(); return true; }
+    if (f === "event-interval"){ s.draft.interval = Math.max(1, Number(evEl.value) || 1); return true; }
+    if (f === "event-recurrence"){ s.draft.recurrence = evEl.value; renderScreen(); return true; }
+    if (f === "event-tickler"){ s.draft.tickler = evEl.checked; return true; }
+  }
+  return false;
+}
+
+// =========================================================
+// FINGER-FOLLOW MONTH SWIPE (user #7). Three panels (prev · current · next)
+// sit in a track parked one viewport-width left, so the CURRENT month is
+// centred. During a horizontal drag the track's translateX tracks the finger;
+// on release, a flick past the threshold animates to the neighbour and swaps
+// the month, otherwise it snaps back. Deliberately built here (not reused from
+// the lane long-press drag) so we can see whether the browser fights a
+// finger-following horizontal gesture — the same gesture the intray wants.
+// =========================================================
+function bindCalendarSwipe(){
+  const track = document.getElementById("cal-swipe-track");
+  if (!track || track._swipeBound) return;
+  track._swipeBound = true;
+  const viewport = track.parentElement;
+  let startX = 0, startY = 0, dx = 0, w = 0, dragging = false, decided = false, horizontal = false;
+  function setX(px, animate){
+    track.style.transition = animate ? "transform 0.18s ease-out" : "none";
+    track.style.transform = "translateX(" + (-w + px) + "px)";
+  }
+  function reset(){ w = viewport.getBoundingClientRect().width; setX(0, false); }
+  reset();
+  window.addEventListener("resize", reset);
+  track.addEventListener("touchstart", function(e){
+    if (e.touches.length !== 1) return;
+    startX = e.touches[0].clientX; startY = e.touches[0].clientY;
+    dx = 0; dragging = true; decided = false; horizontal = false;
+    w = viewport.getBoundingClientRect().width;
+  }, { passive: true });
+  track.addEventListener("touchmove", function(e){
+    if (!dragging) return;
+    const t = e.touches[0];
+    const mx = t.clientX - startX, my = t.clientY - startY;
+    if (!decided){
+      decided = Math.abs(mx) > 8 || Math.abs(my) > 8;
+      horizontal = Math.abs(mx) > Math.abs(my);
+    }
+    if (decided && !horizontal){ dragging = false; setX(0, true); return; } // vertical scroll wins
+    if (decided && horizontal){
+      e.preventDefault(); // claim the horizontal gesture from the browser
+      dx = mx; setX(dx, false);
+    }
+  }, { passive: false });
+  function end(){
+    if (!dragging){ return; }
+    dragging = false;
+    if (!horizontal){ setX(0, true); return; }
+    const threshold = Math.max(48, w * 0.25);
+    if (dx <= -threshold){ setX(-w, true); setTimeout(function(){ shiftMonth(1); }, 160); }
+    else if (dx >= threshold){ setX(w, true); setTimeout(function(){ shiftMonth(-1); }, 160); }
+    else { setX(0, true); }
+  }
+  track.addEventListener("touchend", end, { passive: true });
+  track.addEventListener("touchcancel", end, { passive: true });
+}
 
 })();
 </script>
