@@ -1317,8 +1317,17 @@
       if (task.conditionId){
         const liveTarget = (task.conditionKind === "next" ? state.tasks.next : state.tasks.waiting)
           .find(function(t){ return t.id === task.conditionId && !t.isGroup; });
+        // chunk 8 (§10): a condition may point at a NOT-YET-LIVE event. Its
+        // task ID isn't in a lane yet, but it is not an orphan — resolve it
+        // against gtd_events so it shows as a valid pending condition.
+        const pendingEv = liveTarget ? null : findEventByTaskId(task.conditionId);
         if (liveTarget){
           cueBlock = '<button class="link-pill" data-action="open-edit" data-kind="waiting" data-id="' + task.id + '">&#129693; After <span class="pill-target">' + escapeHtml(liveTarget.title) + '</span></button>';
+        } else if (pendingEv && !pendingEv.paused){
+          const eff = effDate(pendingEv, pendingEv.date);
+          const dd = dateStrToDate(eff);
+          const when = dd.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+          cueBlock = '<button class="link-pill" data-action="open-edit" data-kind="waiting" data-id="' + task.id + '">&#129693; After <span class="pill-target">' + escapeHtml(effTitle(pendingEv, pendingEv.date)) + '</span> · ' + escapeHtml(when) + '</button>';
         } else {
           cueBlock = '<button class="link-pill cue-orphaned" data-action="open-edit" data-kind="waiting" data-id="' + task.id + '">&#129693; After ' + escapeHtml(task.conditionLabel || "a deleted item") + '</button>';
         }
@@ -1811,14 +1820,31 @@
     }
     const excluded = excludeId ? mergedConditionDescendants(excludeId, all) : new Set();
     if (excludeId) excluded.add(excludeId);
-    return all.filter(function(l){
+    const out = all.filter(function(l){
       if (l.task.id === excludeId) return false;
       if (l.kind === "waiting" && excluded.has(l.task.id)) return false;
       return true;
     }).map(function(l){
-      return { id: l.task.id, title: l.task.title, kind: l.kind,
+      return { id: l.task.id, title: l.task.title, kind: l.kind, isEvent: false,
         inProject: !!(ctx.projectId && l.task.linkedProjectId === ctx.projectId) };
     });
+    // chunk 8 (§10): condition a Waiting action on a NOT-YET-LIVE event. Its
+    // task ID was minted at event creation (§4.14a), so it hooks with a plain
+    // task ID like any other condition. Only pending events (no live pseudo-
+    // action yet) and only LIVE, unexpired occurrences (§10) — a passed one is
+    // already a live past-due row and appears above; an already-live one is in
+    // `all`. Stored as conditionKind "next" (that is the lane it lands in).
+    const liveIds = new Set(out.map(function(t){ return t.id; }));
+    (state.events || []).forEach(function(ev){
+      if (liveIds.has(ev.taskId)) return;               // already a live pseudo-action target
+      if (ev.paused) return;                            // a paused series won't fire
+      const eff = effDate(ev, ev.date), effT = effTime(ev, ev.date);
+      if (occPassed(eff, effT)) return;                 // expired live occurrence — never offer it
+      const dd = dateStrToDate(eff);
+      const hint = dd.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }) + (effT ? " · " + effT : "");
+      out.push({ id: ev.taskId, title: effTitle(ev, ev.date), kind: "next", isEvent: true, inProject: !!(ctx.projectId && ev.linkedProjectId === ctx.projectId), dateHint: hint });
+    });
+    return out;
   }
   // Has the project draft changed anything storage would keep? Drives the ✕
   // warning — a state-compare, not a dirty flag, so create-then-delete and
@@ -3000,20 +3026,26 @@
     const targets = conditionTargetsForScreen(s, excludeId);
     const ctx = conditionContext(s);
     function itemBtn(t){
+      // Events show their date and a calendar dot; picking stores conditionKind
+      // "next" (data-kind), so resolution/promotion never learn events exist.
+      const dot = t.isEvent ? kindDot("event") : kindDot(t.kind);
+      const hint = t.isEvent && t.dateHint ? ' <span class="cal-agenda-kind">' + escapeHtml(t.dateHint) + '</span>' : "";
       return '<button type="button" class="screen-hook-pick-item" data-action="screen-pick-condition" data-id="' + t.id + '" data-kind="' + t.kind + '">' +
-        kindDot(t.kind) + escapeHtml(t.title) + '</button>';
+        dot + escapeHtml(t.title) + hint + '</button>';
     }
     function group(label, arr){ return arr.length ? '<div class="screen-hook-pick-label">' + label + '</div><div class="screen-hook-pick-list">' + arr.map(itemBtn).join("") + '</div>' : ""; }
+    const events = targets.filter(function(t){ return t.isEvent; });
     let body;
     if (ctx.projectId){
       // GROUP, don't filter (§12.1b): the project's own actions first, the rest
       // below — a condition may still target anything (§4.2).
-      body = group("This project", targets.filter(function(t){ return t.inProject; })) +
-             group("Everything else", targets.filter(function(t){ return !t.inProject; }));
+      body = group("This project", targets.filter(function(t){ return t.inProject && !t.isEvent; })) +
+             group("Everything else", targets.filter(function(t){ return !t.inProject && !t.isEvent; }));
     } else {
-      body = group("Next Actions", targets.filter(function(t){ return t.kind === "next"; })) +
-             group("Waiting Actions", targets.filter(function(t){ return t.kind === "waiting"; }));
+      body = group("Next Actions", targets.filter(function(t){ return t.kind === "next" && !t.isEvent; })) +
+             group("Waiting Actions", targets.filter(function(t){ return t.kind === "waiting" && !t.isEvent; }));
     }
+    body += group("Upcoming events", events); // chunk 8 (§10): condition on a pending event
     // Empty state is a teaching surface, not an error (§12.1b) — name the exits.
     const empty = !targets.length
       ? '<div class="empty-note">No actions to wait on yet. Add a next action first — or use ✎ to say what you’re waiting for.</div>' : "";
@@ -4970,7 +5002,16 @@
   function isWaitingOrphaned(task){
     if (!task || !task.conditionId) return false;
     const pool = task.conditionKind === "next" ? state.tasks.next : state.tasks.waiting;
-    return !pool.some(function(t){ return t.id === task.conditionId && !t.isGroup; });
+    if (pool.some(function(t){ return t.id === task.conditionId && !t.isGroup; })) return false;
+    // chunk 8 (§10 / §4.15b): a condition on a not-yet-live event is NOT an
+    // orphan — resolve it against gtd_events. A PAUSED series won't fire, so a
+    // dependent on it IS shown orphaned, but reversibly (this is derived, not a
+    // frozen label — it clears the moment the series is unpaused). Delete-series
+    // removes the event, so its dependents fall through to the genuine-orphan
+    // case below; skip-this-one keeps the same task ID and never lands here.
+    const ev = findEventByTaskId(task.conditionId);
+    if (ev) return !!ev.paused;
+    return true;
   }
   // Dev scaffolding (the chunk-map roadmap, the QA checklist) is injected as
   // groups tagged devContext and is deliberately unlinked/actionless — the

@@ -922,6 +922,12 @@ function skipOccurrence(ev){
   renderLane("next"); renderLane("waiting");
 }
 function deleteEventEntirely(ev){
+  // §4.15b: delete-series orphans any dependent hooked to this occurrence's
+  // task ID. Freeze its label first (mirrors deleteTask), so the dashed orphan
+  // pill still reads meaningfully once the target is gone. skip-this-one does
+  // NOT come here (it keeps the same task ID); pause is reversible (resolver).
+  const deps = state.tasks.waiting.filter(function(t){ return t.conditionId === ev.taskId; });
+  if (deps.length){ deps.forEach(function(t){ t.conditionLabel = effTitle(ev, ev.date); }); saveTasksLocal("waiting"); }
   removePseudoRow(ev.id);
   state.events = state.events.filter(function(e){ return e.id !== ev.id; });
   saveEvents();
