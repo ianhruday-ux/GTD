@@ -4870,6 +4870,36 @@
     saveTasksLocal("next");
   }
 
+  // Chunk 8 checklist — also ADDITIVE (self-sweeps only its own group), so the
+  // chunk-7 and per-occurrence checklists you're still working through stay put.
+  // ⚑ Same §8.1 deviation as the override one: when testing is done, fold all
+  // three into a single replace-mode checklist and delete the extra injectors.
+  function injectChunk8QAChecklist(){
+    const FLAG = "gtd_qa_checklist_chunk8_v1";
+    if (Storage.get(FLAG)) return;
+    Storage.set(FLAG, "1");
+    const staleIds = new Set(state.tasks.next
+      .filter(function(t){ return t.isGroup && (t.title || "").indexOf("✅ QA — Chunk 8") === 0; })
+      .map(function(t){ return t.id; }));
+    if (staleIds.size){
+      state.tasks.next = state.tasks.next.filter(function(t){ return !staleIds.has(t.id) && !staleIds.has(t.parent); });
+    }
+    const groupId = genId();
+    state.tasks.next.push({ id: groupId, title: "✅ QA — Chunk 8: Event-conditioning & backup", notesClean: "", linkedProjectId: null, isGroup: true, parent: null, devContext: "qa-checklist" });
+    [
+      { title: "Wait on an event that hasn’t happened yet", notes: "Create a new Waiting action and open its condition picker (the 🪝). Below Next/Waiting there’s now an ‘Upcoming events’ list showing your future events with their dates. Pick one — the waiting card reads ‘After <event> · <date>’ as a normal (not dashed/orphaned) condition, even though that event isn’t in Next Actions yet." },
+      { title: "The event completing promotes the waiting item", notes: "Make an event for today (so it’s a card in Next Actions), wait a new action on it, then tick the event’s card done. The waiting item automatically moves to Next Actions — exactly as if you’d completed a normal action it was waiting on." },
+      { title: "Pausing a repeating event orphans its waiters (reversibly)", notes: "Wait an action on a repeating event, then open the event and pause it (save). The waiting item now shows a dashed ‘orphaned’ condition and appears in the review — a paused series can’t fire. Un-pause the event and the waiting item goes back to normal on its own. Nothing is permanently frozen." },
+      { title: "Delete-series vs skip-this-one", notes: "With a waiting item hooked to a repeating event: choosing ‘Skip this one’ on the event keeps the waiter pointed at the next occurrence (still a valid condition). Choosing ‘Delete series’ orphans the waiter (its target is truly gone) — it keeps the event’s last name on a dashed pill and still saves fine." },
+      { title: "A waiting item shows under what it waits on, in a project", notes: "On a project page, a Waiting action hooked to one of the project’s linked actions (or a linked event) appears indented beneath that item — even if the waiting item itself isn’t linked to the project. Tapping it opens its own page." },
+      { title: "Export a backup file", notes: "Open the ⋯ menu → ‘Export a backup’. A .json file downloads (named with today’s date). It contains everything — actions, projects, habits, notes, tags, contexts, and your calendar events. Keep it somewhere safe; it’s your snapshot." },
+      { title: "Import replaces everything", notes: "⋯ menu → ‘Import a backup’, pick a backup file. It warns ‘This will replace everything currently in the app’ before doing anything. Confirm and the app reloads with exactly what was in the file (import replaces, it never merges). A file that isn’t a valid backup is refused with a message, not a crash." }
+    ].forEach(function(item){
+      state.tasks.next.push({ id: genId(), title: item.title, notesClean: item.notes || "", linkedProjectId: null, isGroup: false, parent: groupId, whenText: null, hooks: [], deadline: null });
+    });
+    saveTasksLocal("next");
+  }
+
   // =========================================================
   // BOOT
   // =========================================================
@@ -5360,18 +5390,76 @@
     qs("#dialog-root").innerHTML =
       '<div class="choice-dialog-backdrop"><div class="choice-dialog settings-sheet">' +
         '<div class="settings-title">Settings</div>' +
+        '<button type="button" class="settings-row" data-action="export-data">⬆ Export a backup</button>' +
+        '<button type="button" class="settings-row" data-action="import-data">⬇ Import a backup</button>' +
         '<button type="button" class="settings-row danger" data-action="clear-all-data">↺ Restore app to defaults</button>' +
         '<div class="choice-dialog-btns"><button type="button" data-action="settings-close">Close</button></div>' +
       '</div></div>';
     const backdrop = qs(".choice-dialog-backdrop");
     backdrop.addEventListener("click", function(e){ if (e.target === backdrop) closeDialog(); });
     qs('[data-action="settings-close"]').addEventListener("click", closeDialog);
+    qs('[data-action="export-data"]').addEventListener("click", exportAllData);
+    qs('[data-action="import-data"]').addEventListener("click", importAllData);
     qs('[data-action="clear-all-data"]').addEventListener("click", function(){
       openConfirmDialog("Restore the app to its default state? Everything you’ve entered — notes, actions, projects, habits — will be permanently erased and replaced with the sample data. This can’t be undone.", [
         { label: "Erase & restore defaults", style: "danger", action: clearAllAppData },
         { label: "Cancel", action: function(){} }
       ]);
     });
+  }
+  // =========================================================
+  // EXPORT / IMPORT (chunk 8, §2). The user-facing backup — a different feature
+  // from the dev snapshot (§12.3), but it shares the "every gtd_ key, verbatim"
+  // serialization. The backup MUST carry events/series (a top-level entity as
+  // of chunk 7) — it does, because it sweeps ALL gtd_ keys, gtd_events included.
+  // Import REPLACES (never merges): merge is a conflict engine in disguise (§10);
+  // replace makes the file an honest snapshot.
+  // =========================================================
+  function serializeAllData(){
+    const data = {};
+    Storage.keys().forEach(function(k){ if (k.indexOf("gtd_") === 0) data[k] = Storage.get(k); });
+    return { app: "GTD Console", format: 1, exportedAt: new Date().toISOString(), data: data };
+  }
+  function exportAllData(){
+    closeDialog();
+    const payload = serializeAllData();
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "gtd-console-backup-" + todayStr() + ".json";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1500);
+  }
+  function importError(msg){ openConfirmDialog(msg, [{ label: "OK", style: "primary", action: function(){} }]); }
+  function importAllData(){
+    // A hidden file input — native <input type=file> is the one native dialog
+    // that works in sandboxed contexts (unlike alert/confirm/prompt).
+    const inp = document.createElement("input");
+    inp.type = "file"; inp.accept = "application/json,.json"; inp.style.display = "none";
+    inp.addEventListener("change", function(){
+      const file = inp.files && inp.files[0];
+      inp.remove();
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(){
+        let payload;
+        try { payload = JSON.parse(reader.result); } catch (e){ importError("That file isn’t valid backup JSON."); return; }
+        const data = payload && payload.data;
+        if (!data || typeof data !== "object"){ importError("That file doesn’t look like a GTD Console backup."); return; }
+        closeDialog();
+        openConfirmDialog("This will replace everything currently in the app.", [
+          { label: "Replace everything", style: "danger", action: function(){
+              Storage.keys().forEach(function(k){ if (k.indexOf("gtd_") === 0) Storage.remove(k); });
+              Object.keys(data).forEach(function(k){ if (k.indexOf("gtd_") === 0) Storage.set(k, data[k]); });
+              window.location.reload();
+            } },
+          { label: "Cancel", action: function(){} }
+        ]);
+      };
+      reader.readAsText(file);
+    });
+    document.body.appendChild(inp);
+    inp.click();
   }
 
   // =========================================================
@@ -5882,6 +5970,7 @@
     initCompletedData();
     injectQAChecklist();
     injectOverrideQAChecklist(); // additive — keeps the chunk-7 checklist (user request)
+    injectChunk8QAChecklist();   // additive — keeps chunk-7 + per-occurrence checklists intact
     injectChunkMap();
     state.habitDone = loadHabitDone();
     state.habitDoneOrder = loadHabitDoneOrder();
