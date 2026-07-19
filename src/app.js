@@ -1361,7 +1361,7 @@
     // appointment progress bar (\u00a74.14c), not a deadline bar.
     const isPseudo = kind === "next" && isPseudoAction(task);
     const titleOpen = isPseudo
-      ? 'data-action="open-event" data-id="' + task.eventId + '" data-date="' + (task.occDate || "") + '"'
+      ? 'data-action="open-event" data-id="' + task.eventId + '" data-date="' + (task.occCanon || task.occDate || "") + '"'
       : 'data-action="open-edit" data-kind="' + kind + '" data-id="' + task.id + '"';
     const titleHtml = '<div class="card-title' + (done ? " done" : "") + '" ' + titleOpen + ' title="Tap to open \u2014 press and hold to reorder">' + escapeHtml(task.title) + '</div>';
     const deadlineBarBlock = isPseudo ? pseudoBarHtml(task) : (kind === "next" || kind === "current") ? deadlineBarHtml(task) : "";
@@ -4796,9 +4796,18 @@
   // next chunk's checklist is written, FOLD THIS GROUP INTO IT and delete this
   // injector, or a Reset in that era will re-add it alongside the new one.
   function injectOverrideQAChecklist(){
-    const FLAG = "gtd_qa_checklist_override_v1";
+    const FLAG = "gtd_qa_checklist_override_v2";
     if (Storage.get(FLAG)) return;
+    Storage.remove("gtd_qa_checklist_override_v1"); // superseded
     Storage.set(FLAG, "1");
+    // Self-sweep: replace only OUR prior "Per-occurrence" group, never the
+    // chunk-7 "✅ QA" groups (which this injector deliberately leaves alone).
+    const staleIds = new Set(state.tasks.next
+      .filter(function(t){ return t.isGroup && (t.title || "").indexOf("✅ QA — Per-occurrence") === 0; })
+      .map(function(t){ return t.id; }));
+    if (staleIds.size){
+      state.tasks.next = state.tasks.next.filter(function(t){ return !staleIds.has(t.id) && !staleIds.has(t.parent); });
+    }
     const groupId = genId();
     state.tasks.next.push({ id: groupId, title: "✅ QA — Per-occurrence event edits", notesClean: "", linkedProjectId: null, isGroup: true, parent: null, devContext: "qa-checklist" });
     [
@@ -4806,7 +4815,8 @@
       { title: "‘This occurrence only’ leaves the series alone", notes: "Choose ‘This occurrence only.’ Only today’s copy changes — the next one keeps the original time/title. If you gave an all-day repeating event a one-time time, that day’s dot turns yellow (appointment) and its card shows the time, but only for that day." },
       { title: "‘All occurrences’ changes every copy", notes: "Edit again and choose ‘All occurrences.’ Every future copy takes the new value, and any one-time tweak you’d made to this occurrence is cleared (it now follows the series again)." },
       { title: "The page names the occurrence you’re editing", notes: "At the top of a repeating event’s page a line says which date you’re editing (‘Editing the occurrence on …’), so ‘this one vs all’ is unambiguous. Cancel in the dialog returns you to the page with your changes still unsaved in the draft." },
-      { title: "Edit a FUTURE occurrence from Day view", notes: "Open the calendar, tap a future day that has a repeating event, tap it in the Day list, change its time, Save → ‘This occurrence only.’ When that day eventually arrives, the event shows up with your one-time change already applied." }
+      { title: "Edit a FUTURE occurrence from Day view", notes: "Open the calendar, tap a future day that has a repeating event, tap it in the Day list, change its time, Save → ‘This occurrence only.’ When that day eventually arrives, the event shows up with your one-time change already applied." },
+      { title: "Move a single occurrence to a different day", notes: "Open a repeating event and change the DATE field (‘move this occurrence’), then Save → ‘This occurrence only.’ The event’s dot jumps to the new day on the calendar (tagged ‘moved’ in Day view) while every other occurrence stays put. If today’s occurrence is moved to a future day, its card leaves Next Actions now and comes back on the new day. ‘All occurrences’ instead reschedules the whole series." }
     ].forEach(function(item){
       state.tasks.next.push({ id: genId(), title: item.title, notesClean: item.notes || "", linkedProjectId: null, isGroup: false, parent: groupId, whenText: null, hooks: [], deadline: null });
     });
