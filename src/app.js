@@ -1361,7 +1361,7 @@
     // appointment progress bar (\u00a74.14c), not a deadline bar.
     const isPseudo = kind === "next" && isPseudoAction(task);
     const titleOpen = isPseudo
-      ? 'data-action="open-event" data-id="' + task.eventId + '"'
+      ? 'data-action="open-event" data-id="' + task.eventId + '" data-date="' + (task.occDate || "") + '"'
       : 'data-action="open-edit" data-kind="' + kind + '" data-id="' + task.id + '"';
     const titleHtml = '<div class="card-title' + (done ? " done" : "") + '" ' + titleOpen + ' title="Tap to open \u2014 press and hold to reorder">' + escapeHtml(task.title) + '</div>';
     const deadlineBarBlock = isPseudo ? pseudoBarHtml(task) : (kind === "next" || kind === "current") ? deadlineBarHtml(task) : "";
@@ -4789,6 +4789,30 @@
     saveTasksLocal("next");
   }
 
+  // ADDITIVE checklist for the per-occurrence-override follow-up (user asked to
+  // keep the chunk-7 checklist intact — "don't override the current one in case
+  // I missed an item"). ⚑ Deliberate deviation from §8.1's replace-don't-
+  // accumulate: its own flag, and it does NOT sweep the "✅ QA" groups. When the
+  // next chunk's checklist is written, FOLD THIS GROUP INTO IT and delete this
+  // injector, or a Reset in that era will re-add it alongside the new one.
+  function injectOverrideQAChecklist(){
+    const FLAG = "gtd_qa_checklist_override_v1";
+    if (Storage.get(FLAG)) return;
+    Storage.set(FLAG, "1");
+    const groupId = genId();
+    state.tasks.next.push({ id: groupId, title: "✅ QA — Per-occurrence event edits", notesClean: "", linkedProjectId: null, isGroup: true, parent: null, devContext: "qa-checklist" });
+    [
+      { title: "Editing a repeating event asks: this one, or all?", notes: "Create a repeating event (or open the sample ‘Pay rent’). Open it from its Next Actions card, change the time or the title, and tap Save (←). A dialog appears: ‘Apply your changes to… This occurrence only / All occurrences / Cancel.’ A one-off (non-repeating) event just saves with no dialog." },
+      { title: "‘This occurrence only’ leaves the series alone", notes: "Choose ‘This occurrence only.’ Only today’s copy changes — the next one keeps the original time/title. If you gave an all-day repeating event a one-time time, that day’s dot turns yellow (appointment) and its card shows the time, but only for that day." },
+      { title: "‘All occurrences’ changes every copy", notes: "Edit again and choose ‘All occurrences.’ Every future copy takes the new value, and any one-time tweak you’d made to this occurrence is cleared (it now follows the series again)." },
+      { title: "The page names the occurrence you’re editing", notes: "At the top of a repeating event’s page a line says which date you’re editing (‘Editing the occurrence on …’), so ‘this one vs all’ is unambiguous. Cancel in the dialog returns you to the page with your changes still unsaved in the draft." },
+      { title: "Edit a FUTURE occurrence from Day view", notes: "Open the calendar, tap a future day that has a repeating event, tap it in the Day list, change its time, Save → ‘This occurrence only.’ When that day eventually arrives, the event shows up with your one-time change already applied." }
+    ].forEach(function(item){
+      state.tasks.next.push({ id: genId(), title: item.title, notesClean: item.notes || "", linkedProjectId: null, isGroup: false, parent: groupId, whenText: null, hooks: [], deadline: null });
+    });
+    saveTasksLocal("next");
+  }
+
   // =========================================================
   // BOOT
   // =========================================================
@@ -5791,6 +5815,7 @@
     initLocalData();
     initCompletedData();
     injectQAChecklist();
+    injectOverrideQAChecklist(); // additive — keeps the chunk-7 checklist (user request)
     injectChunkMap();
     state.habitDone = loadHabitDone();
     state.habitDoneOrder = loadHabitDoneOrder();

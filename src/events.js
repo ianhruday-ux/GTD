@@ -92,6 +92,30 @@ function prevOccurrenceDate(dateStr, recurrence, interval){
 }
 function isRecurring(ev){ return ev && ev.recurrence && ev.recurrence !== "none"; }
 
+// =========================================================
+// PER-OCCURRENCE OVERRIDES (user ruling #3: "edit particular events, not just
+// series"). The one-live-entity model has no storage for a single overridden
+// occurrence (§4.15b), so we add the smallest thing that does: an `overrides`
+// map on the event, keyed by an occurrence's CANONICAL date (the date the pure
+// recurrence rule lands it on — never moved). Each entry carries occurrence-
+// level fields only: title, time, notesClean. Everything else (recurrence,
+// interval, pause, context, project link, tickler) stays series-level.
+// The EFFECTIVE value of an occurrence = the override for its date if present,
+// else the series value. Scope is chosen at save via a dialog that mirrors the
+// recurring-delete one. ⚑ Moving a single occurrence to a DIFFERENT day is out
+// of scope (use "Skip this one", or edit the series) — flagged in the handoff.
+// =========================================================
+function occOverride(ev, canonicalDate){ return (ev && ev.overrides && ev.overrides[canonicalDate]) || null; }
+function has(o, k){ return o && Object.prototype.hasOwnProperty.call(o, k); }
+function effTitle(ev, d){ const o = occOverride(ev, d); return has(o, "title") ? o.title : ev.title; }
+function effTime(ev, d){ const o = occOverride(ev, d); return has(o, "time") ? o.time : (ev.time || null); }
+function effNotes(ev, d){ const o = occOverride(ev, d); return has(o, "notesClean") ? o.notesClean : (ev.notesClean || ""); }
+// After a roll, an override keyed to a now-past canonical date is dead weight.
+function pruneOverrides(ev){
+  if (!ev.overrides) return;
+  Object.keys(ev.overrides).forEach(function(k){ if (k < ev.date) delete ev.overrides[k]; });
+}
+
 // §4.3b/§4.8b (chunk 7): a linked event/appointment is forward motion — a
 // project planned around "act after the conference on the 14th" is NOT
 // stalled. A recurring series always counts; a one-shot counts until it is
@@ -116,11 +140,12 @@ function isPseudoAction(task){ return !!(task && task.eventId); }
 // occurrence's app-day begins (§4.15b: "replaced at the 4 AM boundary of the
 // next occurrence's app-day").
 function makePseudoActionRow(ev){
+  const d = ev.date; // canonical live occurrence
   return {
     id: ev.taskId, eventId: ev.id, isGroup: false, parent: null,
-    title: ev.title, notesClean: ev.notesClean || "",
+    title: effTitle(ev, d), notesClean: effNotes(ev, d),
     contextId: ev.contextId || null, linkedProjectId: ev.linkedProjectId || null,
-    occDate: ev.date, occTime: ev.time || null,
+    occDate: d, occTime: effTime(ev, d),
     deadline: null, whenText: null, conditionId: null, conditionKind: null, conditionLabel: null,
     bundleText: null, createdAt: Date.now()
   };
@@ -178,6 +203,7 @@ function processEventBoundaries(){
           ev.date = nd; changed = true;
         } else break;
       }
+      pruneOverrides(ev); // drop overrides for occurrences the series has passed
     }
     // (3) APPEARANCE / REPLACEMENT. Once the live occurrence's app-day has
     //     begun, make sure exactly one pseudo-action exists for it. A row that
@@ -192,8 +218,8 @@ function processEventBoundaries(){
       insertPseudoAtTop(fresh);
       changed = true;
     } else if (row.occDate !== ev.date){
-      row.occDate = ev.date; row.occTime = ev.time || null;
-      row.title = ev.title; row.notesClean = ev.notesClean || "";
+      row.occDate = ev.date; row.occTime = effTime(ev, ev.date);
+      row.title = effTitle(ev, ev.date); row.notesClean = effNotes(ev, ev.date);
       row.linkedProjectId = ev.linkedProjectId || null;
       // Inherit the previous occurrence's context and re-file at its top; if
       // that context was deleted meanwhile, null it and land at the lane top
@@ -339,7 +365,7 @@ function upcomingWidgetEvents(){
     let d = ev.date, guard = 0;
     while (guard++ < 60){
       if (d > horizon) break;
-      if (d >= today) out.push({ date: d, time: ev.time, title: ev.title });
+      if (d >= today) out.push({ date: d, time: effTime(ev, d), title: effTitle(ev, d) });
       if (!isRecurring(ev)) break;
       const nd = nextOccurrenceDate(d, ev.recurrence, ev.interval);
       if (!nd || nd <= d) break;
@@ -428,23 +454,24 @@ function marksForDay(dateStr){
   (state.events || []).forEach(function(ev){
     if (ev.tickler) return; // set-and-forget: no month-grid mark (user addition)
     const completed = (ev.completedOccs || []).indexOf(dateStr) !== -1;
+    const t = effTime(ev, dateStr); // effective time can differ from the series per occurrence
     // Live occurrence (solid) vs a projected recurrence (dimmed).
     if (ev.date === dateStr){
-      (ev.time ? appts : events).push({ kind: ev.time ? "appt" : "event", cls: "cal-mark-" + (ev.time ? "appt" : "event") + (completed ? " cal-mark-done" : "") });
+      (t ? appts : events).push({ kind: t ? "appt" : "event", cls: "cal-mark-" + (t ? "appt" : "event") + (completed ? " cal-mark-done" : "") });
       return;
     }
     if (isRecurring(ev) && !ev.paused){
       // Does a projected occurrence fall on this day? Walk forward and back a
       // bounded number of steps from the live date.
       if (occursOn(ev, dateStr)){
-        projected.push({ kind: "proj", cls: "cal-mark-" + (ev.time ? "appt" : "event") + " cal-mark-proj" + (completed ? " cal-mark-done" : "") });
+        projected.push({ kind: "proj", cls: "cal-mark-" + (t ? "appt" : "event") + " cal-mark-proj" + (completed ? " cal-mark-done" : "") });
       } else if (completed){
         // A past completed occurrence that is no longer the live date: keep its
         // dimmed historical dot (§4.15, user #6 — the grid is also a log).
-        events.push({ kind: "event", cls: "cal-mark-" + (ev.time ? "appt" : "event") + " cal-mark-done" });
+        events.push({ kind: "event", cls: "cal-mark-" + (t ? "appt" : "event") + " cal-mark-done" });
       }
     } else if (completed){
-      events.push({ kind: "event", cls: "cal-mark-" + (ev.time ? "appt" : "event") + " cal-mark-done" });
+      events.push({ kind: "event", cls: "cal-mark-" + (t ? "appt" : "event") + " cal-mark-done" });
     }
   });
   const deadlines = [];
@@ -510,12 +537,15 @@ function calDayAgendaHtml(dateStr){
   (state.events || []).forEach(function(ev){
     if (!occursOn(ev, dateStr)) return;
     const done = (ev.completedOccs || []).indexOf(dateStr) !== -1;
+    const t = effTime(ev, dateStr), title = effTitle(ev, dateStr); // per-occurrence effective values
     rows.push({
-      sort: (ev.time ? "1" + ev.time : "0"), timed: !!ev.time,
-      html: '<button type="button" class="cal-agenda-row' + (done ? " cal-agenda-done" : "") + '" data-action="cal-open-event" data-id="' + ev.id + '">' +
-        '<span class="cal-agenda-dot ' + (ev.time ? "cal-mark-appt" : "cal-mark-event") + '"></span>' +
-        '<span class="cal-agenda-when">' + (ev.time ? escapeHtml(ev.time) : "All day") + '</span>' +
-        '<span class="cal-agenda-title">' + escapeHtml(ev.title) + (ev.tickler ? ' <span class="cal-tickler-tag">tickler</span>' : "") + '</span>' +
+      sort: (t ? "1" + t : "0"), timed: !!t,
+      // data-date opens the event page for THIS occurrence, so a "this
+      // occurrence only" edit targets the right day (per-occurrence overrides).
+      html: '<button type="button" class="cal-agenda-row' + (done ? " cal-agenda-done" : "") + '" data-action="cal-open-event" data-id="' + ev.id + '" data-date="' + dateStr + '">' +
+        '<span class="cal-agenda-dot ' + (t ? "cal-mark-appt" : "cal-mark-event") + '"></span>' +
+        '<span class="cal-agenda-when">' + (t ? escapeHtml(t) : "All day") + '</span>' +
+        '<span class="cal-agenda-title">' + escapeHtml(title) + (ev.tickler ? ' <span class="cal-tickler-tag">tickler</span>' : "") + '</span>' +
       '</button>'
     });
   });
@@ -647,14 +677,19 @@ function nextMonthYM(y, m){ return m === 11 ? { y: y + 1, m: 0 } : { y: y, m: m 
 // no "Make Waiting" (§4.13a, an absence not a disable). Renders through
 // screenBodyHtml's kind==="event" branch (eventBodyHtml below).
 // =========================================================
-function openEventScreen(eventId){
+function openEventScreen(eventId, occDate){
   const ev = findEvent(eventId);
   if (!ev) return;
+  // Which occurrence are we editing? Defaults to the live one; the calendar
+  // agenda passes the tapped day so a future occurrence can be overridden too.
+  const d = occDate || ev.date;
   state.screen = {
-    kind: "event", eventView: true, taskId: eventId, eventId: eventId,
+    kind: "event", eventView: true, taskId: eventId, eventId: eventId, occDate: d,
     draft: {
-      title: ev.title, notesClean: ev.notesClean || "", time: ev.time || null,
-      date: ev.date, recurrence: ev.recurrence || "none", interval: ev.interval || 1,
+      // occurrence-level fields show their EFFECTIVE value for this occurrence
+      title: effTitle(ev, d), notesClean: effNotes(ev, d), time: effTime(ev, d),
+      // series-level fields
+      date: d, recurrence: ev.recurrence || "none", interval: ev.interval || 1,
       paused: !!ev.paused, contextId: ev.contextId || null, linkedProjectId: ev.linkedProjectId || null,
       tickler: !!ev.tickler, willComplete: false
     }
@@ -666,7 +701,16 @@ function eventBodyHtml(s){
   const ev = findEvent(s.eventId) || {};
   const isAppt = !!d.time;
   const doneToday = (ev.completedOccs || []).indexOf(d.date) !== -1;
-  let fields = '<input type="text" class="screen-field-title' + (s.invalidField === "title" ? " field-invalid" : "") + '" data-field="title" placeholder="Event title…" value="' + escapeHtml(d.title) + '">';
+  let fields = "";
+  // On a recurring series, name the occurrence being edited so "this occurrence
+  // only" vs "all occurrences" (offered at save) has a clear referent.
+  if (isRecurring({ recurrence: d.recurrence })){
+    const occ = dateStrToDate(s.occDate || d.date);
+    fields += '<div class="event-occ-hint">Editing the occurrence on ' +
+      escapeHtml(occ.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })) +
+      ' · you’ll choose this one or the whole series when you save</div>';
+  }
+  fields += '<input type="text" class="screen-field-title' + (s.invalidField === "title" ? " field-invalid" : "") + '" data-field="title" placeholder="Event title…" value="' + escapeHtml(d.title) + '">';
   fields += '<textarea class="screen-field-desc" data-field="notesClean" placeholder="Description (optional)…">' + escapeHtml(d.notesClean) + '</textarea>';
   // Time
   fields += '<div class="screen-row"><div class="screen-boxed-row"><span class="field-icon">&#128337;</span>' +
@@ -705,16 +749,22 @@ function eventBodyHtml(s){
 
 // Save the event page (§4.14a: on a recurring series the pseudo-action keeps
 // its task ID; the ID lives on the event, so it survives all edits here).
+// The occurrence-level fields (title/time/notesClean) can land on THIS
+// occurrence (an override) or the WHOLE series (the base) — chosen at save via
+// a dialog that mirrors the recurring-delete one (user #3).
 function saveEventScreen(s){
   const d = s.draft;
   const ev = findEvent(s.eventId);
   if (!ev){ closeScreen(); return; }
+  const occDate = s.occDate || ev.date;
   let title = (d.title || "").trim();
-  if (!title){ title = ev.title; } // edit: empty title keeps the old one (house rule)
+  if (!title){ title = effTitle(ev, occDate); } // edit: empty title keeps the effective one (house rule)
   if (eventTitleClashes(title, ev.id)){ s.invalidField = "title"; renderScreen(); return; }
-  ev.title = title;
-  ev.notesClean = d.notesClean || "";
-  ev.time = d.time || null;
+  const newTime = d.time || null;
+  const newNotes = d.notesClean || "";
+
+  // Series-level fields always commit to the base series (they define the
+  // series; there is no per-occurrence recurrence/pause/context/link/tickler).
   ev.recurrence = d.recurrence || "none";
   ev.interval = Math.max(1, d.interval || 1);
   ev.contextId = d.contextId || null;
@@ -722,17 +772,47 @@ function saveEventScreen(s){
   ev.tickler = !!d.tickler;
   ev.paused = !!d.paused;
   if (ev.recurrence !== "none" && !ev.seriesId) ev.seriesId = genId();
-  // Keep the live pseudo-action's denormalised fields in step with the edit.
+
+  // Did the occurrence-level fields actually change vs this occurrence's
+  // effective values? Only then is there a scope question to ask.
+  const occChanged = (title !== effTitle(ev, occDate)) || (newTime !== effTime(ev, occDate)) || (newNotes !== effNotes(ev, occDate));
+
+  function commitSeries(){
+    ev.title = title; ev.time = newTime; ev.notesClean = newNotes;
+    if (ev.overrides) delete ev.overrides[occDate]; // this occurrence now follows the series again
+    finishEventSave(s, ev);
+  }
+  function commitOccurrence(){
+    ev.overrides = ev.overrides || {};
+    ev.overrides[occDate] = { title: title, time: newTime, notesClean: newNotes };
+    finishEventSave(s, ev);
+  }
+
+  if (isRecurring(ev) && occChanged){
+    openConfirmDialog("Apply your changes to…", [
+      { label: "This occurrence only", style: "primary", action: commitOccurrence },
+      { label: "All occurrences", action: commitSeries },
+      { label: "Cancel", action: function(){} }
+    ]);
+    return;
+  }
+  // Non-recurring, or a recurring event where only series-level fields changed:
+  // commit the occurrence values straight to the base (harmless no-op if equal).
+  commitSeries();
+}
+// The shared tail of an event save: persist, re-sync the live pseudo row from
+// EFFECTIVE values, honour a draft-armed Complete, and close.
+function finishEventSave(s, ev){
+  const d = s.draft;
+  saveEvents();
   const row = findPseudoRow(ev.id);
   if (row){
-    row.title = ev.title; row.notesClean = ev.notesClean;
-    row.linkedProjectId = ev.linkedProjectId; row.contextId = ev.contextId;
-    if (row.occDate === ev.date) row.occTime = ev.time || null;
+    row.title = effTitle(ev, row.occDate); row.notesClean = effNotes(ev, row.occDate);
+    row.linkedProjectId = ev.linkedProjectId;
+    row.occTime = effTime(ev, row.occDate);
     saveTasksLocal("next");
   }
-  // Draft-only Complete: arm → archive the occurrence now (mirrors a card tick).
   if (d.willComplete && row){
-    saveEvents();
     completeTask("next", row.id); // archives + calls onPseudoActionCompleted
   } else if (d.willComplete){
     // Completing a future event (opened from the calendar, no live row yet):
@@ -741,11 +821,9 @@ function saveEventScreen(s){
     state.completed.next.unshift(Object.assign({}, synth, { completedAt: todayStr(), seriesId: ev.seriesId || null }));
     saveCompletedLocal("next");
     onPseudoActionCompleted(synth);
-    saveEvents();
     processEventBoundaries();
     renderLane("next");
   } else {
-    saveEvents();
     processEventBoundaries();
     renderLane("next");
   }
@@ -782,6 +860,7 @@ function skipOccurrence(ev){
   const nd = nextOccurrenceDate(ev.date, ev.recurrence, ev.interval);
   if (nd){ ev.date = nd; }
   ev.completedAt = null; ev.completedFrom = null;
+  pruneOverrides(ev);
   removePseudoRow(ev.id);
   saveEvents();
   processEventBoundaries();
@@ -821,7 +900,7 @@ function eventsHandleClick(e){
   const openEv = e.target.closest('[data-action="open-event"]');
   if (openEv){
     if (s){ state.screenStack.push(s); state.screen = null; }
-    openEventScreen(openEv.getAttribute("data-id"));
+    openEventScreen(openEv.getAttribute("data-id"), openEv.getAttribute("data-date") || null);
     return true;
   }
   // ---- the Waiting widget / header 📅 ----
@@ -852,7 +931,7 @@ function eventsHandleClick(e){
     if (e.target.closest('[data-action="cal-add"]')){ calAdd(); return true; }
     if (e.target.closest('[data-action="cal-make-habit"]')){ calMakeHabit(); return true; }
     const openEvt = e.target.closest('[data-action="cal-open-event"]');
-    if (openEvt){ state.screenStack.push(s); state.screen = null; openEventScreen(openEvt.getAttribute("data-id")); return true; }
+    if (openEvt){ state.screenStack.push(s); state.screen = null; openEventScreen(openEvt.getAttribute("data-id"), openEvt.getAttribute("data-date") || null); return true; }
     const openTask = e.target.closest('[data-action="cal-open-task"]');
     if (openTask){ state.screenStack.push(s); state.screen = null; openScreen(openTask.getAttribute("data-lane"), openTask.getAttribute("data-id")); return true; }
     return false;
