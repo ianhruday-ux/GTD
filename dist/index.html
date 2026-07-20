@@ -7428,13 +7428,14 @@ function injectChunkMap(){
     // chunk 8 (the user has finished walking all three). §8.1's replace-don't-
     // accumulate discipline is restored: this is the ONLY injector again, and
     // the two additive ones are deleted rather than left dormant.
-    const FLAG = "gtd_qa_checklist_postsprint_v1";
+    const FLAG = "gtd_qa_checklist_postsprint_v2";
     if (Storage.get(FLAG)) return;
     Storage.set(FLAG, "1");
     // Retire the superseded flags so they can't resurrect their injectors, and
     // so a future Reset doesn't leave dead keys behind.
     ["gtd_qa_checklist_chunk7_v1", "gtd_qa_checklist_override_v1",
-     "gtd_qa_checklist_override_v2", "gtd_qa_checklist_chunk8_v1"].forEach(Storage.remove);
+     "gtd_qa_checklist_override_v2", "gtd_qa_checklist_chunk8_v1",
+     "gtd_qa_checklist_postsprint_v1"].forEach(Storage.remove);
 
     // Replace, don't accumulate (8.1) — and actually mean it this time.
     // Earlier rounds bumped the flag but left the previous rounds' groups
@@ -7475,12 +7476,15 @@ function injectChunkMap(){
     addGroupWithItems('\u2705 QA \u2014 The habit runner', [
       { title: 'Every habit has a chalkboard', notes: 'Open Habits and tap any habit. Above the numbers there is a dark green chalkboard with a chalk stick figure on it and a thought bubble. Check the board looks like a board \u2014 faint dusty smears, nothing crisp or printed-looking.' },
       { title: 'The runner reacts as you tick the habit', notes: 'On a habit\'s page tap Complete. The figure and its thought should change immediately (from stretching to running). Now tap \u2715 to leave WITHOUT saving, then reopen it \u2014 it is back to how it was. The runner follows your unsaved changes, like everything else on that page.' },
+      { title: 'Ticking a habit always gets the runner moving', notes: 'Tick a habit on a day it is NOT scheduled (an off day) \u2014 the figure should get up and run rather than stay sitting with its book. Same if it is showing you a celebration after a run ended: completing again starts the next lap, so the runner runs. The off day still does not count towards your record. A paused habit is the exception \u2014 you cannot complete it at all.' },
       { title: 'The two rows of dots are gone', notes: 'The old box of little circles under the chalkboard has been removed \u2014 it was only ever there to show the logic while it was being built, and the runner shows the same thing now. The \'personal best / lifetime\' numbers stay.' },
       { title: 'Pause and off-days show a resting runner', notes: 'Tap Pause on a habit and save. Reopen it: the figure is sitting reading a book. Same for a habit not scheduled for today (untick today\'s day and save) \u2014 you will also still see the \'Off day\' line explaining why.' },
       { title: 'A second, faded runner appears once you have a record', notes: 'This one needs a habit with a personal best, so it may take a few days of real use \u2014 or use the QA time buttons to jump days. Once a best run exists, a faded grey figure runs alongside you: that is your record. Worth telling me whether it reads clearly on the small screen.' }
     ]);
 
     addGroupWithItems('\u2705 QA \u2014 Calendar & review fixes', [
+      { title: 'The add-event controls moved to the bottom', notes: 'Open the calendar. The controls for adding an event or deadline are no longer pinned in view at the bottom of the screen \u2014 they sit underneath the dates and you scroll down to reach them. While you are there, check the WHOLE month is showing, including the last week: an earlier version of this change quietly cut the last row off.' },
+      { title: 'Stalled projects still reach the review', notes: 'Make a project with no actions under it, then open the review \u2014 it should appear as a stalled project. The chunk-list entries deliberately do NOT appear there: they are scaffolding for building the app, and if they showed up they would bury the real ones. That was the thing you spotted; it is working as intended.' },
       { title: 'Leave the calendar with the back arrow', notes: 'Open the calendar. The \u2715 in the top-right is gone; there is a \u2190 in the top-left instead, the same as every other page. It should take you back where you came from.' },
       { title: 'Today has a border', notes: 'In Month view, today\'s square has a brass outline around it, not just a brass number \u2014 it should be easy to find at a glance. Tap a different day: the selected day is filled in, and today keeps its outline, so you can tell the two apart.' },
       { title: 'The jargon is going away', notes: 'On an event\'s page the checkbox now reads \'Hide until the day it happens\' (it used to say \'Tickler\'), and the note next to the time box about appointments is gone entirely. In Day view a hidden event is tagged \'hidden\'. Tell me anywhere else the app still talks like a manual.' },
@@ -7495,6 +7499,16 @@ function injectChunkMap(){
       { title: 'The \'passed\' tag no longer pushes the screen sideways', notes: 'Find any card showing the red \'passed\' tag. The whole tag should be visible inside the card, and the page should not scroll or drift sideways at all. Try it on your phone in portrait.' },
       { title: 'The event page\'s Complete button lights up like the others', notes: 'Open an event and tap Mark complete. The button should change colour and read \'Completing on save\' \u2014 the same look a normal action\'s Complete button gets. It used to stay unshaded so you could not tell it was armed.' },
       { title: 'AM/PM \u2014 needs your eyes on the phone', notes: 'Tap a time box to open the time picker. The AM/PM buttons belong to your phone\'s own picker, not to this app, so I cannot put an underline on them. I have made the picker use the app\'s dark colours and brass highlight. Please check whether it is now clear which of AM/PM is selected \u2014 if it still is not, tell me and I will build a custom picker instead.' }
+    ]);
+
+    addGroupWithItems('\u2705 QA \u2014 Repeating events', [
+      { title: 'Past repeats no longer clutter the calendar', notes: 'Open the calendar and page back a few months. A repeating event should leave NO mark on days that have already gone by \u2014 unless you actually completed it that day, in which case it keeps a dimmed dot. It used to draw a faint \u2018coming up\u2019 dot on every past occurrence, all the way back.' },
+      { title: 'Skipping one occurrence really removes it', notes: 'On a repeating event tap \ud83d\uddd1 and choose \u2018Skip this one\u2019. That date should now be completely empty, both on the month grid and in Day view, and the event should show on its next date instead. It used to keep drawing the skipped day.' },
+      { title: 'Editing one occurrence now says what it cannot change', notes: 'Open a repeating event on a FUTURE date, change its title, and also change its repeat setting. Save. The dialog should tell you that repeat, pause, context, project link and hiding always apply to the whole series, and offer the this-one-or-all choice only for the rest. Then check \u2018This occurrence only\u2019 really did leave the other dates alone.' }
+    ]);
+
+    addGroupWithItems('\u2705 QA \u2014 Pickers', [
+      { title: 'Every picker looks the same now', notes: 'Compare three: the \ud83e\ude9d on a Waiting action (what it waits on), the \ud83e\ude9d on a habit (its cue), and the + on a note (tags and projects). All three should now have the same small uppercase section headings, with a thin dividing line between sections, and the same list items. The note one was the model. Tell me if you find a picker anywhere that still looks different.' }
     ]);
 
     saveTasksLocal("next");

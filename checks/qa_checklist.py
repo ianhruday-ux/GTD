@@ -34,7 +34,8 @@ def check(cond, msg):
     (notes if cond else fails).append(("PASS " if cond else "FAIL ") + msg)
 
 
-EXPECTED = ["Settings & appearance", "The habit runner", "Calendar & review fixes", "Progress bars"]
+EXPECTED = ["Settings & appearance", "The habit runner", "Calendar & review fixes",
+            "Progress bars", "Repeating events", "Pickers"]
 RETIRED = ["Chunk 7", "Chunk 8", "Per-occurrence", "Recheck chunk 6b"]
 
 with serve(DIST) as url, sync_playwright() as p:
@@ -58,7 +59,7 @@ with serve(DIST) as url, sync_playwright() as p:
         }""", title)
 
     g = groups()
-    check(len(g) == 4, f"exactly four checklist groups (got {len(g)}: {g})")
+    check(len(g) == len(EXPECTED), f"exactly {len(EXPECTED)} checklist groups (got {len(g)}: {g})")
     for name in EXPECTED:
         check(any(name in t for t in g), f"group present: {name}")
     for old in RETIRED:
@@ -75,14 +76,14 @@ with serve(DIST) as url, sync_playwright() as p:
 
     # a reload must not inject a second copy
     pg.reload(); pg.wait_for_timeout(900)
-    check(len(groups()) == 4, f"reload does not re-inject (got {len(groups())})")
+    check(len(groups()) == len(EXPECTED), f"reload does not re-inject (got {len(groups())})")
 
     # neither should a full reset
     pg.evaluate("""() => { Object.keys(localStorage).filter(k => k.indexOf('gtd_') === 0)
         .forEach(k => localStorage.removeItem(k)); }""")
     pg.reload(); pg.wait_for_timeout(1100)
     g2 = groups()
-    check(len(g2) == 4, f"a reset re-seeds exactly one set (got {len(g2)}: {g2})")
+    check(len(g2) == len(EXPECTED), f"a reset re-seeds exactly one set (got {len(g2)}: {g2})")
 
     # THE UPGRADE PATH — the one that actually matters for the existing install:
     # the three old checklists are sitting in the lane and their flags are set,
@@ -106,11 +107,13 @@ with serve(DIST) as url, sync_playwright() as p:
       localStorage.setItem('gtd_qa_checklist_chunk7_v1', '1');
       localStorage.setItem('gtd_qa_checklist_override_v2', '1');
       localStorage.setItem('gtd_qa_checklist_chunk8_v1', '1');
-      localStorage.removeItem('gtd_qa_checklist_postsprint_v1');
+      // v1 of the post-sprint checklist counts as superseded too
+      localStorage.setItem('gtd_qa_checklist_postsprint_v1', '1');
+      localStorage.removeItem('gtd_qa_checklist_postsprint_v2');
     }""")
     pg.reload(); pg.wait_for_timeout(1100)
     g3 = groups()
-    check(len(g3) == 4, f"upgrade sweeps the three old checklists (got {len(g3)}: {g3})")
+    check(len(g3) == len(EXPECTED), f"upgrade sweeps the old checklists (got {len(g3)}: {g3})")
     check(not any(any(o in t for o in RETIRED) for t in g3), "no retired group survives the upgrade")
     orphans = pg.evaluate("""() => {
       const rows = JSON.parse(localStorage.getItem('gtd_tasks_next'));
@@ -119,7 +122,7 @@ with serve(DIST) as url, sync_playwright() as p:
     }""")
     check(orphans == 0, f"no orphaned items left behind by the sweep (got {orphans})")
     stale_flags = pg.evaluate("""() => ['gtd_qa_checklist_chunk7_v1','gtd_qa_checklist_override_v1',
-        'gtd_qa_checklist_override_v2','gtd_qa_checklist_chunk8_v1']
+        'gtd_qa_checklist_override_v2','gtd_qa_checklist_chunk8_v1','gtd_qa_checklist_postsprint_v1']
         .filter(k => localStorage.getItem(k) !== null)""")
     check(not stale_flags, f"superseded flag keys are retired (left: {stale_flags})")
 
@@ -127,6 +130,7 @@ with serve(DIST) as url, sync_playwright() as p:
     b.close()
 
 for line in notes + fails:
-    print(line)
+    # some Windows consoles are cp1252; group titles carry an emoji
+    print(line.encode("ascii", "replace").decode())
 print("\n%d passed, %d failed" % (len(notes), len(fails)))
 sys.exit(1 if fails else 0)
