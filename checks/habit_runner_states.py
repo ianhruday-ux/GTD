@@ -10,6 +10,11 @@ real built app and reads what rendered.
 """
 import os, functools, http.server, socket, socketserver, threading, contextlib, sys, json, datetime
 
+# ⚠ habitDone stores a DATE STRING per habit, not a boolean — habitDoneToday()
+# compares it against the app-day, which starts at 4am. Seeding `true` looks
+# right and silently reads as "not done".
+APP_TODAY = (datetime.datetime.now() - datetime.timedelta(hours=4)).strftime("%Y-%m-%d")
+
 from playwright.sync_api import sync_playwright
 
 DIST = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "dist")
@@ -86,6 +91,22 @@ CASES = [
     # past the end of the ghost's sequence there is nobody to race
     ("run_solo", run_record(personalBest=2, bestSequence=["done", "done"],
                             history=[DONE, DONE, DONE, DONE]), False),
+
+    # ---- completion is ALWAYS acknowledged (user ruling) ----
+    # a rest day normally rests, but ticking it puts the runner back on its feet
+    ("rest_reading", run_record(schedule=[], history=[DONE]), False),
+    ("run_solo", run_record(schedule=[], history=[DONE]), True),
+    # ...and it overrides a pending celebration: the next lap has started
+    ("pb_end_celebration", run_record(pendingResult={"type": "record", "length": 9, "prevBest": 4}), False),
+    ("run_solo", run_record(pendingResult={"type": "record", "length": 9, "prevBest": 4}), True),
+    ("run_solo", run_record(pendingResult={"type": "tie", "length": 4, "prevBest": 4}), True),
+    ("run_solo", run_record(pendingResult={"type": "short", "length": 2, "prevBest": 9}), True),
+    # but PAUSE still wins, because completing is impossible while paused
+    ("rest_reading", run_record(paused=True, history=[DONE]), True),
+    # a rest-day completion must NOT count toward the run: with a PB of 2 and
+    # two done days, counting it would falsely fire the overtake scene
+    ("run_with_ghost", run_record(personalBest=2, bestSequence=["done", "done"],
+                                  schedule=[], history=[DONE]), True),
 ]
 
 fails, notes = [], []
@@ -107,13 +128,21 @@ with serve(DIST) as url, sync_playwright() as p:
         .filter(t => !t.isGroup)[0].id""")
 
     for expected, record, done_today in CASES:
-        pg.evaluate("""([id, rec, done]) => {
+        pg.evaluate("""([id, rec, done, today]) => {
           localStorage.setItem('gtd_habit_runs', JSON.stringify({[id]: rec}));
-          localStorage.setItem('gtd_habit_done', JSON.stringify(done ? {[id]: true} : {}));
-        }""", [habit_id, record, done_today])
+          localStorage.setItem('gtd_habit_done', JSON.stringify(done ? {[id]: today} : {}));
+        }""", [habit_id, record, done_today, APP_TODAY])
         pg.reload(); pg.wait_for_timeout(800)
         pg.evaluate("() => { const r=document.querySelector('#tray-root'); if(r) r.innerHTML=''; }")
         pg.click('.tab[data-kind="habit"]'); pg.wait_for_timeout(400)
+        # ⚠ A habit ticked off TODAY leaves the active list and moves into the
+        # lane's "Completed" section, which is collapsed by default — so its
+        # card is not in the DOM at all until that section is opened. Expand it
+        # when the card isn't found, rather than assuming the habit vanished.
+        if pg.locator(f'.card-title[data-id="{habit_id}"]').count() == 0:
+            hdr = pg.locator('[data-action="toggle-group"][data-id="__completed_open__"]')
+            if hdr.count():
+                hdr.first.click(); pg.wait_for_timeout(350)
         pg.locator(f'.card-title[data-id="{habit_id}"]').first.click()
         pg.wait_for_timeout(600)
         bubble = (pg.evaluate("() => (document.querySelector('.runner-bubble')||{}).textContent") or "").strip()

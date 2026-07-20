@@ -2989,15 +2989,28 @@
     const draft = s.draft;
     const todayDow = boundaryNow().getDay();
     const scheduledToday = draft.schedule.indexOf(todayDow) !== -1;
-    // 11: paused or off-day. Checked first — a paused habit is resting whatever
-    // its history says, and §"pausing disables completion" makes any other
-    // reading incoherent.
-    if (draft.paused || !scheduledToday) return { state: "rest_reading", variant: null };
+    const doneToday = !!draft.done;
+
+    // ⚑ COMPLETION IS ALWAYS ACKNOWLEDGED (user ruling). Ticking a habit puts
+    // the runner back on its feet — on a rest day, and over the top of a
+    // celebration. The rest day still does not COUNT (the engine only records
+    // scheduled days, and doneCount below reflects that), but the figure must
+    // not sit reading a book straight after you told it you did the thing.
+    //
+    // 11: paused. The one case completion cannot override, and only because
+    // completion is impossible while paused — the pill renders inert — so this
+    // can never be reached with doneToday true.
+    if (draft.paused) return { state: "rest_reading", variant: null };
+    // 11: off-day, when nothing was done. Done on an off-day falls through to
+    // the running states below.
+    if (!scheduledToday && !doneToday) return { state: "rest_reading", variant: null };
 
     // 3 / 12 / 8: a run that has ENDED and whose result hasn't been seen yet.
     // pendingResult is exactly the "run just ended" signal, already consumed by
     // the celebration banner, so the runner and the banner can never disagree.
-    if (draft.pendingResult){
+    // Completing cancels the celebration: the next lap has started, and that is
+    // the more useful thing to show.
+    if (draft.pendingResult && !doneToday){
       const t = draft.pendingResult.type;
       if (t === "record") return { state: "pb_end_celebration", variant: null };
       if (t === "tie") return { state: "tie_celebration", variant: null };
@@ -3005,7 +3018,6 @@
     }
 
     const entries = currentRunEntries(run);
-    const doneToday = !!draft.done;
     const hasPB = run.personalBest > 0;
 
     // 10: the habit exists but this lap hasn't started. Lap one gets its own
@@ -3016,7 +3028,11 @@
 
     // Today's index on the track is where the ghost is compared against.
     const todayIdx = entries.length;
-    const doneCount = entries.filter(function(e){ return e.status === "done"; }).length + (doneToday ? 1 : 0);
+    // A rest-day completion is acknowledged by the figure but must NOT count
+    // toward the run — otherwise it could fire the overtake scene on a day the
+    // engine will never record.
+    const doneCount = entries.filter(function(e){ return e.status === "done"; }).length +
+      ((doneToday && scheduledToday) ? 1 : 0);
     // "You stumbled" is about the CURRENT position: today if today is a miss so
     // far, otherwise the most recent recorded day.
     const youStumbled = doneToday

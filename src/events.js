@@ -875,6 +875,20 @@ function saveEventScreen(s){
   const newNotes = d.notesClean || "";
   const newDate = d.date || effDate(ev, occDate); // where the occurrence should land
 
+  // ⚑ QA #25 (ruling A). Some fields have NO per-occurrence storage — they
+  // define the series — so they always hit every occurrence whichever scope you
+  // pick. The dialog used to promise "this occurrence only" over the top of
+  // them, which is how an edit could appear to leak into the whole series
+  // "regardless of what you pick". Detect them BEFORE they are written to the
+  // event, so the dialog can name what it cannot scope instead of lying.
+  const seriesFieldsChanged =
+    (ev.recurrence || "none") !== (d.recurrence || "none") ||
+    Math.max(1, ev.interval || 1) !== Math.max(1, d.interval || 1) ||
+    (ev.contextId || null) !== (d.contextId || null) ||
+    (ev.linkedProjectId || null) !== (d.linkedProjectId || null) ||
+    !!ev.tickler !== !!d.tickler ||
+    !!ev.paused !== !!d.paused;
+
   // Series-level fields always commit to the base series (they define the
   // series; there is no per-occurrence recurrence/pause/context/link/tickler).
   ev.recurrence = d.recurrence || "none";
@@ -912,7 +926,13 @@ function saveEventScreen(s){
   }
 
   if (isRecurring(ev) && occChanged){
-    openConfirmDialog("Apply your changes to…", [
+    // The choice is only offered for what can actually honour it. When the save
+    // also carries series-level changes, say so rather than implying they are
+    // being scoped too (QA #25, ruling A).
+    const prompt = seriesFieldsChanged
+      ? "Repeat, pause, context, project link and hiding always apply to the whole series — those are saved either way. Apply your other changes to…"
+      : "Apply your changes to…";
+    openConfirmDialog(prompt, [
       { label: "This occurrence only", style: "primary", action: commitOccurrence },
       { label: "All occurrences", action: commitSeries },
       { label: "Cancel", action: function(){} }
