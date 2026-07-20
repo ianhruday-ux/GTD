@@ -5077,10 +5077,10 @@
     ]);
 
     addGroupWithItems('✅ QA — The review and the intray', [
-      { title: 'The intray tells the truth now', notes: 'Your note. Empty the intray of captures, but leave a stalled project or an orphaned action outstanding. The drawer should NOT say “nothing slipping through the cracks” — those loops now appear as blacked-out cards, and the number of cards matches the number on the Review button above them. Tap Reveal to read them: each says what it is (“stalled project”, “orphaned action”).' },
+      { title: 'The intray tells the truth now', notes: 'Your note. Empty the intray of captures, but leave a stalled project, or an action waiting on something you deleted. The drawer should NOT say “nothing slipping through the cracks” — those loops now appear as blacked-out cards, and the number of cards matches the number on the Review button above them. Tap Reveal to read them: each says what is wrong with it (“no way forward”, “waiting on something gone”).' },
       { title: 'Those cards cannot be poked at', notes: 'A revealed stalled project in the drawer has no ✕ and does not open when tapped — same rule as the review itself. You clear it by giving it a way forward, not by dismissing it. Tell me if that feels too strict.' },
-      { title: 'Adding a waiting action to a stalled project', notes: 'The other half of your note. Open 🔍 Review until a stalled project comes up. Alongside “Add a next action” there is now “Add a waiting action”. It asks two things: what you are waiting on, and what has to happen first. Both are required — a waiting action with nothing to wait on would come straight back at you as an orphan, which is the loop this is meant to close.' },
-      { title: 'The form tells you which box is wrong', notes: 'In that form, fill in only one of the two boxes and tap Add. The EMPTY one gets a dashed outline, and whatever you already typed stays put. No popup. Then fill both and tap Add — the project should stop appearing as stalled, and the new waiting action should NOT appear as an orphan.' },
+      { title: 'Adding a waiting action to a stalled project', notes: 'The other half of your note. Open 🔍 Review until a stalled project comes up. Alongside “Add a next action” there is now “Add a waiting action”. It asks two things: what you are waiting on, and what has to happen first. Both are required — a waiting action with nothing to wait on would come straight back at you as a new problem, which is the thing this is meant to close.' },
+      { title: 'The form tells you which box is wrong', notes: 'In that form, fill in only one of the two boxes and tap Add. The EMPTY one gets a dashed outline, and whatever you already typed stays put. No popup. Then fill both and tap Add — the project should stop appearing as stalled, and the new waiting action should NOT turn up as a problem of its own.' },
       { title: 'Creating an event from here is still to come', notes: 'You asked for “create waiting action and create event”. Only the waiting half is built — the event half waits on the projects page being able to see the calendar, which is its own piece of work. Nothing to test here; it is a note so the gap is not a surprise.' }
     ]);
 
@@ -5159,7 +5159,10 @@
       return l.kind === "stalled" || l.kind === "orphaned";
     });
   }
-  const TRAY_LOOP_LABEL = { stalled: "stalled project", orphaned: "orphaned action" };
+  // ⚑ Plain descriptions, not the internal kind names (user: the jargon pass).
+  // "no way forward" is the same wording the review card already uses for a
+  // stalled project, so the drawer and the review say the same thing.
+  const TRAY_LOOP_LABEL = { stalled: "no way forward", orphaned: "waiting on something gone" };
   function trayLoopCardHtml(loop, revealed){
     if (!revealed){
       return '<div class="tray-card tray-card-redacted tray-card-loop">' +
@@ -5449,7 +5452,7 @@
   }
   const REVIEW_MENU_INFO = {
     pastdue: "This was due and the moment has passed. Push it to a new date, tick it if it's actually done, delete it if it's dead — or Not now to see it again next time.",
-    stalled: "A project with no next action, no waiting item — no way forward. Name the very next physical step, move it to Someday/Maybe (an honest answer, not a failure), finish it, or delete it.",
+    stalled: "A project with no next action, no waiting item — no way forward. Name the very next physical step, move it to Someday (an honest answer, not a failure), finish it, or delete it.",
     orphaned: "This was waiting on something that no longer exists. Point it at something else, replace it with a note to yourself, promote it if you can act now, or close it out.",
     capture: "A stray thought you haven't filed yet. Send it to a lane — or Not now to leave it for later."
   };
@@ -5464,10 +5467,15 @@
           '<b>Habit:</b> ' + escapeHtml(LANE_INFO.habit) + '<br>' +
           '<b>Note:</b> ' + escapeHtml(LANE_INFO.notes) +
         '</div>' +
-        '<div class="review-info-block"><b>Deciding on an open loop</b><br>' +
-          '<b>Past-due:</b> ' + escapeHtml(REVIEW_MENU_INFO.pastdue) + '<br>' +
+        // ⚑ Was "Deciding on an open loop" / "Orphaned waiting" (user: "open
+        // loop is jargon from the book. It should be changed"). Both were terms
+        // you had to already know — one borrowed from GTD, one the app invented.
+        // The headings now describe the situation instead of naming it. "Stalled"
+        // survives because it is ordinary English, not a term of art.
+        '<div class="review-info-block"><b>When something needs a decision</b><br>' +
+          '<b>Past its date:</b> ' + escapeHtml(REVIEW_MENU_INFO.pastdue) + '<br>' +
           '<b>Stalled project:</b> ' + escapeHtml(REVIEW_MENU_INFO.stalled) + '<br>' +
-          '<b>Orphaned waiting:</b> ' + escapeHtml(REVIEW_MENU_INFO.orphaned) +
+          '<b>Waiting on something gone:</b> ' + escapeHtml(REVIEW_MENU_INFO.orphaned) +
         '</div>' +
       '</div>'
     );
@@ -5602,7 +5610,7 @@
         menuHtml =
           reviewMenuBtn("review-form-start", "Add a next action", ' data-key="' + l.key + '" data-type="text"') +
           reviewMenuBtn("review-form-start", "Add a waiting action", ' data-key="' + l.key + '" data-type="waiting"') +
-          reviewMenuBtn("review-someday", "Move to Someday/Maybe", ' data-id="' + l.id + '"') +
+          reviewMenuBtn("review-someday", "Move to Someday", ' data-id="' + l.id + '"') +
           reviewMenuBtn("review-complete", "Complete it", ' data-lane="current" data-id="' + l.id + '"') +
           reviewMenuBtn("review-delete", "Delete it", ' data-lane="current" data-id="' + l.id + '"', true) +
           reviewNotNowBtn(l.key);

@@ -56,7 +56,7 @@ BASE = datetime.datetime(2026, 6, 15, 10, 0, 0)
 STALLED = {"id": "zz-proj", "title": "ZZ stalled project", "notesClean": "",
            "linkedProjectId": None, "isGroup": False, "parent": None,
            "whenText": None, "deadline": None, "contextId": None}
-ORPHAN = {"id": "zz-orph", "title": "ZZ orphaned waiter", "notesClean": "",
+ORPHAN = {"id": "zz-orph", "title": "ZZ stranded waiter", "notesClean": "",
           "linkedProjectId": None, "isGroup": False, "parent": None,
           "whenText": None, "conditionId": "gone-forever", "conditionKind": "next",
           "conditionLabel": "a deleted thing", "bundleText": None, "contextId": None}
@@ -113,10 +113,15 @@ with serve(DIST) as url, sync_playwright() as p:
     pg.wait_for_timeout(400)
     st = tray_state()
     joined = " | ".join(st["texts"])
-    check("ZZ stalled project" in joined and "stalled project" in joined,
-          f"revealed, a stalled project names its kind ({joined[:120]})")
-    check("ZZ orphaned waiter" in joined and "orphaned action" in joined,
-          f"and so does an orphaned action ({joined[:120]})")
+    # ⚠ The labels are deliberately plain English, not the internal kind names
+    # ("stalled"/"orphaned") — the user's jargon pass. Assert the words a reader
+    # actually sees, so renaming the internals cannot quietly reintroduce them.
+    check("ZZ stalled project" in joined and "no way forward" in joined,
+          f"revealed, a stalled project says what is wrong with it ({joined[:140]})")
+    check("ZZ stranded waiter" in joined and "waiting on something gone" in joined,
+          f"and so does one whose condition was deleted ({joined[:140]})")
+    check("orphan" not in joined.lower(),
+          f"and the word 'orphan' does not reach the user ({joined[:140]})")
 
     # ---------- not discardable, not tappable ----------
     dis = pg.evaluate("""() => [...document.querySelectorAll('.tray-card-loop')]

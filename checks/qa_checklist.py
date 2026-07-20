@@ -83,6 +83,22 @@ with serve(DIST) as url, sync_playwright() as p:
     for banned in ["devtools", "console", "localstorage", "inspect element", "git "]:
         check(banned not in body, f"no {banned!r} in the checklist text")
 
+    # ⚑ No jargon anywhere the user can read it (user ruling: "open loop is
+    # jargon from the book. It should be changed"). These are terms you have to
+    # already know — one borrowed from GTD, one the app invented — and they kept
+    # reappearing because the CODE uses them correctly as internal vocabulary.
+    # Scanned across the whole rendered app, not just the checklist, since that
+    # is the only way to catch it drifting back into a new screen.
+    visible = pg.evaluate("""() => {
+      const t = document.body.innerText || '';
+      const attrs = [...document.querySelectorAll('[title],[placeholder],[aria-label]')]
+        .map(e => [e.getAttribute('title'), e.getAttribute('placeholder'),
+                   e.getAttribute('aria-label')].filter(Boolean).join(' ')).join(' ');
+      return (t + ' ' + attrs).toLowerCase();
+    }""")
+    for jargon in ["open loop", "orphan", "tickler", "someday/maybe", "pseudo-action"]:
+        check(jargon not in visible, f"no {jargon!r} visible in the app")
+
     # a reload must not inject a second copy
     pg.reload(); pg.wait_for_timeout(900)
     check(len(groups()) == len(EXPECTED), f"reload does not re-inject (got {len(groups())})")
