@@ -1213,7 +1213,17 @@
     if (!deadline || !deadline.date) return null;
     const due = deadlineDueInstant(deadline);
     const now = Date.now() + (state.qaTimeOffset || 0) * 60000;
-    if (now >= due) return { full: true, red: true, passed: true, fillPercent: 100 };
+    // ⚑ FIXED (4 AM turnover audit, this round): an UNTIMED deadline's bar
+    // converges on the 4 AM boundary that BEGINS its due day — that is when it
+    // reaches full, and it is right, because the day itself is the resolution.
+    // But it does not go PASSED there: §4.4d puts the chip at the 4 AM boundary
+    // that ENDS the app-day. The two were conflated, so a deadline due today
+    // wore the "passed" chip from 4 AM onward — a full day early — and the
+    // review (§4.8b) counted it as a past-due open loop on the morning it was
+    // still perfectly on time. Full all day, passed once the day is over.
+    const passedAt = deadline.time ? due : due + 24 * 3600 * 1000;
+    if (now >= passedAt) return { full: true, red: true, passed: true, fillPercent: 100 };
+    if (now >= due) return { full: true, red: true, passed: false, fillPercent: 100 };
     // Missing createdAt (pre-chunk-2 / hand-edited test data) → treat as a
     // zero-width window, the same safe fallback a same-day deadline uses
     // (§4.4d: don't divide by zero).

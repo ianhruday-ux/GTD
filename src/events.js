@@ -329,24 +329,30 @@ function onPseudoActionRestored(task){
 }
 
 // =========================================================
-// THE PSEUDO-ACTION PROGRESS BAR (§4.14c / §4.4d) — different origin than a
-// deadline's. Appointment: appearance → time (~20–28h, linear, red final 15%).
-// Untimed event: FULL for the whole day, then red + passed at day-end.
+// THE PSEUDO-ACTION PROGRESS BAR (§4.14c / §4.4d).
+//
+// ONE RULE, both shapes: the bar starts EMPTY at the moment the pseudo-action
+// appears — the 4 AM boundary beginning its app-day — and fills linearly to the
+// moment the occurrence happens. Red in the final 15%, passed after.
+//   · Appointment (timed): 4 AM → the time.
+//   · Untimed event:       4 AM → the 4 AM that ENDS the app-day (a flat 24h),
+//                          so it reaches full exactly as it goes past-due.
+//
+// ⚑ CORRECTED (user, this round): the untimed case used to return a FULL bar
+// for the whole day, on a "Full ≠ late" reading recorded in §4.4d/§4.14c as a
+// user ruling. That was a miscommunication — the actual ruling is the one above
+// (the bar begins when the row appears), and a bar that is full from the moment
+// you first see it carries no information. spec.md §4.4d/§4.14c updated to match.
 // =========================================================
 function pseudoBarState(dateStr, timeStr){
   const now = nowInstant();
-  if (timeStr){
-    const due = occDueInstant(dateStr, timeStr);
-    if (now >= due) return { full: true, red: true, passed: true, fillPercent: 100 };
-    const origin = occAppearanceInstant(dateStr, timeStr);
-    const total = due - origin;
-    if (total <= 0) return { full: true, red: false, passed: false, fillPercent: 100 };
-    const frac = Math.max(0, Math.min(1, (now - origin) / total));
-    return { full: false, red: frac >= 0.85, passed: false, fillPercent: Math.round(frac * 100) };
-  }
-  const dueEnd = occDueInstant(dateStr, null);
-  if (now >= dueEnd) return { full: true, red: true, passed: true, fillPercent: 100 };
-  return { full: true, red: false, passed: false, fillPercent: 100 };
+  const due = occDueInstant(dateStr, timeStr);
+  if (now >= due) return { full: true, red: true, passed: true, fillPercent: 100 };
+  const origin = occAppearanceInstant(dateStr, timeStr);
+  const total = due - origin;
+  if (total <= 0) return { full: true, red: false, passed: false, fillPercent: 100 };
+  const frac = Math.max(0, Math.min(1, (now - origin) / total));
+  return { full: false, red: frac >= 0.85, passed: false, fillPercent: Math.round(frac * 100) };
 }
 function pseudoBarHtml(task){
   const s = pseudoBarState(task.occDate, task.occTime);

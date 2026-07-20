@@ -656,7 +656,7 @@ other.
 | **Deadline with a time** | §4.4b's curve, converging on **the time** | reaches 100% at the time |
 | **Deadline with no time** | §4.4b's curve, converging on **the day** | **arrives full at the 4 AM boundary** — there is no intra-day countdown to run |
 | **Appointment** (event with a time) | §4.14c's window: 4 AM → the time | reaches 100% at the time |
-| **Event with no time** | *(exists only on its day)* | **full, from the 4 AM boundary** |
+| **Event with no time** | *(exists only on its day)* | **starts empty at the 4 AM boundary that begins its day and fills across it, reaching 100% at the 4 AM boundary that ends it** |
 
 - **⚠ THE BAR'S ORIGIN IS PER-TYPE, AND IT IS NOT THE ROW'S CREATION (user, this round — stated here
   because CHUNK 2 BUILDS THE RENDERER and would otherwise have no reason to know).** A deadline's bar
@@ -673,9 +673,17 @@ other.
   AM, unchanged. Nothing is rendered, sorted, counted, duplicate-checked, or **measured** before the
   boundary; an event that exists is not an item in a lane. *(Recorded because "the ID exists early"
   reads as "the row exists early," and a row that exists early is a row something will measure from.)*
-- **Full ≠ late.** A full bar says "today"; the chip says "gone." An untimed thing sits at a full
-  brass bar all day, which is honest: the day is the resolution of the deadline, so the whole day is
-  the final moment.
+- **Full ≠ late.** A full bar says "the moment is here"; the chip says "gone." An untimed
+  **deadline** does arrive full at the 4 AM boundary that starts its due day — its bar began at
+  creation and converges on the day itself, so there is nothing left to run.
+- **⚑ CORRECTED (user, this round): an untimed EVENT does not sit at a full bar all day.** This
+  section previously ruled that it did ("the whole day is the final moment"). That was a
+  miscommunication, not a ruling. **The rule is the one in §4.14c: a pseudo-action's bar begins at
+  the moment the row appears** — 4 AM — and an untimed event therefore *fills across its day*,
+  reaching 100% at the 4 AM boundary that ends it, which is the same instant it goes past-due. A bar
+  that is full from the first moment you see it carries no information, which is the same failure
+  §4.14c exists to prevent. **The distinction is the origin, not the type:** a deadline's bar starts
+  at creation, a pseudo-action's starts at appearance.
 - **The passed chip.** When the moment passes uncompleted — the time, for timed things; the 4 AM
   boundary that **ends** the app-day, for untimed ones — the bar stays **full and red** and a small
   **"passed" chip renders at the end of the bar.** It stays in place. **Nothing auto-expires, ever.**
@@ -1516,17 +1524,26 @@ will look like a bug to whoever finds it first.
 six weeks ago, the bar arrives 98% full and red at birth — useless.
 
 > **A pseudo-action's bar spans the pseudo-action's own window: from its 4 AM appearance to the
-> appointment's time.** ~20–28 hours, straight linear (under 3 weeks, per §4.4b), red in the final
-> 15%.
+> moment the occurrence happens** — the time, for an appointment; the 4 AM boundary that ends the
+> app-day, for an untimed event. Straight linear (under 3 weeks, per §4.4b), red in the final 15%.
+
+*(⚑ Corrected: this block quote used to read "to the appointment's time," with the window given as
+"~20–28 hours." Both were wrong. It named only the timed shape, which is what let the untimed one
+drift into "full all day"; and the window is 4 AM → the time, so a 9 AM appointment gets **five**
+hours, not twenty. The 24-hour figure belongs to the untimed case alone.)*
 
 It is a *"how long until this happens"* bar, not a *"how long have you been procrastinating"* bar —
 which is right, because **you cannot do an appointment early.**
 
-**An untimed event's bar is FULL for the whole of its day (§4.4d — AMENDED, user ruling).** There is
-no time to converge on, so there is nothing to count down: the bar arrives full at the 4 AM boundary
-and stays full. *(This replaces the old rule — "an untimed event gets no bar at all and shows its
-date in red" — which gave untimed things a second, private vocabulary for lateness. One display
-language, §4.4d.)*
+**An untimed event's bar runs the length of its app-day — ⚑ CORRECTED (user, this round).** It
+starts **empty** at the 4 AM boundary that begins the day and reaches **100% at the 4 AM boundary
+that ends it**, which is the same instant it goes past-due: a flat 24-hour window, same linear fill,
+same red final 15%. *(This section previously said the bar was FULL for the whole day, attributed to
+a user ruling. It was a miscommunication. The real ruling is the sentence in the block quote above —*
+**the bar begins when the pseudo-action appears** *— and it applies to both shapes; the untimed case
+just converges on the end of the day instead of on a time. The still-older rule it replaced — "an
+untimed event gets no bar at all and shows its date in red" — stays dead: one display language,
+§4.4d.)*
 
 **Overdue — and the untimed case, RULED (amended this round, per §4.4d):**
 - An **appointment** whose time passes uncompleted behaves like any Next Action: **full red bar plus
