@@ -1199,7 +1199,25 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
    So .cal-body keeps .screen-body's own scrolling and only adjusts padding —
    the bottom is trimmed because the calendar has no floating action button to
    clear, unlike the lanes. */
-.cal-body{ padding-bottom:calc(24px + env(safe-area-inset-bottom)); }
+.cal-body{
+  padding-bottom:calc(24px + env(safe-area-inset-bottom));
+  /* The month grid's own arithmetic, reused so the other tabs can reserve the
+     same room: .screen-body is max-width 640 with 20px side padding, .cal-cells
+     is 7 columns with 3px gaps, and each cell is aspect-ratio 1/1.15. Six rows
+     (the tallest a month gets) plus the weekday header row. */
+  --cal-cell-w: calc((min(100vw, 640px) - 40px - 18px) / 7);
+  --cal-grid-h: calc(6 * 1.15 * var(--cal-cell-w) + 15px + 20px);
+}
+/* ⚑ The create row used to sit immediately under whatever the day happened to
+   contain, so an empty day floated it up beneath the header while Month view
+   had it two-thirds down the screen — the same controls landing somewhere
+   different on every tab (user). Day and List now reserve the height of a full
+   month grid, so the controls sit in a stable place, and a long list just
+   pushes them further down. Note the month grid is itself 5 or 6 rows deep
+   depending on the month, so this matches the taller case rather than tracking
+   it exactly — there is no single "where month view puts it" to hit. */
+.cal-agenda, .cal-day-empty{ min-height:var(--cal-grid-h); }
+.cal-day-empty{ display:flex; align-items:center; justify-content:center; }
 /* ⚠ .screen-body is a flex COLUMN, so its children shrink to fit by default.
    The swipe viewport carries overflow:hidden (it has to — it clips the
    neighbouring months of the 300%-wide track), which means shrinking it does
@@ -1208,7 +1226,10 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
    direct child of the calendar body must therefore keep its natural height and
    let the body scroll. */
 .cal-body > *{ flex:0 0 auto; }
-.cal-monthnav, .cal-daynav{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px; }
+/* min-height matches .cal-navbtn: List view's nav is a bare label with no
+   arrows, and without this its row is shorter, so everything below it — the
+   create controls included — rides 13px higher than on the other two tabs. */
+.cal-monthnav, .cal-daynav{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px; min-height:34px; }
 .cal-monthlabel{ font-family:var(--font-display); font-weight:700; font-size:16px; color:var(--text-primary); text-align:center; flex:1; }
 .cal-navbtn{
   flex:0 0 auto; width:34px; height:34px; border-radius:8px; border:1px solid rgba(255,255,255,0.16);
@@ -1263,13 +1284,31 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 .cal-agenda-title{ flex:1; }
 .cal-agenda-kind{ font-family:var(--font-mono); font-size:10px; color:var(--text-soft); }
 .cal-day-empty{ color:var(--text-soft); font-size:13px; text-align:center; padding:24px 0; }
+/* List view (QA #33): a day heading above each run of rows. The rows themselves
+   are Day view's rows, unchanged — only the heading is new.
+   ⚑ NOT sticky, deliberately. The screen's background is a wood TEXTURE
+   (.screen-overlay), so a sticky heading needs an opaque fill and would drag a
+   flat patch across the grain as it scrolls. A heading that scrolls with its
+   rows costs nothing and looks like the rest of the app. */
+.cal-list-daylabel{
+  font-family:var(--font-mono); font-size:10px; letter-spacing:0.08em;
+  text-transform:uppercase; color:var(--text-soft);
+  padding:4px 2px; margin-top:7px;
+  border-bottom:1px solid rgba(255,255,255,0.08);
+}
+.cal-list-daylabel:first-child{ margin-top:0; }
+.cal-list-daylabel.is-today{ color:var(--brass); }
 .cal-tickler-tag{ font-family:var(--font-mono); font-size:9px; color:var(--dusty); border:1px solid rgba(110,144,172,0.5); border-radius:6px; padding:0 5px; }
 /* A section of the page now, not chrome: no solid backdrop to hide the lanes
-   behind it, just a rule separating it from the dates above. */
+   behind it, just a rule separating it from the dates above.
+   ⚑ The gap above the rule was 6px, which read as cramped in Day view — the
+   last agenda row sat almost on the divider, so the controls looked like part
+   of the day's list rather than a separate section (user). Widened to 22px;
+   the rule now has room to do its job. */
 .cal-create{
   flex:0 0 auto; display:flex; flex-direction:column; gap:8px;
   border-top:1px solid rgba(255,255,255,0.12);
-  margin-top:6px; padding-top:14px;
+  margin-top:22px; padding-top:14px;
 }
 .cal-seg{ display:flex; gap:0; border:1px solid rgba(255,255,255,0.16); border-radius:8px; overflow:hidden; align-self:flex-start; }
 .cal-seg-btn{ background:transparent; color:var(--text-soft); border:none; font-family:var(--font-body); font-weight:600; font-size:12px; padding:6px 16px; }

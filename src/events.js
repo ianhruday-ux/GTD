@@ -670,6 +670,97 @@ function calDayAgendaHtml(dateStr){
   return '<div class="cal-agenda">' + rows.map(function(r){ return r.html; }).join("") + '</div>';
 }
 
+// =========================================================
+// LIST VIEW (QA #33) — everything dated, in the order it happens.
+//
+// The month grid answers "what does this month look like"; Day answers "what is
+// on this day". Neither answers "what is coming, in order", and that is the
+// question this view exists for. So its inclusion rules are deliberately WIDER
+// than the grid's, in the three ways the user called out:
+//   · HIDDEN (tickler) events appear. The grid hides them because they are
+//     set-and-forget; a complete index that silently omits things is not one.
+//   · PAUSED series appear, at their next projected occurrence, tagged. The
+//     grid projects nothing for a paused series — right there, wrong here.
+//   · ONE row per repeating series, never one per occurrence. This is also what
+//     bounds the list: a series contributes a single row, so there is no
+//     infinite projection to cap and no horizon to pick.
+//
+// ⚑ Three judgment calls, spec silent (CLAUDE.md: simplest option, flagged):
+//   1. TODAY FORWARD. Past occurrences are the month grid's job and the daily
+//      review's; repeating them here would bury the thing you opened it for.
+//      This means a past-due deadline does NOT appear — say if you want it, it
+//      is a leading "Past due" group and half an hour.
+//   2. GROUPED BY DAY with a date heading, rather than a date on every row.
+//      The row markup is then byte-identical to Day view's.
+//   3. UNTIMED BEFORE TIMED within a day — the same ordering rule Day view
+//      already uses (user ruling #4), not a new one.
+// =========================================================
+function calListRows(){
+  const today = todayStr();
+  const rows = [];
+  (state.events || []).forEach(function(ev){
+    // ONE occurrence per series (QA #31's helper does exactly this job): the
+    // next one that has not passed. Paused included — a paused series still has
+    // a next date, and this view is where you want to see it.
+    const canon = nextLiveOccurrenceDate(ev);
+    if (!canon) return;                       // finished one-shot
+    const date = effDate(ev, canon);
+    if (date < today) return;                 // judgment call 1
+    const t = effTime(ev, canon), title = effTitle(ev, canon);
+    const tags =
+      (ev.paused ? ' <span class="cal-agenda-kind">paused</span>' : "") +
+      (isRecurring(ev) && !ev.paused ? ' <span class="cal-agenda-kind">' + escapeHtml(RECUR_LABEL[ev.recurrence] || "Repeats").toLowerCase() + '</span>' : "") +
+      (ev.tickler ? ' <span class="cal-tickler-tag">hidden</span>' : "");
+    rows.push({
+      date: date, sort: (t ? "1" + t : "0"),
+      html: '<button type="button" class="cal-agenda-row" data-action="cal-open-event" data-id="' + ev.id + '" data-date="' + canon + '">' +
+        '<span class="cal-agenda-dot ' + (t ? "cal-mark-appt" : "cal-mark-event") + '"></span>' +
+        '<span class="cal-agenda-when">' + (t ? escapeHtml(t) : "All day") + '</span>' +
+        '<span class="cal-agenda-title">' + escapeHtml(title) + tags + '</span>' +
+      '</button>'
+    });
+  });
+  function deadlineRow(t, laneKind){
+    if (t.isGroup || t.eventId) return;       // pseudo-actions come from gtd_events
+    if (!(t.deadline && t.deadline.date)) return;
+    if (t.deadline.date < today) return;      // judgment call 1
+    rows.push({
+      date: t.deadline.date, sort: (t.deadline.time ? "1" + t.deadline.time : "0"),
+      html: '<button type="button" class="cal-agenda-row" data-action="cal-open-task" data-lane="' + laneKind + '" data-id="' + t.id + '">' +
+        '<span class="cal-agenda-dot cal-mark-dl-' + (laneKind === "current" ? "current" : "next") + '"></span>' +
+        '<span class="cal-agenda-when">' + (t.deadline.time ? escapeHtml(t.deadline.time) : "Due") + '</span>' +
+        '<span class="cal-agenda-title">' + escapeHtml(t.title) + ' <span class="cal-agenda-kind">' + (laneKind === "current" ? "project" : "action") + ' deadline</span></span>' +
+      '</button>'
+    });
+  }
+  state.tasks.next.forEach(function(t){ deadlineRow(t, "next"); });
+  state.tasks.current.forEach(function(t){ deadlineRow(t, "current"); });
+  rows.sort(function(a, b){
+    return a.date === b.date ? a.sort.localeCompare(b.sort) : a.date.localeCompare(b.date);
+  });
+  return rows;
+}
+function calListHtml(){
+  const rows = calListRows();
+  if (!rows.length){
+    return '<div class="cal-day-empty">Nothing coming up. Anything you schedule will be listed here, in the order it happens.</div>';
+  }
+  const today = todayStr();
+  let html = '<div class="cal-agenda cal-list">', lastDate = null;
+  rows.forEach(function(r){
+    if (r.date !== lastDate){
+      const d = dateStrToDate(r.date);
+      const label = r.date === today
+        ? "Today"
+        : d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+      html += '<div class="cal-list-daylabel' + (r.date === today ? " is-today" : "") + '">' + escapeHtml(label) + '</div>';
+      lastDate = r.date;
+    }
+    html += r.html;
+  });
+  return html + '</div>';
+}
+
 // The creation row (§4.15a) — Event · Deadline segmented toggle swaps the
 // controls beneath, quick-add rulings apply (dup check, dashed-empty).
 function calCreateRowHtml(s){
@@ -738,6 +829,7 @@ function calendarHeaderHtml(s){
       '<div class="cal-tabs">' +
         '<button type="button" class="cal-tab' + (s.calTab === "month" ? " active" : "") + '" data-action="cal-tab" data-tab="month">Month</button>' +
         '<button type="button" class="cal-tab' + (s.calTab === "day" ? " active" : "") + '" data-action="cal-tab" data-tab="day">Day</button>' +
+        '<button type="button" class="cal-tab' + (s.calTab === "list" ? " active" : "") + '" data-action="cal-tab" data-tab="list">List</button>' +
       '</div>' +
       '<div class="screen-header-right">' +
         '<span class="screen-chrome-btn" style="visibility:hidden">&#8592;</span>' +
@@ -766,6 +858,10 @@ function calendarBodyHtml(s){
         '</div>' +
       '</div>';
     body = nav + track;
+  } else if (s.calTab === "list"){
+    // No date nav: the list is one continuous run from today, so there is
+    // nothing to page through.
+    body = '<div class="cal-daynav"><span class="cal-monthlabel">Coming up</span></div>' + calListHtml();
   } else {
     const sel = dateStrToDate(s.calSel);
     const label = sel.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
