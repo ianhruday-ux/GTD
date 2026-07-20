@@ -783,6 +783,16 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 .screen-boxed-row .screen-link-select{ flex:1; }
 .screen-boxed-row .screen-date{ flex:1.1; }
 .screen-boxed-row .screen-time{ flex:0.9; }
+/* ⚑ QA #15 (AM/PM selection is hard to see) — PARTIAL, and honestly so. Every
+   time field in this app is a native <input type="time">, so the AM/PM buttons
+   belong to the browser/OS picker, not to us: an underline cannot be added to
+   them from CSS at all. What IS ours is the two properties the native widget
+   reads — a consistent dark scheme and an accent colour for the selected
+   segment. Applied here to ALL time inputs (one of them was missing
+   color-scheme entirely, so its picker rendered light against a dark page).
+   The real fix, if this isn't enough on the device, is a custom picker — see
+   the handoff. */
+.screen-time{ color-scheme:dark; accent-color:var(--brass); }
 .screen-boxed-row .screen-recurrence{ flex:1.3; }
 .screen-clear-x{ border:none; background:transparent; color:var(--text-soft); font-size:13px; padding:2px 2px 2px 4px; flex:0 0 auto; }
 .screen-clear-x:hover{ color:var(--text-primary); }
@@ -882,17 +892,8 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 .habit-pause-btn.active{ border-color:var(--yellow); color:var(--yellow); }
 .cue-dim{ opacity:0.55; }
 .habit-track-block{ display:flex; flex-direction:column; gap:8px; margin-top:4px; }
-.habit-track{ display:flex; flex-direction:column; gap:5px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:10px 12px; }
-.habit-track-row{ display:flex; flex-wrap:wrap; gap:4px; }
-.habit-dot{ width:11px; height:11px; border-radius:50%; background:rgba(255,255,255,0.12); flex:0 0 auto; }
-.habit-dot-done{ background:var(--moss); }
-.habit-dot-stumble{ background:var(--yellow); }
-.habit-dot-miss{ background:var(--red); opacity:0.6; }
-.habit-dot-pending{ background:transparent; border:1.5px dashed var(--text-soft); }
-.habit-dot-empty{ background:transparent; }
-.habit-dot-ghost{ opacity:0.35; }
-.habit-track-ghost .habit-dot-done{ background:var(--purple); }
-.habit-track-ghost .habit-dot-stumble{ background:var(--dusty); }
+/* The habit dot track's rules lived here. Removed with the track itself (post-sprint):
+   the runner (§P6) is now the whole readout on the habit page. */
 .habit-metrics{ display:flex; gap:16px; font-family:var(--font-mono); font-size:11px; color:var(--text-soft); }
 .habit-metrics b{ color:var(--text-primary); font-size:13px; }
 .habit-celebration{ border-radius:8px; padding:10px 12px; font-size:13px; text-align:center; font-weight:600; animation:habitCelebrate 0.5s ease; }
@@ -1196,6 +1197,11 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 .cal-cell:hover{ background:rgba(255,255,255,0.06); }
 .cal-daynum{ font-size:12px; font-weight:500; line-height:1; }
 .cal-cell.cal-today .cal-daynum{ color:var(--brass); font-weight:700; }
+/* Today gets a full border, not just a brass numeral (user QA #3) — a coloured
+   digit is easy to lose among the marks, and the selected day already owns the
+   filled-background treatment, so an outline is the one that stays distinct
+   from it even when today IS the selected day. */
+.cal-cell.cal-today{ border-color:var(--brass); }
 .cal-cell.cal-selected{ background:rgba(198,138,62,0.22); border-color:var(--brass); }
 .cal-marks{ display:flex; flex-wrap:wrap; gap:2px; justify-content:center; align-items:center; padding:0 2px; }
 .cal-mark{ display:inline-block; width:6px; height:6px; border-radius:50%; }

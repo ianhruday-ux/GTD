@@ -615,7 +615,7 @@ function calDayAgendaHtml(dateStr){
           '<span class="cal-agenda-when">' + (t ? escapeHtml(t) : "All day") + '</span>' +
           '<span class="cal-agenda-title">' + escapeHtml(title) +
             (moved ? ' <span class="cal-agenda-kind">moved</span>' : "") +
-            (ev.tickler ? ' <span class="cal-tickler-tag">tickler</span>' : "") + '</span>' +
+            (ev.tickler ? ' <span class="cal-tickler-tag">hidden</span>' : "") + '</span>' +
         '</button>'
       });
     });
@@ -697,14 +697,18 @@ function calCreateRowHtml(s){
 
 function calendarHeaderHtml(s){
   return (
+    // The exit is a BACK ARROW top-left, not an ✕ top-right (user QA #7): the
+    // calendar is a place you came from somewhere else, and every other page in
+    // the app leaves by ← in that corner. The ✕ read as "discard", which is
+    // wrong — there is nothing here to discard.
     '<div class="screen-header">' +
-      '<span class="screen-chrome-btn" style="visibility:hidden">&#8592;</span>' +
+      '<button type="button" class="screen-chrome-btn" data-action="cal-close" title="Back">&#8592;</button>' +
       '<div class="cal-tabs">' +
         '<button type="button" class="cal-tab' + (s.calTab === "month" ? " active" : "") + '" data-action="cal-tab" data-tab="month">Month</button>' +
         '<button type="button" class="cal-tab' + (s.calTab === "day" ? " active" : "") + '" data-action="cal-tab" data-tab="day">Day</button>' +
       '</div>' +
       '<div class="screen-header-right">' +
-        '<button type="button" class="screen-chrome-btn" data-action="cal-close" title="Close">&#10005;</button>' +
+        '<span class="screen-chrome-btn" style="visibility:hidden">&#8592;</span>' +
       '</div>' +
     '</div>'
   );
@@ -817,7 +821,7 @@ function eventBodyHtml(s){
   fields += '<div class="screen-row"><div class="screen-boxed-row"><span class="field-icon">&#128279;</span>' +
     '<select class="screen-link-select" data-field="linkedProjectId">' + projectOptionsHtml(d.linkedProjectId) + '</select></div></div>';
   // Tickler toggle (user addition)
-  fields += '<label class="cal-tickler-row"><input type="checkbox" data-field="event-tickler"' + (d.tickler ? " checked" : "") + '> Tickler — keep off the calendar &amp; reminders until its day</label>';
+  fields += '<label class="cal-tickler-row"><input type="checkbox" data-field="event-tickler"' + (d.tickler ? " checked" : "") + '> Hide until the day it happens</label>';
   // Pause — recurring only, draft-only + armed (§4.15b, golden-rule sibling)
   if (isRecurring({ recurrence: d.recurrence })){
     fields += '<button type="button" class="btn screen-pause-btn' + (d.paused ? " armed" : "") + '" data-action="event-toggle-pause">' +

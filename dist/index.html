@@ -803,6 +803,16 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 .screen-boxed-row .screen-link-select{ flex:1; }
 .screen-boxed-row .screen-date{ flex:1.1; }
 .screen-boxed-row .screen-time{ flex:0.9; }
+/* ⚑ QA #15 (AM/PM selection is hard to see) — PARTIAL, and honestly so. Every
+   time field in this app is a native <input type="time">, so the AM/PM buttons
+   belong to the browser/OS picker, not to us: an underline cannot be added to
+   them from CSS at all. What IS ours is the two properties the native widget
+   reads — a consistent dark scheme and an accent colour for the selected
+   segment. Applied here to ALL time inputs (one of them was missing
+   color-scheme entirely, so its picker rendered light against a dark page).
+   The real fix, if this isn't enough on the device, is a custom picker — see
+   the handoff. */
+.screen-time{ color-scheme:dark; accent-color:var(--brass); }
 .screen-boxed-row .screen-recurrence{ flex:1.3; }
 .screen-clear-x{ border:none; background:transparent; color:var(--text-soft); font-size:13px; padding:2px 2px 2px 4px; flex:0 0 auto; }
 .screen-clear-x:hover{ color:var(--text-primary); }
@@ -902,17 +912,8 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 .habit-pause-btn.active{ border-color:var(--yellow); color:var(--yellow); }
 .cue-dim{ opacity:0.55; }
 .habit-track-block{ display:flex; flex-direction:column; gap:8px; margin-top:4px; }
-.habit-track{ display:flex; flex-direction:column; gap:5px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:10px 12px; }
-.habit-track-row{ display:flex; flex-wrap:wrap; gap:4px; }
-.habit-dot{ width:11px; height:11px; border-radius:50%; background:rgba(255,255,255,0.12); flex:0 0 auto; }
-.habit-dot-done{ background:var(--moss); }
-.habit-dot-stumble{ background:var(--yellow); }
-.habit-dot-miss{ background:var(--red); opacity:0.6; }
-.habit-dot-pending{ background:transparent; border:1.5px dashed var(--text-soft); }
-.habit-dot-empty{ background:transparent; }
-.habit-dot-ghost{ opacity:0.35; }
-.habit-track-ghost .habit-dot-done{ background:var(--purple); }
-.habit-track-ghost .habit-dot-stumble{ background:var(--dusty); }
+/* The habit dot track's rules lived here. Removed with the track itself (post-sprint):
+   the runner (§P6) is now the whole readout on the habit page. */
 .habit-metrics{ display:flex; gap:16px; font-family:var(--font-mono); font-size:11px; color:var(--text-soft); }
 .habit-metrics b{ color:var(--text-primary); font-size:13px; }
 .habit-celebration{ border-radius:8px; padding:10px 12px; font-size:13px; text-align:center; font-weight:600; animation:habitCelebrate 0.5s ease; }
@@ -1216,6 +1217,11 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 .cal-cell:hover{ background:rgba(255,255,255,0.06); }
 .cal-daynum{ font-size:12px; font-weight:500; line-height:1; }
 .cal-cell.cal-today .cal-daynum{ color:var(--brass); font-weight:700; }
+/* Today gets a full border, not just a brass numeral (user QA #3) — a coloured
+   digit is easy to lose among the marks, and the selected day already owns the
+   filled-background treatment, so an outline is the one that stays distinct
+   from it even when today IS the selected day. */
+.cal-cell.cal-today{ border-color:var(--brass); }
 .cal-cell.cal-selected{ background:rgba(198,138,62,0.22); border-color:var(--brass); }
 .cal-marks{ display:flex; flex-wrap:wrap; gap:2px; justify-content:center; align-items:center; padding:0 2px; }
 .cal-mark{ display:inline-block; width:6px; height:6px; border-radius:50%; }
@@ -5467,15 +5473,6 @@ function injectChunkMap(){
     const endedRuns = run.history.filter(function(e){ return e.status === "miss"; }).length;
     return endedRuns + 1;
   }
-  function habitDotHtml(status, isGhost){
-    const cls = "habit-dot" + (isGhost ? " habit-dot-ghost" : "") +
-      (status === "done" ? " habit-dot-done"
-        : status === "stumble" ? " habit-dot-stumble"
-        : status === "pending" ? " habit-dot-pending"
-        : status === "miss" ? " habit-dot-miss"
-        : " habit-dot-empty");
-    return '<span class="' + cls + '"></span>';
-  }
   // The ghost-runner track: your current run's day-by-day dots lined up
   // against the record (or most-recently-tied) run's sequence. Simplified
   // from the full lockstep-replay-with-overtake animation spec'd in 4.11b
@@ -5579,24 +5576,11 @@ function injectChunkMap(){
     // as done the moment the badge is tapped, and reverts on ✕ with
     // everything else — matching how it already previews the draft's
     // schedule rather than the run's.
-    const doneToday = !!draft.done;
-    const runEntries = currentRunEntries(run);
-    // Today is normally only reflected live here, not yet in history — the
-    // boundary sweep records it the day after. The pause-toggle fix is one
-    // case where today's entry can land in history same-day (so pausing
-    // right after completing doesn't lose the credit); guard against
-    // showing it twice when that's happened.
-    const lastEntry = runEntries[runEntries.length - 1];
-    const todayAlreadyRecorded = !!lastEntry && lastEntry.date === today;
-    const liveEntries = runEntries.map(function(e){ return e.status; });
-    if (scheduledToday && !todayAlreadyRecorded) liveEntries.push(doneToday ? "done" : "pending");
-    const ghostSeq = run.bestSequence || [];
-    const trackLen = Math.max(liveEntries.length, ghostSeq.length, 1);
-    let ghostRow = "", yourRow = "";
-    for (let i = 0; i < trackLen; i++){
-      ghostRow += habitDotHtml(ghostSeq[i], true);
-      yourRow += habitDotHtml(liveEntries[i], false);
-    }
+    // ▲ POST-SPRINT: the two rows of dots (you vs. the ghost) are GONE. They
+    // existed to make the run engine's logic visible while it was being built,
+    // and the runner (§P6) now shows the same comparison as a scene — the two
+    // together were the same information twice, in two visual languages.
+    // Nothing about the engine changed; only this readout was removed.
     let celebration = "";
     if (draft.pendingResult){
       const r = draft.pendingResult;
@@ -5610,17 +5594,11 @@ function injectChunkMap(){
     }
     const bodyHtml = !scheduledToday
       ? '<div class="habit-offday">&#128214; Off day \u2014 you can\u2019t be on all the time.</div>'
-      : (
-        '<div class="habit-track">' +
-          '<div class="habit-track-row habit-track-ghost">' + ghostRow + '</div>' +
-          '<div class="habit-track-row habit-track-you">' + yourRow + '</div>' +
-        '</div>'
-      );
+      : "";
     return (
       '<div class="habit-track-block">' +
-        // The runner mounts here after render (§P6). It sits ABOVE the dot
-        // track deliberately: the figure is the feeling, the dots are the
-        // record, and the record should read as the evidence for the feeling.
+        // The runner mounts here after render (§P6) — it is now the whole
+        // readout, not a companion to the dot track.
         '<div id="habit-runner-host" class="habit-runner-host"></div>' +
         celebration + bodyHtml +
         '<div class="habit-metrics">' +
@@ -9350,7 +9328,7 @@ function calDayAgendaHtml(dateStr){
           '<span class="cal-agenda-when">' + (t ? escapeHtml(t) : "All day") + '</span>' +
           '<span class="cal-agenda-title">' + escapeHtml(title) +
             (moved ? ' <span class="cal-agenda-kind">moved</span>' : "") +
-            (ev.tickler ? ' <span class="cal-tickler-tag">tickler</span>' : "") + '</span>' +
+            (ev.tickler ? ' <span class="cal-tickler-tag">hidden</span>' : "") + '</span>' +
         '</button>'
       });
     });
@@ -9432,14 +9410,18 @@ function calCreateRowHtml(s){
 
 function calendarHeaderHtml(s){
   return (
+    // The exit is a BACK ARROW top-left, not an ✕ top-right (user QA #7): the
+    // calendar is a place you came from somewhere else, and every other page in
+    // the app leaves by ← in that corner. The ✕ read as "discard", which is
+    // wrong — there is nothing here to discard.
     '<div class="screen-header">' +
-      '<span class="screen-chrome-btn" style="visibility:hidden">&#8592;</span>' +
+      '<button type="button" class="screen-chrome-btn" data-action="cal-close" title="Back">&#8592;</button>' +
       '<div class="cal-tabs">' +
         '<button type="button" class="cal-tab' + (s.calTab === "month" ? " active" : "") + '" data-action="cal-tab" data-tab="month">Month</button>' +
         '<button type="button" class="cal-tab' + (s.calTab === "day" ? " active" : "") + '" data-action="cal-tab" data-tab="day">Day</button>' +
       '</div>' +
       '<div class="screen-header-right">' +
-        '<button type="button" class="screen-chrome-btn" data-action="cal-close" title="Close">&#10005;</button>' +
+        '<span class="screen-chrome-btn" style="visibility:hidden">&#8592;</span>' +
       '</div>' +
     '</div>'
   );
@@ -9552,7 +9534,7 @@ function eventBodyHtml(s){
   fields += '<div class="screen-row"><div class="screen-boxed-row"><span class="field-icon">&#128279;</span>' +
     '<select class="screen-link-select" data-field="linkedProjectId">' + projectOptionsHtml(d.linkedProjectId) + '</select></div></div>';
   // Tickler toggle (user addition)
-  fields += '<label class="cal-tickler-row"><input type="checkbox" data-field="event-tickler"' + (d.tickler ? " checked" : "") + '> Tickler — keep off the calendar &amp; reminders until its day</label>';
+  fields += '<label class="cal-tickler-row"><input type="checkbox" data-field="event-tickler"' + (d.tickler ? " checked" : "") + '> Hide until the day it happens</label>';
   // Pause — recurring only, draft-only + armed (§4.15b, golden-rule sibling)
   if (isRecurring({ recurrence: d.recurrence })){
     fields += '<button type="button" class="btn screen-pause-btn' + (d.paused ? " armed" : "") + '" data-action="event-toggle-pause">' +

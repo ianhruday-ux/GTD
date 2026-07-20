@@ -2968,15 +2968,6 @@
     const endedRuns = run.history.filter(function(e){ return e.status === "miss"; }).length;
     return endedRuns + 1;
   }
-  function habitDotHtml(status, isGhost){
-    const cls = "habit-dot" + (isGhost ? " habit-dot-ghost" : "") +
-      (status === "done" ? " habit-dot-done"
-        : status === "stumble" ? " habit-dot-stumble"
-        : status === "pending" ? " habit-dot-pending"
-        : status === "miss" ? " habit-dot-miss"
-        : " habit-dot-empty");
-    return '<span class="' + cls + '"></span>';
-  }
   // The ghost-runner track: your current run's day-by-day dots lined up
   // against the record (or most-recently-tied) run's sequence. Simplified
   // from the full lockstep-replay-with-overtake animation spec'd in 4.11b
@@ -3080,24 +3071,11 @@
     // as done the moment the badge is tapped, and reverts on ✕ with
     // everything else — matching how it already previews the draft's
     // schedule rather than the run's.
-    const doneToday = !!draft.done;
-    const runEntries = currentRunEntries(run);
-    // Today is normally only reflected live here, not yet in history — the
-    // boundary sweep records it the day after. The pause-toggle fix is one
-    // case where today's entry can land in history same-day (so pausing
-    // right after completing doesn't lose the credit); guard against
-    // showing it twice when that's happened.
-    const lastEntry = runEntries[runEntries.length - 1];
-    const todayAlreadyRecorded = !!lastEntry && lastEntry.date === today;
-    const liveEntries = runEntries.map(function(e){ return e.status; });
-    if (scheduledToday && !todayAlreadyRecorded) liveEntries.push(doneToday ? "done" : "pending");
-    const ghostSeq = run.bestSequence || [];
-    const trackLen = Math.max(liveEntries.length, ghostSeq.length, 1);
-    let ghostRow = "", yourRow = "";
-    for (let i = 0; i < trackLen; i++){
-      ghostRow += habitDotHtml(ghostSeq[i], true);
-      yourRow += habitDotHtml(liveEntries[i], false);
-    }
+    // ▲ POST-SPRINT: the two rows of dots (you vs. the ghost) are GONE. They
+    // existed to make the run engine's logic visible while it was being built,
+    // and the runner (§P6) now shows the same comparison as a scene — the two
+    // together were the same information twice, in two visual languages.
+    // Nothing about the engine changed; only this readout was removed.
     let celebration = "";
     if (draft.pendingResult){
       const r = draft.pendingResult;
@@ -3111,17 +3089,11 @@
     }
     const bodyHtml = !scheduledToday
       ? '<div class="habit-offday">&#128214; Off day \u2014 you can\u2019t be on all the time.</div>'
-      : (
-        '<div class="habit-track">' +
-          '<div class="habit-track-row habit-track-ghost">' + ghostRow + '</div>' +
-          '<div class="habit-track-row habit-track-you">' + yourRow + '</div>' +
-        '</div>'
-      );
+      : "";
     return (
       '<div class="habit-track-block">' +
-        // The runner mounts here after render (§P6). It sits ABOVE the dot
-        // track deliberately: the figure is the feeling, the dots are the
-        // record, and the record should read as the evidence for the feeling.
+        // The runner mounts here after render (§P6) — it is now the whole
+        // readout, not a companion to the dot track.
         '<div id="habit-runner-host" class="habit-runner-host"></div>' +
         celebration + bodyHtml +
         '<div class="habit-metrics">' +
