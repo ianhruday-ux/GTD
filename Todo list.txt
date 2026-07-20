@@ -1,0 +1,19 @@
+UI Fixups
+
+- For Claude: Create a file with all the copy and button labels.
+
+- For me: read through all the copy and button labels. Find and rewrite everything that needs fixing.
+
+- For Claude: remove the quick add rows for lists and contexts. They just clutter things up.
+
+- For me: look at event pages and see if they can't be decluttered. It might not be possible.
+
+- For Claude: after I go through and fix all the English text to make it more user friendly, Claude has to produce Chinese translations.
+
+- For me: get someone to look at the new backgrounds. Get their feedback.
+
+- For Claude: The projects page really should see the calendar, and we have enough time to do it. Do a collision analysis first, but I suspect the only limitation we need to add is that scheduled events, including repeated events should not extend beyond the project deadline.
+
+- For Claude: Make a blackboard for the notes section.
+
+Some of these might not get done, but we should try for some before pushing the service worker and the rest of chunk 9.

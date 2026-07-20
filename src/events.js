@@ -80,16 +80,9 @@ function nextOccurrenceDate(dateStr, recurrence, interval){
   else return null;
   return dateToStr(d);
 }
-function prevOccurrenceDate(dateStr, recurrence, interval){
-  const d = dateStrToDate(dateStr);
-  const n = Math.max(1, interval || 1);
-  if (recurrence === "daily") d.setDate(d.getDate() - n);
-  else if (recurrence === "weekly") d.setDate(d.getDate() - 7 * n);
-  else if (recurrence === "monthly") d.setMonth(d.getMonth() - n);
-  else if (recurrence === "yearly") d.setFullYear(d.getFullYear() - n);
-  else return null;
-  return dateToStr(d);
-}
+// (prevOccurrenceDate lived here. Its only caller was occursOnCanonical's
+// backward walk, which is exactly the bug in QA #1/#2 — a series never needs to
+// look behind its live date. Deleted rather than left for someone to reuse.)
 function isRecurring(ev){ return ev && ev.recurrence && ev.recurrence !== "none"; }
 
 // =========================================================
@@ -534,10 +527,16 @@ function marksForDay(dateStr){
       const doneCls = completed ? " cal-mark-done" : "";
       if (isLive){
         (t ? appts : events).push({ kind: t ? "appt" : "event", cls: "cal-mark-" + (t ? "appt" : "event") + doneCls });
-      } else if (isRecurring(ev) && !ev.paused){
-        projected.push({ kind: "proj", cls: "cal-mark-" + (t ? "appt" : "event") + " cal-mark-proj" + doneCls });
       } else if (completed){
+        // ⚑ Checked BEFORE the projection branch (QA #1/#2). A completed
+        // occurrence of a live series is a thing that HAPPENED — it earns the
+        // dimmed solid mark, not the hollow "coming up" one. Ordering these
+        // the other way round drew every past completion as a projection.
         events.push({ kind: "event", cls: "cal-mark-" + (t ? "appt" : "event") + " cal-mark-done" });
+      } else if (isRecurring(ev) && !ev.paused){
+        // Strictly future by construction now: occursOnCanonical no longer
+        // reports past dates for a live series unless they were completed.
+        projected.push({ kind: "proj", cls: "cal-mark-" + (t ? "appt" : "event") + " cal-mark-proj" + doneCls });
       }
     });
   });
@@ -557,11 +556,22 @@ function marksForDay(dateStr){
 function occursOnCanonical(ev, dateStr){
   if (!isRecurring(ev)) return ev.date === dateStr;
   if (dateStr === ev.date) return true;
+  // ⚑ QA #1 and #2, which were one bug. A recurring series is ONE live entity
+  // that rolls FORWARD (§4.15b): dates before the live one are occurrences the
+  // series has already left behind — completed, missed, or explicitly skipped.
+  // None of them are projections of anything. This used to walk BACKWARDS to
+  // "find" them, which drew hollow future-marks across every past month (#2)
+  // and kept drawing a skipped occurrence after the skip had rolled the series
+  // past it (#1). The one past occurrence that still has something to say is a
+  // COMPLETED one, which keeps its dimmed mark (user ruling #6) — and it is
+  // recorded in completedOccs, so it needs no walking at all.
+  if (dateStr < ev.date) return (ev.completedOccs || []).indexOf(dateStr) !== -1;
   let d = ev.date, guard = 0;
-  if (dateStr > ev.date){
-    while (guard++ < 400){ const nd = nextOccurrenceDate(d, ev.recurrence, ev.interval); if (!nd || nd > dateStr) break; d = nd; if (d === dateStr) return true; }
-  } else {
-    while (guard++ < 400){ const pd = prevOccurrenceDate(d, ev.recurrence, ev.interval); if (!pd || pd < dateStr) break; d = pd; if (d === dateStr) return true; }
+  while (guard++ < 400){
+    const nd = nextOccurrenceDate(d, ev.recurrence, ev.interval);
+    if (!nd || nd > dateStr) break;
+    d = nd;
+    if (d === dateStr) return true;
   }
   return false;
 }
