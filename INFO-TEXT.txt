@@ -1,0 +1,139 @@
+OELA — THE INFORMATION BUTTONS
+Every word behind an ⓘ, in one place. 17 pieces.
+
+HOW TO USE THIS FILE
+  Rewrite anything you want changed on the line under it, after the arrow.
+  Leave the arrow blank for anything you are happy with. The tags in [brackets]
+  are how I find them again — please leave those.
+
+WHERE THESE APPEAR
+  There are only three information surfaces in the whole app:
+    · the small "i" on each lane's header      → LANE 1-6 below
+    · the ⓘ in the intray drawer               → INTRAY
+    · the ⓘ on the daily review                → REVIEW (it reuses the six lane
+      descriptions, then adds its own block)
+  Edit and create pages deliberately have no ⓘ — the placeholder text inside
+  each empty box carries the teaching there instead.
+
+JARGON I HAVE ALREADY REMOVED, so you do not re-flag it
+  "open loop" → gone. "orphaned" → gone. "tickler" → gone (the checkbox now
+  reads "Hide until the day it happens"). "Someday/Maybe" → now just "Someday",
+  which is what the lane is actually called. There is now an automatic check
+  that fails the build if any of them reappear anywhere a reader can see.
+
+JARGON STILL PRESENT, flagged for your ruling
+  "capture" as a NOUN — a heading below is literally "Sorting a capture", and
+  the intray talks about captures. As a verb ("Capture a thought…") it reads
+  fine; as a noun it is the book's word. Marked ⚑ where it appears.
+  "event" vs "appointment" — you said this is only sometimes jargon. Both appear
+  below in LANE 2. Tell me the rule and I will apply it everywhere.
+
+==============================================================================
+
+THE LANE BUTTONS
+------------------------------------------------------------------------------
+These are the six lists down the side of the app. Each has a small "i".
+
+  [LANE-1] Next Actions
+    The single next physical step for anything you're actively moving forward —
+    not the whole project, just what you'd do next if you sat down right now.
+     →
+
+  [LANE-2] Waiting On                                    ⚑ "event" appears here
+    Things you can't act on yet because they depend on something else — a reply
+    from someone, a delivery, a decision, another action getting done, or a
+    future date or event. Nothing to do here but check in occasionally. Use the
+    arrow to promote it once it's back in your hands.
+     →
+
+  [LANE-3] Current Projects
+    Anything that takes more than one action to finish and that you're actively
+    working on right now — could be as simple as returning a library book or as
+    involved as planning a vacation. Link a Next Action or Waiting On item to
+    one of these to keep the connection visible.
+     →
+
+  [LANE-4] Someday
+    Ideas and projects you're not committing to yet — no pressure, just a
+    parking lot. Use the arrow to promote one to Current Projects when you're
+    ready to start.
+     →
+
+  [LANE-5] Habits
+    Things you want to do every day, not just once. Checking one off only counts
+    for today — it resets automatically tomorrow so it keeps showing up.
+    Everyone misses a habit occasionally. We don't track streaks here, but we do
+    track personal bests. If you break your streak, then maybe you'll have a new
+    personal best to beat. After all: 'It's more important to be persistent than
+    it is to be consistent.' – Rebecca
+     →
+
+  [LANE-6] Notes
+    A place for things that aren't actions. Try linking one to a project so it's
+    there when you need it. One caution: these notes aren't a replacement for a
+    real filing system.
+     →
+
+THE INTRAY DRAWER
+------------------------------------------------------------------------------
+
+  [INTRAY] the ⓘ in the drawer's header
+    A holding pen for stray thoughts. Try sorting through it once a day — an
+    empty intray means nothing's slipping through the cracks.
+     →
+
+THE DAILY REVIEW
+------------------------------------------------------------------------------
+Its ⓘ opens a panel in two halves. The first half repeats LANE-1 to LANE-6
+above (so whatever you write there shows up here too). The second half is the
+part below.
+
+  [REV-HEAD-1] first heading                          ⚑ "capture" as a noun
+    Sorting a capture
+     →
+
+  [REV-HEAD-2] second heading  (this was "Deciding on an open loop")
+    When something needs a decision
+     →
+
+  [REV-1] what a captured thought is                  ⚑ "capture" concept
+    A stray thought you haven't filed yet. Send it to a lane — or Not now to
+    leave it for later.
+     →
+
+  [REV-2] label + text for something past its date
+    Past its date:
+    This was due and the moment has passed. Push it to a new date, tick it if
+    it's actually done, delete it if it's dead — or Not now to see it again next
+    time.
+     →
+
+  [REV-3] label + text for a project with no way forward
+    Stalled project:
+    A project with no next action, no waiting item — no way forward. Name the
+    very next physical step, move it to Someday (an honest answer, not a
+    failure), finish it, or delete it.
+     →
+
+  [REV-4] label + text for a waiting item whose trigger was deleted
+    Waiting on something gone:
+    This was waiting on something that no longer exists. Point it at something
+    else, replace it with a note to yourself, promote it if you can act now, or
+    close it out.
+     →
+
+THE TOOLTIPS ON THE BUTTONS THEMSELVES
+------------------------------------------------------------------------------
+What you see if you hover, or long-press on a phone.
+
+  [TIP-1] on each lane's "i"
+    What is this list for?
+     →
+
+  [TIP-2] on the intray's ⓘ
+    What is this?
+     →
+
+  [TIP-3] on the review's ⓘ
+    What do these do?
+     →
