@@ -890,7 +890,23 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 .screen-hook-pick-item:hover{ background:var(--paper); }
 .screen-hook-pick-none{ color:var(--text-soft); font-style:italic; }
 .screen-hook-pick-label{ font-family:var(--font-mono); font-size:10.5px; letter-spacing:0.09em; text-transform:uppercase; color:var(--text-soft); margin-bottom:-2px; }
-.screen-hook-pick-section{ font-family:var(--font-mono); font-size:9.5px; letter-spacing:0.1em; text-transform:uppercase; color:var(--text-soft); opacity:0.75; margin:4px 0 -1px; }
+/* ▲ QA #29 — ONE picker standard, taken from the notes tag/project picker.
+   Every picker is now: a section heading, then a .screen-hook-pick-list of
+   items, repeated. Sections after the first are separated by a rule.
+
+   What this replaces: two competing heading classes (this one was the second,
+   smaller and dimmer, used only by the habit cue picker) and FOUR different
+   hand-written inline margins — 2px, 6px, 12px, 18px — so no two pickers
+   divided their sections the same way. The items were always shared; it was
+   the headings and the spacing that drifted.
+
+   Scoped to .pick-body on purpose: .screen-hook-pick-label is also used outside
+   pickers (the habit page's "Scheduled days"), where a divider would be wrong. */
+.pick-body{ display:flex; flex-direction:column; gap:8px; }
+.pick-body .screen-hook-pick-label:not(:first-child){
+  margin-top:8px; padding-top:12px; border-top:1px solid rgba(255,255,255,0.10);
+}
+.pick-intro{ font-size:12.5px; color:var(--text-soft); line-height:1.4; }
 .screen-hook-pick-section:first-child{ margin-top:0; }
 .habit-day-row{ display:flex; gap:6px; }
 .habit-day-row.field-invalid{ outline:1.5px dashed var(--red); outline-offset:4px; border-radius:8px; }

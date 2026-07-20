@@ -2916,25 +2916,32 @@
     const ctxTargets = getValidContextCueTargets(currentIds, s.taskId);
     // The list now holds two kinds of cue target (§4.5): other habits, and
     // contexts. Group them into labelled sections so they read as distinct.
+    // QA #29: heading, then a list — the same shape as every other picker. This
+    // used to nest its headings INSIDE one .screen-hook-pick-list, which is why
+    // its sections read differently from the notes and condition pickers.
     let sections = "";
     if (targets.length){
-      sections += '<div class="screen-hook-pick-section">Habits</div>' +
-        targets.map(function(t){ return '<button type="button" class="screen-hook-pick-item" data-action="screen-pick-hook" data-id="' + t.id + '">' + escapeHtml(t.title) + '</button>'; }).join("");
+      sections += '<div class="screen-hook-pick-label">Habits</div>' +
+        '<div class="screen-hook-pick-list">' +
+        targets.map(function(t){ return '<button type="button" class="screen-hook-pick-item" data-action="screen-pick-hook" data-id="' + t.id + '">' + escapeHtml(t.title) + '</button>'; }).join("") +
+        '</div>';
     }
     if (ctxTargets.length){
-      sections += '<div class="screen-hook-pick-section">Contexts</div>' +
-        ctxTargets.map(function(c){ return '<button type="button" class="screen-hook-pick-item" data-action="screen-pick-hook" data-ctx="1" data-id="' + c.id + '">' + escapeHtml(c.name) + '</button>'; }).join("");
+      sections += '<div class="screen-hook-pick-label">Contexts</div>' +
+        '<div class="screen-hook-pick-list">' +
+        ctxTargets.map(function(c){ return '<button type="button" class="screen-hook-pick-item" data-action="screen-pick-hook" data-ctx="1" data-id="' + c.id + '">' + escapeHtml(c.name) + '</button>'; }).join("") +
+        '</div>';
     }
     // Empty state names the way out, per the empty-picker-teaches rule
     // (§4.3d/§12.1b): no habits to hook to AND no contexts to cue on.
     const itemsHtml = sections ||
-      '<div class="empty-note">No cues yet — add a habit, or create a context with + on the Next or Waiting lane.</div>';
+      '<div class="screen-hook-pick-list"><div class="empty-note">No cues yet — add a habit, or create a context with + on the Next or Waiting lane.</div></div>';
     return (
-      '<div>' +
-        '<div class="screen-hook-pick-label">Cue on which habit or context?</div>' +
-        '<div class="screen-hook-pick-list">' +
-          itemsHtml +
-        '</div>' +
+      '<div class="pick-body">' +
+        // The prompt is an intro, not a section heading — otherwise it would
+        // take a divider and sit right on top of the first section's.
+        '<div class="pick-intro">Cue on which habit or context?</div>' +
+        itemsHtml +
         '<div class="screen-row" style="margin-top:8px;"><button type="button" class="btn btn-ghost btn-small" data-action="screen-cancel-hook-pick">Back</button></div>' +
       '</div>'
     );
@@ -3157,7 +3164,7 @@
     const noneHtml = isQuickAdd ? ""
       : '<div class="screen-hook-pick-list"><button type="button" class="screen-hook-pick-item screen-hook-pick-none" data-action="screen-clear-condition-pick">No condition</button></div>';
     return (
-      '<div>' +
+      '<div class="pick-body">' +
         noneHtml + body + empty +
         '<div class="screen-row" style="margin-top:8px;"><button type="button" class="btn btn-ghost btn-small" data-action="screen-cancel-condition-pick">Back</button></div>' +
       '</div>'
@@ -3294,10 +3301,10 @@
     // §12.1b: the project's Waiting quick-add hook picker (creates a staged
     // Waiting on pick). Title shown read-only above the target list.
     if (isProjectKind(kind) && draft.waitingHookPicker){
-      return '<div class="screen-body">' +
+      return '<div class="screen-body pick-body">' +
         '<div class="screen-hook-pick-label">New waiting action</div>' +
         '<input type="text" class="screen-field-title" value="' + escapeHtml(draft.waitingHookTitle || "") + '" readonly>' +
-        '<div class="screen-hook-pick-label" style="margin-top:6px;">Waiting on…</div>' +
+        '<div class="screen-hook-pick-label">Waiting on…</div>' +
         conditionPickerHtml(s) +
       '</div>';
     }
@@ -6005,10 +6012,10 @@
       ? tags.map(function(t){ return '<button type="button" class="screen-hook-pick-item" data-action="note-pick-tag" data-id="' + t.id + '">#' + escapeHtml(t.name) + '</button>'; }).join("")
       : '<div class="empty-note">No tags yet — add some with “Manage tags”.</div>';
 
-    return '<div class="screen-body">' +
+    return '<div class="screen-body pick-body">' +
       '<div class="screen-hook-pick-label">Tags</div>' +
       '<div class="screen-hook-pick-list">' + tagItems + '</div>' +
-      '<div class="screen-hook-pick-label" style="margin-top:12px;">Link a project</div>' +
+      '<div class="screen-hook-pick-label">Link a project</div>' +
       '<div class="screen-hook-pick-list">' + projItems + '</div>' +
       '<div class="screen-row" style="margin-top:10px; justify-content:space-between;">' +
         '<button type="button" class="btn btn-ghost btn-small" data-action="note-cancel-pick">Back</button>' +
