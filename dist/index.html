@@ -1196,10 +1196,22 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
   font-family:var(--font-body); font-weight:600; font-size:12.5px; padding:6px 14px; border-radius:8px;
 }
 .cal-tab.active{ background:var(--brass); border-color:var(--brass); color:var(--dark-on-accent); }
-/* The calendar overlay is a fixed column: a scrolling month/day area above a
-   solid, always-visible creation footer. Overrides .screen-body's own scroll. */
-.cal-body{ overflow:hidden; padding:0; min-height:0; }
-.cal-scroll{ flex:1 1 auto; overflow-y:auto; min-height:0; padding:16px 20px 8px 20px; overscroll-behavior:contain; }
+/* ▲ QA #9 — the calendar is one ordinary scrolling page: month/day area, then
+   the creation section at the bottom of the content. It used to be a fixed
+   column with the creation row pinned as a footer; the ruling is that scrolling
+   down to the controls is preferable to them permanently occupying the view.
+   So .cal-body keeps .screen-body's own scrolling and only adjusts padding —
+   the bottom is trimmed because the calendar has no floating action button to
+   clear, unlike the lanes. */
+.cal-body{ padding-bottom:calc(24px + env(safe-area-inset-bottom)); }
+/* ⚠ .screen-body is a flex COLUMN, so its children shrink to fit by default.
+   The swipe viewport carries overflow:hidden (it has to — it clips the
+   neighbouring months of the 300%-wide track), which means shrinking it does
+   not produce a scrollbar, it silently CROPS the grid: the last week of the
+   month simply vanished, and the page reported itself as not scrollable. Every
+   direct child of the calendar body must therefore keep its natural height and
+   let the body scroll. */
+.cal-body > *{ flex:0 0 auto; }
 .cal-monthnav, .cal-daynav{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px; }
 .cal-monthlabel{ font-family:var(--font-display); font-weight:700; font-size:16px; color:var(--text-primary); text-align:center; flex:1; }
 .cal-navbtn{
@@ -1256,10 +1268,12 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 .cal-agenda-kind{ font-family:var(--font-mono); font-size:10px; color:var(--text-soft); }
 .cal-day-empty{ color:var(--text-soft); font-size:13px; text-align:center; padding:24px 0; }
 .cal-tickler-tag{ font-family:var(--font-mono); font-size:9px; color:var(--dusty); border:1px solid rgba(110,144,172,0.5); border-radius:6px; padding:0 5px; }
+/* A section of the page now, not chrome: no solid backdrop to hide the lanes
+   behind it, just a rule separating it from the dates above. */
 .cal-create{
   flex:0 0 auto; display:flex; flex-direction:column; gap:8px;
-  background:var(--paper); border-top:1px solid rgba(255,255,255,0.12);
-  padding:12px 16px calc(12px + env(safe-area-inset-bottom)) 16px;
+  border-top:1px solid rgba(255,255,255,0.12);
+  margin-top:6px; padding-top:14px;
 }
 .cal-seg{ display:flex; gap:0; border:1px solid rgba(255,255,255,0.16); border-radius:8px; overflow:hidden; align-self:flex-start; }
 .cal-seg-btn{ background:transparent; color:var(--text-soft); border:none; font-family:var(--font-body); font-weight:600; font-size:12px; padding:6px 16px; }
@@ -9438,11 +9452,14 @@ function calendarBodyHtml(s){
       '<button type="button" class="cal-navbtn" data-action="cal-dayshift" data-dir="1">&#8250;</button></div>' +
       calDayAgendaHtml(s.calSel);
   }
-  // The month/day area scrolls; the creation row is a SOLID footer outside the
-  // scroller — so it never overlaps the dates and nothing shows through beneath
-  // it (user-reported: the sticky row was overlaying the grid and leaking the
-  // lanes at the bottom).
-  return '<div class="screen-body cal-body"><div class="cal-scroll">' + body + '</div>' + calCreateRowHtml(s) + '</div>';
+  // ⚑ QA #9 — the creation row is part of the CONTENT, at the bottom of the
+  // calendar, not a pinned footer. Third and final shape for this: it was
+  // sticky (overlapped the grid), then a solid pinned footer (ate half a phone
+  // screen), then collapsible (hid controls behind a tap). The ruling is
+  // simply that scrolling down to it is fine and it should never occupy the
+  // view when you are reading the calendar — so it stops being chrome and
+  // becomes the last section of the page.
+  return '<div class="screen-body cal-body">' + body + calCreateRowHtml(s) + '</div>';
 }
 function prevMonth(y, m){ return m === 0 ? { y: y - 1, m: 11 } : { y: y, m: m - 1 }; }
 function nextMonthYM(y, m){ return m === 11 ? { y: y + 1, m: 0 } : { y: y, m: m + 1 }; }

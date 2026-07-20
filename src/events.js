@@ -742,11 +742,14 @@ function calendarBodyHtml(s){
       '<button type="button" class="cal-navbtn" data-action="cal-dayshift" data-dir="1">&#8250;</button></div>' +
       calDayAgendaHtml(s.calSel);
   }
-  // The month/day area scrolls; the creation row is a SOLID footer outside the
-  // scroller — so it never overlaps the dates and nothing shows through beneath
-  // it (user-reported: the sticky row was overlaying the grid and leaking the
-  // lanes at the bottom).
-  return '<div class="screen-body cal-body"><div class="cal-scroll">' + body + '</div>' + calCreateRowHtml(s) + '</div>';
+  // ⚑ QA #9 — the creation row is part of the CONTENT, at the bottom of the
+  // calendar, not a pinned footer. Third and final shape for this: it was
+  // sticky (overlapped the grid), then a solid pinned footer (ate half a phone
+  // screen), then collapsible (hid controls behind a tap). The ruling is
+  // simply that scrolling down to it is fine and it should never occupy the
+  // view when you are reading the calendar — so it stops being chrome and
+  // becomes the last section of the page.
+  return '<div class="screen-body cal-body">' + body + calCreateRowHtml(s) + '</div>';
 }
 function prevMonth(y, m){ return m === 0 ? { y: y - 1, m: 11 } : { y: y, m: m - 1 }; }
 function nextMonthYM(y, m){ return m === 11 ? { y: y + 1, m: 0 } : { y: y, m: m + 1 }; }

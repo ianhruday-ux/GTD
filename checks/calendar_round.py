@@ -69,6 +69,34 @@ with serve(DIST) as url, sync_playwright() as p:
     check(pg.locator('[data-action="cal-more"]').count() == 0, "no Options toggle")
     check(pg.locator('[data-calfield="time"]').first.is_visible(), "time field visible without a tap")
 
+    # ---- 1b. QA #9: the creation row is CONTENT at the bottom, not a footer ----
+    layout = pg.evaluate("""() => {
+      const body = document.querySelector('.cal-body');
+      const create = document.querySelector('.cal-create');
+      const vp = document.querySelector('.cal-swipe-viewport');
+      const cells = [...document.querySelectorAll('.cal-swipe-panel')][1]
+        .querySelectorAll('.cal-cell:not(.cal-cell-blank)');
+      const last = cells[cells.length - 1];
+      return {
+        inside: body.contains(create),
+        hasOldScroller: !!document.querySelector('.cal-scroll'),
+        pinned: getComputedStyle(create).position === 'sticky'
+             || getComputedStyle(create).position === 'fixed',
+        dayCount: cells.length,
+        lastCellBottom: Math.round(last.getBoundingClientRect().bottom),
+        viewportBottom: Math.round(vp.getBoundingClientRect().bottom)
+      };
+    }""")
+    check(layout["inside"], "creation row lives inside the scrolling body")
+    check(not layout["hasOldScroller"], "the separate .cal-scroll column is gone")
+    check(not layout["pinned"], "creation row is not pinned/sticky")
+    # ⚠ the regression this guards: .screen-body is a flex column, so the swipe
+    # viewport (overflow:hidden, to clip neighbouring months) was being SHRUNK,
+    # silently cropping the last week of the month instead of scrolling.
+    check(layout["dayCount"] >= 28, f"the whole month renders ({layout['dayCount']} day cells)")
+    check(layout["lastCellBottom"] <= layout["viewportBottom"] + 1,
+          f"the last week is not cropped (cell {layout['lastCellBottom']} vs viewport {layout['viewportBottom']})")
+
     # ---- 2. jargon removed ----
     footer = pg.locator(".cal-create").inner_text().lower()
     check("makes it an appointment" not in footer, "'time makes it an appointment' line gone")
@@ -116,6 +144,22 @@ with serve(DIST) as url, sync_playwright() as p:
     check(pg.evaluate("!document.querySelector('.tray-drawer.open')"), "short drag does not open it")
     swipe(6, 400, 300, 400)
     check(pg.evaluate("!!document.querySelector('.tray-drawer.open')"), "still opens after a cancelled drag")
+
+    # ---- 6. the two gestures must coexist now that the page also scrolls ----
+    close_tray()   # the drawer auto-opens on every boot and would swallow the tap
+    pg.click('[data-action="open-calendar"]'); pg.wait_for_timeout(500)
+    month = lambda: pg.locator(".cal-monthlabel").first.inner_text()
+    scrolled = lambda: pg.evaluate("() => document.querySelector('.cal-body').scrollTop")
+    start_month = month()
+    swipe(300, 250, 60, 250)
+    check(month() != start_month, f"horizontal swipe still changes month ({start_month} -> {month()})")
+    swipe(60, 250, 300, 250)
+    check(month() == start_month, "and swiping back returns to it")
+    before = scrolled()
+    swipe(180, 430, 180, 160)
+    check(month() == start_month, "a vertical drag does not change the month")
+    check(scrolled() >= before, "a vertical drag scrolls the page instead")
+    pg.click('[data-action="cal-close"]'); pg.wait_for_timeout(300)
 
     check(not errors, f"no JS errors ({errors[:3]})")
     b.close()
