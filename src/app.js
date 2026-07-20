@@ -2778,7 +2778,7 @@
           '<div class="screen-boxed-row">' +
             '<span class="field-icon">&#128197;</span>' +
             '<input type="date" class="screen-date" data-field="deadline-date" value="' + escapeHtml(d.date || "") + '">' +
-            (d.date ? '<input type="time" class="screen-time" data-field="deadline-time" value="' + escapeHtml(d.time || "") + '">' : "") +
+            (d.date ? '<input type="text" readonly inputmode="none" class="screen-time" data-field="deadline-time" placeholder="--:--" value="' + escapeHtml(d.time || "") + '">' : "") +
             (d.date ? '<button type="button" class="screen-clear-x" data-action="clear-deadline" title="Clear deadline">&times;</button>' : "") +
           '</div>' +
         '</div>' +
@@ -6338,6 +6338,10 @@
     updateQaTimeReadout();
     dragLogInit();
     updateDragLogUI();
+    // Bug #2 / QA #15: the app's own time picker takes over every .screen-time
+    // field. Delegated at the document, so it covers fields that do not exist
+    // yet (the calendar creation row, an event page opened later).
+    initTimePickerFields();
     openTray(); // §4.8a: auto-open on launch — capture is the first job
   }
 

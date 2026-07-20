@@ -31,7 +31,7 @@ DIST = REPO / "dist"
 # first for readability; chunkMap depends on helpers app.js defines
 # (genId, saveTasksLocal, state) but that's fine because those are all
 # function declarations, hoisted before anything runs.
-JS_MODULES = ["storage.js", "surface.js", "runner.js", "chunkMap.js", "app.js", "events.js"]
+JS_MODULES = ["storage.js", "surface.js", "runner.js", "timepicker.js", "chunkMap.js", "app.js", "events.js"]
 
 ASSET_FILES = ["manifest.webmanifest", "icon.svg", "icon-192.png", "icon-512.png"]
 

@@ -839,7 +839,7 @@ function calCreateRowHtml(s){
     controls =
       '<div class="cal-create-controls">' +
         '<div class="cal-boxed"><span class="field-icon">&#128337;</span>' +
-          '<input type="time" class="screen-time" data-calfield="time" value="' + escapeHtml(s.calTime || "") + '" style="color-scheme:dark" title="Optional">' +
+          '<input type="text" readonly inputmode="none" class="screen-time" data-calfield="time" placeholder="--:--" value="' + escapeHtml(s.calTime || "") + '" title="Optional">' +
         '</div>' +
         '<input type="text" class="cal-desc" data-calfield="desc" placeholder="Description (optional)…" value="' + escapeHtml(s.calDesc || "") + '">' +
         '<div class="cal-boxed"><span class="field-icon">&#128260;</span>' +
@@ -855,7 +855,7 @@ function calCreateRowHtml(s){
     controls =
       '<div class="cal-create-controls">' +
         '<div class="cal-boxed"><span class="field-icon">&#128337;</span>' +
-          '<input type="time" class="screen-time" data-calfield="time" value="' + escapeHtml(s.calTime || "") + '" style="color-scheme:dark" title="Optional">' +
+          '<input type="text" readonly inputmode="none" class="screen-time" data-calfield="time" placeholder="--:--" value="' + escapeHtml(s.calTime || "") + '" title="Optional">' +
         '</div>' +
         '<input type="text" class="cal-desc" data-calfield="desc" placeholder="Description (optional)…" value="' + escapeHtml(s.calDesc || "") + '">' +
         '<div class="cal-seg cal-seg-small">' +
@@ -999,7 +999,7 @@ function eventBodyHtml(s){
     // nothing to someone adding a dentist visit. The field is optional and
     // self-evident; naming the taxonomy only taught users a word they will
     // never need. The internal terms stay in the code and the spec.
-    '<input type="time" class="screen-time" data-field="event-time" value="' + escapeHtml(d.time || "") + '" style="color-scheme:dark">' +
+    '<input type="text" readonly inputmode="none" class="screen-time" data-field="event-time" placeholder="--:--" value="' + escapeHtml(d.time || "") + '">' +
     (d.time ? '<button type="button" class="screen-clear-x" data-action="event-clear-time" title="Clear time">&times;</button>' : "") +
     '</div></div>';
   // Recurrence
