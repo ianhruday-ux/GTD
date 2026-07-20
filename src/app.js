@@ -1841,18 +1841,27 @@
     // chunk 8 (§10): condition a Waiting action on a NOT-YET-LIVE event. Its
     // task ID was minted at event creation (§4.14a), so it hooks with a plain
     // task ID like any other condition. Only pending events (no live pseudo-
-    // action yet) and only LIVE, unexpired occurrences (§10) — a passed one is
-    // already a live past-due row and appears above; an already-live one is in
-    // `all`. Stored as conditionKind "next" (that is the lane it lands in).
+    // action yet) and only LIVE, unexpired occurrences (§10) — an already-live
+    // one is in `all`. Stored as conditionKind "next" (that is the lane it
+    // lands in).
+    //
+    // ⚑ QA #31: this used to read ev.date directly and drop anything already
+    // passed, which silently excluded every repeating series whose live date
+    // had gone by — the common case, since a series' live date sits in the past
+    // whenever it is completed, hidden, or waiting on the 4 AM roll. A series
+    // is never "expired"; only its current occurrence is. nextLiveOccurrenceDate
+    // rolls forward to the one you can still hook onto, and returns null for a
+    // genuinely finished one-shot. One row per series, at its next occurrence.
     const liveIds = new Set(out.map(function(t){ return t.id; }));
     (state.events || []).forEach(function(ev){
       if (liveIds.has(ev.taskId)) return;               // already a live pseudo-action target
       if (ev.paused) return;                            // a paused series won't fire
-      const eff = effDate(ev, ev.date), effT = effTime(ev, ev.date);
-      if (occPassed(eff, effT)) return;                 // expired live occurrence — never offer it
+      const canon = nextLiveOccurrenceDate(ev);
+      if (!canon) return;                               // finished one-shot — nothing left to wait on
+      const eff = effDate(ev, canon), effT = effTime(ev, canon);
       const dd = dateStrToDate(eff);
       const hint = dd.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }) + (effT ? " · " + effT : "");
-      out.push({ id: ev.taskId, title: effTitle(ev, ev.date), kind: "next", isEvent: true, inProject: !!(ctx.projectId && ev.linkedProjectId === ctx.projectId), dateHint: hint });
+      out.push({ id: ev.taskId, title: effTitle(ev, canon), kind: "next", isEvent: true, inProject: !!(ctx.projectId && ev.linkedProjectId === ctx.projectId), dateHint: hint });
     });
     return out;
   }

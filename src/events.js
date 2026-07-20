@@ -85,6 +85,28 @@ function nextOccurrenceDate(dateStr, recurrence, interval){
 // look behind its live date. Deleted rather than left for someone to reuse.)
 function isRecurring(ev){ return ev && ev.recurrence && ev.recurrence !== "none"; }
 
+// The first occurrence of `ev` that has NOT yet passed, as a CANONICAL date —
+// the occurrence a picker should offer you (QA #31). A one-shot has only its
+// own date, so a passed one yields null. A recurring series is different: its
+// live date is frequently already behind us (completed, hidden, or simply
+// awaiting the 4 AM roll), and the thing you can still hook a Waiting action
+// onto is the NEXT occurrence, not the one that is gone. Walking forward here
+// is safe — unlike occursOnCanonical's deleted backward walk, this never
+// invents an occurrence the series has already left behind.
+function nextLiveOccurrenceDate(ev){
+  if (!ev) return null;
+  let d = ev.date, guard = 0;
+  if (!occPassed(effDate(ev, d), effTime(ev, d))) return d;
+  if (!isRecurring(ev)) return null;
+  while (guard++ < 400){
+    const nd = nextOccurrenceDate(d, ev.recurrence, ev.interval);
+    if (!nd) return null;
+    d = nd;
+    if (!occPassed(effDate(ev, d), effTime(ev, d))) return d;
+  }
+  return null;
+}
+
 // =========================================================
 // PER-OCCURRENCE OVERRIDES (user ruling #3: "edit particular events, not just
 // series"). The one-live-entity model has no storage for a single overridden
