@@ -4001,6 +4001,7 @@
       if (e.target.closest('[data-action="review-form-cancel"]')){ if (state.screen) state.screen.reviewForm = null; renderScreen(); return; }
       if (e.target.closest('[data-action="review-pushdate-save"]')){ reviewSavePushDate(); return; }
       if (e.target.closest('[data-action="review-addnext-save"]')){ reviewSaveAddNext(); return; }
+      if (e.target.closest('[data-action="review-addwaiting-save"]')){ reviewSaveAddWaiting(); return; }
       if (e.target.closest('[data-action="review-freetext-save"]')){ reviewSaveFreeText(); return; }
       const revComplete = e.target.closest('[data-action="review-complete"]');
       if (revComplete){ reviewComplete(revComplete.getAttribute("data-lane"), revComplete.getAttribute("data-id")); return; }
@@ -5007,14 +5008,15 @@
     // chunk 8 (the user has finished walking all three). §8.1's replace-don't-
     // accumulate discipline is restored: this is the ONLY injector again, and
     // the two additive ones are deleted rather than left dormant.
-    const FLAG = "gtd_qa_checklist_postsprint_v3";
+    const FLAG = "gtd_qa_checklist_postsprint_v4";
     if (Storage.get(FLAG)) return;
     Storage.set(FLAG, "1");
     // Retire the superseded flags so they can't resurrect their injectors, and
     // so a future Reset doesn't leave dead keys behind.
     ["gtd_qa_checklist_chunk7_v1", "gtd_qa_checklist_override_v1",
      "gtd_qa_checklist_override_v2", "gtd_qa_checklist_chunk8_v1",
-     "gtd_qa_checklist_postsprint_v1", "gtd_qa_checklist_postsprint_v2"].forEach(Storage.remove);
+     "gtd_qa_checklist_postsprint_v1", "gtd_qa_checklist_postsprint_v2",
+     "gtd_qa_checklist_postsprint_v3"].forEach(Storage.remove);
 
     // Replace, don't accumulate (8.1) — and actually mean it this time.
     // Earlier rounds bumped the flag but left the previous rounds' groups
@@ -5074,6 +5076,14 @@
       { title: 'The add controls sit still now', notes: 'Your note about spacing. Switch between Month, Day and List. The Add controls at the bottom should start at the SAME height on all three, including on a day with nothing on it. A long list can push them further down — that is intended — but they should never ride up under the header.' }
     ]);
 
+    addGroupWithItems('✅ QA — The review and the intray', [
+      { title: 'The intray tells the truth now', notes: 'Your note. Empty the intray of captures, but leave a stalled project or an orphaned action outstanding. The drawer should NOT say “nothing slipping through the cracks” — those loops now appear as blacked-out cards, and the number of cards matches the number on the Review button above them. Tap Reveal to read them: each says what it is (“stalled project”, “orphaned action”).' },
+      { title: 'Those cards cannot be poked at', notes: 'A revealed stalled project in the drawer has no ✕ and does not open when tapped — same rule as the review itself. You clear it by giving it a way forward, not by dismissing it. Tell me if that feels too strict.' },
+      { title: 'Adding a waiting action to a stalled project', notes: 'The other half of your note. Open 🔍 Review until a stalled project comes up. Alongside “Add a next action” there is now “Add a waiting action”. It asks two things: what you are waiting on, and what has to happen first. Both are required — a waiting action with nothing to wait on would come straight back at you as an orphan, which is the loop this is meant to close.' },
+      { title: 'The form tells you which box is wrong', notes: 'In that form, fill in only one of the two boxes and tap Add. The EMPTY one gets a dashed outline, and whatever you already typed stays put. No popup. Then fill both and tap Add — the project should stop appearing as stalled, and the new waiting action should NOT appear as an orphan.' },
+      { title: 'Creating an event from here is still to come', notes: 'You asked for “create waiting action and create event”. Only the waiting half is built — the event half waits on the projects page being able to see the calendar, which is its own piece of work. Nothing to test here; it is a note so the gap is not a surprise.' }
+    ]);
+
     addGroupWithItems('✅ QA — Repeating events and habits', [
       { title: 'Waiting on a repeating event', notes: 'The bug where repeating events went missing. Tick off a repeating event for today. Now make a Waiting action and tap 🪝 to pick what it waits on — under ‘Upcoming events’ the repeating one should be offered, showing its NEXT date. Before, once you ticked it off it vanished from that list until the next morning.' },
       { title: 'The runner after a run ends', notes: 'You thought this already worked and it does — worth confirming on the phone. When a habit run ends you get a celebration on the chalkboard. Leave the habit page and come back: the figure is now STRETCHING, ready for the next lap, and stays that way on every visit until you tick the habit again. The celebration is a one-time thing, not something that nags.' }
@@ -5125,14 +5135,51 @@
       '<span>&#128269; Review</span>' + (n ? '<span class="tray-review-count">' + n + '</span>' : '') +
     '</button>';
   }
+  // ⚑ The drawer lists DERIVED loops too, not just captures (user): "the empty
+  // label shows when there are no captures, but it's not strictly true. Stalled
+  // projects and orphaned actions should show up as redacted cards in the list
+  // which can be revealed."
+  //
+  // The Review button's badge has always counted every open loop, so a drawer
+  // that said "nothing slipping through the cracks" directly above a badge
+  // reading 3 was contradicting itself. Now the list shows what the badge counts.
+  //
+  // These are NOT captures and behave differently, deliberately:
+  //   · no ✕ — a stalled project is not a stray thought you can discard; the
+  //     way to clear it is to give it a way forward, which is the review's job
+  //   · not tappable, revealed or not — same ruling as the review's own
+  //     redaction (§4.8b): cherry-picking blind makes the discipline decorative
+  //   · revealed, they name the kind ("stalled project"), because the title
+  //     alone does not say why it is in the list
+  // ⚑ Past-due items are deliberately NOT included: they are time-driven, they
+  // already carry their own bar and chip in the lanes, and putting them here
+  // would make the drawer a second review rather than a way in to the first.
+  function trayDerivedLoops(){
+    return computeOpenLoops().filter(function(l){
+      return l.kind === "stalled" || l.kind === "orphaned";
+    });
+  }
+  const TRAY_LOOP_LABEL = { stalled: "stalled project", orphaned: "orphaned action" };
+  function trayLoopCardHtml(loop, revealed){
+    if (!revealed){
+      return '<div class="tray-card tray-card-redacted tray-card-loop">' +
+        '<span class="tray-card-redaction" aria-hidden="true"></span></div>';
+    }
+    return '<div class="tray-card tray-card-loop">' +
+      '<span class="tray-card-text">' + escapeHtml(loop.task.title || "") +
+        ' <span class="tray-card-kind">' + TRAY_LOOP_LABEL[loop.kind] + '</span>' +
+      '</span></div>';
+  }
   function trayListHtml(){
     const items = state.tray || [];
+    const loops = trayDerivedLoops();
     const revealed = !!state.trayReveal;
     let list;
-    if (items.length){
-      const cards = items.map(function(it){ return trayCardHtml(it, revealed); }).join("");
+    if (items.length || loops.length){
+      const cards = items.map(function(it){ return trayCardHtml(it, revealed); }).join("") +
+        loops.map(function(l){ return trayLoopCardHtml(l, revealed); }).join("");
       const toggle = '<div class="tray-list-head">' +
-        '<button type="button" class="tray-reveal-btn" data-action="tray-reveal" title="' + (revealed ? "Hide captures" : "Reveal captures") + '">' +
+        '<button type="button" class="tray-reveal-btn" data-action="tray-reveal" title="' + (revealed ? "Hide" : "Reveal") + '">' +
           eyeIconHtml(revealed) + '<span>' + (revealed ? "Hide" : "Reveal") + '</span>' +
         '</button></div>';
       list = toggle + '<div class="tray-list">' + cards + '</div>';
@@ -5456,6 +5503,29 @@
     );
   }
 
+  // The two-field variant, for adding a Waiting action to a stalled project.
+  // `invalidField` names which box is at fault so the dashed outline lands on
+  // the right one — validation shows an outline, never a popup (CLAUDE.md).
+  function reviewWaitingFormHtml(s, key){
+    const f = s.reviewForm || {};
+    const bad = f.key === key ? (f.invalidField || null) : null;
+    function box(id, ph, val, name){
+      return '<input type="text" id="' + id + '" class="review-form-input' +
+        (bad === name ? " field-invalid" : "") + '" placeholder="' + escapeHtml(ph) +
+        '" value="' + escapeHtml(val || "") + '" autocomplete="off">';
+    }
+    return (
+      '<div class="review-inline-form">' +
+        box("review-form-input", "What are you waiting on?", f.value, "title") +
+        box("review-form-input2", "Until what, or until when?", f.value2, "when") +
+        '<div class="review-inline-form-btns">' +
+          '<button type="button" class="review-menu-btn" data-action="review-form-cancel">Cancel</button>' +
+          '<button type="button" class="review-menu-btn" data-action="review-addwaiting-save">Add</button>' +
+        '</div>' +
+      '</div>'
+    );
+  }
+
   function reviewCardHtml(l, s){
     const invalid = !!(s.reviewForm && s.reviewForm.key === l.key && s.reviewForm.invalid);
     let bodyHtml = "", menuHtml = "";
@@ -5519,9 +5589,19 @@
     } else if (l.kind === "stalled"){
       if (form && form.type === "text"){
         menuHtml = reviewInlineFormHtml("What's the very next physical action?", "text", "review-addnext-save", "Add", "", invalid);
+      } else if (form && form.type === "waiting"){
+        // ⚑ Two fields, not one (user: stalled projects need a waiting action
+        // here too). A Waiting action is invalid without something to wait ON
+        // (§4.2), so a single title box would create a broken row that the
+        // review would immediately re-report as orphaned — the exact loop this
+        // menu exists to close. The second field is free text rather than the
+        // condition picker: the picker is a whole sub-view, and the review's
+        // character is one decision, inline, without leaving.
+        menuHtml = reviewWaitingFormHtml(s, l.key);
       } else {
         menuHtml =
           reviewMenuBtn("review-form-start", "Add a next action", ' data-key="' + l.key + '" data-type="text"') +
+          reviewMenuBtn("review-form-start", "Add a waiting action", ' data-key="' + l.key + '" data-type="waiting"') +
           reviewMenuBtn("review-someday", "Move to Someday/Maybe", ' data-id="' + l.id + '"') +
           reviewMenuBtn("review-complete", "Complete it", ' data-lane="current" data-id="' + l.id + '"') +
           reviewMenuBtn("review-delete", "Delete it", ' data-lane="current" data-id="' + l.id + '"', true) +
@@ -5606,6 +5686,29 @@
     if (!val){ reviewMarkFormInvalid(); return; }
     const pid = s.reviewForm.key;
     createTask("next", { title: val, linkedProjectId: pid }).then(function(){ s.reviewForm = null; renderScreen(); });
+  }
+  // Add a Waiting action to a stalled project (user). Both fields are required:
+  // the title, and something to wait on — a Waiting action without either is
+  // the orphaned state the review reports, so creating one here would be the
+  // review manufacturing its own next finding.
+  function reviewSaveAddWaiting(){
+    const s = state.screen; if (!s || !s.reviewForm) return;
+    const t = qs("#review-form-input"), w = qs("#review-form-input2");
+    const title = (t ? t.value : "").trim();
+    const when = (w ? w.value : "").trim();
+    // Keep what was typed across the re-render, or the valid field is wiped
+    // while the user fixes the other one.
+    s.reviewForm.value = title; s.reviewForm.value2 = when;
+    if (!title || !when){
+      s.reviewForm.invalidField = !title ? "title" : "when";
+      renderScreen();
+      const el = qs(!title ? "#review-form-input" : "#review-form-input2");
+      if (el) el.focus();
+      return;
+    }
+    const pid = s.reviewForm.key;
+    createTask("waiting", { title: title, whenText: when, linkedProjectId: pid })
+      .then(function(){ s.reviewForm = null; renderScreen(); });
   }
   function reviewSaveFreeText(){
     const s = state.screen; if (!s || !s.reviewForm) return;

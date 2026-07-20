@@ -999,6 +999,13 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
    as a revealed card, unreadable and with no discard button. */
 .tray-card-redacted{ background:#000; border-color:#000; }
 .tray-card-redaction{ flex:1; height:18px; }
+/* A derived loop (stalled project / orphaned action) rather than a capture. The
+   left edge marks it as something the app noticed rather than something you
+   wrote — visible even while redacted, so the count is honest without the
+   content leaking. */
+.tray-card-loop{ border-left:2px solid var(--text-soft); }
+.tray-card-loop.tray-card-redacted{ border-left-color:var(--text-soft); }
+.tray-card-kind{ font-family:var(--font-mono); font-size:10px; color:var(--text-soft); white-space:nowrap; }
 .tray-list-head{ display:flex; justify-content:flex-end; margin-bottom:8px; }
 .tray-reveal-btn{ display:inline-flex; align-items:center; gap:6px; background:transparent;
   border:1px solid rgba(255,255,255,0.18); color:var(--text-soft); border-radius:8px;
