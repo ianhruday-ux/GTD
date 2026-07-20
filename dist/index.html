@@ -1121,7 +1121,10 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
   font-family:var(--font-body); font-weight:600; font-size:12.5px; padding:6px 14px; border-radius:8px;
 }
 .cal-tab.active{ background:var(--brass); border-color:var(--brass); color:var(--dark-on-accent); }
-.cal-body{ padding-bottom:calc(20px + env(safe-area-inset-bottom)); }
+/* The calendar overlay is a fixed column: a scrolling month/day area above a
+   solid, always-visible creation footer. Overrides .screen-body's own scroll. */
+.cal-body{ overflow:hidden; padding:0; min-height:0; }
+.cal-scroll{ flex:1 1 auto; overflow-y:auto; min-height:0; padding:16px 20px 8px 20px; overscroll-behavior:contain; }
 .cal-monthnav, .cal-daynav{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px; }
 .cal-monthlabel{ font-family:var(--font-display); font-weight:700; font-size:16px; color:var(--text-primary); text-align:center; flex:1; }
 .cal-navbtn{
@@ -1151,7 +1154,7 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 .cal-mark{ display:inline-block; width:6px; height:6px; border-radius:50%; }
 .cal-mark-appt{ background:var(--yellow); }
 .cal-mark-event{ background:var(--text-primary); }
-.cal-mark-dl-next, .cal-mark-dl-current{ width:11px; height:3px; border-radius:1px; }
+.cal-mark-dl-next, .cal-mark-dl-current{ width:3px; height:11px; border-radius:1px; }
 .cal-mark-dl-next{ background:var(--red); }
 .cal-mark-dl-current{ background:var(--moss); }
 .cal-mark-proj.cal-mark-appt{ background:transparent; border:1.5px solid var(--yellow); }
@@ -1167,17 +1170,25 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 .cal-agenda-row:hover{ background:rgba(255,255,255,0.09); }
 .cal-agenda-done{ opacity:0.5; }
 .cal-agenda-dot{ flex:0 0 auto; width:8px; height:8px; border-radius:50%; }
-.cal-agenda-dot.cal-mark-dl-next, .cal-agenda-dot.cal-mark-dl-current{ width:11px; height:3px; border-radius:1px; }
+.cal-agenda-dot.cal-mark-dl-next, .cal-agenda-dot.cal-mark-dl-current{ width:3px; height:14px; border-radius:1px; }
 .cal-agenda-when{ flex:0 0 auto; font-family:var(--font-mono); font-size:11px; color:var(--text-soft); min-width:52px; }
 .cal-agenda-title{ flex:1; }
 .cal-agenda-kind{ font-family:var(--font-mono); font-size:10px; color:var(--text-soft); }
 .cal-day-empty{ color:var(--text-soft); font-size:13px; text-align:center; padding:24px 0; }
 .cal-tickler-tag{ font-family:var(--font-mono); font-size:9px; color:var(--dusty); border:1px solid rgba(110,144,172,0.5); border-radius:6px; padding:0 5px; }
 .cal-create{
-  position:sticky; bottom:0; margin-top:12px; padding-top:10px;
-  background:linear-gradient(to top, var(--paper) 78%, rgba(38,36,32,0));
-  display:flex; flex-direction:column; gap:8px;
+  flex:0 0 auto; display:flex; flex-direction:column; gap:8px;
+  background:var(--paper); border-top:1px solid rgba(255,255,255,0.12);
+  padding:12px 16px calc(12px + env(safe-area-inset-bottom)) 16px;
 }
+.cal-create-top{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.cal-more-btn{
+  flex:0 0 auto; border:1px solid rgba(255,255,255,0.16); background:transparent; color:var(--text-soft);
+  font-family:var(--font-body); font-weight:600; font-size:12px; padding:6px 12px; border-radius:8px;
+}
+.cal-more-btn.open{ color:var(--text-primary); border-color:rgba(255,255,255,0.3); }
+.cal-more-dot{ color:var(--brass); font-size:9px; vertical-align:middle; }
+.cal-more-caret{ font-size:10px; opacity:0.8; }
 .cal-seg{ display:flex; gap:0; border:1px solid rgba(255,255,255,0.16); border-radius:8px; overflow:hidden; align-self:flex-start; }
 .cal-seg-btn{ background:transparent; color:var(--text-soft); border:none; font-family:var(--font-body); font-weight:600; font-size:12px; padding:6px 16px; }
 .cal-seg-btn.active{ background:var(--brass); color:var(--dark-on-accent); }
@@ -1193,7 +1204,9 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
   flex:0 0 auto; border:none; background:var(--brass); color:var(--dark-on-accent);
   font-weight:700; font-size:13.5px; border-radius:8px; padding:0 18px;
 }
-.cal-create-controls{ display:flex; flex-direction:column; gap:7px; }
+/* Even expanded, the options never take more than ~a third of the overlay —
+   they scroll inside themselves rather than pushing the grid off-screen. */
+.cal-create-controls{ display:flex; flex-direction:column; gap:7px; max-height:34vh; overflow-y:auto; overscroll-behavior:contain; }
 .cal-boxed{
   display:flex; align-items:center; gap:6px; border:1px solid rgba(255,255,255,0.14);
   background:rgba(255,255,255,0.04); border-radius:8px; padding:0 10px; min-height:34px;
@@ -6425,7 +6438,7 @@ function injectChunkMap(){
     const wrap = qs(".tray-scroll");
     if (wrap) wrap.innerHTML = trayListHtml(); else renderTray();
   }
-  function renderTray(){
+  function renderTray(skipOpen){
     const root = qs("#tray-root");
     if (!root) return;
     const list = '<div class="tray-scroll">' + trayListHtml() + '</div>';
@@ -6448,7 +6461,10 @@ function injectChunkMap(){
     // Force the -100% start state to commit BEFORE adding .open, or the
     // browser collapses both into one paint and the drawer snaps open with no
     // slide (worst at launch auto-open, user). The reflow read guarantees it.
+    // skipOpen leaves the drawer parked off-screen at -100% so a finger-follow
+    // swipe can drag it in (bindDrawerSwipe).
     const backdrop = qs(".tray-backdrop"), drawer = qs(".tray-drawer");
+    if (skipOpen) return;
     if (drawer){ void drawer.offsetWidth; drawer.classList.add("open"); }
     if (backdrop) backdrop.classList.add("open");
   }
@@ -6466,6 +6482,80 @@ function injectChunkMap(){
     drawer.classList.remove("open");            // slide out
     if (backdrop) backdrop.classList.remove("open");
     setTimeout(function(){ if (r && !state.trayOpen) r.innerHTML = ""; }, 300); // clears after the .28s slide-out
+  }
+  // Finger-follow swipe on the intray drawer — the same drag-and-snap mechanic
+  // as the calendar month swipe (user: "works great, no browser issues"). Two
+  // gestures: drag the OPEN drawer left to dismiss it, and drag in from the
+  // LEFT EDGE to open it. The drawer tracks the finger and snaps on release.
+  let drawerDrag = null;
+  const DRAWER_EDGE = 26;
+  function bindDrawerSwipe(){
+    document.addEventListener("touchstart", function(e){
+      if (drawerDrag || e.touches.length !== 1) return;
+      if (qs(".choice-dialog-backdrop")) return; // a dialog owns the gesture
+      const t = e.touches[0];
+      if (state.trayOpen){
+        const drawer = qs(".tray-drawer"); if (!drawer) return;
+        drawerDrag = { mode: "close", startX: t.clientX, startY: t.clientY, width: drawer.getBoundingClientRect().width, drawer: drawer, backdrop: qs(".tray-backdrop"), decided: false, horizontal: false };
+      } else if (!state.screen && t.clientX <= DRAWER_EDGE){
+        renderTray(true); // build it parked off-screen at -100%, ready to drag in
+        const drawer = qs(".tray-drawer"); if (!drawer) return;
+        drawerDrag = { mode: "open", startX: t.clientX, startY: t.clientY, width: drawer.getBoundingClientRect().width, drawer: drawer, backdrop: qs(".tray-backdrop"), decided: false, horizontal: false };
+      }
+    }, { passive: true });
+    document.addEventListener("touchmove", function(e){
+      if (!drawerDrag) return;
+      const t = e.touches[0];
+      const dx = t.clientX - drawerDrag.startX, dy = t.clientY - drawerDrag.startY;
+      if (!drawerDrag.decided){
+        if (Math.abs(dx) <= 8 && Math.abs(dy) <= 8) return;
+        drawerDrag.decided = true;
+        drawerDrag.horizontal = Math.abs(dx) > Math.abs(dy);
+        if (!drawerDrag.horizontal){ cancelDrawerDrag(); return; } // vertical → let the drawer scroll
+        drawerDrag.drawer.style.transition = "none";
+        if (drawerDrag.backdrop) drawerDrag.backdrop.style.transition = "none";
+      }
+      if (!drawerDrag.horizontal) return;
+      e.preventDefault(); // claim the horizontal gesture
+      const w = drawerDrag.width;
+      const offset = drawerDrag.mode === "close"
+        ? Math.max(-w, Math.min(0, dx))
+        : Math.max(-w, Math.min(0, -w + Math.max(0, dx)));
+      drawerDrag.drawer.style.transform = "translateX(" + offset + "px)";
+      if (drawerDrag.backdrop) drawerDrag.backdrop.style.opacity = String(Math.max(0, Math.min(1, 1 + offset / w)));
+    }, { passive: false });
+    function endDrawer(e){
+      if (!drawerDrag) return;
+      const dd = drawerDrag; drawerDrag = null;
+      dd.drawer.style.transition = ""; if (dd.backdrop) dd.backdrop.style.transition = "";
+      const clearInline = function(){ dd.drawer.style.transform = ""; if (dd.backdrop) dd.backdrop.style.opacity = ""; };
+      const teardown = function(){ clearInline(); setTimeout(function(){ if (!state.trayOpen){ const r = qs("#tray-root"); if (r) r.innerHTML = ""; } }, 300); };
+      if (!dd.decided || !dd.horizontal){
+        if (dd.mode === "open") teardown(); else clearInline();
+        return;
+      }
+      const dx = (e.changedTouches ? e.changedTouches[0].clientX : dd.startX) - dd.startX;
+      const threshold = Math.max(60, dd.width * 0.33);
+      if (dd.mode === "close"){
+        if (dx < -threshold){ closeTray(); clearInline(); }                 // commit close
+        else { dd.drawer.classList.add("open"); if (dd.backdrop) dd.backdrop.classList.add("open"); clearInline(); } // snap back open
+      } else {
+        if (dx > threshold){                                               // commit open
+          state.trayOpen = true; state.trayReveal = false;
+          dd.drawer.classList.add("open"); if (dd.backdrop) dd.backdrop.classList.add("open"); clearInline();
+          const inp = qs("#tray-input"); if (inp) setTimeout(function(){ inp.focus(); }, 60);
+        } else { dd.drawer.classList.remove("open"); teardown(); }          // cancel open
+      }
+    }
+    document.addEventListener("touchend", endDrawer, { passive: true });
+    document.addEventListener("touchcancel", endDrawer, { passive: true });
+  }
+  function cancelDrawerDrag(){
+    if (!drawerDrag) return;
+    const dd = drawerDrag; drawerDrag = null;
+    dd.drawer.style.transition = ""; if (dd.backdrop) dd.backdrop.style.transition = "";
+    dd.drawer.style.transform = ""; if (dd.backdrop) dd.backdrop.style.opacity = "";
+    if (dd.mode === "open"){ setTimeout(function(){ if (!state.trayOpen){ const r = qs("#tray-root"); if (r) r.innerHTML = ""; } }, 300); }
   }
   function trayAdd(text){
     text = (text || "").trim();
@@ -7688,6 +7778,24 @@ function processEventBoundaries(){
     //     action exists; a row still showing an earlier occurrence is REPLACED
     //     IN PLACE (same task ID, inherited context, top of context — §4.15b).
     if (ev.completedAt != null) return; // completed occurrence: no live row until it rolls
+    // A COMPLETED occurrence has no live row (§4.14a). A recurring series is
+    // held here by completedAt until its roll — but a ONE-SHOT never sets
+    // completedAt, so without this check the sweep re-mints its pseudo-action
+    // on every boot/QA-jump: a long-done event walks back into Next Actions,
+    // arriving with a full red "passed" bar because its occDate is in the past.
+    // Keyed by CANONICAL date, the same key completedOccs is written with.
+    const doneOccs = ev.completedOccs || [];
+    if (doneOccs.indexOf(ev.date) !== -1){
+      // Heal state already corrupted by the above: a row for an occurrence
+      // that is recorded complete is a ghost — drop it. (Idempotent, like the
+      // rest of the sweep, so it self-repairs on the next boot.)
+      const ghost = findPseudoRow(ev.id);
+      if (ghost && doneOccs.indexOf(ghost.occCanon) !== -1){
+        state.tasks.next = state.tasks.next.filter(function(t){ return t.id !== ghost.id; });
+        changed = true;
+      }
+      return;
+    }
     const eff = effDate(ev, ev.date), effT = effTime(ev, ev.date);
     const appearCivil = occAppearanceCivil(eff, effT);
     const row = findPseudoRow(ev.id);
@@ -7941,7 +8049,7 @@ function openCalendarScreen(prefill){
     calendarView: true, kind: "calendar", taskId: null, draft: {},
     calTab: "month", calY: d.getFullYear(), calM: d.getMonth(), calSel: sel,
     calKind: "event", calName: (prefill && prefill.name) || "", calTime: "", calDesc: "",
-    calRecur: "none", calInterval: 1, calDeadlineFor: "next", calTickler: false,
+    calRecur: "none", calInterval: 1, calDeadlineFor: "next", calTickler: false, calMore: false,
     calInvalid: false, calFromCaptureId: (prefill && prefill.fromCaptureId) || null
   };
   renderScreen();
@@ -8114,14 +8222,27 @@ function calCreateRowHtml(s){
   }
   const sel = dateStrToDate(s.calSel);
   const selLabel = sel.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+  // The optional controls (time, description, repeat, tickler) are COLLAPSED by
+  // default: fully expanded they are ~6 stacked rows, and a footer that tall
+  // squeezes the month grid off the screen on a phone (user-reported). Title +
+  // Add is the whole common case; everything else is one tap away. A brass dot
+  // on the toggle means an optional field is set while hidden, so collapsed
+  // state can never be silently load-bearing.
+  const hasOpts = !!(s.calTime || s.calDesc || (isEvent && s.calRecur && s.calRecur !== "none") || (isEvent && s.calTickler));
+  const moreBtn =
+    '<button type="button" class="cal-more-btn' + (s.calMore ? " open" : "") + '" data-action="cal-more" ' +
+      'title="Time, description' + (isEvent ? ", repeat, tickler" : ", action or project") + '">' +
+      'Options' + (hasOpts && !s.calMore ? ' <span class="cal-more-dot">&#9679;</span>' : "") +
+      ' <span class="cal-more-caret">' + (s.calMore ? "&#9652;" : "&#9662;") + '</span>' +
+    '</button>';
   return (
     '<div class="cal-create">' +
-      seg +
+      '<div class="cal-create-top">' + seg + moreBtn + '</div>' +
       '<div class="cal-create-main">' +
         '<input type="text" class="cal-name' + (s.calInvalid ? " field-invalid" : "") + '" data-calfield="name" placeholder="' + (isEvent ? "Event on " : "Due ") + escapeHtml(selLabel) + '…" value="' + escapeHtml(s.calName || "") + '" autocomplete="off">' +
         '<button type="button" class="cal-add-btn" data-action="cal-add">Add</button>' +
       '</div>' +
-      controls +
+      (s.calMore ? controls : "") +
     '</div>'
   );
 }
@@ -8169,7 +8290,11 @@ function calendarBodyHtml(s){
       '<button type="button" class="cal-navbtn" data-action="cal-dayshift" data-dir="1">&#8250;</button></div>' +
       calDayAgendaHtml(s.calSel);
   }
-  return '<div class="screen-body cal-body">' + body + calCreateRowHtml(s) + '</div>';
+  // The month/day area scrolls; the creation row is a SOLID footer outside the
+  // scroller — so it never overlaps the dates and nothing shows through beneath
+  // it (user-reported: the sticky row was overlaying the grid and leaking the
+  // lanes at the bottom).
+  return '<div class="screen-body cal-body"><div class="cal-scroll">' + body + '</div>' + calCreateRowHtml(s) + '</div>';
 }
 function prevMonth(y, m){ return m === 0 ? { y: y - 1, m: 11 } : { y: y, m: m - 1 }; }
 function nextMonthYM(y, m){ return m === 11 ? { y: y + 1, m: 0 } : { y: y, m: m + 1 }; }
@@ -8451,6 +8576,7 @@ function eventsHandleClick(e){
     }
     const kb = e.target.closest('[data-action="cal-kind"]');
     if (kb){ s.calKind = kb.getAttribute("data-kind"); renderScreen(); return true; }
+    if (e.target.closest('[data-action="cal-more"]')){ s.calMore = !s.calMore; renderScreen(); return true; }
     const dlf = e.target.closest('[data-action="cal-dlfor"]');
     if (dlf){ s.calDeadlineFor = dlf.getAttribute("data-for"); renderScreen(); return true; }
     if (e.target.closest('[data-action="cal-add"]')){ calAdd(); return true; }

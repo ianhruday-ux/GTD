@@ -232,6 +232,24 @@ function processEventBoundaries(){
     //     action exists; a row still showing an earlier occurrence is REPLACED
     //     IN PLACE (same task ID, inherited context, top of context — §4.15b).
     if (ev.completedAt != null) return; // completed occurrence: no live row until it rolls
+    // A COMPLETED occurrence has no live row (§4.14a). A recurring series is
+    // held here by completedAt until its roll — but a ONE-SHOT never sets
+    // completedAt, so without this check the sweep re-mints its pseudo-action
+    // on every boot/QA-jump: a long-done event walks back into Next Actions,
+    // arriving with a full red "passed" bar because its occDate is in the past.
+    // Keyed by CANONICAL date, the same key completedOccs is written with.
+    const doneOccs = ev.completedOccs || [];
+    if (doneOccs.indexOf(ev.date) !== -1){
+      // Heal state already corrupted by the above: a row for an occurrence
+      // that is recorded complete is a ghost — drop it. (Idempotent, like the
+      // rest of the sweep, so it self-repairs on the next boot.)
+      const ghost = findPseudoRow(ev.id);
+      if (ghost && doneOccs.indexOf(ghost.occCanon) !== -1){
+        state.tasks.next = state.tasks.next.filter(function(t){ return t.id !== ghost.id; });
+        changed = true;
+      }
+      return;
+    }
     const eff = effDate(ev, ev.date), effT = effTime(ev, ev.date);
     const appearCivil = occAppearanceCivil(eff, effT);
     const row = findPseudoRow(ev.id);
@@ -485,7 +503,7 @@ function openCalendarScreen(prefill){
     calendarView: true, kind: "calendar", taskId: null, draft: {},
     calTab: "month", calY: d.getFullYear(), calM: d.getMonth(), calSel: sel,
     calKind: "event", calName: (prefill && prefill.name) || "", calTime: "", calDesc: "",
-    calRecur: "none", calInterval: 1, calDeadlineFor: "next", calTickler: false,
+    calRecur: "none", calInterval: 1, calDeadlineFor: "next", calTickler: false, calMore: false,
     calInvalid: false, calFromCaptureId: (prefill && prefill.fromCaptureId) || null
   };
   renderScreen();
@@ -658,14 +676,27 @@ function calCreateRowHtml(s){
   }
   const sel = dateStrToDate(s.calSel);
   const selLabel = sel.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+  // The optional controls (time, description, repeat, tickler) are COLLAPSED by
+  // default: fully expanded they are ~6 stacked rows, and a footer that tall
+  // squeezes the month grid off the screen on a phone (user-reported). Title +
+  // Add is the whole common case; everything else is one tap away. A brass dot
+  // on the toggle means an optional field is set while hidden, so collapsed
+  // state can never be silently load-bearing.
+  const hasOpts = !!(s.calTime || s.calDesc || (isEvent && s.calRecur && s.calRecur !== "none") || (isEvent && s.calTickler));
+  const moreBtn =
+    '<button type="button" class="cal-more-btn' + (s.calMore ? " open" : "") + '" data-action="cal-more" ' +
+      'title="Time, description' + (isEvent ? ", repeat, tickler" : ", action or project") + '">' +
+      'Options' + (hasOpts && !s.calMore ? ' <span class="cal-more-dot">&#9679;</span>' : "") +
+      ' <span class="cal-more-caret">' + (s.calMore ? "&#9652;" : "&#9662;") + '</span>' +
+    '</button>';
   return (
     '<div class="cal-create">' +
-      seg +
+      '<div class="cal-create-top">' + seg + moreBtn + '</div>' +
       '<div class="cal-create-main">' +
         '<input type="text" class="cal-name' + (s.calInvalid ? " field-invalid" : "") + '" data-calfield="name" placeholder="' + (isEvent ? "Event on " : "Due ") + escapeHtml(selLabel) + '…" value="' + escapeHtml(s.calName || "") + '" autocomplete="off">' +
         '<button type="button" class="cal-add-btn" data-action="cal-add">Add</button>' +
       '</div>' +
-      controls +
+      (s.calMore ? controls : "") +
     '</div>'
   );
 }
@@ -713,7 +744,11 @@ function calendarBodyHtml(s){
       '<button type="button" class="cal-navbtn" data-action="cal-dayshift" data-dir="1">&#8250;</button></div>' +
       calDayAgendaHtml(s.calSel);
   }
-  return '<div class="screen-body cal-body">' + body + calCreateRowHtml(s) + '</div>';
+  // The month/day area scrolls; the creation row is a SOLID footer outside the
+  // scroller — so it never overlaps the dates and nothing shows through beneath
+  // it (user-reported: the sticky row was overlaying the grid and leaking the
+  // lanes at the bottom).
+  return '<div class="screen-body cal-body"><div class="cal-scroll">' + body + '</div>' + calCreateRowHtml(s) + '</div>';
 }
 function prevMonth(y, m){ return m === 0 ? { y: y - 1, m: 11 } : { y: y, m: m - 1 }; }
 function nextMonthYM(y, m){ return m === 11 ? { y: y + 1, m: 0 } : { y: y, m: m + 1 }; }
@@ -995,6 +1030,7 @@ function eventsHandleClick(e){
     }
     const kb = e.target.closest('[data-action="cal-kind"]');
     if (kb){ s.calKind = kb.getAttribute("data-kind"); renderScreen(); return true; }
+    if (e.target.closest('[data-action="cal-more"]')){ s.calMore = !s.calMore; renderScreen(); return true; }
     const dlf = e.target.closest('[data-action="cal-dlfor"]');
     if (dlf){ s.calDeadlineFor = dlf.getAttribute("data-for"); renderScreen(); return true; }
     if (e.target.closest('[data-action="cal-add"]')){ calAdd(); return true; }

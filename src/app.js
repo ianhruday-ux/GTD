@@ -4965,7 +4965,7 @@
     const wrap = qs(".tray-scroll");
     if (wrap) wrap.innerHTML = trayListHtml(); else renderTray();
   }
-  function renderTray(){
+  function renderTray(skipOpen){
     const root = qs("#tray-root");
     if (!root) return;
     const list = '<div class="tray-scroll">' + trayListHtml() + '</div>';
@@ -4988,7 +4988,10 @@
     // Force the -100% start state to commit BEFORE adding .open, or the
     // browser collapses both into one paint and the drawer snaps open with no
     // slide (worst at launch auto-open, user). The reflow read guarantees it.
+    // skipOpen leaves the drawer parked off-screen at -100% so a finger-follow
+    // swipe can drag it in (bindDrawerSwipe).
     const backdrop = qs(".tray-backdrop"), drawer = qs(".tray-drawer");
+    if (skipOpen) return;
     if (drawer){ void drawer.offsetWidth; drawer.classList.add("open"); }
     if (backdrop) backdrop.classList.add("open");
   }
@@ -5006,6 +5009,80 @@
     drawer.classList.remove("open");            // slide out
     if (backdrop) backdrop.classList.remove("open");
     setTimeout(function(){ if (r && !state.trayOpen) r.innerHTML = ""; }, 300); // clears after the .28s slide-out
+  }
+  // Finger-follow swipe on the intray drawer — the same drag-and-snap mechanic
+  // as the calendar month swipe (user: "works great, no browser issues"). Two
+  // gestures: drag the OPEN drawer left to dismiss it, and drag in from the
+  // LEFT EDGE to open it. The drawer tracks the finger and snaps on release.
+  let drawerDrag = null;
+  const DRAWER_EDGE = 26;
+  function bindDrawerSwipe(){
+    document.addEventListener("touchstart", function(e){
+      if (drawerDrag || e.touches.length !== 1) return;
+      if (qs(".choice-dialog-backdrop")) return; // a dialog owns the gesture
+      const t = e.touches[0];
+      if (state.trayOpen){
+        const drawer = qs(".tray-drawer"); if (!drawer) return;
+        drawerDrag = { mode: "close", startX: t.clientX, startY: t.clientY, width: drawer.getBoundingClientRect().width, drawer: drawer, backdrop: qs(".tray-backdrop"), decided: false, horizontal: false };
+      } else if (!state.screen && t.clientX <= DRAWER_EDGE){
+        renderTray(true); // build it parked off-screen at -100%, ready to drag in
+        const drawer = qs(".tray-drawer"); if (!drawer) return;
+        drawerDrag = { mode: "open", startX: t.clientX, startY: t.clientY, width: drawer.getBoundingClientRect().width, drawer: drawer, backdrop: qs(".tray-backdrop"), decided: false, horizontal: false };
+      }
+    }, { passive: true });
+    document.addEventListener("touchmove", function(e){
+      if (!drawerDrag) return;
+      const t = e.touches[0];
+      const dx = t.clientX - drawerDrag.startX, dy = t.clientY - drawerDrag.startY;
+      if (!drawerDrag.decided){
+        if (Math.abs(dx) <= 8 && Math.abs(dy) <= 8) return;
+        drawerDrag.decided = true;
+        drawerDrag.horizontal = Math.abs(dx) > Math.abs(dy);
+        if (!drawerDrag.horizontal){ cancelDrawerDrag(); return; } // vertical → let the drawer scroll
+        drawerDrag.drawer.style.transition = "none";
+        if (drawerDrag.backdrop) drawerDrag.backdrop.style.transition = "none";
+      }
+      if (!drawerDrag.horizontal) return;
+      e.preventDefault(); // claim the horizontal gesture
+      const w = drawerDrag.width;
+      const offset = drawerDrag.mode === "close"
+        ? Math.max(-w, Math.min(0, dx))
+        : Math.max(-w, Math.min(0, -w + Math.max(0, dx)));
+      drawerDrag.drawer.style.transform = "translateX(" + offset + "px)";
+      if (drawerDrag.backdrop) drawerDrag.backdrop.style.opacity = String(Math.max(0, Math.min(1, 1 + offset / w)));
+    }, { passive: false });
+    function endDrawer(e){
+      if (!drawerDrag) return;
+      const dd = drawerDrag; drawerDrag = null;
+      dd.drawer.style.transition = ""; if (dd.backdrop) dd.backdrop.style.transition = "";
+      const clearInline = function(){ dd.drawer.style.transform = ""; if (dd.backdrop) dd.backdrop.style.opacity = ""; };
+      const teardown = function(){ clearInline(); setTimeout(function(){ if (!state.trayOpen){ const r = qs("#tray-root"); if (r) r.innerHTML = ""; } }, 300); };
+      if (!dd.decided || !dd.horizontal){
+        if (dd.mode === "open") teardown(); else clearInline();
+        return;
+      }
+      const dx = (e.changedTouches ? e.changedTouches[0].clientX : dd.startX) - dd.startX;
+      const threshold = Math.max(60, dd.width * 0.33);
+      if (dd.mode === "close"){
+        if (dx < -threshold){ closeTray(); clearInline(); }                 // commit close
+        else { dd.drawer.classList.add("open"); if (dd.backdrop) dd.backdrop.classList.add("open"); clearInline(); } // snap back open
+      } else {
+        if (dx > threshold){                                               // commit open
+          state.trayOpen = true; state.trayReveal = false;
+          dd.drawer.classList.add("open"); if (dd.backdrop) dd.backdrop.classList.add("open"); clearInline();
+          const inp = qs("#tray-input"); if (inp) setTimeout(function(){ inp.focus(); }, 60);
+        } else { dd.drawer.classList.remove("open"); teardown(); }          // cancel open
+      }
+    }
+    document.addEventListener("touchend", endDrawer, { passive: true });
+    document.addEventListener("touchcancel", endDrawer, { passive: true });
+  }
+  function cancelDrawerDrag(){
+    if (!drawerDrag) return;
+    const dd = drawerDrag; drawerDrag = null;
+    dd.drawer.style.transition = ""; if (dd.backdrop) dd.backdrop.style.transition = "";
+    dd.drawer.style.transform = ""; if (dd.backdrop) dd.backdrop.style.opacity = "";
+    if (dd.mode === "open"){ setTimeout(function(){ if (!state.trayOpen){ const r = qs("#tray-root"); if (r) r.innerHTML = ""; } }, 300); }
   }
   function trayAdd(text){
     text = (text || "").trim();
