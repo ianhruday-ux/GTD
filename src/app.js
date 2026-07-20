@@ -5007,14 +5007,14 @@
     // chunk 8 (the user has finished walking all three). §8.1's replace-don't-
     // accumulate discipline is restored: this is the ONLY injector again, and
     // the two additive ones are deleted rather than left dormant.
-    const FLAG = "gtd_qa_checklist_postsprint_v2";
+    const FLAG = "gtd_qa_checklist_postsprint_v3";
     if (Storage.get(FLAG)) return;
     Storage.set(FLAG, "1");
     // Retire the superseded flags so they can't resurrect their injectors, and
     // so a future Reset doesn't leave dead keys behind.
     ["gtd_qa_checklist_chunk7_v1", "gtd_qa_checklist_override_v1",
      "gtd_qa_checklist_override_v2", "gtd_qa_checklist_chunk8_v1",
-     "gtd_qa_checklist_postsprint_v1"].forEach(Storage.remove);
+     "gtd_qa_checklist_postsprint_v1", "gtd_qa_checklist_postsprint_v2"].forEach(Storage.remove);
 
     // Replace, don't accumulate (8.1) — and actually mean it this time.
     // Earlier rounds bumped the flag but left the previous rounds' groups
@@ -5043,53 +5043,41 @@
       });
     }
 
-    addGroupWithItems('\u2705 QA \u2014 Settings & appearance', [
-      { title: 'The \u22ef menu is a dropdown now', notes: 'Tap \u22ef in the top-right. Instead of a box in the middle of the screen, a small menu drops down under the button and the desk stays visible behind it. Tap anywhere outside to close it \u2014 there is no Close button any more, and you should not need one.' },
-      { title: 'Change the desk background', notes: '\u22ef \u2192 Background. Pick each one in turn: Walnut, Oak, Ebony, Slate, Plain. The desk changes straight away AND the menu stays open, so you can compare them without reopening it each time. A tick marks the one you are on. \u2039 Background at the top takes you back to the main menu.' },
-      { title: 'The wood is drawn fresh, not a photo', notes: 'Look closely at the desk behind the cards: it should read as grain \u2014 long lines running across, with darker rings bending through them \u2014 rather than the fuzzy static it used to be. Scroll a long lane down; the pattern should not obviously repeat every screenful. Tell me if any of them look wrong on your phone.' },
-      { title: 'Your background survives a restart, and a reset undoes it', notes: 'Pick Oak, then fully close and reopen the app \u2014 it is still Oak. Then \u22ef \u2192 Restore app to defaults (it still asks first). After the reload the desk is back to Walnut, because the background is a setting like anything else.' },
-      { title: 'Language is listed but greyed out', notes: '\u22ef \u2192 the Language row is visible but dimmed and says \'not built yet\', and tapping it does nothing. That is deliberate \u2014 the slot is real and the work is coming.' },
-      { title: 'The app is called OELA', notes: 'The wordmark top-left reads OELA. If you have added it to your home screen, remove and re-add it \u2014 the icon should now be named OELA. And \u22ef \u2192 Export a backup saves a file starting \'oela-backup-\'.' }
+    addGroupWithItems('✅ QA — The new time picker', [
+      { title: 'AM and PM are finally readable', notes: 'This is the one you reported twice. Open any event or deadline and tap the time box. The picker is now the app’s own, not your phone’s — dark wood colours, brass highlights. The selected one of AM / PM is FILLED IN solid brass; the other is just an outline. Check it in a dim room and in daylight. If it is still not obvious at a glance, say so.' },
+      { title: 'Setting a time by dragging', notes: 'Tap the time box. Drag the hand around the clock face to an hour — it jumps to the minutes on its own when you let go, which is the usual next thing you want. Drag again for the minutes. The two big boxes at the top show what you have picked; tap either one to go back to it.' },
+      { title: 'Midnight and midday', notes: 'The two that computers usually get wrong. Set 12:00 AM, save, and reopen — it should read 00:00, not 12:00. Then set 12:30 PM and reopen — that one SHOULD read 12:30. Tell me if either comes back different from what you set.' },
+      { title: 'Backing out of the time picker', notes: 'Open the time picker and change the time, then tap Cancel — nothing should change. Do it again and tap outside the box instead. Important one: cancelling the time picker must leave you on the page you were on, NOT throw you back to the lanes.' },
+      { title: 'Clearing a time', notes: 'An event with a time is an appointment; without one it lasts the day. Open a timed event, tap the time box, tap Clear. The time empties and the event goes back to being an all-day one.' }
     ]);
 
-    addGroupWithItems('\u2705 QA \u2014 The habit runner', [
-      { title: 'Every habit has a chalkboard', notes: 'Open Habits and tap any habit. Above the numbers there is a dark green chalkboard with a chalk stick figure on it and a thought bubble. Check the board looks like a board \u2014 faint dusty smears, nothing crisp or printed-looking.' },
-      { title: 'The runner reacts as you tick the habit', notes: 'On a habit\'s page tap Complete. The figure and its thought should change immediately (from stretching to running). Now tap \u2715 to leave WITHOUT saving, then reopen it \u2014 it is back to how it was. The runner follows your unsaved changes, like everything else on that page.' },
-      { title: 'Ticking a habit always gets the runner moving', notes: 'Tick a habit on a day it is NOT scheduled (an off day) \u2014 the figure should get up and run rather than stay sitting with its book. Same if it is showing you a celebration after a run ended: completing again starts the next lap, so the runner runs. The off day still does not count towards your record. A paused habit is the exception \u2014 you cannot complete it at all.' },
-      { title: 'The two rows of dots are gone', notes: 'The old box of little circles under the chalkboard has been removed \u2014 it was only ever there to show the logic while it was being built, and the runner shows the same thing now. The \'personal best / lifetime\' numbers stay.' },
-      { title: 'Pause and off-days show a resting runner', notes: 'Tap Pause on a habit and save. Reopen it: the figure is sitting reading a book. Same for a habit not scheduled for today (untick today\'s day and save) \u2014 you will also still see the \'Off day\' line explaining why.' },
-      { title: 'A second, faded runner appears once you have a record', notes: 'This one needs a habit with a personal best, so it may take a few days of real use \u2014 or use the QA time buttons to jump days. Once a best run exists, a faded grey figure runs alongside you: that is your record. Worth telling me whether it reads clearly on the small screen.' }
+    addGroupWithItems('✅ QA — The new date picker', [
+      { title: 'Dates use the app’s calendar now too', notes: 'Tap any date box — on a deadline, on an event, on Push the date in the review. You get the app’s own month grid instead of your phone’s. Move between months with the arrows, tap a day to choose it. Cancel and Escape should change nothing.' },
+      { title: 'The circled day follows the QA clock', notes: 'THIS IS THE FIX for the thing that was confusing you during testing. Open a date box and note which day has a brass ring — it should be today. Close it, tap QA ‘+1 Day’ a few times, then open a date box again. The ring should have MOVED to match the app’s new today. It used to stay stuck on the real date, which is what made progress bars look wrong.' },
+      { title: 'The Today button', notes: 'In the date picker, tap Today. It jumps to the app’s today — the same day that has the ring — not the real one. Worth checking after a few QA day jumps.' }
     ]);
 
-    addGroupWithItems('\u2705 QA \u2014 Calendar & review fixes', [
-      { title: 'The add-event controls moved to the bottom', notes: 'Open the calendar. The controls for adding an event or deadline are no longer pinned in view at the bottom of the screen \u2014 they sit underneath the dates and you scroll down to reach them. While you are there, check the WHOLE month is showing, including the last week: an earlier version of this change quietly cut the last row off.' },
-      { title: 'Stalled projects still reach the review', notes: 'Make a project with no actions under it, then open the review \u2014 it should appear as a stalled project. The chunk-list entries deliberately do NOT appear there: they are scaffolding for building the app, and if they showed up they would bury the real ones. That was the thing you spotted; it is working as intended.' },
-      { title: 'Leave the calendar with the back arrow', notes: 'Open the calendar. The \u2715 in the top-right is gone; there is a \u2190 in the top-left instead, the same as every other page. It should take you back where you came from.' },
-      { title: 'Today has a border', notes: 'In Month view, today\'s square has a brass outline around it, not just a brass number \u2014 it should be easy to find at a glance. Tap a different day: the selected day is filled in, and today keeps its outline, so you can tell the two apart.' },
-      { title: 'The jargon is going away', notes: 'On an event\'s page the checkbox now reads \'Hide until the day it happens\' (it used to say \'Tickler\'), and the note next to the time box about appointments is gone entirely. In Day view a hidden event is tagged \'hidden\'. Tell me anywhere else the app still talks like a manual.' },
-      { title: 'A past-due event can be deleted from the review', notes: 'Let an event\'s day go by without ticking it, then open \ud83d\udd0d Review. Alongside \'Mark done\' there is now a red Delete. Use it for something that just died \u2014 marking it done would file it into Completed as if you had achieved it. It asks before deleting, and for a repeating event it offers to skip just that one instead.' },
-      { title: 'Adding from the review brings you back to the review', notes: 'In \ud83d\udd0d Review, take a captured thought and tap the Calendar chip. The calendar opens with your text ready. Tap Add \u2014 you should land back on the review where you left off, with the banner confirming where it went.' },
-      { title: 'A completed event stays gone', notes: 'Tick off an event that is not repeating (the sample \'Dentist\' works). Fully close and reopen the app, then use the QA \'+1 Day\' button a couple of times. It must not reappear in Next Actions. It used to come back with a full red bar.' }
+    addGroupWithItems('✅ QA — Deadlines that get pushed', [
+      { title: 'Pushing a deadline restarts its bar', notes: 'You asked for this one. Give something a deadline about two weeks out, then use QA ‘+1 Day’ until the bar is half full. Now change the deadline to two weeks from the new today. The bar should drop back to EMPTY — it measures the new stretch of time, not the old one.' },
+      { title: 'And it remembers that you pushed it', notes: 'After the push above, look at the card. Next to the bar there is a small brass tag reading ↻1. Push it again and it becomes ↻2. Press and hold the tag to see ‘Deadline pushed 2 times’. It is deliberately not red — a pushed deadline is not late, it has been moved.' },
+      { title: 'Pushing from the review counts the same', notes: 'Let a deadline go past due, open 🔍 Review, and use ‘Push the date’ there. You should get the same brass ↻ tag and the same restarted bar as doing it from the item’s own page. The two ways must not behave differently.' },
+      { title: 'Bringing a date FORWARD is not a push', notes: 'Judgment call I made — tell me if you disagree. Move a deadline EARLIER instead of later. The bar restarts (the stretch of time really did change), but the ↻ counter does NOT go up, because pulling something forward is not putting it off.' },
+      { title: 'Changing a date then backing out', notes: 'A real bug I found while building this. Open something with a deadline, change the date, then leave with ✕ instead of ←. Reopen it — the OLD date must still be there. Changing a date used to take effect even when you backed out.' }
     ]);
 
-    addGroupWithItems('\u2705 QA \u2014 Progress bars', [
-      { title: 'An all-day event\'s bar now fills across the day', notes: 'Add an event for today with NO time and look at its card in Next Actions early in the day \u2014 the bar should be nearly EMPTY and fill gradually as the day goes on, reaching full at 4am when the day ends. It used to sit completely full all day, which told you nothing. (Use the QA \'+1 Hr\' button to watch it move.)' },
-      { title: 'A deadline due today is not \'passed\' yet', notes: 'Give a Next Action a deadline of today, with no time. Its bar is full \u2014 correct, the day is the deadline \u2014 but it must NOT show the red \'passed\' tag, and it must not appear in the review as past-due. Both should only happen once the day is actually over (4am). It used to be marked passed from 4am that morning, a full day early.' },
-      { title: 'The \'passed\' tag no longer pushes the screen sideways', notes: 'Find any card showing the red \'passed\' tag. The whole tag should be visible inside the card, and the page should not scroll or drift sideways at all. Try it on your phone in portrait.' },
-      { title: 'The event page\'s Complete button lights up like the others', notes: 'Open an event and tap Mark complete. The button should change colour and read \'Completing on save\' \u2014 the same look a normal action\'s Complete button gets. It used to stay unshaded so you could not tell it was armed.' },
-      { title: 'AM/PM \u2014 needs your eyes on the phone', notes: 'Tap a time box to open the time picker. The AM/PM buttons belong to your phone\'s own picker, not to this app, so I cannot put an underline on them. I have made the picker use the app\'s dark colours and brass highlight. Please check whether it is now clear which of AM/PM is selected \u2014 if it still is not, tell me and I will build a custom picker instead.' }
+    addGroupWithItems('✅ QA — The calendar’s new List view', [
+      { title: 'There is a third tab', notes: 'Open the calendar. Alongside Month and Day there is now List — everything you have coming up, in the order it happens, grouped by day. This is the view for answering ‘what is coming’, which neither of the other two really did.' },
+      { title: 'Overdue things come first', notes: 'The list starts with a red PAST DUE group — anything whose day has gone by without being ticked. Below that, today onwards. A past thing you already ticked off does NOT appear; it is history, not something you still owe.' },
+      { title: 'A repeating event appears once', notes: 'Make something repeat daily. In List view it should appear ONCE, on its next date — not once per day forever. It also carries a small ‘daily’ tag so you know why it is only there once.' },
+      { title: 'Hidden and paused things still show here', notes: 'This view deliberately shows more than the month grid. A hidden event (‘hide until the day it happens’) appears, tagged ‘hidden’. A PAUSED repeating event appears at its next date, tagged ‘paused’, even though the month grid draws nothing for it. A list that quietly leaves things out is not a list.' },
+      { title: 'The list keeps up with the clock', notes: 'Open List view and leave it open. Tap QA ‘+1 Day’. The list should redraw on its own — a day that has passed drops out of the headings. It used to sit there showing yesterday until you left and came back.' },
+      { title: 'The add controls sit still now', notes: 'Your note about spacing. Switch between Month, Day and List. The Add controls at the bottom should start at the SAME height on all three, including on a day with nothing on it. A long list can push them further down — that is intended — but they should never ride up under the header.' }
     ]);
 
-    addGroupWithItems('\u2705 QA \u2014 Repeating events', [
-      { title: 'Past repeats no longer clutter the calendar', notes: 'Open the calendar and page back a few months. A repeating event should leave NO mark on days that have already gone by \u2014 unless you actually completed it that day, in which case it keeps a dimmed dot. It used to draw a faint \u2018coming up\u2019 dot on every past occurrence, all the way back.' },
-      { title: 'Skipping one occurrence really removes it', notes: 'On a repeating event tap \ud83d\uddd1 and choose \u2018Skip this one\u2019. That date should now be completely empty, both on the month grid and in Day view, and the event should show on its next date instead. It used to keep drawing the skipped day.' },
-      { title: 'Editing one occurrence now says what it cannot change', notes: 'Open a repeating event on a FUTURE date, change its title, and also change its repeat setting. Save. The dialog should tell you that repeat, pause, context, project link and hiding always apply to the whole series, and offer the this-one-or-all choice only for the rest. Then check \u2018This occurrence only\u2019 really did leave the other dates alone.' }
+    addGroupWithItems('✅ QA — Repeating events and habits', [
+      { title: 'Waiting on a repeating event', notes: 'The bug where repeating events went missing. Tick off a repeating event for today. Now make a Waiting action and tap 🪝 to pick what it waits on — under ‘Upcoming events’ the repeating one should be offered, showing its NEXT date. Before, once you ticked it off it vanished from that list until the next morning.' },
+      { title: 'The runner after a run ends', notes: 'You thought this already worked and it does — worth confirming on the phone. When a habit run ends you get a celebration on the chalkboard. Leave the habit page and come back: the figure is now STRETCHING, ready for the next lap, and stays that way on every visit until you tick the habit again. The celebration is a one-time thing, not something that nags.' }
     ]);
-
-    addGroupWithItems('\u2705 QA \u2014 Pickers', [
-      { title: 'Every picker looks the same now', notes: 'Compare three: the \ud83e\ude9d on a Waiting action (what it waits on), the \ud83e\ude9d on a habit (its cue), and the + on a note (tags and projects). All three should now have the same small uppercase section headings, with a thin dividing line between sections, and the same list items. The note one was the model. Tell me if you find a picker anywhere that still looks different.' }
-    ]);
-
     saveTasksLocal("next");
   }
 
