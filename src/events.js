@@ -372,7 +372,9 @@ function pseudoBarState(dateStr, timeStr){
 function pseudoBarHtml(task){
   const s = pseudoBarState(task.occDate, task.occTime);
   const classes = "deadline-bar" + (s.full ? " full" : "") + (s.red ? " red" : "") + (s.passed ? " passed" : "");
-  const chip = s.passed ? '<span class="deadline-passed-chip">passed</span>' : "";
+  // An event has no push counter (recurrence is its own thing), but it uses the
+  // same chip wrapper so there is one positioning system, not two.
+  const chip = s.passed ? '<span class="deadline-chips"><span class="deadline-passed-chip">passed</span></span>' : "";
   return '<div class="' + classes + '" style="--fill:' + s.fillPercent + '%"><div class="deadline-bar-fill"></div>' + chip + '</div>';
 }
 // Is this pseudo-action past-due? Used by the review's past-due kind (§4.8b,

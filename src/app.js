@@ -890,7 +890,23 @@
     if (kind !== "waiting") renderLane("waiting");
     refreshProjectFlags(kind);
   }
-  function getDeadline(task){ return (task && task.deadline) || null; }
+  // ⚑ Returns a COPY, and that is load-bearing. This used to hand back the
+  // task's own deadline object, which the draft then mutated in place
+  // (screen-date's handler does `draft.deadline.date = el.value`). Two
+  // consequences, both real:
+  //   · DRAFT ISOLATION was broken for this one field — typing a new date and
+  //     leaving by ✕ had already changed the task in memory, against the
+  //     standing ruling that nothing commits until Save.
+  //   · QA #23 could not see a push at all: applyDeadlineChange compares the
+  //     stored deadline against the incoming one, and they were the same
+  //     object, so the date had ALWAYS "not changed".
+  // Found while wiring the push counter; the isolation half is the older and
+  // more serious of the two.
+  function getDeadline(task){
+    const d = task && task.deadline;
+    if (!d) return null;
+    return { date: d.date, time: d.time || null, setAt: d.setAt || null, pushCount: d.pushCount || 0 };
+  }
 
   // Creates a brand-new leaf task (Next/Waiting/Current/Future) from the
   // full-screen create page. Habits have their own creation path (addHabit)
@@ -911,6 +927,42 @@
     return Promise.resolve(task);
   }
 
+  // QA #23 — moving a deadline's date restarts its progress bar, and a move to
+  // a LATER date is counted (user ruling: "change the start, but mark the pushed
+  // with a counter").
+  //
+  // The bar answers "how much of this window has gone", so when the window
+  // changes the origin has to change with it: keeping the old start made a
+  // deadline three weeks out render nearly full, which trains you to ignore the
+  // bar. The counter is what stops the reset from erasing the fact that you
+  // slipped — the bar reads honestly AND the card still says you have moved this
+  // twice.
+  //
+  // ⚑ Two judgment calls, flagged:
+  //   · The COUNTER only increments when the new date is LATER. Pulling a
+  //     deadline forward is not a deferral and should not be scored as one, but
+  //     it does restart the window, so the origin still moves.
+  //   · This lives here rather than in the review's push handler, so that
+  //     editing the date on the item's own page behaves identically. One
+  //     gesture, one rule — the alternative was a bar whose origin depended on
+  //     WHICH screen you changed the date from.
+  //
+  // setAt is the bar's origin when present; createdAt remains the fallback for
+  // a deadline that has never moved (and for pre-existing test data).
+  function applyDeadlineChange(task, next){
+    const prev = task.deadline || null;
+    const nd = (next && next.date) ? next : null;
+    if (!nd){ task.deadline = null; return; }
+    const dateChanged = !prev || !prev.date || prev.date !== nd.date;
+    const pushedLater = !!(prev && prev.date && nd.date > prev.date);
+    task.deadline = {
+      date: nd.date,
+      time: nd.time || null,
+      setAt: dateChanged ? nowMs() : (prev && prev.setAt) || null,
+      pushCount: ((prev && prev.pushCount) || 0) + (pushedLater ? 1 : 0)
+    };
+  }
+
   // Updates an existing Next/Waiting/Current/Future task's editable fields.
   function updateTask(kind, taskId, data){
     const task = state.tasks[kind].find(function(t){ return t.id === taskId; });
@@ -918,7 +970,7 @@
     task.title = data.title;
     task.notesClean = data.notesClean || "";
     task.linkedProjectId = data.linkedProjectId || null;
-    task.deadline = data.deadline || null;
+    applyDeadlineChange(task, data.deadline);
     task.whenText = data.whenText || null;
     task.conditionId = data.conditionId || null;
     task.conditionKind = data.conditionKind || null;
@@ -1238,10 +1290,14 @@
     const passedAt = deadline.time ? due : due + 24 * 3600 * 1000;
     if (now >= passedAt) return { full: true, red: true, passed: true, fillPercent: 100 };
     if (now >= due) return { full: true, red: true, passed: false, fillPercent: 100 };
-    // Missing createdAt (pre-chunk-2 / hand-edited test data) → treat as a
+    // QA #23: the window starts when the deadline was last SET. A deadline that
+    // has been moved measures from the move, not from when the task was born —
+    // otherwise pushing a date leaves the bar nearly full and the bar stops
+    // meaning anything. deadline.setAt is written by applyDeadlineChange.
+    // Missing both (pre-chunk-2 / hand-edited test data) → treat as a
     // zero-width window, the same safe fallback a same-day deadline uses
     // (§4.4d: don't divide by zero).
-    const origin = task.createdAt || due;
+    const origin = deadline.setAt || task.createdAt || due;
     const totalWindow = due - origin;
     if (totalWindow <= 0) return { full: true, red: false, passed: false, fillPercent: 100 };
     const elapsedFrac = Math.max(0, Math.min(1, (now - origin) / totalWindow));
@@ -1261,12 +1317,28 @@
     }
     return { full: false, red: elapsedFrac >= 0.85, passed: false, fillPercent: Math.round(fillFrac * 100) };
   }
+  // QA #23: the push counter sits in the same slot as the passed marker (user
+  // ruling). ⚑ Rendered compactly as "↻2" with the count spelled out in the
+  // tooltip, rather than "pushed ×2" — the chip slot is space the BAR gives up
+  // (see .deadline-bar.passed's reserved margin, QA #21), and a wordy second
+  // chip on a passed-and-pushed deadline eats a third of the card's width. The
+  // app already puts teaching in tooltips (CLAUDE.md). Say if you would rather
+  // have the word and the narrower bar.
+  function deadlinePushChipHtml(deadline){
+    const n = (deadline && deadline.pushCount) || 0;
+    if (!n) return "";
+    return '<span class="deadline-push-chip" title="Deadline pushed ' + n + (n === 1 ? " time" : " times") + '">&#8635;' + n + '</span>';
+  }
   function deadlineBarHtml(task){
     const s = deadlineBarState(task);
     if (!s) return "";
-    const classes = "deadline-bar" + (s.full ? " full" : "") + (s.red ? " red" : "") + (s.passed ? " passed" : "");
-    const chip = s.passed ? '<span class="deadline-passed-chip">passed</span>' : "";
-    return '<div class="' + classes + '" style="--fill:' + s.fillPercent + '%"><div class="deadline-bar-fill"></div>' + chip + '</div>';
+    const pushed = ((task.deadline && task.deadline.pushCount) || 0) > 0;
+    const classes = "deadline-bar" + (s.full ? " full" : "") + (s.red ? " red" : "") +
+      (s.passed ? " passed" : "") + (pushed ? " pushed" : "");
+    const chips = deadlinePushChipHtml(task.deadline) +
+      (s.passed ? '<span class="deadline-passed-chip">passed</span>' : "");
+    return '<div class="' + classes + '" style="--fill:' + s.fillPercent + '%"><div class="deadline-bar-fill"></div>' +
+      (chips ? '<span class="deadline-chips">' + chips + '</span>' : "") + '</div>';
   }
   function leafCardHtml(kind, task){
     const canLink = (kind === "next" || kind === "waiting");
@@ -1937,7 +2009,20 @@
     });
     for (const id in staged.edits){
       const found = findTaskAnywhere(id);
-      if (found){ Object.assign(found.task, staged.edits[id]); touched.push(id); }
+      if (found){
+        // ⚑ QA #23: the deadline is pulled OUT of the blind Object.assign and
+        // routed through applyDeadlineChange, so a child action edited from its
+        // project page restarts its bar and counts its push exactly as one
+        // edited from its own page does. A raw assign here would overwrite
+        // setAt/pushCount with the draft's copy and silently exempt this path.
+        const ed = staged.edits[id];
+        const hasDeadline = Object.prototype.hasOwnProperty.call(ed, "deadline");
+        const rest = Object.assign({}, ed);
+        delete rest.deadline;
+        Object.assign(found.task, rest);
+        if (hasDeadline) applyDeadlineChange(found.task, ed.deadline);
+        touched.push(id);
+      }
     }
     ["next", "waiting", "current", "future"].forEach(saveTasksLocal);
     for (const id in staged.deletes){
@@ -3662,6 +3747,16 @@
     KINDS.forEach(renderLane);
     updateHabitBadge();
     updateQaTimeReadout();
+    // ...and the same is true of an OPEN screen. The calendar's three tabs and
+    // the review are all computed from "now": jump a day with the List tab open
+    // and it kept yesterday's grouping, past-due rows and "Today" heading until
+    // something else forced a redraw (user: "make sure the list view re-renders
+    // when it needs to — this was a bug in past builds").
+    //
+    // ⚑ Deliberately limited to the read-only surfaces. A drafting page is
+    // rebuilt from its draft, so re-rendering one mid-edit would tear down the
+    // input under the cursor to show it the same value it already had.
+    if (state.screen && (state.screen.calendarView || state.screen.reviewView)) renderScreen();
   }
 
   const GTD_KEY_PREFIX = "gtd_"; // deliberately excludes gtddev_ (e.g. the snapshot key itself)
@@ -5509,7 +5604,10 @@
     const found = reviewFindTask(s.reviewForm.key);
     if (found){
       const time = (found.task.deadline && found.task.deadline.time) || null;
-      found.task.deadline = { date: val, time: time }; // keep the time; push only the day (§4.8b inline exec)
+      // keep the time; push only the day (§4.8b inline exec). Goes through the
+      // shared helper so the bar restarts and the push is counted exactly as it
+      // would be from the item's own page (QA #23).
+      applyDeadlineChange(found.task, { date: val, time: time });
       saveTasksLocal(found.kind); renderLane(found.kind);
     }
     s.reviewForm = null; renderScreen();

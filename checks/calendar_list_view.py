@@ -215,6 +215,51 @@ with serve(DIST) as url, sync_playwright() as p:
     check(empty_top is not None and abs(empty_top - tops["month"]) <= 4,
           f"an empty day keeps the controls in place ({empty_top} vs month {tops['month']})")
 
+    # ---------- the list re-renders when "now" moves under it ----------
+    # Every group heading, the Past due block and the Today marker are computed
+    # from the clock, so a day rolling over while the tab is open must redraw
+    # it. applyQaTimeJump refreshed the lanes but not the open screen, so the
+    # list sat on yesterday's grouping until something else forced a redraw.
+    # (User: "make sure the list view re-renders when it needs to. This was a
+    # bug in past builds.")
+    pg.click('[data-action="cal-tab"][data-tab="list"]'); pg.wait_for_timeout(450)
+
+    def headings():
+        return pg.evaluate("""() => [...document.querySelectorAll('.cal-list-daylabel')]
+          .map(e => e.textContent.trim());""")
+
+    before_jump = headings()
+    check("Today" not in before_jump,
+          f"nothing is dated today to start with ({before_jump})")
+    # ⚠ Driven programmatically, not clicked: the dev panel lives on the main
+    # page and the calendar is a full-screen overlay, so the button is behind it
+    # and a real click is intercepted. The point here is applyQaTimeJump's
+    # re-render, not the button's reachability.
+    pg.evaluate("() => document.querySelector('#qa-day-btn').click()")
+    pg.wait_for_timeout(500)
+    after_jump = headings()
+    check(after_jump != before_jump,
+          f"the open list redrew when the day rolled ({before_jump} -> {after_jump})")
+    # The 16th's 09:00 standup has passed by 10:00 on the 16th, so the series
+    # rolls to the 17th and the 16 Jun group disappears entirely. (Not "Today"
+    # — an earlier version of this assertion assumed the arriving day would
+    # still hold something, which it does not.)
+    check("Tue 16 Jun" in before_jump and "Tue 16 Jun" not in after_jump,
+          f"the day that passed is gone from the headings ({after_jump})")
+
+    # The reachable path: open a row, change it, come back to the list.
+    titles_before = pg.evaluate("""() => [...document.querySelectorAll('.cal-list .cal-agenda-title')]
+      .map(e => e.textContent.trim()).filter(t => t.indexOf('ZZ') === 0);""")
+    pg.locator('.cal-list .cal-agenda-row:has-text("ZZ dentist")').first.click()
+    pg.wait_for_timeout(600)
+    pg.fill('[data-field="title"]', "ZZ dentist renamed")
+    pg.click('[data-action="screen-save"]'); pg.wait_for_timeout(700)
+    titles_after = pg.evaluate("""() => [...document.querySelectorAll('.cal-list .cal-agenda-title')]
+      .map(e => e.textContent.trim()).filter(t => t.indexOf('ZZ') === 0);""")
+    check(any("renamed" in t for t in titles_after),
+          f"editing an item from the list updates the list on return ({titles_after})")
+    check(titles_before != titles_after, "the list is not showing stale rows")
+
     check(not errs, f"no JS errors ({errs[:3]})")
     b.close()
 
