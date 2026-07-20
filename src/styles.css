@@ -76,12 +76,17 @@
 :root{ --tabbar-h: var(--tabbar-h-open); }
 body.tabs-collapsed{ --tabbar-h: var(--tabbar-h-collapsed); }
 
-/* The dark wood grain, defined ONCE here so the lanes background (body::before)
-   and the drafting pages (.screen-overlay) can share the exact same texture
-   without duplicating the (long) base64 data URI. See body::before for the
-   full derivation notes. */
+/* The desk grain, defined ONCE here so the lanes background (body::before) and
+   the drafting pages (.screen-overlay) share the exact same texture.
+   ▲ POST-SPRINT: --wood is now GENERATED AT BOOT by src/surface.js (real Perlin
+   noise displacing a periodic ring function) and set on :root as an inline
+   style, which overrides the fallback below. The fallback is the flat desk
+   colour, not the old feTurbulence streak texture — if the canvas is
+   unavailable for any reason, a clean surface beats a bad one. --wood-size is
+   set alongside it; 260px here only matters for the fallback path. */
 :root{
-  --wood: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScyNjAnIGhlaWdodD0nMjYwJz4KPGZpbHRlciBpZD0nZycgeD0nMCcgeT0nMCcgd2lkdGg9JzEwMCUnIGhlaWdodD0nMTAwJScgY29sb3ItaW50ZXJwb2xhdGlvbi1maWx0ZXJzPSdzUkdCJz4KPGZlVHVyYnVsZW5jZSB0eXBlPSdmcmFjdGFsTm9pc2UnIGJhc2VGcmVxdWVuY3k9JzAuOSAwLjAxMCcgbnVtT2N0YXZlcz0nNCcgc2VlZD0nMTEnIHN0aXRjaFRpbGVzPSdzdGl0Y2gnLz4KPGZlQ29sb3JNYXRyaXggdHlwZT0nbWF0cml4JyB2YWx1ZXM9JzAgMCAwIDAuMzAgMC4wNSAgMCAwIDAgMC4yMCAwLjAzICAwIDAgMCAwLjEzIDAuMDE4ICAwIDAgMCAwIDEnLz4KPC9maWx0ZXI+CjxyZWN0IHdpZHRoPScxMDAlJyBoZWlnaHQ9JzEwMCUnIGZpbHRlcj0ndXJsKCNnKScvPgo8L3N2Zz4=");
+  --wood: none;
+  --wood-size: 260px;
 }
 
 *{ box-sizing:border-box; }
@@ -115,7 +120,7 @@ body::before{
   position:fixed; inset:0; z-index:-1;
   background-color:var(--desk); /* fallback if the data URI can't decode for any reason */
   background-image: var(--wood);
-  background-size: 260px 260px;
+  background-size: var(--wood-size) var(--wood-size);
   background-repeat: repeat;
 }
 
@@ -718,7 +723,7 @@ footer{ text-align:center; color:var(--text-soft); font-size:11.5px; padding:30p
      texture rather than letting the lanes show through. Shared --wood token,
      same 260px tile, so the two surfaces are identical. */
   background:var(--desk) var(--wood);
-  background-size:260px 260px;
+  background-size:var(--wood-size) var(--wood-size);
   background-repeat:repeat;
   display:flex; flex-direction:column;
   transform:translateX(100%); transition:transform .22s ease;
@@ -932,7 +937,7 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 .tray-scroll{ display:flex; flex-direction:column; }
 .tray-drawer{
   position:fixed; top:0; left:0; bottom:0; z-index:211; width:min(360px, 86vw);
-  background:var(--desk) var(--wood); background-size:260px 260px; background-repeat:repeat;
+  background:var(--desk) var(--wood); background-size:var(--wood-size) var(--wood-size); background-repeat:repeat;
   box-shadow:6px 0 24px rgba(0,0,0,0.5); display:flex; flex-direction:column; overflow-y:auto;
   padding:calc(env(safe-area-inset-top) + 14px) 16px calc(env(safe-area-inset-bottom) + 16px) calc(env(safe-area-inset-left) + 16px);
   transform:translateX(-100%); transition:transform .28s ease; /* .2s read too fast on desktop (user) */
@@ -1005,10 +1010,37 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 .review-end-big{ font-family:var(--font-display); font-weight:700; font-size:22px; color:var(--text-primary); }
 .review-end-sub{ font-size:13.5px; color:var(--text-soft); line-height:1.5; }
 
-.settings-sheet{ align-items:stretch; }
-.settings-title{ font-family:var(--font-display); font-weight:700; font-size:17px; }
-.settings-row{ display:block; width:100%; text-align:left; padding:12px 14px; border:1px solid rgba(255,255,255,0.14); border-radius:8px; background:rgba(255,255,255,0.04); color:var(--text-primary); font-size:14px; }
-.settings-row.danger{ color:var(--red); border-color:rgba(194,74,61,0.5); }
+/* ▲ POST-SPRINT (§P1) — settings as a dropdown under the header ⋯, replacing
+   the modal sheet. Same visual idiom as the notes filter menu, anchored to the
+   header's right edge. The scrim is invisible but catches the outside tap. */
+.menu-scrim{ position:fixed; inset:0; z-index:130; background:transparent; }
+.settings-menu{
+  position:fixed; z-index:131;
+  top:calc(var(--header-h) + env(safe-area-inset-top) - 6px);
+  right:calc(14px + env(safe-area-inset-right));
+  min-width:238px; max-width:min(300px, 86vw);
+  background:var(--paper); border:1px solid rgba(255,255,255,0.16); border-radius:10px;
+  box-shadow:var(--paper-shadow); padding:5px; display:flex; flex-direction:column; gap:2px;
+}
+.settings-item{
+  display:flex; align-items:center; gap:10px; text-align:left; width:100%;
+  border:none; background:transparent; color:var(--text-primary);
+  border-radius:7px; padding:10px 11px; font-size:13.5px;
+}
+.settings-item:hover{ background:rgba(255,255,255,0.08); }
+.settings-item .si-label{ flex:1; }
+.settings-item .si-value{ font-family:var(--font-mono); font-size:11px; color:var(--text-soft); }
+.settings-item .si-caret{ color:var(--text-soft); font-size:14px; }
+.settings-item.danger{ color:var(--red); }
+.settings-item.disabled{ color:var(--text-soft); cursor:default; }
+.settings-item.disabled:hover{ background:transparent; }
+.settings-back{ color:var(--text-soft); font-weight:600; }
+.settings-sep{ height:1px; background:rgba(255,255,255,0.10); margin:4px 6px; }
+.settings-check{ color:var(--brass); font-size:13px; }
+.settings-swatch{
+  flex:0 0 auto; width:20px; height:20px; border-radius:4px;
+  border:1px solid rgba(255,255,255,0.22);
+}
 
 /* CHUNK 6 — Notes lane */
 .note-card{ cursor:pointer; }

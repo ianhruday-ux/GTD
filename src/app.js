@@ -5473,25 +5473,81 @@
     Storage.keys().forEach(function(key){ if (key.indexOf("gtd_") === 0) Storage.remove(key); });
     window.location.reload();
   }
+  // ▲ POST-SPRINT (§P1): the settings surface is a DROPDOWN anchored under the
+  // header ⋯, not a modal sheet. A modal is a room you have to leave; settings
+  // here are small, frequent, and mostly one tap, so the menu opens over the
+  // desk and dismisses on any outside tap. Nested panels (Background) push into
+  // the same dropdown rather than opening a second layer.
+  let settingsPanel = "root";
+  function settingsRootHtml(){
+    const surf = SURFACES[currentSurfaceId()] || SURFACES[DEFAULT_SURFACE];
+    return (
+      '<button type="button" class="settings-item" data-action="export-data">' +
+        '<span>&#11014;</span><span class="si-label">Export a backup</span></button>' +
+      '<button type="button" class="settings-item" data-action="import-data">' +
+        '<span>&#11015;</span><span class="si-label">Import a backup</span></button>' +
+      '<div class="settings-sep"></div>' +
+      '<button type="button" class="settings-item" data-action="settings-backgrounds">' +
+        '<span>&#127912;</span><span class="si-label">Background</span>' +
+        '<span class="si-value">' + escapeHtml(surf.label) + '</span><span class="si-caret">&#8250;</span></button>' +
+      // Listed, not hidden: the slot is real and the work is scheduled, so the
+      // menu says so rather than pretending the feature doesn't exist.
+      '<button type="button" class="settings-item disabled" data-action="settings-language" disabled>' +
+        '<span>&#127760;</span><span class="si-label">Language</span>' +
+        '<span class="si-value">not built yet</span></button>' +
+      '<div class="settings-sep"></div>' +
+      '<button type="button" class="settings-item danger" data-action="clear-all-data">' +
+        '<span>&#8634;</span><span class="si-label">Restore app to defaults</span></button>'
+    );
+  }
+  function settingsBackgroundsHtml(){
+    const cur = currentSurfaceId();
+    let out =
+      '<button type="button" class="settings-item settings-back" data-action="settings-root">' +
+        '<span>&#8249;</span><span class="si-label">Background</span></button>' +
+      '<div class="settings-sep"></div>';
+    Object.keys(SURFACES).forEach(function(id){
+      out +=
+        '<button type="button" class="settings-item" data-action="settings-pick-bg" data-bg="' + id + '">' +
+          '<span class="settings-swatch" style="' + surfaceSwatchStyle(id) + '"></span>' +
+          '<span class="si-label">' + escapeHtml(SURFACES[id].label) + '</span>' +
+          (id === cur ? '<span class="settings-check">&#10003;</span>' : "") +
+        '</button>';
+    });
+    return out;
+  }
+  function renderSettingsMenu(){
+    const menu = qs(".settings-menu");
+    if (menu) menu.innerHTML = settingsPanel === "backgrounds" ? settingsBackgroundsHtml() : settingsRootHtml();
+  }
   function openSettings(){
+    settingsPanel = "root";
     qs("#dialog-root").innerHTML =
-      '<div class="choice-dialog-backdrop"><div class="choice-dialog settings-sheet">' +
-        '<div class="settings-title">Settings</div>' +
-        '<button type="button" class="settings-row" data-action="export-data">⬆ Export a backup</button>' +
-        '<button type="button" class="settings-row" data-action="import-data">⬇ Import a backup</button>' +
-        '<button type="button" class="settings-row danger" data-action="clear-all-data">↺ Restore app to defaults</button>' +
-        '<div class="choice-dialog-btns"><button type="button" data-action="settings-close">Close</button></div>' +
-      '</div></div>';
-    const backdrop = qs(".choice-dialog-backdrop");
-    backdrop.addEventListener("click", function(e){ if (e.target === backdrop) closeDialog(); });
-    qs('[data-action="settings-close"]').addEventListener("click", closeDialog);
-    qs('[data-action="export-data"]').addEventListener("click", exportAllData);
-    qs('[data-action="import-data"]').addEventListener("click", importAllData);
-    qs('[data-action="clear-all-data"]').addEventListener("click", function(){
-      openConfirmDialog("Restore the app to its default state? Everything you’ve entered — notes, actions, projects, habits — will be permanently erased and replaced with the sample data. This can’t be undone.", [
-        { label: "Erase & restore defaults", style: "danger", action: clearAllAppData },
-        { label: "Cancel", action: function(){} }
-      ]);
+      '<div class="menu-scrim" data-action="settings-close"></div>' +
+      '<div class="settings-menu"></div>';
+    renderSettingsMenu();
+    qs(".menu-scrim").addEventListener("click", closeDialog);
+    qs(".settings-menu").addEventListener("click", function(e){
+      const item = e.target.closest("[data-action]");
+      if (!item) return;
+      const action = item.getAttribute("data-action");
+      if (action === "export-data"){ exportAllData(); return; }
+      if (action === "import-data"){ importAllData(); return; }
+      if (action === "settings-backgrounds"){ settingsPanel = "backgrounds"; renderSettingsMenu(); return; }
+      if (action === "settings-root"){ settingsPanel = "root"; renderSettingsMenu(); return; }
+      if (action === "settings-pick-bg"){
+        // Applies immediately and stays open, so the surfaces can be compared
+        // against the real desk instead of from memory.
+        setSurface(item.getAttribute("data-bg"));
+        renderSettingsMenu();
+        return;
+      }
+      if (action === "clear-all-data"){
+        openConfirmDialog("Restore the app to its default state? Everything you’ve entered — notes, actions, projects, habits — will be permanently erased and replaced with the sample data. This can’t be undone.", [
+          { label: "Erase & restore defaults", style: "danger", action: clearAllAppData },
+          { label: "Cancel", action: function(){} }
+        ]);
+      }
     });
   }
   // =========================================================
@@ -6051,6 +6107,7 @@
   }
 
   function boot(){
+    applySurface(loadSurfaceId()); // post-sprint: paint the desk before the shell lands on it
     renderShell();
     bindEvents();
     bindDrawerSwipe(); // finger-follow open/close on the intray drawer, same mechanic as the calendar month swipe

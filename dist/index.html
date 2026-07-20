@@ -96,12 +96,17 @@
 :root{ --tabbar-h: var(--tabbar-h-open); }
 body.tabs-collapsed{ --tabbar-h: var(--tabbar-h-collapsed); }
 
-/* The dark wood grain, defined ONCE here so the lanes background (body::before)
-   and the drafting pages (.screen-overlay) can share the exact same texture
-   without duplicating the (long) base64 data URI. See body::before for the
-   full derivation notes. */
+/* The desk grain, defined ONCE here so the lanes background (body::before) and
+   the drafting pages (.screen-overlay) share the exact same texture.
+   ▲ POST-SPRINT: --wood is now GENERATED AT BOOT by src/surface.js (real Perlin
+   noise displacing a periodic ring function) and set on :root as an inline
+   style, which overrides the fallback below. The fallback is the flat desk
+   colour, not the old feTurbulence streak texture — if the canvas is
+   unavailable for any reason, a clean surface beats a bad one. --wood-size is
+   set alongside it; 260px here only matters for the fallback path. */
 :root{
-  --wood: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScyNjAnIGhlaWdodD0nMjYwJz4KPGZpbHRlciBpZD0nZycgeD0nMCcgeT0nMCcgd2lkdGg9JzEwMCUnIGhlaWdodD0nMTAwJScgY29sb3ItaW50ZXJwb2xhdGlvbi1maWx0ZXJzPSdzUkdCJz4KPGZlVHVyYnVsZW5jZSB0eXBlPSdmcmFjdGFsTm9pc2UnIGJhc2VGcmVxdWVuY3k9JzAuOSAwLjAxMCcgbnVtT2N0YXZlcz0nNCcgc2VlZD0nMTEnIHN0aXRjaFRpbGVzPSdzdGl0Y2gnLz4KPGZlQ29sb3JNYXRyaXggdHlwZT0nbWF0cml4JyB2YWx1ZXM9JzAgMCAwIDAuMzAgMC4wNSAgMCAwIDAgMC4yMCAwLjAzICAwIDAgMCAwLjEzIDAuMDE4ICAwIDAgMCAwIDEnLz4KPC9maWx0ZXI+CjxyZWN0IHdpZHRoPScxMDAlJyBoZWlnaHQ9JzEwMCUnIGZpbHRlcj0ndXJsKCNnKScvPgo8L3N2Zz4=");
+  --wood: none;
+  --wood-size: 260px;
 }
 
 *{ box-sizing:border-box; }
@@ -135,7 +140,7 @@ body::before{
   position:fixed; inset:0; z-index:-1;
   background-color:var(--desk); /* fallback if the data URI can't decode for any reason */
   background-image: var(--wood);
-  background-size: 260px 260px;
+  background-size: var(--wood-size) var(--wood-size);
   background-repeat: repeat;
 }
 
@@ -738,7 +743,7 @@ footer{ text-align:center; color:var(--text-soft); font-size:11.5px; padding:30p
      texture rather than letting the lanes show through. Shared --wood token,
      same 260px tile, so the two surfaces are identical. */
   background:var(--desk) var(--wood);
-  background-size:260px 260px;
+  background-size:var(--wood-size) var(--wood-size);
   background-repeat:repeat;
   display:flex; flex-direction:column;
   transform:translateX(100%); transition:transform .22s ease;
@@ -952,7 +957,7 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 .tray-scroll{ display:flex; flex-direction:column; }
 .tray-drawer{
   position:fixed; top:0; left:0; bottom:0; z-index:211; width:min(360px, 86vw);
-  background:var(--desk) var(--wood); background-size:260px 260px; background-repeat:repeat;
+  background:var(--desk) var(--wood); background-size:var(--wood-size) var(--wood-size); background-repeat:repeat;
   box-shadow:6px 0 24px rgba(0,0,0,0.5); display:flex; flex-direction:column; overflow-y:auto;
   padding:calc(env(safe-area-inset-top) + 14px) 16px calc(env(safe-area-inset-bottom) + 16px) calc(env(safe-area-inset-left) + 16px);
   transform:translateX(-100%); transition:transform .28s ease; /* .2s read too fast on desktop (user) */
@@ -1025,10 +1030,37 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 .review-end-big{ font-family:var(--font-display); font-weight:700; font-size:22px; color:var(--text-primary); }
 .review-end-sub{ font-size:13.5px; color:var(--text-soft); line-height:1.5; }
 
-.settings-sheet{ align-items:stretch; }
-.settings-title{ font-family:var(--font-display); font-weight:700; font-size:17px; }
-.settings-row{ display:block; width:100%; text-align:left; padding:12px 14px; border:1px solid rgba(255,255,255,0.14); border-radius:8px; background:rgba(255,255,255,0.04); color:var(--text-primary); font-size:14px; }
-.settings-row.danger{ color:var(--red); border-color:rgba(194,74,61,0.5); }
+/* ▲ POST-SPRINT (§P1) — settings as a dropdown under the header ⋯, replacing
+   the modal sheet. Same visual idiom as the notes filter menu, anchored to the
+   header's right edge. The scrim is invisible but catches the outside tap. */
+.menu-scrim{ position:fixed; inset:0; z-index:130; background:transparent; }
+.settings-menu{
+  position:fixed; z-index:131;
+  top:calc(var(--header-h) + env(safe-area-inset-top) - 6px);
+  right:calc(14px + env(safe-area-inset-right));
+  min-width:238px; max-width:min(300px, 86vw);
+  background:var(--paper); border:1px solid rgba(255,255,255,0.16); border-radius:10px;
+  box-shadow:var(--paper-shadow); padding:5px; display:flex; flex-direction:column; gap:2px;
+}
+.settings-item{
+  display:flex; align-items:center; gap:10px; text-align:left; width:100%;
+  border:none; background:transparent; color:var(--text-primary);
+  border-radius:7px; padding:10px 11px; font-size:13.5px;
+}
+.settings-item:hover{ background:rgba(255,255,255,0.08); }
+.settings-item .si-label{ flex:1; }
+.settings-item .si-value{ font-family:var(--font-mono); font-size:11px; color:var(--text-soft); }
+.settings-item .si-caret{ color:var(--text-soft); font-size:14px; }
+.settings-item.danger{ color:var(--red); }
+.settings-item.disabled{ color:var(--text-soft); cursor:default; }
+.settings-item.disabled:hover{ background:transparent; }
+.settings-back{ color:var(--text-soft); font-weight:600; }
+.settings-sep{ height:1px; background:rgba(255,255,255,0.10); margin:4px 6px; }
+.settings-check{ color:var(--brass); font-size:13px; }
+.settings-swatch{
+  flex:0 0 auto; width:20px; height:20px; border-radius:4px;
+  border:1px solid rgba(255,255,255,0.22);
+}
 
 /* CHUNK 6 — Notes lane */
 .note-card{ cursor:pointer; }
@@ -1390,6 +1422,240 @@ const Storage = {
     }
   }
 };
+
+// =========================================================
+// THE DESK SURFACE — procedural wood grain (post-sprint, §P1/§P2)
+//
+// The desk texture used to be a hand-tuned feTurbulence data URI: fractal
+// noise at baseFrequency "0.9 0.010", which stretches noise into horizontal
+// streaks. Streaks are not grain. Real wood has *growth rings* — roughly
+// parallel bands, warped by the tree's own irregularity — and a fibre texture
+// running along them. Noise alone can't produce rings, however it is stretched,
+// because rings are a periodic function that noise *displaces*; that is the
+// whole trick, and it is Perlin's own (the "wood" example in his 1985 paper,
+// the same construction as his marble).
+//
+//   ring coordinate  r = v·RINGS + warp(u,v)      ← noise displaces the bands
+//   ring line        d = |2·frac(r) − 1|          ← triangle wave, 0 mid-band
+//   fibre            f = fbm stretched along the grain
+//
+// So: real Perlin noise (gradient noise, fade curve, permutation table), used
+// as the displacement inside a periodic ring function. Not feTurbulence.
+//
+// TILEABLE BY CONSTRUCTION. The tile repeats across the whole viewport, so a
+// seam would be visible as a grid. Every lattice coordinate is wrapped modulo
+// a per-axis period, and each octave doubles that period alongside its
+// frequency — which makes the noise exactly periodic over the tile, so the
+// edges match with no blending or mirroring.
+//
+// Generated at boot into a data URI and handed to CSS as --wood, which is
+// where the old base64 string used to sit; nothing downstream changed.
+// =========================================================
+
+// ---- Perlin gradient noise, seeded and periodic ----------------------------
+function makePerlin(seed){
+  const p = new Uint8Array(256);
+  for (let i = 0; i < 256; i++) p[i] = i;
+  // mulberry32: a seeded shuffle, so a given background always looks the same
+  // (a texture that changed on every boot would read as a rendering bug).
+  let s = seed >>> 0;
+  function rnd(){
+    s = (s + 0x6D2B79F5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }
+  for (let i = 255; i > 0; i--){
+    const j = Math.floor(rnd() * (i + 1));
+    const tmp = p[i]; p[i] = p[j]; p[j] = tmp;
+  }
+  const perm = new Uint8Array(512);
+  for (let i = 0; i < 512; i++) perm[i] = p[i & 255];
+
+  function fade(t){ return t * t * t * (t * (t * 6 - 15) + 10); }
+  function lerp(a, b, t){ return a + (b - a) * t; }
+  // 4 diagonal gradients — enough in 2D, and branch-free-ish
+  function grad(h, x, y){
+    switch (h & 3){
+      case 0: return x + y;
+      case 1: return -x + y;
+      case 2: return x - y;
+      default: return -x - y;
+    }
+  }
+  // perX/perY are the lattice periods: the noise repeats exactly every perX
+  // units in x and perY in y, which is what makes the tile seamless.
+  return function noise(x, y, perX, perY){
+    let X = Math.floor(x), Y = Math.floor(y);
+    const xf = x - X, yf = y - Y;
+    X = ((X % perX) + perX) % perX;
+    Y = ((Y % perY) + perY) % perY;
+    const X1 = (X + 1) % perX, Y1 = (Y + 1) % perY;
+    const u = fade(xf), v = fade(yf);
+    const aa = perm[perm[X] + Y], ab = perm[perm[X] + Y1];
+    const ba = perm[perm[X1] + Y], bb = perm[perm[X1] + Y1];
+    const r1 = lerp(grad(aa, xf, yf), grad(ba, xf - 1, yf), u);
+    const r2 = lerp(grad(ab, xf, yf - 1), grad(bb, xf - 1, yf - 1), u);
+    return lerp(r1, r2, v); // ~[-1, 1]
+  };
+}
+
+// Fractal sum. Frequencies are integers and double per octave, so the periods
+// double with them and the whole sum stays tileable.
+function fbm(noise, u, v, fx, fy, octaves){
+  let sum = 0, amp = 1, norm = 0, ax = fx, ay = fy;
+  for (let i = 0; i < octaves; i++){
+    sum += amp * noise(u * ax, v * ay, ax, ay);
+    norm += amp;
+    amp *= 0.5; ax *= 2; ay *= 2;
+  }
+  return sum / norm; // ~[-1, 1]
+}
+
+// ---- the palettes ---------------------------------------------------------
+// Each is the same construction with different constants — which is the point
+// of building it procedurally rather than shipping four baked PNGs.
+//   rings  how many growth rings cross the tile
+//   warp   how far the noise displaces them (0 = drawn with a ruler)
+//   fibre  weight of the along-grain streaking
+//   seed   which tree
+const SURFACES = {
+  walnut: { label: "Walnut", desk: "#171513", dark: "#0F0C0A", mid: "#241B15", light: "#38291D",
+            rings: 7, warp: 0.55, ringDepth: 0.50, fibre: 0.30, seed: 11 },
+  oak:    { label: "Oak", desk: "#1B1713", dark: "#150F08", mid: "#2C2117", light: "#453322",
+            rings: 5, warp: 0.42, ringDepth: 0.42, fibre: 0.34, seed: 7 },
+  ebony:  { label: "Ebony", desk: "#111010", dark: "#080707", mid: "#15120F", light: "#241E18",
+            rings: 9, warp: 0.70, ringDepth: 0.55, fibre: 0.26, seed: 23 },
+  slate:  { label: "Slate", desk: "#15161A", dark: "#0E0F13", mid: "#1A1C21", light: "#292C33",
+            rings: 0, warp: 0.0,  ringDepth: 0.0,  fibre: 0.55, seed: 5 },  // rings:0 → stone, not wood
+  plain:  { label: "Plain", desk: "#171513", flat: true }
+};
+const DEFAULT_SURFACE = "walnut";
+// 512 rather than 256: at 256 the same ring wave recurs every 256px down the
+// page and the eye locks onto the repeat immediately. Doubling it quarters how
+// often that happens for ~40ms more generation, paid once at boot.
+const SURFACE_TILE = 512;
+
+function hexToRgb(h){
+  return [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+}
+function smoothstep(a, b, x){
+  const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+}
+
+// Render one seamless tile and return it as a PNG data URI. `size` and
+// `ringsOverride` exist for the picker's chip: a 512px tile shrunk into a 20px
+// swatch averages its own grain away and every surface comes out an identical
+// dark square, so the chip is rendered small with only a couple of rings in it
+// — a stylised sample of the material, like a paint chip, not a literal crop.
+function renderSurfaceTile(cfg, size, ringsOverride){
+  const N = size || SURFACE_TILE;
+  const rings = (ringsOverride == null) ? cfg.rings : ringsOverride;
+  const cv = document.createElement("canvas");
+  cv.width = N; cv.height = N;
+  const ctx = cv.getContext("2d");
+  const img = ctx.createImageData(N, N);
+  const d = img.data;
+  const noise = makePerlin(cfg.seed);
+  const dark = hexToRgb(cfg.dark), mid = hexToRgb(cfg.mid), light = hexToRgb(cfg.light);
+
+  for (let y = 0; y < N; y++){
+    const v = y / N;
+    for (let x = 0; x < N; x++){
+      const u = x / N;
+      // (1) The warp: a slow, large-scale wander, five octaves so it bends at
+      //     several scales at once. This is what stops the rings looking
+      //     printed — it is the tree not growing straight.
+      const warp = fbm(noise, u, v, 2, 3, 5);
+      // (2) The fibre: stretched hard along the grain (low frequency across the
+      //     plank, high along it) — the long capillary streaking that carries
+      //     most of the "this is a cut surface" reading.
+      const fibre = fbm(noise, u, v, 3, 64, 4);
+      // (3) Pores: fine, short, high-frequency flecks.
+      const pore = fbm(noise, u, v, 16, 128, 2);
+      // Base tone first — the plank is not one flat colour before the rings
+      // arrive. Rings then CUT INTO it (subtractive), rather than being mixed
+      // against it; mixing is what flattened this into painted stripes.
+      let shade = 0.58 + cfg.fibre * fibre + 0.07 * pore;
+      if (rings > 0){
+        // The rings themselves: a periodic band function of the ring
+        // coordinate, displaced by the warp. |2·frac(r)−1| is a triangle wave;
+        // smoothstep turns its peak into a NARROW dark line rather than a soft
+        // sine — a wide soft band reads as a stripe, a narrow one as timber.
+        const r = v * rings + warp * cfg.warp;
+        const t = r - Math.floor(r);
+        const dline = Math.abs(2 * t - 1);
+        // Ring lines vary in weight along their length (a real ring is not a
+        // uniform stroke), driven by the same fibre field.
+        const weight = 0.62 + 0.10 * fibre;
+        const ring = smoothstep(weight, 1.0, dline);
+        shade -= ring * cfg.ringDepth;
+      }
+      shade = Math.max(0, Math.min(1, shade));
+      // Three-stop ramp (dark → mid → light) rather than two: a straight
+      // two-colour lerp washes the midtones flat and loses the depth.
+      let c0, c1, f;
+      if (shade < 0.5){ c0 = dark; c1 = mid; f = shade * 2; }
+      else { c0 = mid; c1 = light; f = (shade - 0.5) * 2; }
+      const i = (y * N + x) * 4;
+      d[i]     = Math.round(c0[0] + (c1[0] - c0[0]) * f);
+      d[i + 1] = Math.round(c0[1] + (c1[1] - c0[1]) * f);
+      d[i + 2] = Math.round(c0[2] + (c1[2] - c0[2]) * f);
+      d[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return cv.toDataURL("image/png");
+}
+
+// ---- wiring into CSS ------------------------------------------------------
+const SURFACE_KEY = "gtd_surface"; // gtd_: a preference, so "Restore to defaults" resets it too
+function loadSurfaceId(){
+  const id = Storage.get(SURFACE_KEY);
+  return (id && SURFACES[id]) ? id : DEFAULT_SURFACE;
+}
+function currentSurfaceId(){ return state.surfaceId || loadSurfaceId(); }
+
+// Each tile costs a few ms of canvas work, so they are generated once and kept
+// — the picker shows every surface at once, and re-rendering four textures on
+// each repaint of the menu would be visible.
+const surfaceTileCache = {};
+function surfaceTile(id){
+  const cfg = SURFACES[id];
+  if (!cfg || cfg.flat) return null;
+  if (!surfaceTileCache[id]) surfaceTileCache[id] = renderSurfaceTile(cfg);
+  return surfaceTileCache[id];
+}
+function applySurface(id){
+  const cfg = SURFACES[id] || SURFACES[DEFAULT_SURFACE];
+  state.surfaceId = SURFACES[id] ? id : DEFAULT_SURFACE;
+  const root = document.documentElement;
+  root.style.setProperty("--desk", cfg.desk);
+  root.style.setProperty("--wood-size", SURFACE_TILE + "px");
+  const tile = surfaceTile(state.surfaceId);
+  root.style.setProperty("--wood", tile ? 'url("' + tile + '")' : "none");
+}
+// The picker's swatch: the whole tile shrunk into a 20px square, which reads as
+// a sample of that surface rather than four near-identical dark chips (all the
+// desk colours are within a few points of each other by design).
+// ⚑ Judgement call: the chip is a COLOUR sample, not a texture sample. Both
+// texture options were tried and rejected by looking at them: the full tile
+// shrunk to 20px averages its own grain into a flat square, and a 20px tile
+// rendered directly puts the fibre frequency past Nyquist, which aliases into
+// mud. These woods are all near-black by design, so a two-stop ramp of the
+// surface's own tones is the most a chip that size can honestly carry.
+function surfaceSwatchStyle(id){
+  const cfg = SURFACES[id];
+  if (!cfg) return "background:#000";
+  if (cfg.flat) return "background:" + cfg.desk;
+  return "background:linear-gradient(135deg," + cfg.light + " 0%," + cfg.mid + " 55%," + cfg.dark + " 100%)";
+}
+function setSurface(id){
+  if (!SURFACES[id]) return;
+  Storage.set(SURFACE_KEY, id);
+  applySurface(id);
+}
 
 // =========================================================
 // CHUNK MAP (spec.md §8.2) — its own src/ module per that section's
@@ -6936,25 +7202,81 @@ function injectChunkMap(){
     Storage.keys().forEach(function(key){ if (key.indexOf("gtd_") === 0) Storage.remove(key); });
     window.location.reload();
   }
+  // ▲ POST-SPRINT (§P1): the settings surface is a DROPDOWN anchored under the
+  // header ⋯, not a modal sheet. A modal is a room you have to leave; settings
+  // here are small, frequent, and mostly one tap, so the menu opens over the
+  // desk and dismisses on any outside tap. Nested panels (Background) push into
+  // the same dropdown rather than opening a second layer.
+  let settingsPanel = "root";
+  function settingsRootHtml(){
+    const surf = SURFACES[currentSurfaceId()] || SURFACES[DEFAULT_SURFACE];
+    return (
+      '<button type="button" class="settings-item" data-action="export-data">' +
+        '<span>&#11014;</span><span class="si-label">Export a backup</span></button>' +
+      '<button type="button" class="settings-item" data-action="import-data">' +
+        '<span>&#11015;</span><span class="si-label">Import a backup</span></button>' +
+      '<div class="settings-sep"></div>' +
+      '<button type="button" class="settings-item" data-action="settings-backgrounds">' +
+        '<span>&#127912;</span><span class="si-label">Background</span>' +
+        '<span class="si-value">' + escapeHtml(surf.label) + '</span><span class="si-caret">&#8250;</span></button>' +
+      // Listed, not hidden: the slot is real and the work is scheduled, so the
+      // menu says so rather than pretending the feature doesn't exist.
+      '<button type="button" class="settings-item disabled" data-action="settings-language" disabled>' +
+        '<span>&#127760;</span><span class="si-label">Language</span>' +
+        '<span class="si-value">not built yet</span></button>' +
+      '<div class="settings-sep"></div>' +
+      '<button type="button" class="settings-item danger" data-action="clear-all-data">' +
+        '<span>&#8634;</span><span class="si-label">Restore app to defaults</span></button>'
+    );
+  }
+  function settingsBackgroundsHtml(){
+    const cur = currentSurfaceId();
+    let out =
+      '<button type="button" class="settings-item settings-back" data-action="settings-root">' +
+        '<span>&#8249;</span><span class="si-label">Background</span></button>' +
+      '<div class="settings-sep"></div>';
+    Object.keys(SURFACES).forEach(function(id){
+      out +=
+        '<button type="button" class="settings-item" data-action="settings-pick-bg" data-bg="' + id + '">' +
+          '<span class="settings-swatch" style="' + surfaceSwatchStyle(id) + '"></span>' +
+          '<span class="si-label">' + escapeHtml(SURFACES[id].label) + '</span>' +
+          (id === cur ? '<span class="settings-check">&#10003;</span>' : "") +
+        '</button>';
+    });
+    return out;
+  }
+  function renderSettingsMenu(){
+    const menu = qs(".settings-menu");
+    if (menu) menu.innerHTML = settingsPanel === "backgrounds" ? settingsBackgroundsHtml() : settingsRootHtml();
+  }
   function openSettings(){
+    settingsPanel = "root";
     qs("#dialog-root").innerHTML =
-      '<div class="choice-dialog-backdrop"><div class="choice-dialog settings-sheet">' +
-        '<div class="settings-title">Settings</div>' +
-        '<button type="button" class="settings-row" data-action="export-data">⬆ Export a backup</button>' +
-        '<button type="button" class="settings-row" data-action="import-data">⬇ Import a backup</button>' +
-        '<button type="button" class="settings-row danger" data-action="clear-all-data">↺ Restore app to defaults</button>' +
-        '<div class="choice-dialog-btns"><button type="button" data-action="settings-close">Close</button></div>' +
-      '</div></div>';
-    const backdrop = qs(".choice-dialog-backdrop");
-    backdrop.addEventListener("click", function(e){ if (e.target === backdrop) closeDialog(); });
-    qs('[data-action="settings-close"]').addEventListener("click", closeDialog);
-    qs('[data-action="export-data"]').addEventListener("click", exportAllData);
-    qs('[data-action="import-data"]').addEventListener("click", importAllData);
-    qs('[data-action="clear-all-data"]').addEventListener("click", function(){
-      openConfirmDialog("Restore the app to its default state? Everything you’ve entered — notes, actions, projects, habits — will be permanently erased and replaced with the sample data. This can’t be undone.", [
-        { label: "Erase & restore defaults", style: "danger", action: clearAllAppData },
-        { label: "Cancel", action: function(){} }
-      ]);
+      '<div class="menu-scrim" data-action="settings-close"></div>' +
+      '<div class="settings-menu"></div>';
+    renderSettingsMenu();
+    qs(".menu-scrim").addEventListener("click", closeDialog);
+    qs(".settings-menu").addEventListener("click", function(e){
+      const item = e.target.closest("[data-action]");
+      if (!item) return;
+      const action = item.getAttribute("data-action");
+      if (action === "export-data"){ exportAllData(); return; }
+      if (action === "import-data"){ importAllData(); return; }
+      if (action === "settings-backgrounds"){ settingsPanel = "backgrounds"; renderSettingsMenu(); return; }
+      if (action === "settings-root"){ settingsPanel = "root"; renderSettingsMenu(); return; }
+      if (action === "settings-pick-bg"){
+        // Applies immediately and stays open, so the surfaces can be compared
+        // against the real desk instead of from memory.
+        setSurface(item.getAttribute("data-bg"));
+        renderSettingsMenu();
+        return;
+      }
+      if (action === "clear-all-data"){
+        openConfirmDialog("Restore the app to its default state? Everything you’ve entered — notes, actions, projects, habits — will be permanently erased and replaced with the sample data. This can’t be undone.", [
+          { label: "Erase & restore defaults", style: "danger", action: clearAllAppData },
+          { label: "Cancel", action: function(){} }
+        ]);
+      }
     });
   }
   // =========================================================
@@ -7514,6 +7836,7 @@ function injectChunkMap(){
   }
 
   function boot(){
+    applySurface(loadSurfaceId()); // post-sprint: paint the desk before the shell lands on it
     renderShell();
     bindEvents();
     bindDrawerSwipe(); // finger-follow open/close on the intray drawer, same mechanic as the calendar month swipe
