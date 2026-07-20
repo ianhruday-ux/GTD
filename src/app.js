@@ -3862,6 +3862,8 @@
       if (revComplete){ reviewComplete(revComplete.getAttribute("data-lane"), revComplete.getAttribute("data-id")); return; }
       const revDelete = e.target.closest('[data-action="review-delete"]');
       if (revDelete){ reviewDelete(revDelete.getAttribute("data-lane"), revDelete.getAttribute("data-id")); return; }
+      const revDeleteEvent = e.target.closest('[data-action="review-delete-event"]');
+      if (revDeleteEvent){ reviewDeleteEvent(revDeleteEvent.getAttribute("data-id")); return; }
       const revSomeday = e.target.closest('[data-action="review-someday"]');
       if (revSomeday){ changeKind("current", "future", revSomeday.getAttribute("data-id")).then(function(){ renderScreen(); }); return; }
       const revPromote = e.target.closest('[data-action="review-promote"]');
@@ -5390,8 +5392,15 @@
       // §2: the pseudo-action shape of the past-due kind is a CHECKBOX, not the
       // deadline menu — you cannot "push" an event's date from here (it is
       // rescheduled on its own page), only tick it done or defer it.
+      // ⚑ QA #13: Delete joins Mark done. They look interchangeable but they
+      // are not — completing files the event into Completed, which is right for
+      // something you did and wrong for something that simply died. Without a
+      // delete here, the only way to clear a dead past-due event was to record
+      // it as an accomplishment. Routed through the event (not the lane row):
+      // deleting the row alone leaves the event live and the sweep re-mints it.
       menuHtml =
         '<button type="button" class="review-menu-btn" data-action="review-complete" data-lane="' + l.laneKind + '" data-id="' + l.id + '">&#10003; Mark done</button>' +
+        '<button type="button" class="review-menu-btn danger" data-action="review-delete-event" data-id="' + l.id + '">&#128465; Delete</button>' +
         reviewNotNowBtn(l.key);
     } else if (l.kind === "pastdue"){
       if (form && form.type === "date"){
@@ -5515,6 +5524,17 @@
       { label: "Delete", style: "danger", action: function(){ deleteTask(lane, id); if (state.screen) state.screen.reviewForm = null; renderScreen(); } },
       { label: "Cancel", action: function(){} }
     ]);
+  }
+  // QA #13. The id is the pseudo-action's task ID, which IS the event's taskId
+  // (§4.14a) — that stability is exactly what lets the review address the event
+  // without carrying a second identifier.
+  function reviewDeleteEvent(taskId){
+    const ev = findEventByTaskId(taskId);
+    if (!ev){ renderScreen(); return; }
+    confirmDeleteEvent(ev, function(){
+      if (state.screen) state.screen.reviewForm = null;
+      renderScreen();
+    });
   }
   function reviewSortCapture(target, key){
     const capture = (state.tray || []).find(function(t){ return t.id === key; });

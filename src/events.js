@@ -780,7 +780,6 @@ function openEventScreen(eventId, occDate){
 function eventBodyHtml(s){
   const d = s.draft;
   const ev = findEvent(s.eventId) || {};
-  const isAppt = !!d.time;
   const doneToday = (ev.completedOccs || []).indexOf(s.occDate || d.date) !== -1; // completion keyed by canonical
   let fields = "";
   // On a recurring series, name the occurrence being edited so "this occurrence
@@ -801,8 +800,13 @@ function eventBodyHtml(s){
     '</div></div>';
   // Time
   fields += '<div class="screen-row"><div class="screen-boxed-row"><span class="field-icon">&#128337;</span>' +
+    // ⚑ The "a time makes it an appointment" hint is gone (user): event vs.
+    // appointment is a distinction the IMPLEMENTATION needs — it decides the
+    // progress bar's window (§4.14c) and the past-due moment — but it means
+    // nothing to someone adding a dentist visit. The field is optional and
+    // self-evident; naming the taxonomy only taught users a word they will
+    // never need. The internal terms stay in the code and the spec.
     '<input type="time" class="screen-time" data-field="event-time" value="' + escapeHtml(d.time || "") + '" style="color-scheme:dark">' +
-    '<span class="cal-hint">' + (isAppt ? "appointment" : "a time makes it an appointment") + '</span>' +
     (d.time ? '<button type="button" class="screen-clear-x" data-action="event-clear-time" title="Clear time">&times;</button>' : "") +
     '</div></div>';
   // Recurrence
@@ -829,7 +833,14 @@ function eventBodyHtml(s){
   }
   // Complete — draft-only, arms on save (§4.14: completes like a Next Action)
   const armed = !!d.willComplete;
-  fields += '<button type="button" class="btn screen-complete-pill' + (armed ? " armed" : "") + '" data-action="event-complete">' +
+  // ⚑ QA #27: this emitted `armed`, but .screen-complete-pill only styles
+  // `.done` (and `.paused`) — .screen-complete-pill.armed matches no rule
+  // anywhere, so the armed state on THIS page alone rendered unshaded. The
+  // action page has always emitted `done` for the identical draft state; the
+  // class name is the app-wide contract for "this pill is lit", so the event
+  // page now speaks it too. (`armed` remains correct on .screen-pause-btn and
+  // .screen-make-kind-btn, which do define it.)
+  fields += '<button type="button" class="btn screen-complete-pill' + (armed ? " done" : "") + '" data-action="event-complete">' +
     (armed ? "&#10003; Completing on save" : (doneToday ? "&#10003; Completed today — tap to reopen on save" : "Mark complete")) + '</button>';
   return '<div class="screen-body">' + fields + '</div>';
 }
@@ -929,21 +940,31 @@ function finishEventSave(s, ev){
 
 // Delete on the event page. Recurring → Skip this one · Delete series · Cancel
 // (§4.15b); one-shot → a plain confirm.
-function deleteEventFromPage(){
-  const s = state.screen; if (!s || !s.eventView) return;
-  const ev = findEvent(s.eventId); if (!ev){ closeScreen(); return; }
+// Deleting an event, wherever it is deleted FROM (the event page, the review's
+// past-due queue). Factored out for QA #13: a pseudo-action is a view of an
+// event, so deleting one must delete the EVENT — removing just the lane row
+// would leave the event live and the 4 AM sweep would mint the row straight
+// back (the ghost-row bug, fixed earlier this round). A recurring series gets
+// the scope choice; nothing here bypasses the confirm.
+function confirmDeleteEvent(ev, after){
+  const done = function(){ if (after) after(); };
   if (isRecurring(ev)){
     openConfirmDialog("This event repeats. What would you like to do?", [
-      { label: "Skip this one", action: function(){ skipOccurrence(ev); closeScreen(); } },
-      { label: "Delete series", style: "danger", action: function(){ deleteEventEntirely(ev); closeScreen(); } },
+      { label: "Skip this one", action: function(){ skipOccurrence(ev); done(); } },
+      { label: "Delete series", style: "danger", action: function(){ deleteEventEntirely(ev); done(); } },
       { label: "Cancel", action: function(){} }
     ]);
   } else {
     openConfirmDialog("Delete “" + escapeHtml(ev.title) + "”?", [
-      { label: "Delete", style: "danger", action: function(){ deleteEventEntirely(ev); closeScreen(); } },
+      { label: "Delete", style: "danger", action: function(){ deleteEventEntirely(ev); done(); } },
       { label: "Cancel", action: function(){} }
     ]);
   }
+}
+function deleteEventFromPage(){
+  const s = state.screen; if (!s || !s.eventView) return;
+  const ev = findEvent(s.eventId); if (!ev){ closeScreen(); return; }
+  confirmDeleteEvent(ev, closeScreen);
 }
 function removePseudoRow(eventId){
   const before = state.tasks.next.length;
@@ -1070,6 +1091,10 @@ function calAdd(){
   const s = state.screen;
   const name = (s.calName || "").trim();
   if (!name){ s.calInvalid = true; renderScreen(); const el = qs(".cal-name"); if (el) el.focus(); return; }
+  // Captured BEFORE the branches: consumeCalCapture() clears calFromCaptureId
+  // as its first act, so by the time the add finishes there is no longer any
+  // record that this calendar was opened from the review.
+  const cameFromReview = !!s.calFromCaptureId;
   if (s.calKind === "event"){
     if (eventTitleClashes(name, null)){ s.calInvalid = true; renderScreen(); const el = qs(".cal-name"); if (el) el.focus(); return; }
     const ev = {
@@ -1091,7 +1116,14 @@ function calAdd(){
     createTask(kind, { title: name, notesClean: s.calDesc || "", deadline: { date: s.calSel, time: s.calTime || null } });
     consumeCalCapture();
   }
-  // Reset the row for the next entry, keep the toggles where they are.
+  // ⚑ QA #19: when the calendar was opened FROM the review (a capture's
+  // Calendar chip), placing the thing is the whole errand — so go back to the
+  // review instead of leaving the user parked in the calendar to find their own
+  // way home. closeScreen() pops the stack the review pushed. The "it moved"
+  // banner has already said where it went, so nothing is lost by leaving.
+  if (cameFromReview){ closeScreen(); return; }
+  // Otherwise the calendar is where the user chose to be: reset the row for the
+  // next entry and stay put, keeping the toggles where they are.
   s.calName = ""; s.calDesc = ""; s.calTime = ""; s.calInvalid = false;
   renderScreen();
 }
