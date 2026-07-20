@@ -4859,9 +4859,17 @@
   // off to the next chunk.
   // =========================================================
   function injectQAChecklist(){
-    const FLAG = "gtd_qa_checklist_chunk7_v1"; // chunk 7 (§4.13–§4.15): calendar & events — replaces chunk 6b's groups
+    // POST-SPRINT round — replaces chunk 7, the per-occurrence follow-up AND
+    // chunk 8 (the user has finished walking all three). §8.1's replace-don't-
+    // accumulate discipline is restored: this is the ONLY injector again, and
+    // the two additive ones are deleted rather than left dormant.
+    const FLAG = "gtd_qa_checklist_postsprint_v1";
     if (Storage.get(FLAG)) return;
     Storage.set(FLAG, "1");
+    // Retire the superseded flags so they can't resurrect their injectors, and
+    // so a future Reset doesn't leave dead keys behind.
+    ["gtd_qa_checklist_chunk7_v1", "gtd_qa_checklist_override_v1",
+     "gtd_qa_checklist_override_v2", "gtd_qa_checklist_chunk8_v1"].forEach(Storage.remove);
 
     // Replace, don't accumulate (8.1) — and actually mean it this time.
     // Earlier rounds bumped the flag but left the previous rounds' groups
@@ -4890,93 +4898,43 @@
       });
     }
 
-    addGroupWithItems("\u2705 QA \u2014 Chunk 7: Calendar & events", [
-      { title: "Two ways into the calendar", notes: "Tap the \ud83d\udcc5 in the top-right header \u2014 the calendar opens full-screen. Also open Waiting On: a yellow-bordered box sits at the top listing what\u2019s coming in the next 7 days; tapping anywhere on it opens the same calendar." },
-      { title: "Month grid shows marks", notes: "In Month view, days with something on them show small marks: a yellow dot = an appointment (has a time), a white dot = an all-day event, a red line = a Next Action deadline, a green line = a Project deadline. Faint/hollow dots are future repeats of a repeating event. A day never shows more than three marks \u2014 after that you\u2019ll see a \u2018+\u2019." },
-      { title: "Move between months \u2014 arrows AND swipe", notes: "Use the \u2039 \u203a arrows above the grid, or swipe the grid left/right with your finger: the month should follow your finger as you drag and snap into place when you let go. (This is the finger-follow swipe we\u2019re trialling here \u2014 note anything that feels wrong on your phone.)" },
-      { title: "Tap a day, then tap again for Day view", notes: "Tap any day to select it (it highlights). Tap the already-selected day again \u2014 or the \u2018Day\u2019 tab up top \u2014 to see everything on that day in a list: all-day items first, then timed ones in order." },
-      { title: "Create an event from the bottom row", notes: "At the bottom of the calendar is a creation row. With \u2018Event\u2019 selected, type a name and tap Add \u2014 a white dot appears on the selected day. Add a time first and it becomes an appointment (yellow dot) instead. Leaving the name blank flashes the box; a name that already exists flashes it too." },
-      { title: "An event on TODAY shows up in Next Actions", notes: "Select today in the calendar and add an event. Now open Next Actions \u2014 the event is sitting at the top as a card with a progress bar (an appointment\u2019s bar fills toward its time; an all-day event\u2019s bar is full all day). Tapping the card opens the EVENT page, not a normal action page. Its checkbox completes it like any card." },
-      { title: "Repeating events + \u2018make this a habit instead\u2019", notes: "On the creation row or the event page, set a repeat of Daily/Weekly/Monthly/Yearly (with an \u2018every N\u2019 box for, say, every 2 weeks). When you pick Daily or Weekly a suggestion appears: \u2018Make this a habit instead \u2192\u2019. Tapping it opens a new habit with the title and schedule filled in; saving the habit removes the event, and cancelling brings you back to the event with nothing lost." },
-      { title: "Complete or delete a repeating event", notes: "Complete a repeating event\u2019s card (or on its page) \u2014 it archives and the series rolls to the next date. In the Completed section, repeats of one series collapse into a single \u2018Title \u00d7N\u2019 row. Deleting a repeating event from its page asks: Skip this one (jump to the next date), Delete series, or Cancel." },
-      { title: "Tickler \u2014 set-and-forget reminders", notes: "When creating or editing an event, tick \u2018Tickler\u2019. A tickler stays OFF the month grid and OFF the Waiting On box \u2014 it won\u2019t clutter anything \u2014 but it still appears in Day view, and it still shows up in Next Actions on its day so you actually deal with it. Good for \u2018renew the passport in 6 months\u2019 (the sample \u2018Renew passport\u2019 is one)." },
-      { title: "Deadlines can be born in the calendar", notes: "On the creation row, switch the toggle to \u2018Deadline\u2019 and choose Action or Project. Adding one creates a Next Action (or Current Project) due on the selected day \u2014 you\u2019ll see its red/green line on the grid. (A project made this way has no actions yet, so it\u2019s \u2018stalled\u2019 by design and shows in the review \u2014 that\u2019s expected.)" },
-      { title: "The review handles past-due events and a Calendar chip", notes: "If an event\u2019s day passes without completing it, it shows up in the daily review at the top \u2014 but as a simple checkbox (\u2018Mark done\u2019), not the push-a-date menu a deadline gets. Also: when sorting a captured thought, there\u2019s now a sixth chip, \u2018Calendar\u2019, which opens the calendar with your text ready to place." },
-      { title: "Three sample habits teach the routine", notes: "Open Habits: \u2018Sort my tray\u2019 (every day), \u2018Review my calendar and waiting actions\u2019 (every day, hooked to the first one), and \u2018Review my projects\u2019 (Fridays). They\u2019re ordinary habits \u2014 edit or delete them freely; Reset brings them back." }
+    addGroupWithItems('\u2705 QA \u2014 Settings & appearance', [
+      { title: 'The \u22ef menu is a dropdown now', notes: 'Tap \u22ef in the top-right. Instead of a box in the middle of the screen, a small menu drops down under the button and the desk stays visible behind it. Tap anywhere outside to close it \u2014 there is no Close button any more, and you should not need one.' },
+      { title: 'Change the desk background', notes: '\u22ef \u2192 Background. Pick each one in turn: Walnut, Oak, Ebony, Slate, Plain. The desk changes straight away AND the menu stays open, so you can compare them without reopening it each time. A tick marks the one you are on. \u2039 Background at the top takes you back to the main menu.' },
+      { title: 'The wood is drawn fresh, not a photo', notes: 'Look closely at the desk behind the cards: it should read as grain \u2014 long lines running across, with darker rings bending through them \u2014 rather than the fuzzy static it used to be. Scroll a long lane down; the pattern should not obviously repeat every screenful. Tell me if any of them look wrong on your phone.' },
+      { title: 'Your background survives a restart, and a reset undoes it', notes: 'Pick Oak, then fully close and reopen the app \u2014 it is still Oak. Then \u22ef \u2192 Restore app to defaults (it still asks first). After the reload the desk is back to Walnut, because the background is a setting like anything else.' },
+      { title: 'Language is listed but greyed out', notes: '\u22ef \u2192 the Language row is visible but dimmed and says \'not built yet\', and tapping it does nothing. That is deliberate \u2014 the slot is real and the work is coming.' },
+      { title: 'The app is called OELA', notes: 'The wordmark top-left reads OELA. If you have added it to your home screen, remove and re-add it \u2014 the icon should now be named OELA. And \u22ef \u2192 Export a backup saves a file starting \'oela-backup-\'.' }
     ]);
 
-    addGroupWithItems("\u2705 QA \u2014 Recheck chunk 6b", [
-      { title: "The review still walks open loops one at a time", notes: "Open the intray\u2019s \ud83d\udd0d Review. Stalled projects, orphaned waiting items, past-due deadlines, and captures still appear one card at a time (the rest sealed), with \u2018Show all\u2019 / \u2018One at a time\u2019 and \u2018Not now\u2019 working as before. Adding the calendar shouldn\u2019t have changed any of that." },
-      { title: "Deadlines in the past still get the full menu", notes: "Give a normal Next Action a deadline of yesterday and open the review \u2014 it still offers Push the date / Complete / Delete / Not now (the menu), which is different from an event\u2019s checkbox. Both kinds can appear together at the top." },
-      { title: "Captures still file into every lane", notes: "A captured thought still sorts to Next / Waiting / Project / Future / Habit / Note (now plus Calendar), opening a prefilled page; saving files it, cancelling leaves it in the intray." }
+    addGroupWithItems('\u2705 QA \u2014 The habit runner', [
+      { title: 'Every habit has a chalkboard', notes: 'Open Habits and tap any habit. Above the numbers there is a dark green chalkboard with a chalk stick figure on it and a thought bubble. Check the board looks like a board \u2014 faint dusty smears, nothing crisp or printed-looking.' },
+      { title: 'The runner reacts as you tick the habit', notes: 'On a habit\'s page tap Complete. The figure and its thought should change immediately (from stretching to running). Now tap \u2715 to leave WITHOUT saving, then reopen it \u2014 it is back to how it was. The runner follows your unsaved changes, like everything else on that page.' },
+      { title: 'The two rows of dots are gone', notes: 'The old box of little circles under the chalkboard has been removed \u2014 it was only ever there to show the logic while it was being built, and the runner shows the same thing now. The \'personal best / lifetime\' numbers stay.' },
+      { title: 'Pause and off-days show a resting runner', notes: 'Tap Pause on a habit and save. Reopen it: the figure is sitting reading a book. Same for a habit not scheduled for today (untick today\'s day and save) \u2014 you will also still see the \'Off day\' line explaining why.' },
+      { title: 'A second, faded runner appears once you have a record', notes: 'This one needs a habit with a personal best, so it may take a few days of real use \u2014 or use the QA time buttons to jump days. Once a best run exists, a faded grey figure runs alongside you: that is your record. Worth telling me whether it reads clearly on the small screen.' }
+    ]);
+
+    addGroupWithItems('\u2705 QA \u2014 Calendar & review fixes', [
+      { title: 'Leave the calendar with the back arrow', notes: 'Open the calendar. The \u2715 in the top-right is gone; there is a \u2190 in the top-left instead, the same as every other page. It should take you back where you came from.' },
+      { title: 'Today has a border', notes: 'In Month view, today\'s square has a brass outline around it, not just a brass number \u2014 it should be easy to find at a glance. Tap a different day: the selected day is filled in, and today keeps its outline, so you can tell the two apart.' },
+      { title: 'The jargon is going away', notes: 'On an event\'s page the checkbox now reads \'Hide until the day it happens\' (it used to say \'Tickler\'), and the note next to the time box about appointments is gone entirely. In Day view a hidden event is tagged \'hidden\'. Tell me anywhere else the app still talks like a manual.' },
+      { title: 'A past-due event can be deleted from the review', notes: 'Let an event\'s day go by without ticking it, then open \ud83d\udd0d Review. Alongside \'Mark done\' there is now a red Delete. Use it for something that just died \u2014 marking it done would file it into Completed as if you had achieved it. It asks before deleting, and for a repeating event it offers to skip just that one instead.' },
+      { title: 'Adding from the review brings you back to the review', notes: 'In \ud83d\udd0d Review, take a captured thought and tap the Calendar chip. The calendar opens with your text ready. Tap Add \u2014 you should land back on the review where you left off, with the banner confirming where it went.' },
+      { title: 'A completed event stays gone', notes: 'Tick off an event that is not repeating (the sample \'Dentist\' works). Fully close and reopen the app, then use the QA \'+1 Day\' button a couple of times. It must not reappear in Next Actions. It used to come back with a full red bar.' }
+    ]);
+
+    addGroupWithItems('\u2705 QA \u2014 Progress bars', [
+      { title: 'An all-day event\'s bar now fills across the day', notes: 'Add an event for today with NO time and look at its card in Next Actions early in the day \u2014 the bar should be nearly EMPTY and fill gradually as the day goes on, reaching full at 4am when the day ends. It used to sit completely full all day, which told you nothing. (Use the QA \'+1 Hr\' button to watch it move.)' },
+      { title: 'A deadline due today is not \'passed\' yet', notes: 'Give a Next Action a deadline of today, with no time. Its bar is full \u2014 correct, the day is the deadline \u2014 but it must NOT show the red \'passed\' tag, and it must not appear in the review as past-due. Both should only happen once the day is actually over (4am). It used to be marked passed from 4am that morning, a full day early.' },
+      { title: 'The \'passed\' tag no longer pushes the screen sideways', notes: 'Find any card showing the red \'passed\' tag. The whole tag should be visible inside the card, and the page should not scroll or drift sideways at all. Try it on your phone in portrait.' },
+      { title: 'The event page\'s Complete button lights up like the others', notes: 'Open an event and tap Mark complete. The button should change colour and read \'Completing on save\' \u2014 the same look a normal action\'s Complete button gets. It used to stay unshaded so you could not tell it was armed.' },
+      { title: 'AM/PM \u2014 needs your eyes on the phone', notes: 'Tap a time box to open the time picker. The AM/PM buttons belong to your phone\'s own picker, not to this app, so I cannot put an underline on them. I have made the picker use the app\'s dark colours and brass highlight. Please check whether it is now clear which of AM/PM is selected \u2014 if it still is not, tell me and I will build a custom picker instead.' }
     ]);
 
     saveTasksLocal("next");
   }
 
-  // ADDITIVE checklist for the per-occurrence-override follow-up (user asked to
-  // keep the chunk-7 checklist intact — "don't override the current one in case
-  // I missed an item"). ⚑ Deliberate deviation from §8.1's replace-don't-
-  // accumulate: its own flag, and it does NOT sweep the "✅ QA" groups. When the
-  // next chunk's checklist is written, FOLD THIS GROUP INTO IT and delete this
-  // injector, or a Reset in that era will re-add it alongside the new one.
-  function injectOverrideQAChecklist(){
-    const FLAG = "gtd_qa_checklist_override_v2";
-    if (Storage.get(FLAG)) return;
-    Storage.remove("gtd_qa_checklist_override_v1"); // superseded
-    Storage.set(FLAG, "1");
-    // Self-sweep: replace only OUR prior "Per-occurrence" group, never the
-    // chunk-7 "✅ QA" groups (which this injector deliberately leaves alone).
-    const staleIds = new Set(state.tasks.next
-      .filter(function(t){ return t.isGroup && (t.title || "").indexOf("✅ QA — Per-occurrence") === 0; })
-      .map(function(t){ return t.id; }));
-    if (staleIds.size){
-      state.tasks.next = state.tasks.next.filter(function(t){ return !staleIds.has(t.id) && !staleIds.has(t.parent); });
-    }
-    const groupId = genId();
-    state.tasks.next.push({ id: groupId, title: "✅ QA — Per-occurrence event edits", notesClean: "", linkedProjectId: null, isGroup: true, parent: null, devContext: "qa-checklist" });
-    [
-      { title: "Editing a repeating event asks: this one, or all?", notes: "Create a repeating event (or open the sample ‘Pay rent’). Open it from its Next Actions card, change the time or the title, and tap Save (←). A dialog appears: ‘Apply your changes to… This occurrence only / All occurrences / Cancel.’ A one-off (non-repeating) event just saves with no dialog." },
-      { title: "‘This occurrence only’ leaves the series alone", notes: "Choose ‘This occurrence only.’ Only today’s copy changes — the next one keeps the original time/title. If you gave an all-day repeating event a one-time time, that day’s dot turns yellow (appointment) and its card shows the time, but only for that day." },
-      { title: "‘All occurrences’ changes every copy", notes: "Edit again and choose ‘All occurrences.’ Every future copy takes the new value, and any one-time tweak you’d made to this occurrence is cleared (it now follows the series again)." },
-      { title: "The page names the occurrence you’re editing", notes: "At the top of a repeating event’s page a line says which date you’re editing (‘Editing the occurrence on …’), so ‘this one vs all’ is unambiguous. Cancel in the dialog returns you to the page with your changes still unsaved in the draft." },
-      { title: "Edit a FUTURE occurrence from Day view", notes: "Open the calendar, tap a future day that has a repeating event, tap it in the Day list, change its time, Save → ‘This occurrence only.’ When that day eventually arrives, the event shows up with your one-time change already applied." },
-      { title: "Move a single occurrence to a different day", notes: "Open a repeating event and change the DATE field (‘move this occurrence’), then Save → ‘This occurrence only.’ The event’s dot jumps to the new day on the calendar (tagged ‘moved’ in Day view) while every other occurrence stays put. If today’s occurrence is moved to a future day, its card leaves Next Actions now and comes back on the new day. ‘All occurrences’ instead reschedules the whole series." }
-    ].forEach(function(item){
-      state.tasks.next.push({ id: genId(), title: item.title, notesClean: item.notes || "", linkedProjectId: null, isGroup: false, parent: groupId, whenText: null, hooks: [], deadline: null });
-    });
-    saveTasksLocal("next");
-  }
-
-  // Chunk 8 checklist — also ADDITIVE (self-sweeps only its own group), so the
-  // chunk-7 and per-occurrence checklists you're still working through stay put.
-  // ⚑ Same §8.1 deviation as the override one: when testing is done, fold all
-  // three into a single replace-mode checklist and delete the extra injectors.
-  function injectChunk8QAChecklist(){
-    const FLAG = "gtd_qa_checklist_chunk8_v1";
-    if (Storage.get(FLAG)) return;
-    Storage.set(FLAG, "1");
-    const staleIds = new Set(state.tasks.next
-      .filter(function(t){ return t.isGroup && (t.title || "").indexOf("✅ QA — Chunk 8") === 0; })
-      .map(function(t){ return t.id; }));
-    if (staleIds.size){
-      state.tasks.next = state.tasks.next.filter(function(t){ return !staleIds.has(t.id) && !staleIds.has(t.parent); });
-    }
-    const groupId = genId();
-    state.tasks.next.push({ id: groupId, title: "✅ QA — Chunk 8: Event-conditioning & backup", notesClean: "", linkedProjectId: null, isGroup: true, parent: null, devContext: "qa-checklist" });
-    [
-      { title: "Wait on an event that hasn’t happened yet", notes: "Create a new Waiting action and open its condition picker (the 🪝). Below Next/Waiting there’s now an ‘Upcoming events’ list showing your future events with their dates. Pick one — the waiting card reads ‘After <event> · <date>’ as a normal (not dashed/orphaned) condition, even though that event isn’t in Next Actions yet." },
-      { title: "The event completing promotes the waiting item", notes: "Make an event for today (so it’s a card in Next Actions), wait a new action on it, then tick the event’s card done. The waiting item automatically moves to Next Actions — exactly as if you’d completed a normal action it was waiting on." },
-      { title: "Pausing a repeating event orphans its waiters (reversibly)", notes: "Wait an action on a repeating event, then open the event and pause it (save). The waiting item now shows a dashed ‘orphaned’ condition and appears in the review — a paused series can’t fire. Un-pause the event and the waiting item goes back to normal on its own. Nothing is permanently frozen." },
-      { title: "Delete-series vs skip-this-one", notes: "With a waiting item hooked to a repeating event: choosing ‘Skip this one’ on the event keeps the waiter pointed at the next occurrence (still a valid condition). Choosing ‘Delete series’ orphans the waiter (its target is truly gone) — it keeps the event’s last name on a dashed pill and still saves fine." },
-      { title: "A waiting item shows under what it waits on, in a project", notes: "On a project page, a Waiting action hooked to one of the project’s linked actions (or a linked event) appears indented beneath that item — even if the waiting item itself isn’t linked to the project. Tapping it opens its own page." },
-      { title: "Export a backup file", notes: "Open the ⋯ menu → ‘Export a backup’. A .json file downloads (named with today’s date). It contains everything — actions, projects, habits, notes, tags, contexts, and your calendar events. Keep it somewhere safe; it’s your snapshot." },
-      { title: "Import replaces everything", notes: "⋯ menu → ‘Import a backup’, pick a backup file. It warns ‘This will replace everything currently in the app’ before doing anything. Confirm and the app reloads with exactly what was in the file (import replaces, it never merges). A file that isn’t a valid backup is refused with a message, not a crash." }
-    ].forEach(function(item){
-      state.tasks.next.push({ id: genId(), title: item.title, notesClean: item.notes || "", linkedProjectId: null, isGroup: false, parent: groupId, whenText: null, hooks: [], deadline: null });
-    });
-    saveTasksLocal("next");
-  }
 
   // =========================================================
   // BOOT
@@ -6200,9 +6158,7 @@
     bindDrawerSwipe(); // finger-follow open/close on the intray drawer, same mechanic as the calendar month swipe
     initLocalData();
     initCompletedData();
-    injectQAChecklist();
-    injectOverrideQAChecklist(); // additive — keeps the chunk-7 checklist (user request)
-    injectChunk8QAChecklist();   // additive — keeps chunk-7 + per-occurrence checklists intact
+    injectQAChecklist(); // §8.1 replace-mode again: one checklist, one flag key
     injectChunkMap();
     state.habitDone = loadHabitDone();
     state.habitDoneOrder = loadHabitDoneOrder();
