@@ -1298,6 +1298,10 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 }
 .cal-list-daylabel:first-child{ margin-top:0; }
 .cal-list-daylabel.is-today{ color:var(--brass); }
+.cal-list-daylabel.is-overdue{ color:var(--red); border-bottom-color:rgba(194,74,61,0.45); }
+/* Overdue rows carry a red left edge — the same signal the passed deadline chip
+   uses, so "late" reads the same everywhere. */
+.cal-agenda-overdue{ border-left:2px solid var(--red); }
 .cal-tickler-tag{ font-family:var(--font-mono); font-size:9px; color:var(--dusty); border:1px solid rgba(110,144,172,0.5); border-radius:6px; padding:0 5px; }
 /* A section of the page now, not chrome: no solid backdrop to hide the lanes
    behind it, just a rule separating it from the dates above.

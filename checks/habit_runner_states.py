@@ -152,6 +152,74 @@ with serve(DIST) as url, sync_playwright() as p:
         pg.evaluate("() => { const c=document.querySelector('[data-action=\"screen-close\"],.screen-chrome-btn'); if(c) c.click(); }")
         pg.wait_for_timeout(250)
 
+    # ---------------------------------------------------------------
+    # THE CELEBRATION IS SEEN ONCE, THEN STRETCHING UNTIL THE NEXT LAP
+    #
+    # User ruling: "on your next visit, and until you start a new lap after
+    # that." The cases above each test one state from a fresh reload, so none
+    # of them exercises the TRANSITION — and the transition is the whole
+    # behaviour. consumeHabitPendingResult() clears pendingResult from
+    # persisted state as the page opens, so the celebration renders once and
+    # every later visit falls through to the stretch.
+    #
+    # ⚠ Deliberately no reload between visits: the point is that the clear is
+    # PERSISTED. Reloading here would pass even if it were only draft state.
+    # ---------------------------------------------------------------
+    def open_habit():
+        pg.click('.tab[data-kind="habit"]'); pg.wait_for_timeout(400)
+        if pg.locator(f'.card-title[data-id="{habit_id}"]').count() == 0:
+            hdr = pg.locator('[data-action="toggle-group"][data-id="__completed_open__"]')
+            if hdr.count():
+                hdr.first.click(); pg.wait_for_timeout(350)
+        pg.locator(f'.card-title[data-id="{habit_id}"]').first.click()
+        pg.wait_for_timeout(600)
+        return (pg.evaluate("() => (document.querySelector('.runner-bubble')||{}).textContent") or "").strip()
+
+    def close_screen():
+        pg.evaluate("() => { const c=document.querySelector('[data-action=\"screen-close\"],.screen-chrome-btn'); if(c) c.click(); }")
+        pg.wait_for_timeout(300)
+
+    ended = run_record(personalBest=4, bestSequence=["done"] * 4,
+                       pendingResult={"type": "record", "length": 9, "prevBest": 4})
+    pg.evaluate("""([id, rec]) => {
+      localStorage.setItem('gtd_habit_runs', JSON.stringify({[id]: rec}));
+      localStorage.setItem('gtd_habit_done', JSON.stringify({}));
+    }""", [habit_id, ended])
+    pg.reload(); pg.wait_for_timeout(800)
+    pg.evaluate("() => { const r=document.querySelector('#tray-root'); if(r) r.innerHTML=''; }")
+
+    first = open_habit()
+    check(first.startswith(FINGERPRINT["pb_end_celebration"]),
+          f"visit 1 after a run ends celebrates -> {first[:46]!r}")
+    close_screen()
+
+    second = open_habit()
+    check(second.startswith(FINGERPRINT["fresh_start_stretch"]),
+          f"visit 2 has moved on to stretching -> {second[:46]!r}")
+    close_screen()
+
+    third = open_habit()
+    check(third.startswith(FINGERPRINT["fresh_start_stretch"]),
+          f"visit 3 is still stretching, not re-celebrating -> {third[:46]!r}")
+    close_screen()
+
+    cleared = pg.evaluate("""(id) => {
+      const runs = JSON.parse(localStorage.getItem('gtd_habit_runs') || '{}');
+      return runs[id] ? runs[id].pendingResult : 'MISSING';
+    }""", habit_id)
+    check(cleared is None, f"the pending result was cleared from storage, not just the draft ({cleared})")
+
+    # And the stretch holds until a completion starts the next lap.
+    pg.evaluate("""([id, today]) => {
+      localStorage.setItem('gtd_habit_done', JSON.stringify({[id]: today}));
+    }""", [habit_id, APP_TODAY])
+    pg.reload(); pg.wait_for_timeout(800)
+    pg.evaluate("() => { const r=document.querySelector('#tray-root'); if(r) r.innerHTML=''; }")
+    after_tick = open_habit()
+    check(after_tick.startswith(FINGERPRINT["run_with_ghost"]),
+          f"completing starts the next lap and the runner runs -> {after_tick[:46]!r}")
+    close_screen()
+
     check(not errs, f"no JS errors ({errs[:3]})")
     b.close()
 

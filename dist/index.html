@@ -1318,6 +1318,10 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 }
 .cal-list-daylabel:first-child{ margin-top:0; }
 .cal-list-daylabel.is-today{ color:var(--brass); }
+.cal-list-daylabel.is-overdue{ color:var(--red); border-bottom-color:rgba(194,74,61,0.45); }
+/* Overdue rows carry a red left edge — the same signal the passed deadline chip
+   uses, so "late" reads the same everywhere. */
+.cal-agenda-overdue{ border-left:2px solid var(--red); }
 .cal-tickler-tag{ font-family:var(--font-mono); font-size:9px; color:var(--dusty); border:1px solid rgba(110,144,172,0.5); border-radius:6px; padding:0 5px; }
 /* A section of the page now, not chrome: no solid backdrop to hide the lanes
    behind it, just a rule separating it from the dates above.
@@ -9513,27 +9517,80 @@ function calDayAgendaHtml(dateStr){
 //     bounds the list: a series contributes a single row, so there is no
 //     infinite projection to cap and no horizon to pick.
 //
-// ⚑ Three judgment calls, spec silent (CLAUDE.md: simplest option, flagged):
-//   1. TODAY FORWARD. Past occurrences are the month grid's job and the daily
-//      review's; repeating them here would bury the thing you opened it for.
-//      This means a past-due deadline does NOT appear — say if you want it, it
-//      is a leading "Past due" group and half an hour.
+// ⚑ Judgment calls, spec silent (CLAUDE.md: simplest option, flagged):
+//   1. PAST DUE FIRST, then today forward. (Ruled by the user: an index of
+//      everything that omits the overdue thing reads as broken.) Overdue rows
+//      lead the list in their own group, oldest first, and use the SAME test
+//      the daily review uses — see calPastDueRows. Still-past but RESOLVED
+//      occurrences stay out: they are the month grid's history, not a loop.
 //   2. GROUPED BY DAY with a date heading, rather than a date on every row.
 //      The row markup is then byte-identical to Day view's.
 //   3. UNTIMED BEFORE TIMED within a day — the same ordering rule Day view
 //      already uses (user ruling #4), not a new one.
 // =========================================================
+// Everything already overdue, in the SAME terms the daily review uses — a
+// past-due event is its pseudo-action row (pseudoPassed), a past-due deadline
+// is deadlineBarState().passed. Deliberately not a second rule: if the review
+// and this list ever disagreed about what "overdue" means, one of them would be
+// lying, and there would be no way to tell which.
+function calPastDueRows(){
+  const rows = [];
+  ["next", "current"].forEach(function(k){
+    state.tasks[k].forEach(function(t){
+      if (t.isGroup || isDevScaffold(t)) return;
+      if (t.eventId){
+        if (!pseudoPassed(t)) return;
+        const when = dateStrToDate(t.occDate).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+        rows.push({
+          date: t.occDate, sort: (t.occTime ? "1" + t.occTime : "0"),
+          html: '<button type="button" class="cal-agenda-row cal-agenda-overdue" data-action="cal-open-event" data-id="' + t.eventId + '" data-date="' + t.occDate + '">' +
+            '<span class="cal-agenda-dot ' + (t.occTime ? "cal-mark-appt" : "cal-mark-event") + '"></span>' +
+            '<span class="cal-agenda-when">' + escapeHtml(when + (t.occTime ? " " + t.occTime : "")) + '</span>' +
+            '<span class="cal-agenda-title">' + escapeHtml(t.title) + '</span>' +
+          '</button>'
+        });
+        return;
+      }
+      const st = deadlineBarState(t);
+      if (!(st && st.passed)) return;
+      const when = dateStrToDate(t.deadline.date).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+      rows.push({
+        date: t.deadline.date, sort: (t.deadline.time ? "1" + t.deadline.time : "0"),
+        html: '<button type="button" class="cal-agenda-row cal-agenda-overdue" data-action="cal-open-task" data-lane="' + k + '" data-id="' + t.id + '">' +
+          '<span class="cal-agenda-dot cal-mark-dl-' + (k === "current" ? "current" : "next") + '"></span>' +
+          '<span class="cal-agenda-when">' + escapeHtml(when + (t.deadline.time ? " " + t.deadline.time : "")) + '</span>' +
+          '<span class="cal-agenda-title">' + escapeHtml(t.title) + ' <span class="cal-agenda-kind">' + (k === "current" ? "project" : "action") + ' deadline</span></span>' +
+        '</button>'
+      });
+    });
+  });
+  rows.sort(function(a, b){
+    return a.date === b.date ? a.sort.localeCompare(b.sort) : a.date.localeCompare(b.date);
+  });
+  return rows;
+}
 function calListRows(){
   const today = todayStr();
   const rows = [];
+  // An event with a past-due pseudo-action is shown in the Past due group, so
+  // it must not ALSO appear at its next occurrence — that would put one
+  // repeating series on the list twice. Past-due wins, which is the same
+  // precedence computeOpenLoops uses when an item is both past-due and stalled.
+  const overdueEventIds = {};
+  ["next", "current"].forEach(function(k){
+    state.tasks[k].forEach(function(t){
+      if (!t.isGroup && t.eventId && pseudoPassed(t)) overdueEventIds[t.eventId] = 1;
+    });
+  });
   (state.events || []).forEach(function(ev){
+    if (overdueEventIds[ev.id]) return;
     // ONE occurrence per series (QA #31's helper does exactly this job): the
     // next one that has not passed. Paused included — a paused series still has
     // a next date, and this view is where you want to see it.
     const canon = nextLiveOccurrenceDate(ev);
     if (!canon) return;                       // finished one-shot
     const date = effDate(ev, canon);
-    if (date < today) return;                 // judgment call 1
+    if (date < today) return;
     const t = effTime(ev, canon), title = effTitle(ev, canon);
     const tags =
       (ev.paused ? ' <span class="cal-agenda-kind">paused</span>' : "") +
@@ -9551,7 +9608,9 @@ function calListRows(){
   function deadlineRow(t, laneKind){
     if (t.isGroup || t.eventId) return;       // pseudo-actions come from gtd_events
     if (!(t.deadline && t.deadline.date)) return;
-    if (t.deadline.date < today) return;      // judgment call 1
+    const st = deadlineBarState(t);
+    if (st && st.passed) return;              // shown in the Past due group instead
+    if (t.deadline.date < today) return;
     rows.push({
       date: t.deadline.date, sort: (t.deadline.time ? "1" + t.deadline.time : "0"),
       html: '<button type="button" class="cal-agenda-row" data-action="cal-open-task" data-lane="' + laneKind + '" data-id="' + t.id + '">' +
@@ -9569,12 +9628,17 @@ function calListRows(){
   return rows;
 }
 function calListHtml(){
+  const overdue = calPastDueRows();
   const rows = calListRows();
-  if (!rows.length){
+  if (!overdue.length && !rows.length){
     return '<div class="cal-day-empty">Nothing coming up. Anything you schedule will be listed here, in the order it happens.</div>';
   }
   const today = todayStr();
   let html = '<div class="cal-agenda cal-list">', lastDate = null;
+  if (overdue.length){
+    html += '<div class="cal-list-daylabel is-overdue">Past due</div>';
+    overdue.forEach(function(r){ html += r.html; });
+  }
   rows.forEach(function(r){
     if (r.date !== lastDate){
       const d = dateStrToDate(r.date);

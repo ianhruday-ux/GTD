@@ -59,7 +59,10 @@ EVENTS = [
     ev("e2", "ZZ standup", "2026-06-16", time="09:00", recurrence="daily", seriesId="s1"),
     ev("e3", "ZZ passport", "2026-07-05", tickler=True),
     ev("e4", "ZZ gym", "2026-06-17", recurrence="weekly", seriesId="s2", paused=True),
-    ev("e5", "ZZ long gone", "2026-05-01"),
+    # resolved: ticked off back in May, so it is history, not a loop
+    ev("e5", "ZZ long gone", "2026-05-01", completedOccs=["2026-05-01"]),
+    # NOT resolved: a May event nobody ever ticked is still an open loop
+    ev("e8", "ZZ never ticked", "2026-05-04"),
     ev("e6", "ZZ all day thing", "2026-06-18"),
 ]
 
@@ -138,9 +141,30 @@ with serve(DIST) as url, sync_playwright() as p:
           f"within a day, untimed comes first then timed in order ({day18})")
 
     # ---------- the flagged exclusions ----------
-    check(not find("ZZ long gone"), f"a finished past one-shot is not listed ({find('ZZ long gone')})")
-    check(not find("ZZ past due thing"),
-          f"[flagged] a past-due deadline is not listed ({find('ZZ past due thing')})")
+    check(not find("ZZ long gone"),
+          f"a COMPLETED past event is not listed — history, not a loop ({find('ZZ long gone')})")
+    check(len(find("ZZ never ticked")) == 1,
+          f"an UNCOMPLETED past event is listed as overdue ({find('ZZ never ticked')})")
+
+    # ---------- past due leads the list (user ruling) ----------
+    check(len(find("ZZ past due thing")) == 1,
+          f"an overdue deadline IS listed ({find('ZZ past due thing')})")
+    sections = pg.evaluate("""() => {
+      const out = [];
+      [...document.querySelectorAll('.cal-list > *')].forEach(el => {
+        if (el.classList.contains('cal-list-daylabel')) out.push(['HEAD', el.textContent.trim()]);
+        else out.push(['ROW', (el.querySelector('.cal-agenda-title')||{}).textContent.trim()]);
+      });
+      return out;
+    }""")
+    check(sections and sections[0] == ["HEAD", "Past due"],
+          f"the Past due group leads the list ({sections[:2]})")
+    overdue_idx = next((i for i, (k, v) in enumerate(sections) if k == "ROW" and "past due thing" in v), -1)
+    first_future = next((i for i, (k, v) in enumerate(sections) if k == "HEAD" and v != "Past due"), -1)
+    check(overdue_idx >= 0 and first_future > overdue_idx,
+          f"the overdue row sits above the dated groups ({overdue_idx} < {first_future})")
+    check(pg.locator('.cal-agenda-overdue').count() >= 1,
+          "overdue rows are marked as overdue")
 
     # ---------- a row still opens its item ----------
     pg.locator('.cal-list .cal-agenda-row:has-text("ZZ dentist")').first.click()
@@ -171,8 +195,14 @@ with serve(DIST) as url, sync_playwright() as p:
     tops = {t: create_top(t) for t in ("month", "day", "list")}
     check(all(v is not None for v in tops.values()), f"every tab renders the controls ({tops})")
     if all(v is not None for v in tops.values()):
-        spread = max(tops.values()) - min(tops.values())
-        check(spread <= 4, f"the controls land in the same place on every tab ({tops})")
+        # Day has less content than a month grid, so it must land in the same
+        # place. List may sit LOWER — content pushes it down, which is the
+        # asked-for "if the list is long, the list section can expand" — but it
+        # must never ride HIGHER than Month, which was the original complaint.
+        check(abs(tops["day"] - tops["month"]) <= 4,
+              f"Day puts the controls where Month does ({tops})")
+        check(tops["list"] >= tops["month"] - 4,
+              f"List never puts the controls higher than Month ({tops})")
 
     # An EMPTY day must not float them up either.
     pg.click('[data-action="cal-tab"][data-tab="month"]'); pg.wait_for_timeout(400)
