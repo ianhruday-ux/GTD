@@ -91,12 +91,22 @@
       return ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c];
     });
   }
+  // THE CLOCK. Every "what time is it" in the app goes through here, exactly as
+  // every write goes through storage.js. The QA time-jump buttons move
+  // qaTimeOffset, so honouring it here is what makes the dev tool tell the truth.
+  //
+  // ⚑ This used to be read in three places and BYPASSED in six, all of them
+  // `createdAt: nowMs()`. One of those six is load-bearing: createdAt is the
+  // deadline bar's origin (§4.4b, read at deadlineBarState). Jump the clock ten
+  // days forward, create a deadline, and the bar measured from the real now —
+  // ten days behind the app's now — so it was born part-full. Reported as a
+  // date-picker bug; it was two clocks. (User ruling: one clock, app-wide.)
+  function nowMs(){ return Date.now() + (state.qaTimeOffset || 0) * 60000; }
   // Single 4:00 AM day boundary, app-wide (habits, events, deadlines — one
   // clock, one rule, per the edge-case rulings). "Today" doesn't roll over
   // until 4am, so a late night doesn't cost you a habit day.
   function boundaryNow(){
-    const d = new Date();
-    d.setMinutes(d.getMinutes() + (state.qaTimeOffset || 0));
+    const d = new Date(nowMs());
     d.setHours(d.getHours() - 4);
     return d;
   }
@@ -104,6 +114,10 @@
   function dateStrToDate(s){ const parts = s.split("-").map(Number); return new Date(parts[0], parts[1] - 1, parts[2]); }
   function dateToStr(d){ return d.toLocaleDateString("en-CA"); }
   function addDaysToDate(d, n){ const copy = new Date(d); copy.setDate(copy.getDate() + n); return copy; }
+  // ⚠ DELIBERATELY the real clock, and it must stay that way. An id must never
+  // repeat, and qaTimeOffset can run BACKWARDS (the QA buttons subtract as well
+  // as add) — feed it a rewindable clock and two sessions either side of a jump
+  // can mint the same id. Uniqueness beats consistency here. Do not "fix" this.
   function genId(){ return "local-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8); }
 
   // How many habits (other than excludeId) currently hook onto targetId.
@@ -887,7 +901,7 @@
       notesClean: data.notesClean || "", linkedProjectId: data.linkedProjectId || null, deadline: data.deadline || null,
       whenText: data.whenText || null, conditionId: data.conditionId || null,
       conditionKind: data.conditionKind || null, conditionLabel: data.conditionLabel || null,
-      bundleText: data.bundleText || null, contextId: data.contextId || null, createdAt: Date.now() // deadline-bar origin (§4.4b)
+      bundleText: data.bundleText || null, contextId: data.contextId || null, createdAt: nowMs() // deadline-bar origin (§4.4b)
     };
     const task = Object.assign({ id: genId(), title: data.title, isGroup: false, parent: null }, base);
     state.tasks[kind].unshift(task);
@@ -1212,7 +1226,7 @@
     const deadline = task.deadline;
     if (!deadline || !deadline.date) return null;
     const due = deadlineDueInstant(deadline);
-    const now = Date.now() + (state.qaTimeOffset || 0) * 60000;
+    const now = nowMs();
     // ⚑ FIXED (4 AM turnover audit, this round): an UNTIMED deadline's bar
     // converges on the 4 AM boundary that BEGINS its due day — that is when it
     // reaches full, and it is right, because the day itself is the resolution.
@@ -2222,7 +2236,7 @@
     const pid = s.staging.projectId;
     const willComplete = !!s.draft.willComplete;
     if (!s.taskId){
-      const task = Object.assign({ id: genId(), isGroup: false, parent: null, createdAt: Date.now() }, data);
+      const task = Object.assign({ id: genId(), isGroup: false, parent: null, createdAt: nowMs() }, data);
       task.linkedProjectId = pid;
       task.kind = s.kind;
       if (willComplete) task.stagedComplete = true;
@@ -2268,7 +2282,7 @@
     };
     const projectId = stagingProjectId(s);
     if (!s.taskId){
-      const proj = Object.assign({ id: projectId, isGroup: false, parent: null, createdAt: Date.now() }, projData);
+      const proj = Object.assign({ id: projectId, isGroup: false, parent: null, createdAt: nowMs() }, projData);
       state.tasks[s.kind].unshift(proj);
       saveTasksLocal(s.kind);
     } else {
@@ -2429,7 +2443,7 @@
     s.draft.staged.creates.push({
       id: genId(), kind: "next", title: title, notesClean: "", linkedProjectId: stagingProjectId(s),
       isGroup: false, parent: null, deadline: null, contextId: null, whenText: null,
-      conditionId: null, conditionKind: null, conditionLabel: null, bundleText: null, createdAt: Date.now()
+      conditionId: null, conditionKind: null, conditionLabel: null, bundleText: null, createdAt: nowMs()
     });
     if (s.invalidField === "projectActions") s.invalidField = null;
     renderScreen();
@@ -2627,7 +2641,7 @@
         notesClean: "", linkedProjectId: stagingProjectId(s), isGroup: false, parent: null,
         deadline: null, contextId: null, whenText: null,
         conditionId: targetId, conditionKind: targetKind, conditionLabel: label, bundleText: null,
-        createdAt: Date.now()
+        createdAt: nowMs()
       });
       if (s.invalidField === "projectActions") s.invalidField = null;
       s.draft.waitingHookPicker = false;
@@ -3603,6 +3617,9 @@
   }
   function dlog(ev, detail){
     if (!dragLogOn) return;
+    // ⚠ Real clock on purpose (like genId): these are elapsed-millisecond deltas
+    // for a drag gesture. A QA time jump landing mid-drag would inject days of
+    // "elapsed" into a log measuring thumb movement.
     const now = Date.now();
     if (!dragLogBuf.length) dragLogT0 = now;
     dragLogBuf.push("+" + (now - dragLogT0) + "ms  " + ev + (detail ? "  " + detail : ""));
@@ -5169,7 +5186,7 @@
   function trayAdd(text){
     text = (text || "").trim();
     if (!text) return;
-    state.tray.unshift({ id: genId(), text: text, createdAt: Date.now() });
+    state.tray.unshift({ id: genId(), text: text, createdAt: nowMs() });
     saveTray();
     const inp = qs("#tray-input"); if (inp) inp.value = ""; // clear the box in place — no full re-render/re-slide
     refreshTrayList();
@@ -6063,9 +6080,9 @@
     const body = sanitizeNoteHtml(s.draft.body || ""); // untrusted-input surface (§4.9) — sanitise at the commit
     if (s.noteId){
       const n = findNote(s.noteId);
-      if (n){ n.title = title; n.body = body; n.projectLinks = s.draft.projectLinks || []; n.tagIds = s.draft.tagIds || []; n.editedAt = Date.now(); }
+      if (n){ n.title = title; n.body = body; n.projectLinks = s.draft.projectLinks || []; n.tagIds = s.draft.tagIds || []; n.editedAt = nowMs(); }
     } else {
-      state.notes.unshift({ id: genId(), title: title, body: body, projectLinks: s.draft.projectLinks || [], tagIds: s.draft.tagIds || [], editedAt: Date.now() });
+      state.notes.unshift({ id: genId(), title: title, body: body, projectLinks: s.draft.projectLinks || [], tagIds: s.draft.tagIds || [], editedAt: nowMs() });
     }
     saveNotes();
     renderLane("notes");

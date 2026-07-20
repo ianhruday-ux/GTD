@@ -41,7 +41,7 @@ function findEventByTaskId(taskId){ return (state.events || []).find(function(e)
 function eventIsAppointment(ev){ return !!(ev && ev.time); }
 
 // The clock, matching deadlineBarState() — real time plus the dev QA offset.
-function nowInstant(){ return Date.now() + (state.qaTimeOffset || 0) * 60000; }
+function nowInstant(){ return nowMs(); }
 
 // The instant an occurrence "happens" (and, once past, goes overdue). A timed
 // occurrence passes at its time; an UNTIMED one has no moment to converge on,
@@ -183,7 +183,7 @@ function makePseudoActionRow(ev){
     contextId: ev.contextId || null, linkedProjectId: ev.linkedProjectId || null,
     occCanon: c, occDate: effDate(ev, c), occTime: effTime(ev, c), // occDate = EFFECTIVE (where it lands)
     deadline: null, whenText: null, conditionId: null, conditionKind: null, conditionLabel: null,
-    bundleText: null, createdAt: Date.now()
+    bundleText: null, createdAt: nowMs()
   };
 }
 function findPseudoRow(eventId){ return state.tasks.next.find(function(t){ return t.eventId === eventId; }) || null; }
