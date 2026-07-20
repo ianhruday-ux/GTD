@@ -988,7 +988,7 @@ function eventBodyHtml(s){
   // Date — editable, so an occurrence can be moved to another day (a recurring
   // event asks "this occurrence / all" at save; a one-off just moves).
   fields += '<div class="screen-row"><div class="screen-boxed-row"><span class="field-icon">&#128197;</span>' +
-    '<input type="date" class="screen-date" data-field="event-date" value="' + escapeHtml(d.date || "") + '" style="color-scheme:dark">' +
+    '<input type="text" readonly inputmode="none" class="screen-date" data-field="event-date" placeholder="Pick a date" value="' + escapeHtml(d.date || "") + '">' +
     (isRecurring({ recurrence: d.recurrence }) ? '<span class="cal-hint">move this occurrence</span>' : "") +
     '</div></div>';
   // Time

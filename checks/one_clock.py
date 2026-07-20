@@ -20,6 +20,7 @@ future round "unifies" those, that is a regression, not a cleanup.
 """
 import os, functools, http.server, socket, socketserver, threading, contextlib, sys, datetime
 from playwright.sync_api import sync_playwright
+from _pickers import pick_date
 
 DIST = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "dist")
 
@@ -74,7 +75,7 @@ with serve(DIST) as url, sync_playwright() as p:
         pg.fill('[data-field="title"]', title)
         # Setting the date re-renders the screen (the time + clear controls
         # appear), so this must settle before the save button is clicked.
-        pg.fill('[data-field="deadline-date"]', due); pg.wait_for_timeout(400)
+        pick_date(pg, '[data-field="deadline-date"]', due)
         pg.click('[data-action="screen-save"]'); pg.wait_for_timeout(600)
 
     def bar_percent(title):

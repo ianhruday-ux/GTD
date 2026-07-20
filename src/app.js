@@ -2777,7 +2777,7 @@
         '<div class="screen-row">' +
           '<div class="screen-boxed-row">' +
             '<span class="field-icon">&#128197;</span>' +
-            '<input type="date" class="screen-date" data-field="deadline-date" value="' + escapeHtml(d.date || "") + '">' +
+            '<input type="text" readonly inputmode="none" class="screen-date" data-field="deadline-date" placeholder="No deadline" value="' + escapeHtml(d.date || "") + '">' +
             (d.date ? '<input type="text" readonly inputmode="none" class="screen-time" data-field="deadline-time" placeholder="--:--" value="' + escapeHtml(d.time || "") + '">' : "") +
             (d.date ? '<button type="button" class="screen-clear-x" data-action="clear-deadline" title="Clear deadline">&times;</button>' : "") +
           '</div>' +
@@ -5458,7 +5458,7 @@
     return (
       '<div class="review-inline-form">' +
         (isDate
-          ? '<input type="date" id="review-form-input" data-field="reviewForm" class="review-form-input' + (invalid ? " field-invalid" : "") + '" value="' + escapeHtml(value || "") + '" style="color-scheme:dark">'
+          ? '<input type="text" readonly inputmode="none" id="review-form-input" data-field="reviewForm" placeholder="Pick a date" class="review-form-input' + (invalid ? " field-invalid" : "") + '" value="' + escapeHtml(value || "") + '">'
           : '<input type="text" id="review-form-input" data-field="reviewForm" class="review-form-input' + (invalid ? " field-invalid" : "") + '" placeholder="' + escapeHtml(placeholder) + '" value="' + escapeHtml(value || "") + '" autocomplete="off">') +
         '<div class="review-inline-form-btns">' +
           '<button type="button" class="review-menu-btn" data-action="review-form-cancel">Cancel</button>' +

@@ -1,5 +1,6 @@
 /* ============================================================
- * timepicker.js — the app's own time picker (bug #2, QA #15)
+ * pickers.js — the app's own time and date pickers
+ * (bug #2 / QA #15 for the clock; the second half of bug #3 for the date)
  *
  * WHY THIS EXISTS. The complaint was that you cannot tell which of AM/PM is
  * selected. Last round that was answered with "those buttons belong to your
@@ -327,20 +328,201 @@ function openTimePicker(value, opts, onDone){
  * value. Setting .value alone would update the box and silently drop the write.
  */
 function timePickerFieldValue(el){ return el.value || ""; }
+
+/* ============================================================
+ * THE DATE PICKER — the other half of bug #3.
+ *
+ * "The date picker still recognizes the real day. This is the wanted behaviour
+ * in the real app, but it's unwanted during testing."
+ *
+ * Routing every clock read through nowMs() fixed the half that was ours. This
+ * is the half that was not: the ring the phone's own picker draws around the
+ * real today is drawn by the phone, and no amount of CSS or JS could move it.
+ * The only fix is to stop using that picker — so this one asks the APP what
+ * today is (todayStr(), which honours the QA offset) and rings that instead.
+ * Jump the dev clock ten days and the highlight moves ten days with it.
+ *
+ * Value format is unchanged, "YYYY-MM-DD", so every existing reader is
+ * untouched — same approach the time picker took.
+ * ============================================================ */
+const DP_DOW = ["S", "M", "T", "W", "T", "F", "S"];
+const DP_MONTHS = ["January", "February", "March", "April", "May", "June", "July",
+                   "August", "September", "October", "November", "December"];
+
+const DATE_PICKER_CSS = `
+.dp-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:2px; }
+.dp-dow{
+  text-align:center; font-family:var(--font-mono, monospace); font-size:10px;
+  color:var(--text-soft, #A79E8C); padding:4px 0;
+}
+.dp-cell{
+  aspect-ratio:1/1; border:none; background:transparent; border-radius:50%;
+  color:var(--text-primary, #EDE7DA);
+  font-family:var(--font-body, sans-serif); font-size:13.5px;
+}
+.dp-cell:disabled{ color:transparent; }
+.dp-cell:hover:not(:disabled){ background:rgba(255,255,255,0.09); }
+/* TODAY per the APP's clock, not the device's. The whole point of the file. */
+.dp-cell.is-today{ box-shadow:inset 0 0 0 1.5px var(--brass, #C68A3E); }
+.dp-cell.is-sel{
+  background:var(--brass, #C68A3E); color:var(--dark-on-accent, #1a1408); font-weight:700;
+}
+.dp-nav{ display:flex; align-items:center; gap:6px; margin-bottom:6px; }
+.dp-nav .dp-label{
+  flex:1; text-align:center; font-family:var(--font-display, sans-serif);
+  font-weight:700; font-size:15px;
+}
+.dp-nav button{
+  width:32px; height:32px; border-radius:8px; flex:0 0 auto;
+  border:1px solid rgba(255,255,255,0.16); background:rgba(255,255,255,0.04);
+  color:var(--text-primary, #EDE7DA); font-size:17px; line-height:1;
+}
+.dp-nav button:hover{ background:rgba(255,255,255,0.1); }
+`;
+
+function ensureDatePickerStyles(){
+  ensureTimePickerStyles();                    // the shared card/backdrop shell
+  if (document.getElementById("oela-datepicker-styles")) return;
+  const st = document.createElement("style");
+  st.id = "oela-datepicker-styles";
+  st.textContent = DATE_PICKER_CSS;
+  document.head.appendChild(st);
+}
+
+function dpParse(value){
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || "").trim());
+  if (!m) return null;
+  return { y: +m[1], m: +m[2] - 1, d: +m[3] };
+}
+function dpStr(y, m, d){
+  return String(y) + "-" + String(m + 1).padStart(2, "0") + "-" + String(d).padStart(2, "0");
+}
+// The app's today, not the device's. todayStr() lives in app.js and already
+// honours the QA offset; falling back to the real date only matters if this
+// module is ever used before app.js loads, which the build order prevents.
+function dpToday(){
+  try { return todayStr(); } catch (e){ return new Date().toLocaleDateString("en-CA"); }
+}
+
+function openDatePicker(value, opts, onDone){
+  ensureDatePickerStyles();
+  const options = opts || {};
+  const today = dpToday();
+  const sel = dpParse(value);
+  const start = sel || dpParse(today) || { y: 2026, m: 0, d: 1 };
+  let viewY = start.y, viewM = start.m;
+  let chosen = sel ? dpStr(sel.y, sel.m, sel.d) : null;
+
+  const root = document.getElementById("dialog-root");
+  root.innerHTML =
+    '<div class="tp-backdrop" role="dialog" aria-modal="true" aria-label="Choose a date">' +
+      '<div class="tp-card">' +
+        '<div class="tp-title">Select date</div>' +
+        '<div class="dp-nav">' +
+          '<button type="button" data-dp="prev" aria-label="Previous month">&#8249;</button>' +
+          '<span class="dp-label"></span>' +
+          '<button type="button" data-dp="next" aria-label="Next month">&#8250;</button>' +
+        '</div>' +
+        '<div class="dp-grid" data-dp="grid"></div>' +
+        '<div class="tp-btns">' +
+          (options.allowClear ? '<button type="button" class="tp-clear" data-dp="clear">Clear</button>' : "") +
+          '<button type="button" class="tp-clear" data-dp="today">Today</button>' +
+          '<span class="tp-spacer"></span>' +
+          '<button type="button" data-dp="cancel">Cancel</button>' +
+          '<button type="button" data-dp="set">Set</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+  const backdrop = root.querySelector(".tp-backdrop");
+  const grid = root.querySelector('[data-dp="grid"]');
+  const label = root.querySelector(".dp-label");
+
+  function render(){
+    label.textContent = DP_MONTHS[viewM] + " " + viewY;
+    let html = DP_DOW.map(function(d){ return '<div class="dp-dow">' + d + "</div>"; }).join("");
+    const first = new Date(viewY, viewM, 1).getDay();
+    const days = new Date(viewY, viewM + 1, 0).getDate();
+    for (let i = 0; i < first; i++) html += '<button type="button" class="dp-cell" disabled></button>';
+    for (let d = 1; d <= days; d++){
+      const ds = dpStr(viewY, viewM, d);
+      const cls = "dp-cell" + (ds === today ? " is-today" : "") + (ds === chosen ? " is-sel" : "");
+      html += '<button type="button" class="' + cls + '" data-dp="day" data-date="' + ds + '">' + d + "</button>";
+    }
+    grid.innerHTML = html;
+  }
+
+  function finish(result){
+    document.removeEventListener("keydown", onKey, true);
+    root.innerHTML = "";
+    if (result !== null && onDone) onDone(result);
+  }
+  // Capture + stop, for the same reason the time picker does it: one Escape
+  // must not close both this and the screen underneath.
+  function onKey(e){
+    if (e.key === "Escape"){ e.preventDefault(); e.stopPropagation(); finish(null); }
+    else if (e.key === "Enter"){ e.preventDefault(); e.stopPropagation(); if (chosen) finish(chosen); }
+  }
+  document.addEventListener("keydown", onKey, true);
+
+  backdrop.addEventListener("click", function(e){ if (e.target === backdrop) finish(null); });
+  root.addEventListener("click", function(e){
+    const btn = e.target.closest("[data-dp]");
+    if (!btn) return;
+    const what = btn.getAttribute("data-dp");
+    if (what === "prev"){ viewM--; if (viewM < 0){ viewM = 11; viewY--; } render(); }
+    else if (what === "next"){ viewM++; if (viewM > 11){ viewM = 0; viewY++; } render(); }
+    else if (what === "day"){
+      chosen = btn.getAttribute("data-date");
+      render();
+      finish(chosen);                     // a tap on a day IS the choice
+    }
+    else if (what === "today"){
+      const t = dpParse(today);
+      viewY = t.y; viewM = t.m; chosen = today;
+      render();
+    }
+    else if (what === "cancel") finish(null);
+    else if (what === "clear") finish("");
+    else if (what === "set") finish(chosen || "");
+  });
+
+  render();
+}
+
+/* Field wiring for both pickers. The inputs keep their name, class and value
+ * format; they are simply no longer typed into directly. `readonly` is what
+ * stops the phone's own picker from opening on top of ours.
+ *
+ * ⚠ The change is dispatched as a real `input` + `change` event so the app's
+ * existing delegated handlers (which listen for those on [data-field] /
+ * [data-calfield]) run exactly as they did when the native picker committed a
+ * value. Setting .value alone would update the box and silently drop the write.
+ */
+const PICKER_SELECTOR = "input.screen-time, input.screen-date, input.review-form-input";
 function initTimePickerFields(){
   document.addEventListener("mousedown", function(e){
-    const el = e.target.closest && e.target.closest("input.screen-time");
+    const el = e.target.closest && e.target.closest(PICKER_SELECTOR);
     if (el) e.preventDefault();          // never focus it; the picker is the UI
   }, true);
   document.addEventListener("click", function(e){
-    const el = e.target.closest && e.target.closest("input.screen-time");
+    const el = e.target.closest && e.target.closest(PICKER_SELECTOR);
     if (!el || el.disabled) return;
     e.preventDefault();
     e.stopPropagation();
-    openTimePicker(timePickerFieldValue(el), { allowClear: true }, function(next){
+    const commit = function(next){
       el.value = next;
       el.dispatchEvent(new Event("input", { bubbles: true }));
       el.dispatchEvent(new Event("change", { bubbles: true }));
-    });
+    };
+    if (el.classList.contains("screen-time")){
+      openTimePicker(timePickerFieldValue(el), { allowClear: true }, commit);
+    } else {
+      // ⚑ The review's push-date field gets no Clear: "push this deadline to
+      // nowhere" is not a thing, and the menu it sits in already has other
+      // exits. Deadline and event dates can be cleared.
+      const allowClear = !el.classList.contains("review-form-input");
+      openDatePicker(el.value || "", { allowClear: allowClear }, commit);
+    }
   }, true);
 }

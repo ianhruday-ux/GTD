@@ -18,6 +18,7 @@ All three go through applyDeadlineChange. All three are checked here.
 """
 import os, functools, http.server, socket, socketserver, threading, contextlib, sys, datetime
 from playwright.sync_api import sync_playwright
+from _pickers import pick_date
 
 DIST = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "dist")
 
@@ -60,7 +61,7 @@ with serve(DIST) as url, sync_playwright() as p:
         pg.click('[data-action="fab"]'); pg.wait_for_timeout(350)
         pg.click('[data-action="new-primary"]'); pg.wait_for_timeout(500)
         pg.fill('[data-field="title"]', title)
-        pg.fill('[data-field="deadline-date"]', due); pg.wait_for_timeout(400)
+        pick_date(pg, '[data-field="deadline-date"]', due)
         pg.click('[data-action="screen-save"]'); pg.wait_for_timeout(600)
 
     def task_row(title):
@@ -86,7 +87,7 @@ with serve(DIST) as url, sync_playwright() as p:
     def edit_deadline(title, new_due):
         """Path 2: change the date on the item's own page."""
         pg.locator(f'.card-title:has-text("{title}")').first.click(); pg.wait_for_timeout(500)
-        pg.fill('[data-field="deadline-date"]', new_due); pg.wait_for_timeout(400)
+        pick_date(pg, '[data-field="deadline-date"]', new_due)
         pg.click('[data-action="screen-save"]'); pg.wait_for_timeout(600)
 
     # ---------- a bar with a moved date restarts ----------
@@ -147,7 +148,7 @@ with serve(DIST) as url, sync_playwright() as p:
     # changed the task. Nothing was guarding this, so it is guarded now.
     was = task_row("ZZ push me")["deadline"]
     pg.locator('.card-title:has-text("ZZ push me")').first.click(); pg.wait_for_timeout(500)
-    pg.fill('[data-field="deadline-date"]', "2026-12-25"); pg.wait_for_timeout(400)
+    pick_date(pg, '[data-field="deadline-date"]', "2026-12-25")
     pg.click('[data-action="screen-cancel"]'); pg.wait_for_timeout(500)
     # ✕ may ask about unsaved changes — discard if it does.
     discard = pg.locator('.choice-dialog button:has-text("Discard changes")')
@@ -193,7 +194,7 @@ with serve(DIST) as url, sync_playwright() as p:
     if card.count():
         card.locator('[data-action="review-form-start"][data-type="date"]').first.click()
         pg.wait_for_timeout(400)
-        pg.fill("#review-form-input", "2026-07-15"); pg.wait_for_timeout(250)
+        pick_date(pg, "#review-form-input", "2026-07-15")
         pg.locator('[data-action="review-pushdate-save"]').first.click(); pg.wait_for_timeout(600)
     after_rev = task_row("ZZ review push")
     check(after_rev and after_rev["deadline"].get("pushCount") == 1,
