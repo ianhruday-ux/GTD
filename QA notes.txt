@@ -1,0 +1,33 @@
+- Single repeat events continue to show as projected on the calendar even when skipped.
+
+- Repeat events also show as projected into the past.
+
+- The current calendar day should be marked with a border so it's easier to keep track of.
+
+- A left-pointing arrow in the upper-left-hand corner would be more intuitive than the X in the upper-right-hand corner to exit the calendar.
+
+- I think there was a miscommunication about what I wanted in terms of the calendar view. I want the controls to be attached to the bottom of the calendar rather than a floating window. I'd rather scroll down to the controls than always have the controls in view.
+
+- The hide calendar events checkbox still uses the word tickler.
+
+- Past-due events in the daily review should have the delete button as well as the complete button. They are functionally similar, but completed events show up in the completed section.
+
+- The time picker has a design issue I hadn't noticed. The AM and PM buttons need an underline when they are selected because it's very hard to tell which one is selected.
+
+- Projects without linked actions no longer show up in the review. Oh, it just seems to be the chunk list that doesn't show up, so maybe this is just a problem with the sample data.
+
+- After adding something to the calendar in the daily review, it should automatically take you back to the daily review.
+
+- There's a bug when a past-due chip gets added to the progress bar. The chip is just slightly out of frame, so it changes the screen boundaries or something.
+
+- I'm not sure whether we should reset the progress bar when you choose to push a deadline. Currently, the progress bar starts from the original date you set the deadline, but I'd like to hear arguments either way. This might be something we want to change.
+
+- Editing a projected occurrence of a repeating event seems to edit every projected occurrence in the series regardless of what you pick.
+
+- The complete button on the calendar event page doesn't get the same shading as the other complete buttons when activated. Try to maintain uniformity across the app.
+
+- the designs in the habits hook picker, note tag and project picker, and waiting actions condition picker are all slightly different. The tags and projects picker for notes looks the best and has the clearest section dividers. Unify everything around that standard, including for Pickers that I've missed.
+
+- repeating events do not show up in the waiting actions picker. You should only show the next occurrence of a repeating event in this picker.
+
+- it's becoming clearer that the calendar also needs a list view that lists all events, appointments and deadlines in the order they occur, including hidden events and the next projected occurrence of paused repeating events. This list should only show one occurrence of a repeating event.

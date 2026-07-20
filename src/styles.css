@@ -1010,6 +1010,41 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 .review-end-big{ font-family:var(--font-display); font-weight:700; font-size:22px; color:var(--text-primary); }
 .review-end-sub{ font-size:13.5px; color:var(--text-soft); line-height:1.5; }
 
+/* ----------------------------------------------------------------------------
+   ▲ POST-SPRINT (§P6) — THE HABIT RUNNER, AS CHALK ON A CHALKBOARD
+   The module ships black-on-cream and exposes four colour variables, so the
+   whole restyle is a palette swap plus the board it is drawn on — the artwork
+   is untouched. Slate green rather than black: a true-black board on a
+   near-black desk loses its edge entirely.
+---------------------------------------------------------------------------- */
+.habit-runner-host{
+  display:flex; justify-content:center;
+  padding:14px 10px 10px;
+  margin-bottom:12px;
+  border-radius:10px;
+  background-color:#1E2A26;
+  background-image:var(--chalk-dust);
+  background-size:var(--chalk-dust-size) var(--chalk-dust-size);
+  background-repeat:repeat;
+  border:1px solid rgba(0,0,0,0.5);
+  /* A chalkboard is recessed in its frame, not raised off the desk. */
+  box-shadow:inset 0 2px 10px rgba(0,0,0,0.45), 0 1px 0 rgba(255,255,255,0.04);
+}
+.habit-runner-host .runner-box{
+  --runner-ink:#EFEADC;                    /* chalk */
+  --runner-ghost:rgba(239,234,220,0.30);   /* a half-erased earlier drawing */
+  --runner-bubble-bg:transparent;          /* chalk outlines the bubble, it doesn't fill it */
+  --runner-ground:rgba(239,234,220,0.42);
+}
+/* Chalk is powder on a rough surface, so its edge is never crisp. A small
+   blur-free glow does more than any drop shadow here. */
+.habit-runner-host .runner-stage{ filter:drop-shadow(0 0 0.6px rgba(239,234,220,0.55)); }
+.habit-runner-host .runner-bubble{
+  font-family:var(--font-body);
+  font-size:13px;
+  text-shadow:0 0 1px rgba(239,234,220,0.4);
+}
+
 /* ▲ POST-SPRINT (§P1) — settings as a dropdown under the header ⋯, replacing
    the modal sheet. Same visual idiom as the notes filter menu, anchored to the
    header's right edge. The scrim is invisible but catches the outside tap. */

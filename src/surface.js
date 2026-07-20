@@ -184,6 +184,56 @@ function renderSurfaceTile(cfg, size, ringsOverride){
   return cv.toDataURL("image/png");
 }
 
+// =========================================================
+// CHALK DUST (post-sprint §P6) — the habit runner is drawn as chalk on a
+// board, and a clean board reads as printed vinyl. Same Perlin machinery as
+// the desk: eraser smears are noise stretched HARD along the sweep direction
+// (that is what an eraser does — it moves in arcs, not dots), with a fine
+// speckle on top for the dust that never comes off.
+//
+// White with a varying alpha, so it composites over whatever board colour the
+// theme sets rather than baking one in.
+// =========================================================
+const CHALK_TILE = 256;
+let chalkDustUrl = null;
+function renderChalkDust(){
+  const N = CHALK_TILE;
+  const cv = document.createElement("canvas");
+  cv.width = N; cv.height = N;
+  const ctx = cv.getContext("2d");
+  const img = ctx.createImageData(N, N);
+  const d = img.data;
+  const noise = makePerlin(1987);
+  for (let y = 0; y < N; y++){
+    const v = y / N;
+    for (let x = 0; x < N; x++){
+      const u = x / N;
+      // Smears: LOW frequency along the sweep, high across it — an eraser
+      // travels sideways, so the marks are long horizontally and thin
+      // vertically. (Reversed once: high-x/low-y gave vertical streaks that
+      // read as rain on a window.)
+      const smear = fbm(noise, u, v, 2, 24, 3);
+      // Speckle: isotropic and fine.
+      const speck = fbm(noise, u, v, 48, 48, 2);
+      // Only the upper tail of each field becomes visible dust, so the board
+      // stays mostly clean and the marks read as occasional, not as texture.
+      let a = 0;
+      a += Math.max(0, smear - 0.25) * 0.10;
+      a += Math.max(0, speck - 0.45) * 0.09;
+      const i = (y * N + x) * 4;
+      d[i] = 255; d[i + 1] = 255; d[i + 2] = 255;
+      d[i + 3] = Math.round(Math.max(0, Math.min(1, a)) * 255);
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return cv.toDataURL("image/png");
+}
+function applyChalkDust(){
+  if (!chalkDustUrl) chalkDustUrl = renderChalkDust();
+  document.documentElement.style.setProperty("--chalk-dust", 'url("' + chalkDustUrl + '")');
+  document.documentElement.style.setProperty("--chalk-dust-size", CHALK_TILE + "px");
+}
+
 // ---- wiring into CSS ------------------------------------------------------
 const SURFACE_KEY = "gtd_surface"; // gtd_: a preference, so "Restore to defaults" resets it too
 function loadSurfaceId(){

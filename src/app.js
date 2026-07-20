@@ -2982,6 +2982,94 @@
   // from the full lockstep-replay-with-overtake animation spec'd in 4.11b
   // to a static per-day comparison — same information (are you ahead of,
   // behind, or matching the best run today), lighter to build and read.
+  // =========================================================
+  // THE HABIT RUNNER (post-sprint §P6) — which of runner.js's 12 states the
+  // habit is actually in. The runner is a VIEW of the run engine, not a second
+  // source of truth: every input below already exists in habitRuns, and the
+  // dot track above it is drawn from the same numbers.
+  //
+  // Reads the DRAFT (draft.done, draft.schedule) exactly as the dot track does,
+  // so the figure reacts the instant the badge is tapped and reverts on ✕ with
+  // everything else — draft isolation covers the runner too.
+  //
+  // Returns { state, variant }.
+  // =========================================================
+  function habitRunnerState(s, run){
+    const draft = s.draft;
+    const todayDow = boundaryNow().getDay();
+    const scheduledToday = draft.schedule.indexOf(todayDow) !== -1;
+    // 11: paused or off-day. Checked first — a paused habit is resting whatever
+    // its history says, and §"pausing disables completion" makes any other
+    // reading incoherent.
+    if (draft.paused || !scheduledToday) return { state: "rest_reading", variant: null };
+
+    // 3 / 12 / 8: a run that has ENDED and whose result hasn't been seen yet.
+    // pendingResult is exactly the "run just ended" signal, already consumed by
+    // the celebration banner, so the runner and the banner can never disagree.
+    if (draft.pendingResult){
+      const t = draft.pendingResult.type;
+      if (t === "record") return { state: "pb_end_celebration", variant: null };
+      if (t === "tie") return { state: "tie_celebration", variant: null };
+      return { state: "run_end_no_pb", variant: null };
+    }
+
+    const entries = currentRunEntries(run);
+    const doneToday = !!draft.done;
+    const hasPB = run.personalBest > 0;
+
+    // 10: the habit exists but this lap hasn't started. Lap one gets its own
+    // copy ("I'm ready for THIS lap" rather than "my next lap").
+    if (!entries.length && !doneToday){
+      return { state: "fresh_start_stretch", variant: hasPB ? null : "fresh_start_stretch_first" };
+    }
+
+    // Today's index on the track is where the ghost is compared against.
+    const todayIdx = entries.length;
+    const doneCount = entries.filter(function(e){ return e.status === "done"; }).length + (doneToday ? 1 : 0);
+    // "You stumbled" is about the CURRENT position: today if today is a miss so
+    // far, otherwise the most recent recorded day.
+    const youStumbled = doneToday
+      ? false
+      : (entries.length ? entries[entries.length - 1].status === "stumble" : false);
+    const ghostSeq = run.bestSequence || [];
+    // 9: the live run has just passed the record. This needs no "already fired"
+    // flag — doneCount === personalBest + 1 is true on exactly one day, then the
+    // count moves past it on its own.
+    if (hasPB && doneCount === run.personalBest + 1) return { state: "pb_overtake", variant: null };
+    // The ghost must be read at the SAME point on the track that the scene is
+    // depicting, or the two figures are showing different days. When you are
+    // running clean, that point is today; when the scene is your stumble, it is
+    // the day you stumbled — which is the last RECORDED day, not today.
+    // (Bug found by the state check: comparing a stumble at index n-1 against
+    // the ghost at index n rendered "you stumbled, record was clean" whenever
+    // the record had in fact stumbled alongside you.)
+    const cmpIdx = youStumbled ? entries.length - 1 : todayIdx;
+    // Past the end of the ghost's sequence there is nobody to race, so the
+    // solo states are the honest ones even though a PB exists.
+    const ghostHere = cmpIdx < ghostSeq.length ? ghostSeq[cmpIdx] : null;
+    if (!hasPB || ghostHere === null){
+      return { state: youStumbled ? "stumble_solo" : "run_solo", variant: null };
+    }
+    const ghostStumbled = ghostHere === "stumble";
+    if (youStumbled && !ghostStumbled) return { state: "stumble_ghost_clean", variant: null };
+    if (youStumbled && ghostStumbled) return { state: "stumble_ghost_stumble", variant: null };
+    if (!youStumbled && ghostStumbled) return { state: "clean_ghost_stumble", variant: null };
+    return { state: "run_with_ghost", variant: null };
+  }
+  // Mounted after render (the page is built as an HTML string; the runner needs
+  // a real element). Torn down and rebuilt on each render — the box is small
+  // and this keeps it honest about draft changes.
+  let habitRunnerInstance = null;
+  function mountHabitRunner(s){
+    if (habitRunnerInstance){ habitRunnerInstance.destroy(); habitRunnerInstance = null; }
+    if (!s || s.kind !== "habit" || !s.taskId) return;
+    const host = qs("#habit-runner-host");
+    if (!host) return;
+    const run = ensureHabitRun(s.taskId);
+    const pick = habitRunnerState(s, run);
+    habitRunnerInstance = mountRunner(host, { state: pick.state, locale: "en", copyVariant: pick.variant });
+  }
+
   function habitTrackHtml(s){
     const run = ensureHabitRun(s.taskId);
     const draft = s.draft;
@@ -3031,6 +3119,10 @@
       );
     return (
       '<div class="habit-track-block">' +
+        // The runner mounts here after render (§P6). It sits ABOVE the dot
+        // track deliberately: the figure is the feeling, the dots are the
+        // record, and the record should read as the evidence for the feeling.
+        '<div id="habit-runner-host" class="habit-runner-host"></div>' +
         celebration + bodyHtml +
         '<div class="habit-metrics">' +
           '<span class="habit-metric"><b>' + run.personalBest + '</b> personal best</span>' +
@@ -3459,6 +3551,7 @@
       if (newBody) newBody.scrollTop = scrollTop;
       autoGrowAll();
       if (s.calendarView) bindCalendarSwipe();
+      mountHabitRunner(s);
       return;
     }
     // Fresh open, or navigation to a different item (child screens,
@@ -3472,6 +3565,7 @@
     });
     autoGrowAll();
     if (s.calendarView) bindCalendarSwipe();
+    mountHabitRunner(s);
   }
   function autoGrowAll(){
     qsa(".screen-field-desc").forEach(function(ta){
@@ -6108,6 +6202,7 @@
 
   function boot(){
     applySurface(loadSurfaceId()); // post-sprint: paint the desk before the shell lands on it
+    applyChalkDust();              // §P6: the habit runner's board
     renderShell();
     bindEvents();
     bindDrawerSwipe(); // finger-follow open/close on the intray drawer, same mechanic as the calendar month swipe

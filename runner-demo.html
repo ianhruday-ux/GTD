@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Runner — all 12 states</title>
+<style>
+  :root {
+    --paper: #f7f6f2;
+    --ink: #222;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: var(--paper);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+      "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+    color: var(--ink);
+    font-size: 17px;
+    line-height: 1.5;
+  }
+  .card {
+    width: min(400px, 96vw);
+    padding: 22px 20px 20px;
+    border: 2px solid var(--ink);
+    border-radius: 18px;
+    background: #fff;
+  }
+  h1 {
+    margin: 0 0 14px;
+    font-size: 19px;
+    font-weight: 700;
+    text-align: center;
+  }
+  /* State navigator */
+  .nav {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+  .nav button {
+    flex: 0 0 auto;
+    min-width: 56px;
+    min-height: 48px;
+    font: inherit;
+    font-size: 24px;
+    font-weight: 700;
+    border: 2px solid var(--ink);
+    border-radius: 12px;
+    background: #fff;
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .nav select {
+    flex: 1 1 auto;
+    min-height: 48px;
+    font: inherit;
+    font-size: 16px;
+    padding: 6px 8px;
+    border: 2px solid var(--ink);
+    border-radius: 12px;
+    background: #fff;
+    color: var(--ink);
+  }
+  .counter {
+    text-align: center;
+    font-size: 15px;
+    opacity: 0.75;
+    margin: 0 0 4px;
+  }
+  .desc {
+    text-align: center;
+    font-size: 15px;
+    margin: 0 0 14px;
+    min-height: 3em;
+  }
+  #stage { display: flex; justify-content: center; }
+  .locale {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 14px;
+  }
+  .locale button {
+    font: inherit;
+    font-size: 16px;
+    min-height: 48px;
+    padding: 6px 20px;
+    border: 2px solid var(--ink);
+    border-radius: 999px;
+    background: #fff;
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .locale button[aria-pressed="true"] {
+    background: var(--ink);
+    color: #fff;
+  }
+  button:focus-visible, select:focus-visible {
+    outline: 3px solid #0b57d0;
+    outline-offset: 2px;
+  }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>Habit runner — 12 states</h1>
+
+    <div class="nav">
+      <button id="prev" aria-label="Previous animation">‹</button>
+      <select id="state-select" aria-label="Choose animation state"></select>
+      <button id="next" aria-label="Next animation">›</button>
+    </div>
+    <p class="counter" id="counter" aria-hidden="true"></p>
+    <p class="desc" id="desc" aria-live="polite"></p>
+
+    <div id="stage"></div>
+
+    <div class="locale" role="group" aria-label="Bubble language">
+      <button id="btn-en" aria-pressed="true">English</button>
+      <button id="btn-zh" aria-pressed="false">简体中文</button>
+    </div>
+  </div>
+
+<script type="module">
+/* ============================================================
+ * runner.js — habit runner animation box (all 12 states)
+ * Dependency-free ES module. Inline SVG + CSS keyframes.
+ *
+ * Usage:
+ *   import { mountRunner, RUNNER_STATES } from "./runner.js";
+ *   const runner = mountRunner(el, { state: "run_solo", locale: "en" });
+ *   runner.setState("pb_overtake");
+ *   runner.setLocale("zh-Hans");
+ *   runner.destroy();
+ *
+ * Theming (set on the container or any ancestor):
+ *   --runner-ink        stroke + text color   (default #2b2b2b)
+ *   --runner-ghost      ghost figure color    (default rgba(43,43,43,.30))
+ *   --runner-bubble-bg  bubble fill           (default #fff)
+ *   --runner-ground     ground line color     (default rgba(43,43,43,.25))
+ *
+ * All figure motion is CSS keyframes on nested SVG groups; each
+ * joint group's local origin IS the joint (parent <g translate>),
+ * so rotations compose like a real skeleton. The thought bubble is
+ * a separate HTML text layer fed from BUBBLE_COPY — the SVG holds
+ * zero text, so localization never touches the artwork.
+ * ============================================================ */
+
+/* ------------------------------------------------------------
+ * State registry — id, and when it fires
+ * ------------------------------------------------------------
+ *  1 run_solo              live run, no personal best exists yet
+ *  2 stumble_solo          no PB; one missed day (grace). Stumble phase
+ *                          shows before today's completion, recovery after
+ *  3 pb_end_celebration    run ENDED at a new personal best
+ *  4 run_with_ghost        live run vs record; both clean today
+ *  5 stumble_ghost_clean   you stumbled, record was clean here
+ *  6 stumble_ghost_stumble both you and the record stumbled here
+ *                          (the ghost falls first — you watch past-you
+ *                          fall and get up on this same track)
+ *  7 clean_ghost_stumble   record stumbled here, you're running clean
+ *  8 run_end_no_pb         run ended, PB not beaten; the ghost runs on
+ *  9 pb_overtake           LIVE run's completed days exceed the record
+ *                          (record + 1). High-five as you pass. Fires
+ *                          once, only while the habit is still going —
+ *                          never at run end (that's state 3)
+ * 10 fresh_start_stretch   habit exists, run not started (post-lapse or
+ *                          brand-new). Stretching. Lap-one uses the
+ *                          "fresh_start_stretch_first" copy variant
+ * 11 rest_reading          paused, or a non-scheduled day
+ * 12 tie_celebration       run ended tying the record; both celebrate
+ * ------------------------------------------------------------ */
+
+const RUNNER_STATES = [
+  "run_solo",
+  "stumble_solo",
+  "pb_end_celebration",
+  "run_with_ghost",
+  "stumble_ghost_clean",
+  "stumble_ghost_stumble",
+  "clean_ghost_stumble",
+  "run_end_no_pb",
+  "pb_overtake",
+  "fresh_start_stretch",
+  "rest_reading",
+  "tie_celebration",
+];
+
+/* ------------------------------------------------------------
+ * Bubble copy — the text layer. Keyed by locale then state.
+ * "fresh_start_stretch_first" is the lap-one copy variant.
+ * ------------------------------------------------------------ */
+const BUBBLE_COPY = {
+  en: {
+    run_solo: "One foot in front of the other.",
+    stumble_solo: "Everyone falls. What matters is getting back up.",
+    pb_end_celebration: "A new personal best! Time to rest, then start a new lap.",
+    run_with_ghost: "I know this path well. I can do this.",
+    stumble_ghost_clean: "A mistake is just something to learn from.",
+    stumble_ghost_stumble: "Even my best run had mistakes. I got back up then, too.",
+    clean_ghost_stumble: "Even my best run had stumbles. Today I'm running clean.",
+    run_end_no_pb:
+      "I've made it past here before, so I know I can again. Rest now — next lap soon.",
+    pb_overtake: "I beat my personal best. Now I just keep running.",
+    fresh_start_stretch: "I'm ready for my next lap.",
+    fresh_start_stretch_first: "I'm ready for this lap.",
+    rest_reading: "It's important to take a break sometimes.",
+    tie_celebration: "A tie is good — but next lap, I'm breaking through this wall!",
+  },
+  "zh-Hans": {
+    run_solo: "一步一个脚印。",
+    stumble_solo: "每个人都会跌倒，重要的是重新站起来。",
+    pb_end_celebration: "新的个人最佳！休息一下，再开始新的一圈。",
+    run_with_ghost: "这条路我很熟，我能做到。",
+    stumble_ghost_clean: "犯错只是学习的机会。",
+    stumble_ghost_stumble: "我最好的一圈也有过失误，但我重新站了起来。",
+    clean_ghost_stumble: "我最好的一圈也曾跌倒过，今天我跑得很稳。",
+    run_end_no_pb: "这里我以前跑过，所以我知道我能做到。先休息，下一圈再来！",
+    pb_overtake: "我打破了个人最佳！现在只要继续跑下去。",
+    fresh_start_stretch: "我准备好跑下一圈了。",
+    fresh_start_stretch_first: "我准备好跑这一圈了。",
+    rest_reading: "有时候，休息一下也很重要。",
+    tie_celebration: "平局也不错——下一圈，我要突破这堵墙！",
+  },
+};
+
+/* Screen-reader description of each scene (the SVG's aria-label). */
+const SCENE_LABELS = {
+  run_solo: "A stick figure running steadily.",
+  stumble_solo: "A stick figure runs, trips and falls onto its hands, tucks its feet under itself, pushes up from the ground, stands, and runs on.",
+  pb_end_celebration: "A stick figure facing forward, arms out at ninety degrees, pumping both fists in the air.",
+  run_with_ghost: "A stick figure running behind a faint ghost of its past self; both run smoothly.",
+  stumble_ghost_clean: "A stick figure falls, pushes itself back up, and rejoins the run while the ghost ahead runs smoothly.",
+  stumble_ghost_stumble: "The ghost falls and pushes itself back up first; the runner then falls and gets back up too.",
+  clean_ghost_stumble: "The ghost ahead falls and pushes itself back up while the runner keeps running smoothly.",
+  run_end_no_pb: "A stick figure pumps one fist while the ghost runs onward and fades away.",
+  pb_overtake: "The ghost holds a hand up behind itself; the catching-up runner raises an arm, they high-five just before the pass, and the ghost waves the runner on.",
+  fresh_start_stretch: "A stick figure in a lunge stretch: back leg straight behind, front knee bent at ninety degrees.",
+  rest_reading: "A stick figure reclined in a chair, reading a book.",
+  tie_celebration: "Two stick figures facing forward, side by side, alternating fist pumps in celebration.",
+};
+
+/* ------------------------------------------------------------
+ * Styles (injected once per document)
+ * ------------------------------------------------------------ */
+const STYLE_ID = "runner-box-styles";
+
+const CSS = `
+.runner-box {
+  --_ink: var(--runner-ink, #2b2b2b);
+  --_ghost: var(--runner-ghost, rgba(43, 43, 43, 0.30));
+  --_bubble-bg: var(--runner-bubble-bg, #fff);
+  --_ground: var(--runner-ground, rgba(43, 43, 43, 0.25));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+  max-width: 320px;
+}
+
+/* ---- Text layer (thought bubble) ---- */
+.runner-bubble {
+  position: relative;
+  max-width: 94%;
+  min-height: 1.4em;
+  padding: 8px 14px;
+  border: 2px solid var(--_ink);
+  border-radius: 16px;
+  background: var(--_bubble-bg);
+  color: var(--_ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsoft YaHei",
+    sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+  text-align: center;
+  margin-bottom: 14px;
+}
+.runner-bubble::before,
+.runner-bubble::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  border: 2px solid var(--_ink);
+  border-radius: 50%;
+  background: var(--_bubble-bg);
+}
+.runner-bubble::before { width: 8px; height: 8px; bottom: -12px; transform: translateX(-14px); }
+.runner-bubble::after  { width: 5px; height: 5px; bottom: -19px; transform: translateX(-22px); }
+
+/* ---- Figure layer ---- */
+.runner-stage { width: 100%; display: block; }
+.runner-stage line,
+.runner-stage circle,
+.runner-stage rect {
+  stroke: var(--_ink);
+  stroke-width: 5;
+  stroke-linecap: round;
+  fill: none;
+}
+.runner-stage .rn-ground { stroke: var(--_ground); stroke-width: 3; }
+.fig-ghost line, .fig-ghost circle, .fig-ghost rect { stroke: var(--_ghost); }
+
+/* ============ RUN CYCLE (rn) — 0.72s stride ============ */
+.rn-body    { transform: rotate(10deg); animation: rn-body 0.36s ease-in-out infinite; }
+.rn-thigh-l { transform: rotate(-34deg); animation: rn-thigh 0.72s ease-in-out infinite; }
+.rn-thigh-r { transform: rotate(26deg);  animation: rn-thigh 0.72s ease-in-out infinite -0.36s; }
+.rn-calf-l  { transform: rotate(14deg);  animation: rn-calf  0.72s linear      infinite; }
+.rn-calf-r  { transform: rotate(70deg);  animation: rn-calf  0.72s linear      infinite -0.36s; }
+.rn-uparm-l { transform: rotate(30deg);  animation: rn-uparm 0.72s ease-in-out infinite -0.36s; }
+.rn-uparm-r { transform: rotate(-32deg); animation: rn-uparm 0.72s ease-in-out infinite; }
+.rn-forearm-l { transform: rotate(-62deg); animation: rn-forearm 0.72s ease-in-out infinite -0.36s; }
+.rn-forearm-r { transform: rotate(-88deg); animation: rn-forearm 0.72s ease-in-out infinite; }
+
+@keyframes rn-body {
+  0%, 100% { transform: translateY(0) rotate(10deg); }
+  50%      { transform: translateY(-3.5px) rotate(10deg); }
+}
+@keyframes rn-thigh { 0%, 100% { transform: rotate(-38deg); } 50% { transform: rotate(30deg); } }
+@keyframes rn-calf {
+  0%, 100% { transform: rotate(10deg); }
+  40%      { transform: rotate(58deg); }
+  68%      { transform: rotate(108deg); }
+  90%      { transform: rotate(30deg); }
+}
+@keyframes rn-uparm   { 0%, 100% { transform: rotate(32deg); }  50% { transform: rotate(-35deg); } }
+@keyframes rn-forearm { 0%, 100% { transform: rotate(-58deg); } 50% { transform: rotate(-95deg); } }
+
+/* ============ STUMBLE SEQUENCE (st) — 7.2s ============
+ * 0–15% run · 15–20% the toe catches and the figure falls onto its
+ * hands · 20–28% down · 28–40% the knees tuck and the feet come under
+ * the body, hands still planted · 40–52% a slow push up off the ground
+ * to standing fully upright · 52–58% stand tall · 58–60% lean back
+ * into the run · 60–100% run. Stride = 0.72s. */
+.st-body    { transform: rotate(10deg);  animation: st-body 7.2s ease-in-out infinite; }
+.st-thigh-l { transform: rotate(-38deg); animation: st-thigh-l 7.2s ease-in-out infinite; }
+.st-thigh-r { transform: rotate(30deg);  animation: st-thigh-r 7.2s ease-in-out infinite; }
+.st-calf-l  { transform: rotate(20deg);  animation: st-calf-l 7.2s ease-in-out infinite; }
+.st-calf-r  { transform: rotate(95deg);  animation: st-calf-r 7.2s ease-in-out infinite; }
+.st-uparm-l { transform: rotate(32deg);  animation: st-uparm-l 7.2s ease-in-out infinite; }
+.st-uparm-r { transform: rotate(-35deg); animation: st-uparm-r 7.2s ease-in-out infinite; }
+.st-forearm-l { transform: rotate(-58deg); animation: st-forearm-l 7.2s ease-in-out infinite; }
+.st-forearm-r { transform: rotate(-95deg); animation: st-forearm-r 7.2s ease-in-out infinite; }
+
+/* In state 6 the ghost carries .st-lead so it falls ~2.2s earlier. */
+.st-lead .st-anim { animation-delay: -2.2s; }
+
+@keyframes st-body {
+  0%, 15% { transform: translate(0, 0) rotate(10deg); }
+  17%  { transform: translate(5px, 8px) rotate(45deg); }
+  19.5% { transform: translate(11px, 26px) rotate(78deg); }
+  20%, 28% { transform: translate(12px, 28px) rotate(82deg); }
+  33%  { transform: translate(9px, 22px) rotate(62deg); }
+  40%  { transform: translate(4px, 13px) rotate(30deg); }
+  46%  { transform: translate(1px, 6px) rotate(12deg); }
+  52%, 58% { transform: translate(0, 0) rotate(0deg); }
+  60%, 100% { transform: translate(0, 0) rotate(10deg); }
+}
+@keyframes st-thigh-l {
+  0% { transform: rotate(-38deg); } 5% { transform: rotate(30deg); }
+  10% { transform: rotate(-38deg); } 15% { transform: rotate(30deg); }
+  17% { transform: rotate(18deg); } 19.5% { transform: rotate(-2deg); }
+  20%, 28% { transform: rotate(-4deg); }
+  33% { transform: rotate(-42deg); } 40% { transform: rotate(-68deg); }
+  46% { transform: rotate(-24deg); } 52%, 58% { transform: rotate(-4deg); }
+  60% { transform: rotate(-38deg); } 65% { transform: rotate(30deg); }
+  70% { transform: rotate(-38deg); } 75% { transform: rotate(30deg); }
+  80% { transform: rotate(-38deg); } 85% { transform: rotate(30deg); }
+  90% { transform: rotate(-38deg); } 95% { transform: rotate(30deg); }
+  100% { transform: rotate(-38deg); }
+}
+@keyframes st-thigh-r {
+  0% { transform: rotate(30deg); } 5% { transform: rotate(-38deg); }
+  10% { transform: rotate(30deg); } 15% { transform: rotate(-38deg); }
+  17% { transform: rotate(-50deg); } 19.5% { transform: rotate(6deg); }
+  20%, 28% { transform: rotate(4deg); }
+  33% { transform: rotate(-30deg); } 40% { transform: rotate(-55deg); }
+  46% { transform: rotate(-14deg); } 52%, 58% { transform: rotate(4deg); }
+  60% { transform: rotate(30deg); } 65% { transform: rotate(-38deg); }
+  70% { transform: rotate(30deg); } 75% { transform: rotate(-38deg); }
+  80% { transform: rotate(30deg); } 85% { transform: rotate(-38deg); }
+  90% { transform: rotate(30deg); } 95% { transform: rotate(-38deg); }
+  100% { transform: rotate(30deg); }
+}
+@keyframes st-calf-l {
+  0% { transform: rotate(20deg); } 5% { transform: rotate(95deg); }
+  10% { transform: rotate(20deg); } 15% { transform: rotate(95deg); }
+  17% { transform: rotate(60deg); } 19.5% { transform: rotate(15deg); }
+  20%, 28% { transform: rotate(12deg); }
+  33% { transform: rotate(72deg); } 40% { transform: rotate(105deg); }
+  46% { transform: rotate(60deg); } 52%, 58% { transform: rotate(8deg); }
+  60% { transform: rotate(20deg); } 65% { transform: rotate(95deg); }
+  70% { transform: rotate(20deg); } 75% { transform: rotate(95deg); }
+  80% { transform: rotate(20deg); } 85% { transform: rotate(95deg); }
+  90% { transform: rotate(20deg); } 95% { transform: rotate(95deg); }
+  100% { transform: rotate(20deg); }
+}
+@keyframes st-calf-r {
+  0% { transform: rotate(95deg); } 5% { transform: rotate(20deg); }
+  10% { transform: rotate(95deg); } 15% { transform: rotate(20deg); }
+  17% { transform: rotate(75deg); } 19.5% { transform: rotate(18deg); }
+  20%, 28% { transform: rotate(15deg); }
+  33% { transform: rotate(68deg); } 40% { transform: rotate(100deg); }
+  46% { transform: rotate(55deg); } 52%, 58% { transform: rotate(8deg); }
+  60% { transform: rotate(95deg); } 65% { transform: rotate(20deg); }
+  70% { transform: rotate(95deg); } 75% { transform: rotate(20deg); }
+  80% { transform: rotate(95deg); } 85% { transform: rotate(20deg); }
+  90% { transform: rotate(95deg); } 95% { transform: rotate(20deg); }
+  100% { transform: rotate(95deg); }
+}
+@keyframes st-uparm-l {
+  0% { transform: rotate(32deg); } 5% { transform: rotate(-35deg); }
+  10% { transform: rotate(32deg); } 15% { transform: rotate(-35deg); }
+  17% { transform: rotate(-70deg); } 19.5% { transform: rotate(-100deg); }
+  20%, 28% { transform: rotate(-102deg); }
+  33% { transform: rotate(-97deg); } 40% { transform: rotate(-58deg); }
+  46% { transform: rotate(-24deg); } 52%, 58% { transform: rotate(5deg); }
+  60% { transform: rotate(32deg); } 65% { transform: rotate(-35deg); }
+  70% { transform: rotate(32deg); } 75% { transform: rotate(-35deg); }
+  80% { transform: rotate(32deg); } 85% { transform: rotate(-35deg); }
+  90% { transform: rotate(32deg); } 95% { transform: rotate(-35deg); }
+  100% { transform: rotate(32deg); }
+}
+@keyframes st-uparm-r {
+  0% { transform: rotate(-35deg); } 5% { transform: rotate(32deg); }
+  10% { transform: rotate(-35deg); } 15% { transform: rotate(32deg); }
+  17% { transform: rotate(-60deg); } 19.5% { transform: rotate(-95deg); }
+  20%, 28% { transform: rotate(-98deg); }
+  33% { transform: rotate(-92deg); } 40% { transform: rotate(-52deg); }
+  46% { transform: rotate(-15deg); } 52%, 58% { transform: rotate(8deg); }
+  60% { transform: rotate(-35deg); } 65% { transform: rotate(32deg); }
+  70% { transform: rotate(-35deg); } 75% { transform: rotate(32deg); }
+  80% { transform: rotate(-35deg); } 85% { transform: rotate(32deg); }
+  90% { transform: rotate(-35deg); } 95% { transform: rotate(32deg); }
+  100% { transform: rotate(-35deg); }
+}
+@keyframes st-forearm-l {
+  0% { transform: rotate(-58deg); } 5% { transform: rotate(-95deg); }
+  10% { transform: rotate(-58deg); } 15% { transform: rotate(-95deg); }
+  17% { transform: rotate(-35deg); } 19.5% { transform: rotate(-8deg); }
+  20%, 28% { transform: rotate(-6deg); }
+  33% { transform: rotate(-22deg); } 40% { transform: rotate(-45deg); }
+  46% { transform: rotate(-42deg); } 52%, 58% { transform: rotate(-12deg); }
+  60% { transform: rotate(-58deg); } 65% { transform: rotate(-95deg); }
+  70% { transform: rotate(-58deg); } 75% { transform: rotate(-95deg); }
+  80% { transform: rotate(-58deg); } 85% { transform: rotate(-95deg); }
+  90% { transform: rotate(-58deg); } 95% { transform: rotate(-95deg); }
+  100% { transform: rotate(-58deg); }
+}
+@keyframes st-forearm-r {
+  0% { transform: rotate(-95deg); } 5% { transform: rotate(-58deg); }
+  10% { transform: rotate(-95deg); } 15% { transform: rotate(-58deg); }
+  17% { transform: rotate(-30deg); } 19.5% { transform: rotate(-10deg); }
+  20%, 28% { transform: rotate(-8deg); }
+  33% { transform: rotate(-25deg); } 40% { transform: rotate(-48deg); }
+  46% { transform: rotate(-45deg); } 52%, 58% { transform: rotate(-15deg); }
+  60% { transform: rotate(-95deg); } 65% { transform: rotate(-58deg); }
+  70% { transform: rotate(-95deg); } 75% { transform: rotate(-58deg); }
+  80% { transform: rotate(-95deg); } 85% { transform: rotate(-58deg); }
+  90% { transform: rotate(-95deg); } 95% { transform: rotate(-58deg); }
+  100% { transform: rotate(-95deg); }
+}
+
+/* ============ CELEBRATION (cb) — front-facing double fist pump, 1.6s ============
+ * Figure faces the camera: feet apart, upper arms straight out at 90°,
+ * forearms vertical so the fists point at the sky. Two pumps per loop —
+ * arms drive upward past horizontal and the figure hops with each pump. */
+.cb-body    { animation: cb-body 1.6s ease-in-out infinite; }
+.cb-thigh-l { transform: rotate(9deg);  animation: cb-thigh-l 1.6s ease-in-out infinite; }
+.cb-thigh-r { transform: rotate(-9deg); animation: cb-thigh-r 1.6s ease-in-out infinite; }
+.cb-calf-l, .cb-calf-r { transform: rotate(0deg); }
+.cb-uparm-l { transform: rotate(90deg);  animation: cb-uparm-l 1.6s ease-in-out infinite; }
+.cb-uparm-r { transform: rotate(-90deg); animation: cb-uparm-r 1.6s ease-in-out infinite; }
+.cb-forearm-l { transform: rotate(90deg);  animation: cb-forearm-l 1.6s ease-in-out infinite; }
+.cb-forearm-r { transform: rotate(-90deg); animation: cb-forearm-r 1.6s ease-in-out infinite; }
+
+/* In state 12 the ghost carries .cb-off so the two figures' pumps alternate. */
+.cb-off .cb-anim { animation-delay: -0.8s; }
+
+@keyframes cb-body {
+  0%, 40%, 75%, 100% { transform: translateY(0); }
+  20%, 55% { transform: translateY(-9px); }
+}
+@keyframes cb-thigh-l { 0%, 40%, 75%, 100% { transform: rotate(9deg); }   20%, 55% { transform: rotate(16deg); } }
+@keyframes cb-thigh-r { 0%, 40%, 75%, 100% { transform: rotate(-9deg); }  20%, 55% { transform: rotate(-16deg); } }
+@keyframes cb-uparm-l { 0%, 40%, 75%, 100% { transform: rotate(90deg); }  20%, 55% { transform: rotate(126deg); } }
+@keyframes cb-uparm-r { 0%, 40%, 75%, 100% { transform: rotate(-90deg); } 20%, 55% { transform: rotate(-126deg); } }
+@keyframes cb-forearm-l { 0%, 40%, 75%, 100% { transform: rotate(90deg); }  20%, 55% { transform: rotate(58deg); } }
+@keyframes cb-forearm-r { 0%, 40%, 75%, 100% { transform: rotate(-90deg); } 20%, 55% { transform: rotate(-58deg); } }
+
+/* ============ MODEST FIST PUMP (pp) — 1.4s ============ */
+.pp-body    { animation: pp-body 1.4s ease-in-out infinite; }
+.pp-uparm-r { transform: rotate(-142deg); animation: pp-uparm-r 1.4s ease-in-out infinite; }
+.pp-forearm-r { transform: rotate(-35deg); animation: pp-forearm-r 1.4s ease-in-out infinite; }
+.pp-uparm-l { transform: rotate(10deg); }
+.pp-forearm-l { transform: rotate(-22deg); }
+.pp-thigh-l { transform: rotate(-6deg); }
+.pp-thigh-r { transform: rotate(6deg); }
+.pp-calf-l, .pp-calf-r { transform: rotate(4deg); }
+
+@keyframes pp-body      { 0%, 60%, 100% { transform: translateY(0); } 45% { transform: translateY(-3px); } }
+@keyframes pp-uparm-r   { 0%, 60%, 100% { transform: rotate(-142deg); } 45% { transform: rotate(-158deg); } }
+@keyframes pp-forearm-r { 0%, 60%, 100% { transform: rotate(-35deg); }  45% { transform: rotate(-2deg); } }
+
+/* Ghost running on ahead and fading (state 8) — 6s */
+.pp-depart { animation: pp-depart 6s ease-in-out infinite; }
+@keyframes pp-depart {
+  0%, 55% { transform: translateX(0); opacity: 1; }
+  85%, 100% { transform: translateX(115px); opacity: 0; }
+}
+
+/* ============ STRETCH (sx) — runner's lunge stretch, 3s ============
+ * Back leg stretched straight out behind, front leg forward with the
+ * knee bent at 90° and the shin vertical. The torso sways gently
+ * upright over the hips; the near hand rests toward the front thigh. */
+.sx-torso   { transform: rotate(4deg); animation: sx-torso 3s ease-in-out infinite; }
+.sx-uparm-l { transform: rotate(-42deg); }
+.sx-forearm-l { transform: rotate(-12deg); }
+.sx-uparm-r { transform: rotate(-16deg); }
+.sx-forearm-r { transform: rotate(-8deg); }
+.sx-thigh-l { transform: rotate(-84deg); } /* front thigh, near horizontal */
+.sx-calf-l  { transform: rotate(84deg); }  /* shin vertical — 90° knee */
+.sx-thigh-r { transform: rotate(54deg); }  /* back leg, straight behind */
+.sx-calf-r  { transform: rotate(0deg); }
+
+@keyframes sx-torso { 0%, 100% { transform: rotate(4deg); } 50% { transform: rotate(11deg); } }
+
+/* ============ OVERTAKE (ov) — 5s pass with high five ============
+ * The ghost puts a hand up BEHIND itself well in advance and waits.
+ * The runner raises an arm while still catching up, and the slap
+ * lands just before the runner draws level. Both keep their arms up
+ * afterward — the ghost waves, cheering the runner on as it passes.
+ * The two high-five arms are frozen out of the run cycle so the
+ * choreography wrappers control them completely. */
+.ov-move { animation: ov-move 5s linear infinite; }
+.hf-run  { animation: hf-run 5s ease-in-out infinite; }
+.hf-gho  { animation: hf-gho 5s ease-in-out infinite; }
+.hf-run .rn-uparm-l, .hf-gho .rn-uparm-l { animation: none; transform: rotate(0deg); }
+.hf-run .rn-forearm-l { animation: none; transform: rotate(-28deg); }
+.hf-gho .rn-forearm-l { animation: none; transform: rotate(24deg); }
+
+@keyframes ov-move { 0% { transform: translateX(-60px); } 100% { transform: translateX(330px); } }
+/* Runner passes the ghost (x=168) at ~58.5% of the loop; contact at ~52%. */
+@keyframes hf-run {
+  0%, 30% { transform: rotate(-8deg); }
+  42%, 48% { transform: rotate(-125deg); }
+  52% { transform: rotate(-142deg); }
+  58% { transform: rotate(-120deg); }
+  70% { transform: rotate(-100deg); }
+  82% { transform: rotate(-20deg); }
+  90%, 100% { transform: rotate(-8deg); }
+}
+@keyframes hf-gho {
+  0%, 8% { transform: rotate(-10deg); }
+  18%, 48% { transform: rotate(135deg); }
+  52% { transform: rotate(150deg); }
+  60% { transform: rotate(135deg); }
+  67% { transform: rotate(124deg); }
+  74% { transform: rotate(142deg); }
+  81% { transform: rotate(126deg); }
+  88%, 100% { transform: rotate(-10deg); }
+}
+
+/* ============ READING (rd) — breathe + page flick ============ */
+.rd-torso { animation: rd-breathe 3.2s ease-in-out infinite; }
+.rd-uparm-l { transform: rotate(-70deg); }
+.rd-forearm-l { transform: rotate(-36deg); }
+.rd-uparm-r { transform: rotate(-62deg); }
+.rd-forearm-r { transform: rotate(-28deg); animation: rd-flick 4.2s ease-in-out infinite; }
+.rd-thigh-l { transform: rotate(-78deg); }
+.rd-thigh-r { transform: rotate(-72deg); }
+.rd-calf-l { transform: rotate(36deg); }
+.rd-calf-r { transform: rotate(30deg); }
+.rd-book line, .rd-book rect { stroke-width: 3.5; }
+.rd-chair { stroke-width: 4; }
+
+@keyframes rd-breathe {
+  0%, 100% { transform: translate(0, 0) rotate(-33deg); }
+  50%      { transform: translate(0, -1.3px) rotate(-33deg); }
+}
+@keyframes rd-flick {
+  0%, 82%, 90%, 100% { transform: rotate(-28deg); }
+  86% { transform: rotate(22deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .runner-box * { animation: none !important; }
+}
+`;
+
+function ensureStyles(doc) {
+  if (!doc.getElementById(STYLE_ID)) {
+    const style = doc.createElement("style");
+    style.id = STYLE_ID;
+    style.textContent = CSS;
+    doc.head.appendChild(style);
+  }
+}
+
+/* ------------------------------------------------------------
+ * Figure builders
+ * ------------------------------------------------------------ */
+const GROUND = `<line class="rn-ground" x1="24" y1="180" x2="276" y2="180" />`;
+
+/* Skeleton drawn relative to the hip at (0,0). Class prefix p
+ * selects the animation set; lWrapOpen/lWrapClose optionally wrap
+ * the near (left) arm for overlay moves like the high five. */
+function skeleton(p, lWrapOpen = "", lWrapClose = "") {
+  return `
+    <line x1="0" y1="0" x2="0" y2="-36" />
+    <circle cx="0" cy="-49" r="10" />
+    <g transform="translate(0 -30)">
+      <g class="${p}-uparm-r ${p}-anim"><line x1="0" y1="0" x2="0" y2="17" />
+        <g transform="translate(0 17)"><g class="${p}-forearm-r ${p}-anim">
+          <line x1="0" y1="0" x2="0" y2="16" /></g></g></g>
+    </g>
+    <g class="${p}-thigh-r ${p}-anim"><line x1="0" y1="0" x2="0" y2="25" />
+      <g transform="translate(0 25)"><g class="${p}-calf-r ${p}-anim">
+        <line x1="0" y1="0" x2="0" y2="23" /></g></g></g>
+    <g transform="translate(0 -30)">${lWrapOpen}
+      <g class="${p}-uparm-l ${p}-anim"><line x1="0" y1="0" x2="0" y2="17" />
+        <g transform="translate(0 17)"><g class="${p}-forearm-l ${p}-anim">
+          <line x1="0" y1="0" x2="0" y2="16" /></g></g></g>${lWrapClose}
+    </g>
+    <g class="${p}-thigh-l ${p}-anim"><line x1="0" y1="0" x2="0" y2="25" />
+      <g transform="translate(0 25)"><g class="${p}-calf-l ${p}-anim">
+        <line x1="0" y1="0" x2="0" y2="23" /></g></g></g>`;
+}
+
+function figure(p, { x = 150, y = 132, ghost = false, extra = "", armWrap = "" } = {}) {
+  const open = armWrap ? `<g class="${armWrap}">` : "";
+  const close = armWrap ? `</g>` : "";
+  return `<g class="${ghost ? "fig-ghost " : ""}${extra}" transform="translate(${x} ${y})">
+    <g class="${p}-body ${p}-anim">${skeleton(p, open, close)}</g></g>`;
+}
+
+function stage(inner, label) {
+  return `<svg class="runner-stage" viewBox="0 0 300 200"
+    xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${label}">
+    ${GROUND}${inner}</svg>`;
+}
+
+/* --- state builders --- */
+const STATE_BUILDERS = {
+  run_solo: () => stage(figure("rn"), SCENE_LABELS.run_solo),
+
+  stumble_solo: () => stage(figure("st"), SCENE_LABELS.stumble_solo),
+
+  pb_end_celebration: () => stage(figure("cb"), SCENE_LABELS.pb_end_celebration),
+
+  run_with_ghost: () =>
+    stage(
+      figure("rn", { x: 210, ghost: true }) + figure("rn", { x: 88 }),
+      SCENE_LABELS.run_with_ghost
+    ),
+
+  stumble_ghost_clean: () =>
+    stage(
+      figure("rn", { x: 218, ghost: true }) + figure("st", { x: 80 }),
+      SCENE_LABELS.stumble_ghost_clean
+    ),
+
+  stumble_ghost_stumble: () =>
+    stage(
+      figure("st", { x: 218, ghost: true, extra: "st-lead" }) + figure("st", { x: 78 }),
+      SCENE_LABELS.stumble_ghost_stumble
+    ),
+
+  clean_ghost_stumble: () =>
+    stage(
+      figure("st", { x: 218, ghost: true }) + figure("rn", { x: 82 }),
+      SCENE_LABELS.clean_ghost_stumble
+    ),
+
+  run_end_no_pb: () =>
+    stage(
+      `<g class="pp-depart">${figure("rn", { x: 214, ghost: true })}</g>` +
+        figure("pp", { x: 86 }),
+      SCENE_LABELS.run_end_no_pb
+    ),
+
+  pb_overtake: () =>
+    stage(
+      figure("rn", { x: 168, ghost: true, armWrap: "hf-gho" }) +
+        `<g class="ov-move">${figure("rn", { x: 0, armWrap: "hf-run" })}</g>`,
+      SCENE_LABELS.pb_overtake
+    ),
+
+  fresh_start_stretch: () =>
+    stage(
+      `
+      <g transform="translate(148 152)">
+        <g class="sx-torso sx-anim">
+          <line x1="0" y1="0" x2="0" y2="-36" />
+          <circle cx="0" cy="-49" r="10" />
+          <g transform="translate(0 -30)">
+            <g class="sx-uparm-r sx-anim"><line x1="0" y1="0" x2="0" y2="17" />
+              <g transform="translate(0 17)"><g class="sx-forearm-r">
+                <line x1="0" y1="0" x2="0" y2="16" /></g></g></g>
+            <g class="sx-uparm-l sx-anim"><line x1="0" y1="0" x2="0" y2="17" />
+              <g transform="translate(0 17)"><g class="sx-forearm-l">
+                <line x1="0" y1="0" x2="0" y2="16" /></g></g></g>
+          </g>
+        </g>
+        <g class="sx-thigh-r"><line x1="0" y1="0" x2="0" y2="25" />
+          <g transform="translate(0 25)"><g class="sx-calf-r">
+            <line x1="0" y1="0" x2="0" y2="23" /></g></g></g>
+        <g class="sx-thigh-l"><line x1="0" y1="0" x2="0" y2="25" />
+          <g transform="translate(0 25)"><g class="sx-calf-l">
+            <line x1="0" y1="0" x2="0" y2="23" /></g></g></g>
+      </g>`,
+      SCENE_LABELS.fresh_start_stretch
+    ),
+
+  rest_reading: () =>
+    stage(
+      `
+      <g class="rd-chair">
+        <line x1="126" y1="153" x2="103" y2="112" />
+        <line x1="110" y1="152" x2="158" y2="152" />
+        <line x1="114" y1="152" x2="114" y2="178" />
+        <line x1="152" y1="152" x2="152" y2="178" />
+      </g>
+      <g transform="translate(132 144)">
+        <g class="rd-torso">
+          <line x1="0" y1="0" x2="0" y2="-36" />
+          <circle cx="0" cy="-49" r="10" />
+          <g transform="translate(0 -30)">
+            <g class="rd-uparm-r"><line x1="0" y1="0" x2="0" y2="17" />
+              <g transform="translate(0 17)"><g class="rd-forearm-r">
+                <line x1="0" y1="0" x2="0" y2="16" /></g></g></g>
+            <g class="rd-uparm-l"><line x1="0" y1="0" x2="0" y2="17" />
+              <g transform="translate(0 17)"><g class="rd-forearm-l">
+                <line x1="0" y1="0" x2="0" y2="16" />
+                <g class="rd-book" transform="translate(0 16) rotate(50)">
+                  <rect x="-9" y="-7" width="18" height="14" rx="1.5" />
+                  <line x1="0" y1="-7" x2="0" y2="7" />
+                </g></g></g></g>
+          </g>
+        </g>
+        <g class="rd-thigh-l"><line x1="0" y1="0" x2="0" y2="25" />
+          <g transform="translate(0 25)"><g class="rd-calf-l">
+            <line x1="0" y1="0" x2="0" y2="23" /></g></g></g>
+        <g class="rd-thigh-r"><line x1="0" y1="0" x2="0" y2="25" />
+          <g transform="translate(0 25)"><g class="rd-calf-r">
+            <line x1="0" y1="0" x2="0" y2="23" /></g></g></g>
+      </g>`,
+      SCENE_LABELS.rest_reading
+    ),
+
+  tie_celebration: () =>
+    stage(
+      figure("cb", { x: 210, ghost: true, extra: "cb-off" }) + figure("cb", { x: 90 }),
+      SCENE_LABELS.tie_celebration
+    ),
+};
+
+/* ------------------------------------------------------------
+ * Public API
+ * ------------------------------------------------------------ */
+function mountRunner(container, opts = {}) {
+  const doc = container.ownerDocument;
+  ensureStyles(doc);
+
+  let state = opts.state || "run_solo";
+  let locale = opts.locale || "en";
+  let copyVariant = opts.copyVariant || null; // e.g. "fresh_start_stretch_first"
+
+  const box = doc.createElement("div");
+  box.className = "runner-box";
+
+  const bubble = doc.createElement("div");
+  bubble.className = "runner-bubble";
+
+  const stageWrap = doc.createElement("div");
+  stageWrap.style.width = "100%";
+
+  box.appendChild(bubble);
+  box.appendChild(stageWrap);
+  container.appendChild(box);
+
+  function render() {
+    stageWrap.innerHTML = STATE_BUILDERS[state]();
+    const dict = BUBBLE_COPY[locale] || BUBBLE_COPY.en;
+    const key = copyVariant && dict[copyVariant] ? copyVariant : state;
+    bubble.textContent = dict[key] || BUBBLE_COPY.en[key] || "";
+    bubble.setAttribute("lang", locale);
+  }
+
+  render();
+
+  return {
+    setState(next, variant = null) {
+      if (!RUNNER_STATES.includes(next)) throw new Error(`Unknown runner state: ${next}`);
+      state = next;
+      copyVariant = variant;
+      render();
+    },
+    setLocale(next) {
+      locale = next;
+      render();
+    },
+    destroy() {
+      box.remove();
+    },
+    get state() { return state; },
+    get locale() { return locale; },
+  };
+}
+
+
+const STATE_INFO = {
+  run_solo: ["1 · Solo run", "Live run, no personal best to compare against yet."],
+  stumble_solo: ["2 · Stumble & recover (solo)", "One missed day used the grace. The trip shows before today's completion; recovering into stride shows after."],
+  pb_end_celebration: ["3 · New personal best (run ended)", "The run ended at a new personal best. Facing forward, fists pumping in the air."],
+  run_with_ghost: ["4 · Running with the ghost", "Live run against the record; both clean today."],
+  stumble_ghost_clean: ["5 · You stumble, ghost clean", "The current run has a stumble here; the record run was clean."],
+  stumble_ghost_stumble: ["6 · Both stumble", "Both runs stumbled here. The ghost falls first — you watch past-you fall and get up on the same track."],
+  clean_ghost_stumble: ["7 · Ghost stumbles, you run clean", "The record stumbled here; today you're running clean."],
+  run_end_no_pb: ["8 · Run ended, no PB", "The run ended short of the record. Modest fist pump; the ghost runs on ahead."],
+  pb_overtake: ["9 · Overtake high five", "Fires once, while the habit is live, the day completed days exceed the record. The ghost's hand goes up behind it early; the slap lands just before the pass, then the ghost cheers you on. (Loops here for preview.)"],
+  fresh_start_stretch: ["10 · Fresh start stretch", "Run not started yet — post-lapse or brand-new habit. Lunge stretch — back leg straight behind, front knee at 90°. Lap one uses 'this lap' copy."],
+  rest_reading: ["11 · Rest & read", "Paused, or a non-scheduled day."],
+  tie_celebration: ["12 · Tie celebration", "The run ended tying the record. Both figures celebrate."],
+};
+
+const stageEl = document.getElementById("stage");
+const select = document.getElementById("state-select");
+const counter = document.getElementById("counter");
+const desc = document.getElementById("desc");
+
+RUNNER_STATES.forEach((id, i) => {
+  const opt = document.createElement("option");
+  opt.value = id;
+  opt.textContent = STATE_INFO[id][0];
+  select.appendChild(opt);
+});
+
+let index = 0;
+let locale = "en";
+const runner = mountRunner(stageEl, { state: RUNNER_STATES[0], locale });
+
+function show(i) {
+  index = (i + RUNNER_STATES.length) % RUNNER_STATES.length;
+  const id = RUNNER_STATES[index];
+  const variant = id === "fresh_start_stretch" ? null : null;
+  runner.setState(id, variant);
+  select.value = id;
+  counter.textContent = `${index + 1} of ${RUNNER_STATES.length}`;
+  desc.textContent = `${STATE_INFO[id][0]}. ${STATE_INFO[id][1]}`;
+}
+
+document.getElementById("prev").addEventListener("click", () => show(index - 1));
+document.getElementById("next").addEventListener("click", () => show(index + 1));
+select.addEventListener("change", () => show(RUNNER_STATES.indexOf(select.value)));
+
+const btnEn = document.getElementById("btn-en");
+const btnZh = document.getElementById("btn-zh");
+function pick(next) {
+  locale = next;
+  runner.setLocale(next);
+  btnEn.setAttribute("aria-pressed", String(next === "en"));
+  btnZh.setAttribute("aria-pressed", String(next === "zh-Hans"));
+}
+btnEn.addEventListener("click", () => pick("en"));
+btnZh.addEventListener("click", () => pick("zh-Hans"));
+
+show(0);
+</script>
+</body>
+</html>
