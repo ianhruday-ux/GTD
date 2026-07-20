@@ -503,7 +503,7 @@ function openCalendarScreen(prefill){
     calendarView: true, kind: "calendar", taskId: null, draft: {},
     calTab: "month", calY: d.getFullYear(), calM: d.getMonth(), calSel: sel,
     calKind: "event", calName: (prefill && prefill.name) || "", calTime: "", calDesc: "",
-    calRecur: "none", calInterval: 1, calDeadlineFor: "next", calTickler: false, calMore: false,
+    calRecur: "none", calInterval: 1, calDeadlineFor: "next", calTickler: false,
     calInvalid: false, calFromCaptureId: (prefill && prefill.fromCaptureId) || null
   };
   renderScreen();
@@ -648,8 +648,7 @@ function calCreateRowHtml(s){
     controls =
       '<div class="cal-create-controls">' +
         '<div class="cal-boxed"><span class="field-icon">&#128337;</span>' +
-          '<input type="time" class="screen-time" data-calfield="time" value="' + escapeHtml(s.calTime || "") + '" style="color-scheme:dark" title="Optional — a time makes it an appointment">' +
-          '<span class="cal-hint">time makes it an appointment</span>' +
+          '<input type="time" class="screen-time" data-calfield="time" value="' + escapeHtml(s.calTime || "") + '" style="color-scheme:dark" title="Optional">' +
         '</div>' +
         '<input type="text" class="cal-desc" data-calfield="desc" placeholder="Description (optional)…" value="' + escapeHtml(s.calDesc || "") + '">' +
         '<div class="cal-boxed"><span class="field-icon">&#128260;</span>' +
@@ -659,7 +658,7 @@ function calCreateRowHtml(s){
           (s.calRecur !== "none" ? '<span class="cal-hint">every</span><input type="number" min="1" class="cal-interval" data-calfield="interval" value="' + (s.calInterval || 1) + '">' : "") +
         '</div>' +
         habitBubble +
-        '<label class="cal-tickler-row"><input type="checkbox" data-calfield="tickler"' + (s.calTickler ? " checked" : "") + '> Tickler — keep off the calendar &amp; reminders until its day</label>' +
+        '<label class="cal-tickler-row"><input type="checkbox" data-calfield="tickler"' + (s.calTickler ? " checked" : "") + '> Hide until the day it happens</label>' +
       '</div>';
   } else {
     controls =
@@ -676,27 +675,16 @@ function calCreateRowHtml(s){
   }
   const sel = dateStrToDate(s.calSel);
   const selLabel = sel.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
-  // The optional controls (time, description, repeat, tickler) are COLLAPSED by
-  // default: fully expanded they are ~6 stacked rows, and a footer that tall
-  // squeezes the month grid off the screen on a phone (user-reported). Title +
-  // Add is the whole common case; everything else is one tap away. A brass dot
-  // on the toggle means an optional field is set while hidden, so collapsed
-  // state can never be silently load-bearing.
-  const hasOpts = !!(s.calTime || s.calDesc || (isEvent && s.calRecur && s.calRecur !== "none") || (isEvent && s.calTickler));
-  const moreBtn =
-    '<button type="button" class="cal-more-btn' + (s.calMore ? " open" : "") + '" data-action="cal-more" ' +
-      'title="Time, description' + (isEvent ? ", repeat, tickler" : ", action or project") + '">' +
-      'Options' + (hasOpts && !s.calMore ? ' <span class="cal-more-dot">&#9679;</span>' : "") +
-      ' <span class="cal-more-caret">' + (s.calMore ? "&#9652;" : "&#9662;") + '</span>' +
-    '</button>';
+  // The creation controls stay fully visible (user ruling: scrolling the
+  // calendar is fine, a collapsible creation section is not).
   return (
     '<div class="cal-create">' +
-      '<div class="cal-create-top">' + seg + moreBtn + '</div>' +
+      seg +
       '<div class="cal-create-main">' +
         '<input type="text" class="cal-name' + (s.calInvalid ? " field-invalid" : "") + '" data-calfield="name" placeholder="' + (isEvent ? "Event on " : "Due ") + escapeHtml(selLabel) + '…" value="' + escapeHtml(s.calName || "") + '" autocomplete="off">' +
         '<button type="button" class="cal-add-btn" data-action="cal-add">Add</button>' +
       '</div>' +
-      (s.calMore ? controls : "") +
+      controls +
     '</div>'
   );
 }
@@ -1030,7 +1018,6 @@ function eventsHandleClick(e){
     }
     const kb = e.target.closest('[data-action="cal-kind"]');
     if (kb){ s.calKind = kb.getAttribute("data-kind"); renderScreen(); return true; }
-    if (e.target.closest('[data-action="cal-more"]')){ s.calMore = !s.calMore; renderScreen(); return true; }
     const dlf = e.target.closest('[data-action="cal-dlfor"]');
     if (dlf){ s.calDeadlineFor = dlf.getAttribute("data-for"); renderScreen(); return true; }
     if (e.target.closest('[data-action="cal-add"]')){ calAdd(); return true; }

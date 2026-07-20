@@ -6043,6 +6043,7 @@
   function boot(){
     renderShell();
     bindEvents();
+    bindDrawerSwipe(); // finger-follow open/close on the intray drawer, same mechanic as the calendar month swipe
     initLocalData();
     initCompletedData();
     injectQAChecklist();
