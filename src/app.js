@@ -5561,7 +5561,7 @@
   function serializeAllData(){
     const data = {};
     Storage.keys().forEach(function(k){ if (k.indexOf("gtd_") === 0) data[k] = Storage.get(k); });
-    return { app: "GTD Console", format: 1, exportedAt: new Date().toISOString(), data: data };
+    return { app: "OELA", format: 1, exportedAt: new Date().toISOString(), data: data };
   }
   function exportAllData(){
     closeDialog();
@@ -5569,7 +5569,7 @@
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = "gtd-console-backup-" + todayStr() + ".json";
+    a.href = url; a.download = "oela-backup-" + todayStr() + ".json";
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function(){ URL.revokeObjectURL(url); }, 1500);
   }
@@ -5588,7 +5588,7 @@
         let payload;
         try { payload = JSON.parse(reader.result); } catch (e){ importError("That file isn’t valid backup JSON."); return; }
         const data = payload && payload.data;
-        if (!data || typeof data !== "object"){ importError("That file doesn’t look like a GTD Console backup."); return; }
+        if (!data || typeof data !== "object"){ importError("That file doesn’t look like an OELA backup."); return; }
         closeDialog();
         openConfirmDialog("This will replace everything currently in the app.", [
           { label: "Replace everything", style: "danger", action: function(){

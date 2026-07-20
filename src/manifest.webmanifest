@@ -1,6 +1,6 @@
 {
-  "name": "GTD Console",
-  "short_name": "GTD Console",
+  "name": "Over-Engineered List App",
+  "short_name": "OELA",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

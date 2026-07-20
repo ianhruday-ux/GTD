@@ -38,7 +38,7 @@ python3 -m pytest tests/chunk0b/ -v
 ## The four intended deltas it checks (spec §2 row)
 
 1. Header `<span class="sub">` "Runs on its own" is **removed**.
-2. Web manifest shipped — name `GTD Console`, `theme_color #171513`,
+2. Web manifest shipped — name `Over-Engineered List App` (short name `OELA`), `theme_color #171513`,
    `display standalone`, `orientation portrait*`; plus `<meta name=theme-color>`.
 3. All `localStorage` behind the adapter, which **catches + surfaces**
    `QuotaExceededError` instead of throwing uncaught (§3 known issue 4).

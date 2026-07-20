@@ -132,7 +132,7 @@ input{ font-family:var(--font-body); }
    ▲ CHUNK 2 — HEADER (§4.10)  — fixed, ALWAYS visible, never collapses.
    MARKUP:
      <header>
-       <div class="brand"><span class="mark">GTD Console</span></div>
+       <div class="brand"><span class="mark">OELA</span></div>
        <div class="header-right">
          <button class="header-icon" data-action="open-tray">📥</button>
          <button class="header-icon" data-action="open-calendar">📅</button>

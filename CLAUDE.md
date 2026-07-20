@@ -1,6 +1,6 @@
 # CLAUDE.md — standing instructions for every session in this repo
 
-**GTD Console.** A GTD-inspired task manager: five lanes (Next Actions, Waiting On, Current
+**OELA — the Over-Engineered List App.** A GTD-inspired task manager: five lanes (Next Actions, Waiting On, Current
 Projects, Future/Someday, Habits), with Notes and a Calendar arriving later in the sprint. Vanilla
 JS, no framework. *(There is no points layer — it is deleted in chunk 0a; see `docs/spec.md` §2.)*
 Source lives in `src/`, is stapled into a single self-contained `dist/index.html`, and runs

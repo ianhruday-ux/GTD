@@ -150,3 +150,29 @@ the good texture can't be made, a clean surface beats a bad one.
 - Tiles are regenerated on every boot rather than cached in `localStorage`. That is currently the
   right trade (a 512px PNG data URI is large, and the storage adapter is already the app's known
   ceiling risk — see `storage.js`), but it is worth revisiting if boot time ever matters.
+
+---
+
+## §P5 The app is called OELA
+
+**Was:** GTD Console. **Is:** **OELA**, the **Over-Engineered List App**.
+
+**Why.** "Getting Things Done" and "GTD" are claimed marks of the David Allen Company. Shipping a
+product *named* GTD Console — installable, with that name on the home screen — is the exposed
+position, however small the audience.
+
+**Where the line is drawn.** The **product name** is renamed everywhere it is user-visible or
+identifying: the wordmark, the page title, the web manifest (`name` / `short_name`), the export
+file's `app` field and filename, and the doc titles. **Descriptive references to the GTD
+*methodology* stay** — "a GTD-inspired task manager", "GTD contexts" — because describing the method
+a tool is built on is not the same act as branding a product with the mark. If that reading is
+wrong, the remaining mentions are all in prose and are a find-and-replace away.
+
+⚑ **The `gtd_` localStorage prefix is deliberately NOT renamed.** It is invisible plumbing — never
+shown, never exported as a name, carrying no trademark exposure — and renaming it would orphan the
+current test data and every backup file already exported, in exchange for nothing. The cost of
+changing it later is the same as the cost of changing it now, so it can wait for a reason. Note that
+`§1`'s "migrations are optional until real use begins" is what makes that true; **once real use
+starts, this decision hardens.**
+
+**Not done, and the author's to do:** the GitHub repository itself is still named `GTD`.
