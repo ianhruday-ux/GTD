@@ -381,9 +381,12 @@ function pseudoBarHtml(task){
 // pseudo-action shape) — mirrors deadlineBarState().passed for real deadlines.
 function pseudoPassed(task){ return pseudoBarState(task.occDate, task.occTime).passed; }
 
-// The descriptor in front of the date on the card/detail — "event" or
-// "appointment", NEVER "deadline" (§4.14).
-function pseudoDescriptor(task){ return task.occTime ? "appointment" : "event"; }
+// (pseudoDescriptor lived here — it returned "appointment" or "event" for the
+// text in front of a date. Its callers were removed in the jargon pass that took
+// out "adding a time makes it an appointment"; the function outlived them as
+// dead code. Deleted rather than left for someone to wire back up: the user's
+// ruling is that the distinction is real but carries no information a reader
+// needs, so it belongs on a label at most, never in a sentence.)
 
 // =========================================================
 // DUPLICATE-TITLE SCOPE FOR EVENTS (§7). An event is not in a lane, so

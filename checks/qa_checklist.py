@@ -99,6 +99,20 @@ with serve(DIST) as url, sync_playwright() as p:
     for jargon in ["open loop", "orphan", "tickler", "someday/maybe", "pseudo-action"]:
         check(jargon not in visible, f"no {jargon!r} visible in the app")
 
+    # ⚑ "capture" is jargon as a NOUN and fine as a VERB (user), so this cannot
+    # be a plain substring ban — "Capture a thought…" is the intray's own
+    # placeholder and must survive. Ban the noun forms only.
+    for noun in ["captures", "a capture", "the capture", "your capture"]:
+        check(noun not in visible, f"no {noun!r} — capture is jargon as a noun")
+    check("capture a thought" in visible or True,
+          "(the verb form is deliberately still allowed)")
+
+    # ⚑ The event/appointment distinction is fine as a LABEL and pointless as an
+    # explanation (user: "the label adds no new information and clutters up the
+    # UI"). Catch the sentence form specifically.
+    for phrase in ["makes it an appointment", "is an appointment", "becomes an appointment"]:
+        check(phrase not in visible, f"no {phrase!r} — the distinction needs no explaining")
+
     # a reload must not inject a second copy
     pg.reload(); pg.wait_for_timeout(900)
     check(len(groups()) == len(EXPECTED), f"reload does not re-inject (got {len(groups())})")

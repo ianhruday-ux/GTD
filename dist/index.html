@@ -8190,7 +8190,7 @@ function injectChunkMap(){
       { title: 'Setting a time by dragging', notes: 'Tap the time box. Drag the hand around the clock face to an hour — it jumps to the minutes on its own when you let go, which is the usual next thing you want. Drag again for the minutes. The two big boxes at the top show what you have picked; tap either one to go back to it.' },
       { title: 'Midnight and midday', notes: 'The two that computers usually get wrong. Set 12:00 AM, save, and reopen — it should read 00:00, not 12:00. Then set 12:30 PM and reopen — that one SHOULD read 12:30. Tell me if either comes back different from what you set.' },
       { title: 'Backing out of the time picker', notes: 'Open the time picker and change the time, then tap Cancel — nothing should change. Do it again and tap outside the box instead. Important one: cancelling the time picker must leave you on the page you were on, NOT throw you back to the lanes.' },
-      { title: 'Clearing a time', notes: 'An event with a time is an appointment; without one it lasts the day. Open a timed event, tap the time box, tap Clear. The time empties and the event goes back to being an all-day one.' }
+      { title: 'Clearing a time', notes: 'Open an event that has a time on it, tap the time box, then tap Clear. The time empties and the event goes back to lasting the whole day.' }
     ]);
 
     addGroupWithItems('✅ QA — The new date picker', [
@@ -8217,7 +8217,7 @@ function injectChunkMap(){
     ]);
 
     addGroupWithItems('✅ QA — The review and the intray', [
-      { title: 'The intray tells the truth now', notes: 'Your note. Empty the intray of captures, but leave a stalled project, or an action waiting on something you deleted. The drawer should NOT say “nothing slipping through the cracks” — those loops now appear as blacked-out cards, and the number of cards matches the number on the Review button above them. Tap Reveal to read them: each says what is wrong with it (“no way forward”, “waiting on something gone”).' },
+      { title: 'The intray tells the truth now', notes: 'Your note. Empty the intray of everything you have jotted down, but leave a stalled project, or an action waiting on something you deleted. The drawer should NOT say “nothing slipping through the cracks” — those loops now appear as blacked-out cards, and the number of cards matches the number on the Review button above them. Tap Reveal to read them: each says what is wrong with it (“no way forward”, “waiting on something gone”).' },
       { title: 'Those cards cannot be poked at', notes: 'A revealed stalled project in the drawer has no ✕ and does not open when tapped — same rule as the review itself. You clear it by giving it a way forward, not by dismissing it. Tell me if that feels too strict.' },
       { title: 'Adding a waiting action to a stalled project', notes: 'The other half of your note. Open 🔍 Review until a stalled project comes up. Alongside “Add a next action” there is now “Add a waiting action”. It asks two things: what you are waiting on, and what has to happen first. Both are required — a waiting action with nothing to wait on would come straight back at you as a new problem, which is the thing this is meant to close.' },
       { title: 'The form tells you which box is wrong', notes: 'In that form, fill in only one of the two boxes and tap Add. The EMPTY one gets a dashed outline, and whatever you already typed stays put. No popup. Then fill both and tap Add — the project should stop appearing as stalled, and the new waiting action should NOT turn up as a problem of its own.' },
@@ -8599,7 +8599,7 @@ function injectChunkMap(){
   function reviewInfoPanelHtml(){
     return (
       '<div class="review-info-panel" hidden>' +
-        '<div class="review-info-block"><b>Sorting a capture</b><br>' +
+        '<div class="review-info-block"><b>Sorting a new thought</b><br>' +
           '<b>Next:</b> ' + escapeHtml(LANE_INFO.next) + '<br>' +
           '<b>Waiting:</b> ' + escapeHtml(LANE_INFO.waiting) + '<br>' +
           '<b>Project:</b> ' + escapeHtml(LANE_INFO.current) + '<br>' +
@@ -9969,9 +9969,12 @@ function pseudoBarHtml(task){
 // pseudo-action shape) — mirrors deadlineBarState().passed for real deadlines.
 function pseudoPassed(task){ return pseudoBarState(task.occDate, task.occTime).passed; }
 
-// The descriptor in front of the date on the card/detail — "event" or
-// "appointment", NEVER "deadline" (§4.14).
-function pseudoDescriptor(task){ return task.occTime ? "appointment" : "event"; }
+// (pseudoDescriptor lived here — it returned "appointment" or "event" for the
+// text in front of a date. Its callers were removed in the jargon pass that took
+// out "adding a time makes it an appointment"; the function outlived them as
+// dead code. Deleted rather than left for someone to wire back up: the user's
+// ruling is that the distinction is real but carries no information a reader
+// needs, so it belongs on a label at most, never in a sentence.)
 
 // =========================================================
 // DUPLICATE-TITLE SCOPE FOR EVENTS (§7). An event is not in a lane, so
