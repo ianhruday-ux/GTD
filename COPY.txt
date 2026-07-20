@@ -1,0 +1,853 @@
+OELA — ALL COPY AND BUTTON LABELS
+Generated 2026-07-20 from src/. 236 strings.
+
+HOW TO USE THIS FILE
+  Read down it. When you want something changed, write the new wording on the
+  line underneath it, after the arrow. Leave the arrow line blank (or delete it)
+  for anything you are happy with. Don't worry about matching the exact spelling
+  of the old text — I find these by their tag, not by their content.
+
+  Example:
+      [A12] placeholder   Add to list…
+         → What needs doing?
+
+  Each entry's tag (like [A12]) is how I locate it in the code, so please leave
+  those alone. The (file:line) at the end is for me.
+
+WHAT THE KINDS MEAN
+  button/label   text on a button, a tab, or a heading — you see it as-is
+  placeholder    the grey hint inside an empty box, gone as soon as you type
+  tooltip        the label on hover, or long-press on a phone
+  text           full sentences: info panels, empty states, confirm dialogs
+  screen-reader  never shown; only read aloud by a screen reader
+
+  The habit thought-bubbles are under HABITS AND THE RUNNER. Those are the
+  ones that will need Chinese versions, so they are worth extra attention.
+
+  NOT IN THIS FILE, on purpose: the QA checklist, the chunk map, the dev
+  buttons, and the sample data. Those are scaffolding for building the app —
+  they get regenerated every round or stripped from the real build, so editing
+  them here would be wasted work.
+
+  A few strings may be filed under the wrong heading — the grouping is worked
+  out from the code's own structure, which does not always match how the app
+  looks. If something is in an odd place, it is still the right string.
+
+==============================================================================
+
+THE MAIN SCREEN — LANES, TABS, CARDS
+------------------------------------------------------------------------------
+
+  [001] button/label  OELA — Over-Engineered List App
+     →
+     (index.html:13)
+  [002] tooltip       Intray
+     →
+     (index.html:29)
+  [003] tooltip       Calendar
+     →
+     (index.html:30)
+  [004] tooltip       More
+     →
+     (index.html:31)
+  [005] button/label  Next Actions
+     →
+     (index.html:44)
+  [006] button/label  Waiting On
+     →
+     (index.html:45)
+  [007] button/label  Projects
+     →
+     (index.html:48)
+  [008] button/label  Someday
+     →
+     (index.html:49)
+  [009] button/label  Habits
+     →
+     (index.html:52)
+  [010] button/label  Notes
+     →
+     (index.html:53)
+  [011] button/label  Restore
+     →
+     (index.html:68)
+  [012] tooltip       Dev: record the press-and-hold drag lifecycle so a phone-only drag bug can be reported as copyable text
+     →
+     (index.html:69)
+  [013] tooltip       Dev: show the recorded drag log to copy or screenshot
+     →
+     (index.html:70)
+  [014] button/label  Show drag log
+     →
+     (index.html:70)
+  [015] placeholder   Turn the drag log ON, reproduce the bug, then tap Show drag log.
+     →
+     (index.html:73)
+  [016] button/label  Copy
+     →
+     (index.html:75)
+  [017] button/label  Clear
+     →
+     (index.html:76)
+  [018] button/label  Close
+     →
+     (index.html:77)
+  [019] tooltip       Create
+     →
+     (index.html:90)
+  [020] button/label  New action
+     →
+     (index.html:92)
+  [021] button/label  New context
+     →
+     (index.html:93)
+  [022] button/label  New tag
+     →
+     (index.html:94)
+
+  [023] text          Current Projects
+     →
+     (app.js:4)
+  [024] text          Future / Someday
+     →
+     (app.js:5)
+
+  [025] text          A place for things that aren't actions. Try linking one to a project so it's there when you need it. One caution: these notes aren't a replacement for a real filing system.
+     →
+     (app.js:13)
+
+  [026] text          New project
+     →
+     (app.js:30)
+  [027] text          New checklist
+     →
+     (app.js:34)
+
+  [028] text          Next Action
+     →
+     (app.js:45)
+  [029] text          Waiting Action
+     →
+     (app.js:45)
+  [030] text          Current Project
+     →
+     (app.js:45)
+  [031] text          Future Project
+     →
+     (app.js:46)
+
+  [032] text          Mark done for today
+     →
+     (app.js:1455)
+  [033] tooltip       Mark complete
+     →
+     (app.js:1457)
+  [034] tooltip       Tap to open — press and hold to reorder
+     →
+     (app.js:1471)
+
+  [035] tooltip       Delete all completed items
+     →
+     (app.js:1496)
+  [036] button/label  Completed
+     →
+     (app.js:1502)
+
+  [037] tooltip       Restore to the active list
+     →
+     (app.js:1518)
+  [038] tooltip       Tap to view
+     →
+     (app.js:1519)
+
+  [039] text          Delete list
+     →
+     (app.js:1532)
+  [040] tooltip       Tap to expand/collapse — press and hold to reorder
+     →
+     (app.js:1544)
+  [041] placeholder   Add to list…
+     →
+     (app.js:1553)
+
+  [042] tooltip       Tap to expand/collapse
+     →
+     (app.js:1573)
+  [043] tooltip       Delete context
+     →
+     (app.js:1576)
+  [044] placeholder   Add to context…
+     →
+     (app.js:1582)
+
+  [045] button/label  Nothing here yet.
+     →
+     (app.js:1614)
+
+  [046] tooltip       What is this list for?
+     →
+     (app.js:1662)
+  [047] tooltip       Suggest an order from your hooks (you can still rearrange freely afterward)
+     →
+     (app.js:1667)
+
+  [048] tooltip       Remove condition
+     →
+     (app.js:2921)
+
+  [049] text          Tap to undo
+     →
+     (app.js:3318)
+  [050] text          Disarm Complete to convert
+     →
+     (app.js:3318)
+
+  [051] text          Restore the item to convert it
+     →
+     (app.js:3380)
+  [052] text          Make Waiting Action
+     →
+     (app.js:3381)
+  [053] text          Make Next Action
+     →
+     (app.js:3382)
+  [054] text          Make Future / Someday
+     →
+     (app.js:3383)
+  [055] text          Make Current Project
+     →
+     (app.js:3384)
+
+  [056] button/label  Nothing in the next 7 days.
+     →
+     (events.js:466)
+  [057] tooltip       Open the calendar
+     →
+     (events.js:468)
+
+
+THE INTRAY (CAPTURE DRAWER)
+------------------------------------------------------------------------------
+
+  [058] text          A holding pen for stray thoughts. Try sorting through it once a day — an empty intray means nothing's slipping through the cracks.
+     →
+     (app.js:5107)
+
+  [059] tooltip       Discard
+     →
+     (app.js:5126)
+
+  [060] text          Hide captures
+     →
+     (app.js:5147)
+  [061] text          Reveal captures
+     →
+     (app.js:5147)
+  [062] button/label  Empty for now — nothing slipping through the cracks.
+     →
+     (app.js:5152)
+
+  [063] tooltip       What is this?
+     →
+     (app.js:5172)
+  [064] placeholder   Capture a thought…
+     →
+     (app.js:5177)
+
+
+THE DAILY REVIEW
+------------------------------------------------------------------------------
+
+  [065] button/label  Review
+     →
+     (app.js:5407)
+  [066] tooltip       What do these do?
+     →
+     (app.js:5409)
+
+  [067] text          This was due and the moment has passed. Push it to a new date, tick it if it's actually done, delete it if it's dead — or Not now to see it again next time.
+     →
+     (app.js:5416)
+  [068] text          A project with no next action, no waiting item — no way forward. Name the very next physical step, move it to Someday/Maybe (an honest answer, not a failure), finish it, or delete it.
+     →
+     (app.js:5417)
+  [069] text          This was waiting on something that no longer exists. Point it at something else, replace it with a note to yourself, promote it if you can act now, or close it out.
+     →
+     (app.js:5418)
+  [070] text          A stray thought you haven't filed yet. Send it to a lane — or Not now to leave it for later.
+     →
+     (app.js:5419)
+
+  [071] button/label  Sorting a capture
+     →
+     (app.js:5424)
+  [072] button/label  Next:
+     →
+     (app.js:5425)
+  [073] button/label  Waiting:
+     →
+     (app.js:5426)
+  [074] button/label  Project:
+     →
+     (app.js:5427)
+  [075] button/label  Future:
+     →
+     (app.js:5428)
+  [076] button/label  Habit:
+     →
+     (app.js:5429)
+  [077] button/label  Note:
+     →
+     (app.js:5430)
+  [078] button/label  Deciding on an open loop
+     →
+     (app.js:5432)
+  [079] button/label  Past-due:
+     →
+     (app.js:5433)
+  [080] button/label  Stalled project:
+     →
+     (app.js:5434)
+  [081] button/label  Orphaned waiting:
+     →
+     (app.js:5435)
+
+  [082] text          Push the date
+     →
+     (app.js:5526)
+  [083] text          Complete it
+     →
+     (app.js:5527)
+  [084] text          What's the very next physical action?
+     →
+     (app.js:5533)
+  [085] text          Add a next action
+     →
+     (app.js:5536)
+  [086] text          Move to Someday/Maybe
+     →
+     (app.js:5537)
+  [087] text          Waiting for…
+     →
+     (app.js:5544)
+  [088] text          Re-point the condition →
+     →
+     (app.js:5547)
+  [089] text          Replace with free text
+     →
+     (app.js:5548)
+  [090] text          Promote to Next
+     →
+     (app.js:5549)
+
+  [091] button/label  All clear.
+     →
+     (app.js:5566)
+  [092] button/label  Nothing slipping through the cracks.
+     →
+     (app.js:5567)
+  [093] text          One at a time
+     →
+     (app.js:5573)
+
+
+CREATE AND EDIT PAGES
+------------------------------------------------------------------------------
+
+  [094] text          This project has
+     →
+     (app.js:1191)
+  [095] text          Complete project
+     →
+     (app.js:1193)
+
+  [096] text          Future projects can't have linked actions. Do you want to unlink your actions or delete them?
+     →
+     (app.js:1207)
+  [097] text          Unlink actions
+     →
+     (app.js:1209)
+  [098] text          Delete actions
+     →
+     (app.js:1213)
+
+  [099] button/label  No linked project
+     →
+     (app.js:1243)
+
+  [100] text          Are you sure? Exiting without saving will undo everything you did on this page — including actions you created, edited, or deleted, and any changes to the project’s own notes.
+     →
+     (app.js:2084)
+  [101] text          Discard changes
+     →
+     (app.js:2086)
+  [102] text          Keep editing
+     →
+     (app.js:2087)
+
+  [103] text          Delete this note for good?
+     →
+     (app.js:2390)
+  [104] text          Delete this for good?
+     →
+     (app.js:2400)
+
+  [105] text          Hook anyway
+     →
+     (app.js:2627)
+  [106] text          Replace them
+     →
+     (app.js:2628)
+  [107] text          Replace that hook
+     →
+     (app.js:2628)
+
+  [108] tooltip       Clear deadline
+     →
+     (app.js:2782)
+
+  [109] button/label  Linked actions
+     →
+     (app.js:2808)
+
+  [110] tooltip       Linked to this project — remove it from the project&#39;s list instead
+     →
+     (app.js:2863)
+
+  [111] button/label  No context
+     →
+     (app.js:2888)
+
+  [112] placeholder   Waiting for… (required — text or a hook)
+     →
+     (app.js:2936)
+  [113] text          Change the hooked condition
+     →
+     (app.js:2942)
+  [114] text          Hook to a Next or Waiting action
+     →
+     (app.js:2942)
+
+  [115] tooltip       Edit in Advanced options
+     →
+     (app.js:2957)
+  [116] tooltip       Remove this bundle
+     →
+     (app.js:2958)
+  [117] button/label  Advanced options…
+     →
+     (app.js:2961)
+
+  [118] text          This project
+     →
+     (app.js:3262)
+  [119] text          Everything else
+     →
+     (app.js:3263)
+  [120] text          Waiting Actions
+     →
+     (app.js:3266)
+  [121] text          Upcoming events
+     →
+     (app.js:3268)
+  [122] button/label  No condition
+     →
+     (app.js:3273)
+
+  [123] tooltip       Save and go back
+     →
+     (app.js:3288)
+  [124] tooltip       Delete
+     →
+     (app.js:3291)
+  [125] tooltip       Cancel
+     →
+     (app.js:3292)
+
+  [126] button/label  New waiting action
+     →
+     (app.js:3413)
+  [127] button/label  Waiting on…
+     →
+     (app.js:3415)
+  [128] placeholder   Description (optional)…
+     →
+     (app.js:3423)
+  [129] text          A waiting action can’t hold a date — clear the deadline first
+     →
+     (app.js:3434)
+  [130] placeholder   Next action…
+     →
+     (app.js:3459)
+  [131] tooltip       Open full editor
+     →
+     (app.js:3461)
+  [132] placeholder   Waiting action…
+     →
+     (app.js:3467)
+  [133] tooltip       Hook to a condition
+     →
+     (app.js:3468)
+  [134] placeholder   Who will I be if I build this habit?
+     →
+     (app.js:3478)
+  [135] text          Disarm the convert to complete
+     →
+     (app.js:3503)
+  [136] text          Complete on save
+     →
+     (app.js:3503)
+
+  [137] button/label  Bundling
+     →
+     (app.js:3582)
+  [138] button/label  Extra cues
+     →
+     (app.js:3583)
+  [139] button/label  Temptation bundling
+     →
+     (app.js:3589)
+  [140] placeholder   What treat goes with this?
+     →
+     (app.js:3590)
+  [141] button/label  Not recommended.
+     →
+     (app.js:3597)
+  [142] button/label  Advanced options
+     →
+     (app.js:3603)
+  [143] button/label  Done
+     →
+     (app.js:3605)
+
+
+THE CALENDAR
+------------------------------------------------------------------------------
+
+  [144] button/label  Past due
+     →
+     (events.js:809)
+
+  [145] button/label  Event
+     →
+     (events.js:832)
+  [146] button/label  Deadline
+     →
+     (events.js:833)
+  [147] button/label  Recurring chore? Make this a habit instead &#8594;
+     →
+     (events.js:838)
+  [148] tooltip       Optional
+     →
+     (events.js:842)
+  [149] button/label  Action
+     →
+     (events.js:862)
+  [150] button/label  Project
+     →
+     (events.js:863)
+
+  [151] button/label  Month
+     →
+     (events.js:892)
+  [152] button/label  List
+     →
+     (events.js:894)
+
+  [153] button/label  Coming up
+     →
+     (events.js:926)
+
+
+EVENTS AND REPEATS
+------------------------------------------------------------------------------
+
+  [154] text          Does not repeat
+     →
+     (app.js:43)
+
+  [155] placeholder   Event title…
+     →
+     (events.js:986)
+  [156] tooltip       Clear time
+     →
+     (events.js:1003)
+
+  [157] text          This event repeats. What would you like to do?
+     →
+     (events.js:1165)
+  [158] text          Skip this one
+     →
+     (events.js:1166)
+  [159] text          Delete series
+     →
+     (events.js:1167)
+
+
+HABITS AND THE RUNNER
+------------------------------------------------------------------------------
+
+  [160] tooltip       Remove this cue
+     →
+     (app.js:2990)
+  [161] tooltip       Hook to another habit
+     →
+     (app.js:3008)
+
+  [162] button/label  Contexts
+     →
+     (app.js:3038)
+  [163] button/label  Cue on which habit or context?
+     →
+     (app.js:3051)
+  [164] button/label  Back
+     →
+     (app.js:3053)
+
+  [165] button/label  Scheduled days
+     →
+     (app.js:3066)
+
+  [166] text          One foot in front of the other.
+     →
+     (runner.js:69)
+  [167] text          Everyone falls. What matters is getting back up.
+     →
+     (runner.js:70)
+  [168] text          A new personal best! Time to rest, then start a new lap.
+     →
+     (runner.js:71)
+  [169] text          I know this path well. I can do this.
+     →
+     (runner.js:72)
+  [170] text          A mistake is just something to learn from.
+     →
+     (runner.js:73)
+  [171] text          Even my best run had mistakes. I got back up then, too.
+     →
+     (runner.js:74)
+  [172] text          Even my best run had stumbles. Today I'm running clean.
+     →
+     (runner.js:75)
+  [173] text          I've made it past here before, so I know I can again. Rest now — next lap soon.
+     →
+     (runner.js:77)
+  [174] text          I beat my personal best. Now I just keep running.
+     →
+     (runner.js:78)
+  [175] text          I'm ready for my next lap.
+     →
+     (runner.js:79)
+  [176] text          I'm ready for this lap.
+     →
+     (runner.js:80)
+  [177] text          It's important to take a break sometimes.
+     →
+     (runner.js:81)
+  [178] text          A tie is good — but next lap, I'm breaking through this wall!
+     →
+     (runner.js:82)
+
+  [179] text          A stick figure running steadily.
+     →
+     (runner.js:103)
+  [180] text          A stick figure runs, trips and falls onto its hands, tucks its feet under itself, pushes up from the ground, stands, and runs on.
+     →
+     (runner.js:104)
+  [181] text          A stick figure facing forward, arms out at ninety degrees, pumping both fists in the air.
+     →
+     (runner.js:105)
+  [182] text          A stick figure running behind a faint ghost of its past self; both run smoothly.
+     →
+     (runner.js:106)
+  [183] text          A stick figure falls, pushes itself back up, and rejoins the run while the ghost ahead runs smoothly.
+     →
+     (runner.js:107)
+  [184] text          The ghost falls and pushes itself back up first; the runner then falls and gets back up too.
+     →
+     (runner.js:108)
+  [185] text          The ghost ahead falls and pushes itself back up while the runner keeps running smoothly.
+     →
+     (runner.js:109)
+  [186] text          A stick figure pumps one fist while the ghost runs onward and fades away.
+     →
+     (runner.js:110)
+  [187] text          The ghost holds a hand up behind itself; the catching-up runner raises an arm, they high-five just before the pass, and the ghost waves the runner on.
+     →
+     (runner.js:111)
+  [188] text          A stick figure in a lunge stretch: back leg straight behind, front knee bent at ninety degrees.
+     →
+     (runner.js:112)
+  [189] text          A stick figure reclined in a chair, reading a book.
+     →
+     (runner.js:113)
+  [190] text          Two stick figures facing forward, side by side, alternating fist pumps in celebration.
+     →
+     (runner.js:114)
+
+
+NOTES AND TAGS
+------------------------------------------------------------------------------
+
+  [191] tooltip       Clear filter
+     →
+     (app.js:5981)
+  [192] button/label  All notes
+     →
+     (app.js:5988)
+  [193] button/label  Tags
+     →
+     (app.js:5990)
+  [194] button/label  Nothing to filter by yet — link a note to a project or add a tag.
+     →
+     (app.js:5991)
+
+  [195] tooltip       Bold
+     →
+     (app.js:6046)
+  [196] tooltip       Italic
+     →
+     (app.js:6047)
+  [197] tooltip       Underline
+     →
+     (app.js:6048)
+  [198] tooltip       Heading
+     →
+     (app.js:6049)
+  [199] tooltip       Bullet list
+     →
+     (app.js:6050)
+  [200] tooltip       Checklist
+     →
+     (app.js:6051)
+  [201] tooltip       Add a tag or linked project
+     →
+     (app.js:6053)
+
+  [202] placeholder   Note title…
+     →
+     (app.js:6119)
+  [203] placeholder   Write anything…
+     →
+     (app.js:6123)
+
+  [204] button/label  No projects to link yet — create one on the Projects tab.
+     →
+     (app.js:6144)
+  [205] button/label  No tags yet — add some with “Manage tags”.
+     →
+     (app.js:6151)
+  [206] button/label  Link a project
+     →
+     (app.js:6156)
+  [207] button/label  Manage tags →
+     →
+     (app.js:6160)
+
+  [208] placeholder   tag name…
+     →
+     (app.js:6250)
+  [209] button/label  A completed project already uses this name.
+     →
+     (app.js:6253)
+  [210] button/label  Projects (names already taken)
+     →
+     (app.js:6262)
+  [211] button/label  No projects yet.
+     →
+     (app.js:6265)
+
+
+SETTINGS, BACKUP AND DIALOGS
+------------------------------------------------------------------------------
+
+  [212] button/label  Export a backup
+     →
+     (app.js:5691)
+  [213] button/label  Import a backup
+     →
+     (app.js:5693)
+  [214] button/label  Background
+     →
+     (app.js:5696)
+  [215] button/label  Language
+     →
+     (app.js:5701)
+
+  [216] text          Restore the app to its default state? Everything you’ve entered — notes, actions, projects, habits — will be permanently erased and replaced with the sample data. This can’t be undone.
+     →
+     (app.js:5751)
+  [217] text          Erase & restore defaults
+     →
+     (app.js:5752)
+
+  [218] text          That file isn’t valid backup JSON.
+     →
+     (app.js:5794)
+  [219] text          That file doesn’t look like an OELA backup.
+     →
+     (app.js:5796)
+  [220] text          This will replace everything currently in the app.
+     →
+     (app.js:5798)
+  [221] text          Replace everything
+     →
+     (app.js:5799)
+
+
+EVERYTHING ELSE
+------------------------------------------------------------------------------
+
+  [222] button/label  Not now
+     →
+     (app.js:5450)
+
+  [223] tooltip       Remove
+     →
+     (app.js:5846)
+
+  [224] text          No notes for this filter.
+     →
+     (app.js:6019)
+  [225] text          No notes yet.
+     →
+     (app.js:6019)
+
+  [226] button/label  Nothing on this day.
+     →
+     (events.js:671)
+
+  [227] text          Scheduled for
+     →
+     (events.js:1353)
+
+  [228] screen-reader Choose a time
+     →
+     (timepicker.js:167)
+  [229] button/label  Select time
+     →
+     (timepicker.js:169)
+  [230] screen-reader Hour
+     →
+     (timepicker.js:171)
+  [231] screen-reader Minute
+     →
+     (timepicker.js:173)
+
+  [232] text          PingFang SC
+     →
+     (runner.js:147)
+  [233] text          Hiragino Sans GB
+     →
+     (runner.js:147)
+  [234] text          Noto Sans SC
+     →
+     (runner.js:147)
+  [235] text          Microsoft YaHei
+     →
+     (runner.js:147)
+
+  [236] screen-reader ${label}
+     →
+     (runner.js:514)
+
