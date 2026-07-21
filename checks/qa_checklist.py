@@ -118,6 +118,47 @@ with serve(DIST) as url, sync_playwright() as p:
     for phrase in ["makes it an appointment", "is an appointment", "becomes an appointment"]:
         check(phrase not in visible, f"no {phrase!r} — the distinction needs no explaining")
 
+    # ⚑ THE LANE-ONLY / REVIEW SPLIT (user, INFO-TEXT.txt). The review's ⓘ reuses
+    # the six lane descriptions (§4.8b), and the user marked two paragraphs with a
+    # SECOND arrow: "some sections of the lane material shouldn't appear in the
+    # daily review." Those are LANE_INFO_EXTRA, and the review must never show
+    # them. This is the whole reason LANE_INFO is split in two — without a check,
+    # the obvious "simplification" of merging them back reintroduces the bug
+    # silently, because both surfaces still render and neither looks broken.
+    pg.evaluate("""() => { const b = document.querySelector('[data-action="toggle-info"][data-kind="next"]');
+      if (b) b.click(); }""")
+    pg.wait_for_timeout(250)
+    lane_next = pg.evaluate("""() => { const el = document.querySelector('.lane-info[data-kind="next"]');
+      return el ? el.textContent : ''; }""")
+    check("recurring place or time" in lane_next,
+          "the lane's own 'i' DOES show the contexts paragraph")
+    lane_habit = pg.evaluate("""() => { const el = document.querySelector('.lane-info[data-kind="habit"]');
+      return el ? el.textContent : ''; }""")
+    check("personal bests" in lane_habit,
+          "and the habits lane DOES show the personal-bests paragraph")
+
+    pg.evaluate("() => { const r = document.querySelector('#tray-root'); if (r) r.innerHTML = ''; }")
+    pg.evaluate("() => document.querySelector('[data-action=\"open-tray\"]').click()")
+    pg.wait_for_timeout(350)
+    pg.evaluate("() => document.querySelector('[data-action=\"open-review\"]').click()")
+    pg.wait_for_timeout(600)
+    pg.evaluate("() => document.querySelector('[data-action=\"review-info\"]').click()")
+    pg.wait_for_timeout(300)
+    panel = pg.evaluate("""() => { const p = document.querySelector('.review-info-panel');
+      return p ? p.textContent : ''; }""")
+    check(len(panel) > 500, f"the review's info panel rendered ({len(panel)} chars)")
+    check("single next physical step" in panel,
+          "it reuses the shared half of the lane text")
+    check("recurring place or time" not in panel,
+          "but NOT the lane-only contexts paragraph (marked with a second arrow)")
+    check("personal bests" not in panel,
+          "nor the lane-only personal-bests paragraph")
+    check("no way forward. Add the next physical step" in panel,
+          "and the stalled-project text is the user's own wording")
+    pg.evaluate("""() => { const c = document.querySelector('[data-action="review-close"]'); if (c) c.click(); }""")
+    pg.wait_for_timeout(300)
+    pg.evaluate("() => { const r = document.querySelector('#tray-root'); if (r) r.innerHTML = ''; }")
+
     # a reload must not inject a second copy
     pg.reload(); pg.wait_for_timeout(900)
     check(len(groups()) == len(EXPECTED), f"reload does not re-inject (got {len(groups())})")

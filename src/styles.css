@@ -525,6 +525,10 @@ body.has-frame #fab-create{
   border-radius:10px; margin:0 0 10px 0;
 }
 .lane-info.show{ display:block; }
+/* The second paragraph of a lane's help — the one the user marked lane-only, so
+   it does NOT appear in the review's ⓘ (LANE_INFO_EXTRA). A separate block
+   because it is a separate idea, not a continuation of the sentence above. */
+.lane-info-more{ display:block; margin-top:9px; }
 
 /* The lane body is now a single flow of items — one padding, generous gap. */
 .lane-body{ display:flex; flex-direction:column; gap:14px; }

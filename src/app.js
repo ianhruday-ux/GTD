@@ -4,13 +4,28 @@
     next: "Next Actions", waiting: "Waiting On", current: "Current Projects",
     future: "Future / Someday", habit: "Habits", notes: "Notes"
   };
+  // \u2691 THE USER'S OWN COPY, transcribed from INFO-TEXT.txt ("Info text is now
+  // done"). Verbatim \u2014 this is authored prose, not generated text, so it is not
+  // silently edited here. If it needs a wording change, change it in
+  // INFO-TEXT.txt and re-transcribe, so the file stays the record.
+  //
+  // TWO PARTS, and the split is load-bearing. The review's \u24d8 reuses these six
+  // lane descriptions (\u00a74.8b), and the user marked some paragraphs with a SECOND
+  // arrow in INFO-TEXT.txt: "some sections of the lane material shouldn't appear
+  // in the daily review." LANE_INFO is the shared half \u2014 lane \u24d8 AND review \u24d8.
+  // LANE_INFO_EXTRA is lane-only, and reviewInfoPanelHtml must never read it.
   const LANE_INFO = {
-    next: "The single next physical step for anything you're actively moving forward \u2014 not the whole project, just what you'd do next if you sat down right now.",
-    waiting: "Things you can't act on yet because they depend on something else \u2014 a reply from someone, a delivery, a decision, another action getting done, or a future date or event. Nothing to do here but check in occasionally. Use the arrow to promote it once it's back in your hands.",
-    current: "Anything that takes more than one action to finish and that you're actively working on right now \u2014 could be as simple as returning a library book or as involved as planning a vacation. Link a Next Action or Waiting On item to one of these to keep the connection visible.",
-    future: "Ideas and projects you're not committing to yet \u2014 no pressure, just a parking lot. Use the arrow to promote one to Current Projects when you're ready to start.",
-    habit: "Things you want to do every day, not just once. Checking one off only counts for today \u2014 it resets automatically tomorrow so it keeps showing up. Everyone misses a habit occasionally. We don't track streaks here, but we do track personal bests. If you break your streak, then maybe you'll have a new personal best to beat. After all: \u2018It's more important to be persistent than it is to be consistent.\u2019 \u2013 Rebecca",
-    notes: "A place for things that aren't actions. Try linking one to a project so it's there when you need it. One caution: these notes aren't a replacement for a real filing system."
+    next: "This lane is for \u201cnext actions\u201d and \u201ccontexts.\u201d A next action is the single next physical step you needed to move something forward. It is not a whole project, only the next action you can take in a project.",
+    waiting: "A waiting action is something you can't act on yet because it depends on something else\u2014a reply from someone, a delivery, a decision, another action getting done, or a future event. Use the left arrow to promote a waiting action to the next action list, or hook it to a next action so it will promote automatically. Actions in a context will promote to their sibling context in the next action list.",
+    current: "A project is anything that takes more than one action to complete. It could be as simple as returning a library book or as involved as planning a vacation. Current projects should always have at least one step tied to them to prevent them from being stalled. This step might be an action, a waiting action, or even an event on the calendar.",
+    future: "This lane is for projects you're not committed starting yet. Review this list at least once a month to keep the dreams alive.",
+    habit: "A habit is an automatic behaviour which is triggered by a cue. It's easiest to build habits when you're doing them at least once a week. Type in a cue when you're creating a habit or use the habit hook to create habit stacks in which one habit is the cue for the next habit in the stack.",
+    notes: "This lane is for notes. It's useful for keeping track of ideas, links, email addresses, and assorted reference materials related to current and future projects."
+  };
+  // The \u2192\u2192 paragraphs: shown on the lane's own \u201ci\u201d, withheld from the review.
+  const LANE_INFO_EXTRA = {
+    next: "A \u201ccontext\u201d is a recurring place or time which offers you the opportunity to take an action. Here, we have created contextual lists, so you can group all your \u201cat computer\u201d and \u201cgetting off work\u201d actions together.",
+    habit: "Some apps track streaks, but everyone misses a habit occasionally. We don't track streaks here, but we do track personal bests. If you break your streak, then maybe you'll have a new personal best to beat. After all: \u2018It's more important to be persistent than it is to be consistent.\u2019 \u2013 Rebecca"
   };
   // Task lanes (each backed by state.tasks[k]). Notes are a lane too but NOT a
   // task kind \u2014 they have their own store \u2014 so KINDS stays task-only and
@@ -1758,10 +1773,13 @@
           '<span class="lane-label-title">' + escapeHtml(LIST_TITLES[k]) + '</span>' +
           '<span class="lane-label-right">' +
             '<span class="count">0</span>' +
-            '<button class="info-btn" data-action="toggle-info" data-kind="' + k + '" type="button" title="What is this list for?">i</button>' +
+            '<button class="info-btn" data-action="toggle-info" data-kind="' + k + '" type="button" title="Information">i</button>' +
           '</span>' +
         '</div>' +
-        '<div class="lane-info" data-kind="' + k + '">' + escapeHtml(LANE_INFO[k]) + '</div>' +
+        // The lane's "i" gets BOTH halves; the review's ⓘ gets only LANE_INFO.
+        '<div class="lane-info" data-kind="' + k + '">' + escapeHtml(LANE_INFO[k]) +
+          (LANE_INFO_EXTRA[k] ? '<span class="lane-info-more">' + escapeHtml(LANE_INFO_EXTRA[k]) + '</span>' : "") +
+        '</div>' +
         (k === "habit"
           ? '<div class="lane-tools-row"><button class="btn btn-ghost btn-small tidy-btn" data-action="tidy-habits" type="button" title="Suggest an order from your hooks (you can still rearrange freely afterward)">&#8645; Tidy order</button></div>'
           : "") +
@@ -5451,7 +5469,8 @@
   // stray thoughts; the daily review (chunk 6b) is where they get sorted.
   // Opening/closing changes nothing on the main screen — closing is a cancel.
   // =========================================================
-  const TRAY_INFO = "A holding pen for stray thoughts. Try sorting through it once a day — an empty intray means nothing's slipping through the cracks.";
+  // ⚑ The user's own copy (INFO-TEXT.txt [INTRAY]), transcribed verbatim.
+  const TRAY_INFO = "The intray is a tray that holds everything that needs dealing with. Stalled projects, overdue deadlines, and waiting actions which have lost their waiting condition, all belong here. You can use the text box to quickly add thoughts or reminders if you don't have time to add them to the proper list. You can sort through and process everything using the tray's review feature.";
   function loadTray(){ return Storage.getJSON("gtd_tray", []); }
   function saveTray(){ Storage.setJSON("gtd_tray", state.tray); }
   // The eye toggle glyph (user follow-up). Crossed eye = captures are hidden
@@ -5587,7 +5606,7 @@
         '<div class="tray-head">' +
           '<span class="tray-title">Intray</span>' +
           '<span style="flex:1"></span>' +
-          '<button type="button" class="icon-btn" data-action="tray-info" title="What is this?">&#9432;</button>' +
+          '<button type="button" class="icon-btn" data-action="tray-info" title="Information">&#9432;</button>' +
           '<button type="button" class="icon-btn" data-action="close-tray" title="Close">&times;</button>' +
         '</div>' +
         '<div class="tray-info-panel" hidden>' + escapeHtml(TRAY_INFO) + '</div>' +
@@ -5846,7 +5865,7 @@
         '<span class="screen-chrome-btn" style="visibility:hidden">&#8592;</span>' +
         '<span class="screen-kind-badge">Review</span>' +
         '<div class="screen-header-right">' +
-          '<button type="button" class="screen-chrome-btn" data-action="review-info" title="What do these do?">&#9432;</button>' +
+          '<button type="button" class="screen-chrome-btn" data-action="review-info" title="Information">&#9432;</button>' +
           '<button type="button" class="screen-chrome-btn" data-action="review-close" title="Close">&#10005;</button>' +
         '</div>' +
       '</div>'
@@ -5854,7 +5873,10 @@
   }
   const REVIEW_MENU_INFO = {
     pastdue: "This was due and the moment has passed. Push it to a new date, tick it if it's actually done, delete it if it's dead — or Not now to see it again next time.",
-    stalled: "A project with no next action, no waiting item — no way forward. Name the very next physical step, move it to Someday (an honest answer, not a failure), finish it, or delete it.",
+    // ⚑ The user's own copy (INFO-TEXT.txt [REV-3]), transcribed verbatim. The
+    // "Stalled project:" label they wrote above it is already emitted by
+    // reviewInfoPanelHtml as the bolded heading, so only the body lives here.
+    stalled: "This is a project with no way forward. Add the next physical step, a waiting action, or an event to keep it going, or move it to future projects if continuing the project isn't possible or practical. You can always come back to it in the future.",
     orphaned: "This was waiting on something that no longer exists. Point it at something else, replace it with a note to yourself, promote it if you can act now, or close it out.",
     missed: "A repeating thing whose day went by without being ticked. Often you did it and forgot to say so — 'I did it' records it on the day it happened. 'Let it go' clears it without pretending you did. Only the most recent one is ever kept, so this never piles up.",
     capture: "A stray thought you haven't filed yet. Send it to a lane — or Not now to leave it for later."

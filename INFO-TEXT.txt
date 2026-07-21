@@ -38,7 +38,7 @@ These are the six lists down the side of the app. Each has a small "i".
     The single next physical step for anything you're actively moving forward —
     not the whole project, just what you'd do next if you sat down right now.
      → This lane is for "next actions" and "contexts." A next action is the single next physical step you needed to move something forward. It is not a whole project, only the next action you can take in a project.
-     → A "context" is a recurring place or time which offers you the opportunity to take an action. Here, we have created contextual lists, so you can group all your "at computer" actions and "getting off work" actions together.
+     →→ A "context" is a recurring place or time which offers you the opportunity to take an action. Here, we have created contextual lists, so you can group all your "at computer" actions and "getting off work" actions together.
 
   [LANE-2] Waiting On                                    ⚑ "event" appears here
     Things you can't act on yet because they depend on something else — a reply
@@ -69,7 +69,7 @@ These are the six lists down the side of the app. Each has a small "i".
     personal best to beat. After all: 'It's more important to be persistent than
     it is to be consistent.' – Rebecca
      → A habit is an automatic behaviour which is triggered by a cue. It's easiest to build habits when you're doing them at least once a week. Type in a cue when you're creating a habit or use the habit hook to create habit stacks in which one habit is the cue for the next habit in the stack.
-     → Some apps track streaks, but everyone misses a habit occasionally. We don't track streaks here, but we do  track personal bests. If you break your streak, then maybe you'll have a new personal best to beat. After all: 'It's more important to be persistent than it is to be consistent.' – Rebecca
+     →→ Some apps track streaks, but everyone misses a habit occasionally. We don't track streaks here, but we do  track personal bests. If you break your streak, then maybe you'll have a new personal best to beat. After all: 'It's more important to be persistent than it is to be consistent.' – Rebecca
 
   [LANE-6] Notes
     A place for things that aren't actions. Try linking one to a project so it's
@@ -141,3 +141,5 @@ What you see if you hover, or long-press on a phone.
   [TIP-3] on the review's ⓘ
     What do these do?
      → Information
+
+While reading the info text I noticed that some sections of the lane material shouldn't appear in the daily review. I marked them with a second arrow.
