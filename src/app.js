@@ -45,8 +45,11 @@
     current: ["New project", "New list"], future: ["New project", "New list"],
     // Notes (user): the menu is column-reversed, so item[0] renders NEAREST the
     // badge (bottom). New note is the common one → bottom; checklist above it;
-    // New tag on top. DOM order here is bottom-up (item[0] = bottom).
-    notes: ["New note", "New checklist", "New tag"]
+    // Tags on top. DOM order here is bottom-up (item[0] = bottom).
+    // ⚑ "New tag" → "Tags" (user): the button opens the Tags PAGE, where you view,
+    // rename and delete every tag as well as add one. "New tag" named the least of
+    // what it does and made the other three jobs unfindable.
+    notes: ["New note", "New checklist", "Tags"]
   };
   const TITLE_PLACEHOLDER = {
     next: "Next action\u2026", waiting: "What are you waiting on\u2026",
@@ -1833,7 +1836,7 @@
       const labels = FAB_MENU_LABELS[state.activeKind] || [];
       const items = menu.querySelectorAll(".fab-menu-item");
       // Variable item count: label + show the first N, hide the rest (Notes has
-      // a third option, New tag; the action/project lanes have two).
+      // a third option, Tags; the action/project lanes have two).
       items.forEach(function(item, i){
         if (i < labels.length){ item.textContent = labels[i]; item.hidden = false; }
         else item.hidden = true;
@@ -4423,7 +4426,7 @@
       const fabBtn = e.target.closest('[data-action="fab"]');
       if (fabBtn){
         // Notes now has a two-option menu too (user): New checklist · New note
-        // (New tag joins with §4.9b). Habits still create directly (no menu).
+        // (Tags joins with §4.9b). Habits still create directly (no menu).
         if (state.activeKind === "habit"){ openScreen("habit", null); return; }
         const menu = qs("#fab-menu");
         if (menu) menu.hidden = !menu.hidden;
@@ -4468,7 +4471,7 @@
       if (fabTertiary){
         const menu = qs("#fab-menu");
         if (menu) menu.hidden = true;
-        if (state.activeKind === "notes"){ openTagsScreen(); return; } // New tag → the Tags page (§4.9b)
+        if (state.activeKind === "notes"){ openTagsScreen(); return; } // Tags → the Tags page (§4.9b)
         return;
       }
       const moveBtn = e.target.closest('[data-action="move"]');
@@ -7005,7 +7008,7 @@
   }
 
   // =========================================================
-  // TAGS PAGE (§4.9b). Reached from the badge → New tag (full manage mode)
+  // TAGS PAGE (§4.9b). Reached from the badge → Tags (full manage mode)
   // and the note picker's "Manage tags →" (create-only sub-view).
   // Chrome is ←(save)/✕(discard) with NO page 🗑 (the page is not an item);
   // tags are removed by the row ✕, which STAGES the removal — draft-isolated,
@@ -7067,7 +7070,7 @@
     html += '</div>';
     html += '<button type="button" class="tags-add-btn" data-action="tag-add-row">+ Add tag</button>';
     if (!manage){
-      html += '<div class="tags-createonly-hint">Adding tags here — ← saves them and returns to your note. Rename or delete tags from the Notes + badge → New tag.</div>';
+      html += '<div class="tags-createonly-hint">Adding tags here — ← saves them and returns to your note. Rename or delete tags from the Notes + badge → Tags.</div>';
     }
     // Projects below, READ-ONLY — the reference that makes duplicates visible.
     html += '<div class="screen-hook-pick-label" style="margin-top:18px;">Projects (names already taken)</div>';
