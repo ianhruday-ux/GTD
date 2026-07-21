@@ -234,6 +234,24 @@ function processEventBoundaries(){
       while (ev.completedAt == null && guard++ < 400){
         const appearCivil = occAppearanceCivil(ev.date, ev.time);
         if (appearCivil < today && occPassed(ev.date, ev.time)){
+          // ⚑ Remember the miss before rolling past it (user ruling: "only keep
+          // the most recent miss in the review").
+          //
+          // A one-shot that goes unticked keeps its pseudo-action and so reaches
+          // the review on its own. A SERIES did not: rolling forward erased the
+          // occurrence, so a standup you simply forgot to tick vanished at 4 AM
+          // with no trace. The roll itself is right and stays — "one live
+          // entity, no accumulation" is what stops a month of ignored dailies
+          // becoming thirty review rows — so the miss is recorded beside the
+          // series rather than by holding the series back.
+          //
+          // ONE slot, deliberately: a newer miss overwrites an older unhandled
+          // one, which is exactly "most recent only". Rolling past several in a
+          // single sweep therefore leaves the LAST one, the one still worth
+          // asking about.
+          if ((ev.completedOccs || []).indexOf(ev.date) === -1){
+            ev.missedOcc = ev.date;
+          }
           const nd = nextOccurrenceDate(ev.date, ev.recurrence, ev.interval);
           if (!nd) break;
           ev.date = nd; changed = true;

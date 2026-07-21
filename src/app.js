@@ -4002,6 +4002,10 @@
       if (e.target.closest('[data-action="review-pushdate-save"]')){ reviewSavePushDate(); return; }
       if (e.target.closest('[data-action="review-addnext-save"]')){ reviewSaveAddNext(); return; }
       if (e.target.closest('[data-action="review-addwaiting-save"]')){ reviewSaveAddWaiting(); return; }
+      const missDone = e.target.closest('[data-action="review-missed-done"]');
+      if (missDone){ reviewMissedDone(missDone.getAttribute("data-id")); return; }
+      const missClear = e.target.closest('[data-action="review-missed-clear"]');
+      if (missClear){ reviewMissedClear(missClear.getAttribute("data-id")); return; }
       if (e.target.closest('[data-action="review-freetext-save"]')){ reviewSaveFreeText(); return; }
       const revComplete = e.target.closest('[data-action="review-complete"]');
       if (revComplete){ reviewComplete(revComplete.getAttribute("data-lane"), revComplete.getAttribute("data-id")); return; }
@@ -5388,6 +5392,13 @@
   // (past-due wins, being first).
   function computeOpenLoops(){
     const loops = [];
+    // Events already being asked about as a live past-due row. A series whose
+    // TODAY has passed unticked is queued below as a pseudo-action; if it also
+    // carries a recorded miss from an earlier day, showing both would put the
+    // same series in the queue twice — the accumulation the single-slot design
+    // exists to prevent. The live one wins: it is the more recent question, and
+    // dealing with it is what the review is for.
+    const pastDueEventIds = {};
     ["next", "current"].forEach(function(k){
       state.tasks[k].forEach(function(t){
         if (t.isGroup || isDevScaffold(t)) return;
@@ -5395,10 +5406,25 @@
         // its CHECKBOX shape (§4.8b / §2) — not the deadline's push/complete/
         // delete menu. deadlineBarState is null for it (no deadline field), so
         // it needs its own past-due test.
-        if (t.eventId){ if (pseudoPassed(t)) loops.push({ key: t.id, kind: "pastdue", laneKind: k, id: t.id, task: t, pseudo: true }); return; }
+        if (t.eventId){
+          if (pseudoPassed(t)){
+            pastDueEventIds[t.eventId] = 1;
+            loops.push({ key: t.id, kind: "pastdue", laneKind: k, id: t.id, task: t, pseudo: true });
+          }
+          return;
+        }
         const st = deadlineBarState(t);
         if (st && st.passed) loops.push({ key: t.id, kind: "pastdue", laneKind: k, id: t.id, task: t });
       });
+    });
+    // A repeating occurrence that went unticked and has already been rolled past
+    // (user ruling). It has no lane row — the series' single pseudo-action has
+    // moved on to the next date — so it is derived from the event itself rather
+    // than found in a lane, and carries the EVENT id, not a task id.
+    (state.events || []).forEach(function(ev){
+      if (!ev.missedOcc) return;
+      if (pastDueEventIds[ev.id]) return;   // already queued, once is enough
+      loops.push({ key: "missed-" + ev.id, kind: "missed", id: ev.id, ev: ev, occ: ev.missedOcc });
     });
     (state.tray || []).forEach(function(c){ loops.push({ key: c.id, kind: "capture", id: c.id, text: c.text }); });
     state.tasks.current.forEach(function(t){
@@ -5454,6 +5480,7 @@
     pastdue: "This was due and the moment has passed. Push it to a new date, tick it if it's actually done, delete it if it's dead — or Not now to see it again next time.",
     stalled: "A project with no next action, no waiting item — no way forward. Name the very next physical step, move it to Someday (an honest answer, not a failure), finish it, or delete it.",
     orphaned: "This was waiting on something that no longer exists. Point it at something else, replace it with a note to yourself, promote it if you can act now, or close it out.",
+    missed: "A repeating thing whose day went by without being ticked. Often you did it and forgot to say so — 'I did it' records it on the day it happened. 'Let it go' clears it without pretending you did. Only the most recent one is ever kept, so this never piles up.",
     capture: "A stray thought you haven't filed yet. Send it to a lane — or Not now to leave it for later."
   };
   function reviewInfoPanelHtml(){
@@ -5475,7 +5502,8 @@
         '<div class="review-info-block"><b>When something needs a decision</b><br>' +
           '<b>Past its date:</b> ' + escapeHtml(REVIEW_MENU_INFO.pastdue) + '<br>' +
           '<b>Stalled project:</b> ' + escapeHtml(REVIEW_MENU_INFO.stalled) + '<br>' +
-          '<b>Waiting on something gone:</b> ' + escapeHtml(REVIEW_MENU_INFO.orphaned) +
+          '<b>Waiting on something gone:</b> ' + escapeHtml(REVIEW_MENU_INFO.orphaned) + '<br>' +
+          '<b>A repeat you missed:</b> ' + escapeHtml(REVIEW_MENU_INFO.missed) +
         '</div>' +
       '</div>'
     );
@@ -5551,6 +5579,27 @@
         '</div>' +
         '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + '</div>';
       return '<div class="review-card review-card-capture">' + bodyHtml + menuHtml + '</div>';
+    }
+    // A rolled-past repeating occurrence (user ruling). Handled before the shared
+    // path below because it has NO lane row to read a title or a bar from — it is
+    // the event plus a date. Tapping through goes to the event's page.
+    //
+    // The menu is the past-due pseudo-action's, minus anything that would act on
+    // the wrong occurrence: you cannot push a date that is already behind you,
+    // and Delete here must clear THIS miss, not the live series.
+    if (l.kind === "missed"){
+      const when = dateStrToDate(l.occ).toLocaleDateString(undefined,
+        { weekday: "long", day: "numeric", month: "long" });
+      bodyHtml =
+        '<button type="button" class="review-card-open" data-action="review-open-event" data-id="' + l.id + '">' +
+          '<span class="review-card-title">' + escapeHtml(effTitle(l.ev, l.occ)) + '</span>' +
+          '<span class="review-card-note">⚠ went by on ' + escapeHtml(when) + ' without being ticked</span>' +
+        '</button>';
+      menuHtml =
+        '<button type="button" class="review-menu-btn" data-action="review-missed-done" data-id="' + l.id + '">&#10003; I did it</button>' +
+        '<button type="button" class="review-menu-btn" data-action="review-missed-clear" data-id="' + l.id + '">Let it go</button>' +
+        reviewNotNowBtn(l.key);
+      return '<div class="review-card">' + bodyHtml + menuHtml + '</div>';
     }
     // Derived kinds share a tap-through title (opens the real page) + a
     // context line, then a per-kind decision menu. A pseudo-action taps
@@ -5717,6 +5766,36 @@
     const pid = s.reviewForm.key;
     createTask("waiting", { title: title, whenText: when, linkedProjectId: pid })
       .then(function(){ s.reviewForm = null; renderScreen(); });
+  }
+  // "I did it" — you did the thing and forgot to tick it, which is the case the
+  // user named. Records the completion against the occurrence's own date, so it
+  // keeps its dimmed mark on the calendar for the day it actually happened
+  // rather than today, and clears the miss.
+  function reviewMissedDone(eventId){
+    const ev = findEvent(eventId);
+    if (!ev) return;
+    if (ev.missedOcc){
+      ev.completedOccs = ev.completedOccs || [];
+      if (ev.completedOccs.indexOf(ev.missedOcc) === -1) ev.completedOccs.push(ev.missedOcc);
+      ev.missedOcc = null;
+    }
+    saveEvents();
+    renderLane("next"); renderLane("waiting");
+    if (state.screen) state.screen.reviewForm = null;
+    renderScreen();
+  }
+  // "Let it go" — it did not happen and that is fine. Clears the miss WITHOUT
+  // recording a completion, so it never counts as something you achieved.
+  // ⚑ No confirm dialog: this destroys nothing (the series is untouched and the
+  // occurrence was already rolled past), so the standing rule about destructive
+  // actions does not apply.
+  function reviewMissedClear(eventId){
+    const ev = findEvent(eventId);
+    if (!ev) return;
+    ev.missedOcc = null;
+    saveEvents();
+    if (state.screen) state.screen.reviewForm = null;
+    renderScreen();
   }
   function reviewSaveFreeText(){
     const s = state.screen; if (!s || !s.reviewForm) return;
