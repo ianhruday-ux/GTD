@@ -9,7 +9,13 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- interactive-widget=resizes-content: the on-screen keyboard shrinks the
+     LAYOUT viewport rather than only the visual one, so a fixed inset:0 overlay
+     is simply correct and the browser never has to scroll the page to reveal the
+     caret. This is the real fix for the drafting page jumping when you move from
+     the title to the body; the JS below is the fallback for browsers that ignore
+     it (iOS Safari, at time of writing). -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
 <title>OELA — Over-Engineered List App</title>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#171513">

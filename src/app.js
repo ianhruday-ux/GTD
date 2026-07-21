@@ -5156,16 +5156,35 @@
     // only the drafting overlay reads them, so updating while no screen is open
     // is harmless.
     if (window.visualViewport){
-      // Only react to RESIZE (keyboard open/close), and only drive HEIGHT. The
-      // earlier version also tracked offsetTop and listened to 'scroll', which
-      // updated the overlay every frame during momentum scroll and the keyboard
-      // transition — that was the viewport "jump" the user saw. The body is
-      // position:fixed while a screen is open, so offsetTop stays 0 and top:0
-      // is correct; dropping both removes the jitter. (Device-confirm pending.)
+      // ⚑ Tracks OFFSET AS WELL AS HEIGHT, and that pairing is the whole point.
+      //
+      // A previous round dropped offsetTop to stop the overlay jittering during
+      // momentum scroll, and kept the height. That combination is worse than
+      // either alone: .screen-overlay is positioned at --vv-top and sized to
+      // --vv-height, so with the top pinned at 0 and the height shrunk to the
+      // keyboard-visible area, the overlay ends up BOTH too high (the title
+      // scrolls out of the visible area) AND too short (the lanes show through
+      // underneath it). That was the reported bug — one cause, both symptoms.
+      //
+      // The jitter is dealt with properly instead: coalesce into a frame, and
+      // write nothing when the numbers have not actually changed. Scroll has to
+      // be listened to, because offsetTop only changes there.
+      let vvRaf = 0, lastH = -1, lastT = -1;
       const syncVv = function(){
-        document.documentElement.style.setProperty("--vv-height", window.visualViewport.height + "px");
+        const vv = window.visualViewport;
+        const h = Math.round(vv.height), top = Math.round(vv.offsetTop);
+        if (h === lastH && top === lastT) return;
+        lastH = h; lastT = top;
+        const root = document.documentElement;
+        root.style.setProperty("--vv-height", h + "px");
+        root.style.setProperty("--vv-top", top + "px");
       };
-      window.visualViewport.addEventListener("resize", syncVv);
+      const queueVv = function(){
+        if (vvRaf) return;
+        vvRaf = requestAnimationFrame(function(){ vvRaf = 0; syncVv(); });
+      };
+      window.visualViewport.addEventListener("resize", queueVv);
+      window.visualViewport.addEventListener("scroll", queueVv);
       syncVv();
     }
 
