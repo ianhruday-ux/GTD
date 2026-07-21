@@ -37,27 +37,29 @@ These are the six lists down the side of the app. Each has a small "i".
   [LANE-1] Next Actions
     The single next physical step for anything you're actively moving forward —
     not the whole project, just what you'd do next if you sat down right now.
-     →
+     → This lane is for "next actions" and "contexts." A next action is the single next physical step you needed to move something forward. It is not a whole project, only the next action you can take in a project.
+     → A "context" is a recurring place or time which offers you the opportunity to take an action. Here, we have created contextual lists, so you can group all your "at computer" actions and "getting off work" actions together.
 
   [LANE-2] Waiting On                                    ⚑ "event" appears here
     Things you can't act on yet because they depend on something else — a reply
     from someone, a delivery, a decision, another action getting done, or a
     future date or event. Nothing to do here but check in occasionally. Use the
     arrow to promote it once it's back in your hands.
-     →
+     → A waiting action is something you can't act on yet because it depends on something else—a reply
+    from someone, a delivery, a decision, another action getting done, or a future event. Use the left arrow to promote a waiting action to the next action list, or hook it to a next action so it will promote automatically. Actions in a context will promote to their sibling context in the next action list.
 
   [LANE-3] Current Projects
     Anything that takes more than one action to finish and that you're actively
     working on right now — could be as simple as returning a library book or as
     involved as planning a vacation. Link a Next Action or Waiting On item to
     one of these to keep the connection visible.
-     →
+     → A project is anything that takes more than one action to complete. It could be as simple as returning a library book or as involved as planning a vacation. Current projects should always have at least one step tied to them to prevent them from being stalled. This step might be an action, a waiting action, or even an event on the calendar.
 
   [LANE-4] Someday
     Ideas and projects you're not committing to yet — no pressure, just a
     parking lot. Use the arrow to promote one to Current Projects when you're
     ready to start.
-     →
+     → This lane is for projects you're not committed starting yet. Review this list at least once a month to keep the dreams alive. 
 
   [LANE-5] Habits
     Things you want to do every day, not just once. Checking one off only counts
@@ -66,13 +68,14 @@ These are the six lists down the side of the app. Each has a small "i".
     track personal bests. If you break your streak, then maybe you'll have a new
     personal best to beat. After all: 'It's more important to be persistent than
     it is to be consistent.' – Rebecca
-     →
+     → A habit is an automatic behaviour which is triggered by a cue. It's easiest to build habits when you're doing them at least once a week. Type in a cue when you're creating a habit or use the habit hook to create habit stacks in which one habit is the cue for the next habit in the stack.
+     → Some apps track streaks, but everyone misses a habit occasionally. We don't track streaks here, but we do  track personal bests. If you break your streak, then maybe you'll have a new personal best to beat. After all: 'It's more important to be persistent than it is to be consistent.' – Rebecca
 
   [LANE-6] Notes
     A place for things that aren't actions. Try linking one to a project so it's
     there when you need it. One caution: these notes aren't a replacement for a
     real filing system.
-     →
+     → This lane is for notes. It's useful for keeping track of ideas, links, email addresses, and assorted reference materials related to current and future projects.
 
 THE INTRAY DRAWER
 ------------------------------------------------------------------------------
@@ -80,7 +83,7 @@ THE INTRAY DRAWER
   [INTRAY] the ⓘ in the drawer's header
     A holding pen for stray thoughts. Try sorting through it once a day — an
     empty intray means nothing's slipping through the cracks.
-     →
+     → The intray is a tray that holds everything that needs dealing with. Stalled projects, overdue deadlines, and waiting actions which have lost their waiting condition, all belong here. You can use the text box to quickly add thoughts or reminders if you don't have time to add them to the proper list. You can sort through and process everything using the tray's review feature.
 
 THE DAILY REVIEW
 ------------------------------------------------------------------------------
@@ -113,7 +116,8 @@ part below.
     A project with no next action, no waiting item — no way forward. Name the
     very next physical step, move it to Someday (an honest answer, not a
     failure), finish it, or delete it.
-     →
+     → Stalled project:
+       This is a project with no way forward. Add the next physical step, a waiting action, or an event to keep it going, or move it to future projects if continuing the project isn't possible or practical. You can always come back to it in the future.
 
   [REV-4] label + text for a waiting item whose trigger was deleted
     Waiting on something gone:
@@ -128,96 +132,12 @@ What you see if you hover, or long-press on a phone.
 
   [TIP-1] on each lane's "i"
     What is this list for?
-     →
+     → Information
 
   [TIP-2] on the intray's ⓘ
     What is this?
-     →
+     → Information
 
   [TIP-3] on the review's ⓘ
     What do these do?
-     →
-
-==============================================================================
-
-PROJECTS AND THE CALENDAR — the collision analysis you asked for
-------------------------------------------------------------------------------
-Not copy to review. A design brief, put here because you said you would read
-this file tonight. Nothing below is built; it is all waiting on your rulings.
-
-THE SURPRISE: MOST OF IT ALREADY EXISTS
-  A project page ALREADY lists its linked events, nearest first, and tapping one
-  opens it. A linked event ALREADY counts as "a way forward", so a project with
-  a scheduled event is not reported as stalled. An event ALREADY carries a
-  project link, and the action it creates on its day inherits that link.
-  What is missing is smaller than it sounds: you cannot CREATE an event from the
-  project page. Everything else is plumbed.
-
-THE REAL PROBLEM IS NOT THE FEATURE, IT IS THE ENDINGS
-  I went looking for what happens when a project ends. Nothing in the app's
-  project handling touches events at all — not completing, not deleting, not
-  moving to Someday. So today, all three of these are already true:
-
-  [P-1] Complete a project, and its events keep going.
-        Linked waiting items get archived, with a dialog telling you so.
-        Linked events are not mentioned and not touched. A weekly "site
-        meeting" on a finished project keeps appearing in Next Actions every
-        week, forever.
-        → What should completing a project do to its events?
-          (a) archive them the way waiting items are archived, with the same
-              "you can restore these" dialog — my recommendation, it matches
-              what the app already does one line above
-          (b) leave them and just say so
-          (c) delete them outright
-
-  [P-2] Delete a project, and its events survive pointing at nothing.
-        They keep firing, now belonging to a project that does not exist.
-        → Delete them with it, or unlink them and leave them as ordinary
-          events? I would unlink: the meeting may still be real even if the
-          project is cancelled, and deleting someone's calendar entries as a
-          side effect of deleting a project is a nasty surprise.
-
-  [P-3] Move a project to Someday, and its events keep firing.
-        Someday means "not now" — but the calendar keeps interrupting you about
-        it. This one I think is clearly wrong.
-        → Pause the series and hide the events while parked, restoring them if
-          the project comes back? That is what Pause already does for habits.
-
-  These are not new problems and this feature does not cause them. But building
-  "create an event from a project" makes them much easier to hit, because it
-  makes linked events something you actually use.
-
-YOUR PROPOSED CONSTRAINT
-  "Scheduled events, including repeated events, should not extend beyond the
-  project deadline."
-  Reasonable, and it needs one decision to be buildable, because a repeating
-  event has no end date at all today — it rolls forward forever by design.
-
-  [P-4] What does "not extend beyond" DO?
-        (a) refuse the date, with the dashed outline the app uses elsewhere
-        (b) allow it but warn
-        (c) allow it, and treat it as evidence the DEADLINE is wrong — offer to
-            push the deadline instead
-        And for a repeat, capping it means recurrence needs an end date, which
-        is a new field and a new control on the event page. Worth knowing that
-        this one clause is the most expensive thing on this page.
-
-  [P-5] Two follow-on cases the rule does not cover:
-        · A project with NO deadline — then there is nothing to exceed, and the
-          rule simply does not apply. Fine, but worth saying out loud.
-        · The deadline gets PULLED EARLIER, leaving events already scheduled
-          past it. Blocking creation cannot help here. Warn, or move nothing
-          and let the review surface it?
-
-  ⚑ My honest view: the constraint is right in spirit but I would not build it
-  first. P-1 to P-3 are live bugs today and cost nothing to decide. P-4 is a new
-  field on the recurrence model, and the sprint has a service worker and a
-  desktop pass still to land.
-
-WHAT I WOULD BUILD, IN ORDER
-  1. The three endings (P-1, P-2, P-3). Small, and they are broken now.
-  2. "New event" on the project page, pre-linked — the actual request. Small,
-     because everything downstream already exists.
-  3. "Create event" in the daily review for a stalled project, which you parked
-     behind exactly this work.
-  4. The deadline constraint, once P-4 is decided.
+     → Information

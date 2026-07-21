@@ -270,6 +270,69 @@ with serve(DIST) as url, sync_playwright() as p:
     }""")
     check(linked_to, "and it is linked to the project that was just created")
 
+    # ---------- a SOMEDAY project gets linked notes too ----------
+    # User: "I think it should be possible to link notes to the future projects
+    # page. Future projects should also get their own section in the tags picker
+    # on the notes page."
+    #
+    # ⚠ Notes ONLY, and no Actions/Notes toggle: §4.3 is explicit that a Future
+    # project holds no linked actions and takes no deadlines, so an Actions side
+    # would be a switch to a list that can never have anything in it.
+    pg.evaluate("""() => {
+      ['#tray-root', '#dialog-root', '#screen-root'].forEach(s => {
+        const el = document.querySelector(s); if (el) el.innerHTML = '';
+      });
+      document.body.classList.remove('screen-open');
+      window.scrollTo(0, 0);
+    }""")
+    pg.wait_for_timeout(250)
+    pg.click('.tab[data-kind="future"]'); pg.wait_for_timeout(450)
+    pg.locator('.lane.active-lane .card-title').first.click(); pg.wait_for_timeout(600)
+    labels = pg.evaluate("""() => [...document.querySelectorAll('.screen-hook-pick-label')]
+      .map(e => e.textContent.trim())""")
+    check("Linked notes" in labels, f"a Someday project page has a Linked notes section ({labels})")
+    check(pg.locator('[data-action="new-linked-note"]').count() == 1,
+          "with its own + New note")
+    check(pg.locator('[data-action="project-linked-tab"]').count() == 0,
+          "and NO Actions/Notes toggle — a Someday project holds no actions (4.3)")
+
+    pg.locator('[data-action="new-linked-note"]').first.click(); pg.wait_for_timeout(650)
+    chips = pg.evaluate("() => [...document.querySelectorAll('.note-chip')].map(e => e.textContent.trim())")
+    check(any("Learn woodworking" in c for c in chips),
+          f"the new note arrives pre-linked to it ({chips})")
+    pg.fill('[data-field="noteTitle"]', "ZZ someday note")
+    pg.click('[data-action="screen-save"]'); pg.wait_for_timeout(600)
+    rows = pg.evaluate("""() => [...document.querySelectorAll('.linked-action-item')]
+      .map(e => e.textContent.trim())""")
+    check(any("ZZ someday note" in r for r in rows), f"and shows in its list ({rows})")
+    pg.click('[data-action="screen-save"]'); pg.wait_for_timeout(700)
+    saved = pg.evaluate("""() => { const n = JSON.parse(localStorage.getItem('gtd_notes') || '[]')
+      .find(x => x.title === 'ZZ someday note');
+      return n ? (n.projectLinks || []).map(l => l.name) : null; }""")
+    check(saved and "Learn woodworking" in saved, f"and the link persists ({saved})")
+
+    # ---------- the notes picker splits the two lanes ----------
+    pg.click('.tab[data-kind="notes"]'); pg.wait_for_timeout(450)
+    pg.locator('#fab-create').first.click(); pg.wait_for_timeout(300)
+    pg.locator('[data-action="new-primary"]').first.click(); pg.wait_for_timeout(600)
+    pg.locator('[data-action="note-add-link"]').first.click(); pg.wait_for_timeout(450)
+    labels = pg.evaluate("""() => [...document.querySelectorAll('.screen-hook-pick-label')]
+      .map(e => e.textContent.trim())""")
+    check("Link a current project" in labels and "Link a Someday project" in labels,
+          f"the picker has a section per lane, not one flat list ({labels})")
+    sections = pg.evaluate("""() => [...document.querySelectorAll('.screen-hook-pick-list')]
+      .map(l => [...l.querySelectorAll('.screen-hook-pick-item')].map(i => i.textContent.trim()))""")
+    cur_sec = sections[1] if len(sections) > 1 else []
+    fut_sec = sections[2] if len(sections) > 2 else []
+    check(any("Learn woodworking" in t for t in fut_sec),
+          f"Someday projects are in the Someday section ({fut_sec})")
+    check(not any("Learn woodworking" in t for t in cur_sec),
+          f"and not in the current one ({cur_sec[:4]})")
+    # ⚠ The chunk map injects ~26 rows into Current Projects. They are dev
+    # scaffolding (devContext), and they were burying the real projects here.
+    check(not any(t.startswith("✓") or "—" in t for t in cur_sec),
+          f"dev scaffolding rows are kept out of the picker ({cur_sec[:6]})")
+
     check(not errs, f"no JS errors ({errs[:3]})")
     b.close()
 

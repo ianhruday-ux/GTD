@@ -3684,6 +3684,16 @@
         }
         if (s.taskId) fields += makeKindBtnHtml("future", "Make Future / Someday", "", draft.convertTo === "future", !!draft.willComplete);
       } else {
+        // ⚑ Future projects get LINKED NOTES (user: "it should be possible to
+        // link notes to the future projects page"). Notes only, and no segmented
+        // control: §4.3 is explicit that a Future project holds no linked actions
+        // and takes no deadlines, so an Actions side would be a switch to a list
+        // that can never have anything in it. A Someday project is exactly the
+        // kind that accumulates thinking rather than steps, which is what a note
+        // is for — the link already worked in one direction (a note could name a
+        // Future project) and the page simply never showed it.
+        fields += '<div class="screen-hook-pick-label">Linked notes</div>' +
+          linkedNotesListHtml(s, s.draft && s.draft.projectId);
         if (s.taskId) fields += makeKindBtnHtml("current", "Make Current Project", "", draft.convertTo === "current", !!draft.willComplete);
       }
     } else if (kind === "habit"){
@@ -6774,11 +6784,27 @@
   // create-only draft sub-view without tearing down this note draft.
   function noteProjectPickerHtml(s){
     const linked = new Set((s.draft.projectLinks || []).map(function(l){ return l.id; }));
-    const projects = state.tasks.current.concat(state.tasks.future)
-      .filter(function(t){ return !t.isGroup && !linked.has(t.id); });
-    const projItems = projects.length
-      ? projects.map(function(p){ return '<button type="button" class="screen-hook-pick-item" data-action="note-pick-project" data-id="' + p.id + '">' + escapeHtml(p.title) + '</button>'; }).join("")
-      : '<div class="empty-note">No projects to link yet — create one on the Projects tab.</div>';
+    // ⚑ Two sections, not one flat list (user: "Future projects should also get
+    // their own section in the tags picker on the notes page"). Both lanes were
+    // always offered here, concatenated — which meant an active project and one
+    // you have parked read as the same kind of thing at the moment you choose,
+    // and the only way to tell them apart was to already know the titles. They
+    // are different lanes with different meanings everywhere else in the app;
+    // this is the one place that flattened them.
+    function pickList(items, empty){
+      return items.length
+        ? items.map(function(p){ return '<button type="button" class="screen-hook-pick-item" data-action="note-pick-project" data-id="' + p.id + '">' + escapeHtml(p.title) + '</button>'; }).join("")
+        : '<div class="empty-note">' + empty + '</div>';
+    }
+    // ⚑ Dev scaffolding is excluded. The chunk map injects ~26 rows into Current
+    // Projects, and they were drowning the two real ones in this picker — the
+    // review already refuses to treat them as real work (isDevScaffold) and a
+    // chooser has the same reason to.
+    const notLinked = function(t){ return !t.isGroup && !linked.has(t.id) && !isDevScaffold(t); };
+    const currentItems = pickList(state.tasks.current.filter(notLinked),
+      "No current projects to link — create one on the Projects tab.");
+    const futureItems = pickList(state.tasks.future.filter(notLinked),
+      "Nothing in Someday to link yet.");
 
     const tagged = new Set((s.draft.tagIds || []));
     const tags = (state.tags || []).filter(function(t){ return !tagged.has(t.id); })
@@ -6790,8 +6816,12 @@
     return '<div class="screen-body pick-body">' +
       '<div class="screen-hook-pick-label">Tags</div>' +
       '<div class="screen-hook-pick-list">' + tagItems + '</div>' +
-      '<div class="screen-hook-pick-label">Link a project</div>' +
-      '<div class="screen-hook-pick-list">' + projItems + '</div>' +
+      // The lanes' own names, so the section headings match the tabs they came
+      // from rather than inventing a second vocabulary for the same two lists.
+      '<div class="screen-hook-pick-label">Link a current project</div>' +
+      '<div class="screen-hook-pick-list">' + currentItems + '</div>' +
+      '<div class="screen-hook-pick-label">Link a Someday project</div>' +
+      '<div class="screen-hook-pick-list">' + futureItems + '</div>' +
       '<div class="screen-row" style="margin-top:10px; justify-content:space-between;">' +
         '<button type="button" class="btn btn-ghost btn-small" data-action="note-cancel-pick">Back</button>' +
         '<button type="button" class="btn btn-ghost btn-small" data-action="note-manage-tags">Manage tags →</button>' + // wired in the Tags-page commit
