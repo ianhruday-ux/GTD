@@ -10,7 +10,9 @@ A project has a "way forward" if a Next Action or Waiting action is linked to
 it, or a linked event is coming (§4.3b/§4.8b).
 """
 import os, functools, http.server, socket, socketserver, threading, contextlib, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from playwright.sync_api import sync_playwright
+from _pickers import enable_qa_scaffolding
 
 DIST = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "dist")
 
@@ -44,6 +46,9 @@ with serve(DIST) as url, sync_playwright() as p:
     pg.on("pageerror", lambda e: errs.append("PAGEERROR " + str(e)))
     pg.on("console", lambda m: errs.append("CONSOLE " + m.text) if m.type == "error" else None)
     pg.goto(url); pg.wait_for_timeout(1000)
+    # ⚠ The chunk map is dev scaffolding and is OFF by default now; this check
+    # exists to prove the review EXCLUDES it, so it has to be present first.
+    enable_qa_scaffolding(pg)
 
     def reload_app():
         pg.reload(); pg.wait_for_timeout(900)

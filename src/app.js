@@ -3978,15 +3978,37 @@
     { id: "snapshot", key: "gtddev_show_snapshot", label: "Snapshot & restore",
       note: "Save all data to one slot before something risky, and put it back after." },
     { id: "draglog", key: "gtddev_show_draglog", label: "Drag log",
-      note: "Record a press-and-hold drag so a phone-only bug can be sent as text." }
+      note: "Record a press-and-hold drag so a phone-only bug can be sent as text." },
+    // ⚑ QA SCAFFOLDING, off by default (user: "noone wants to see the QA
+    // checklists except me"). The app is shown to other people through GitHub
+    // Pages, and until this switch existed every visitor got a Next Actions lane
+    // full of "✅ QA — …" and a Current Projects lane holding the 26-row sprint
+    // map. That is not a demo of a task manager; it is a look at someone's build
+    // notes.
+    //
+    // The chunk map is gated with it, deliberately: the user named the checklist,
+    // but the map is the same category and by far the bulkier of the two. ⚑ Say
+    // so if the map should stay visible on its own switch.
+    //
+    // `noBar` because this one has no toolbar buttons — it changes what is in the
+    // LANES, not what sits in the dev strip, so it must not make an empty bar appear.
+    { id: "qa", key: "gtddev_show_qa", label: "QA checklist & chunk map", noBar: true,
+      note: "Inject your test checklist and the sprint map into the lanes. Off means anyone you show the app to sees a clean one." }
   ];
+  const DEV_GROUP_QA = DEV_GROUPS.find(function(g){ return g.id === "qa"; });
   function devGroupOn(g){ return Storage.get(g.key) === "1"; }
-  function setDevGroup(g, on){ Storage.set(g.key, on ? "1" : "0"); applyDevVisibility(); }
+  function setDevGroup(g, on){
+    Storage.set(g.key, on ? "1" : "0");
+    // Toggling the QA group has to act on the lanes immediately — switching it
+    // off and still seeing the checklist would read as a broken switch.
+    if (g === DEV_GROUP_QA) applyQaScaffolding();
+    applyDevVisibility();
+  }
   function applyDevVisibility(){
     let any = false;
     DEV_GROUPS.forEach(function(g){
       const on = devGroupOn(g);
-      if (on) any = true;
+      if (on && !g.noBar) any = true;
       const el = qs('[data-dev-group="' + g.id + '"]');
       if (el) el.hidden = !on;
     });
@@ -5432,6 +5454,48 @@
   // its boot() call below) once QA is done, or before handing the file
   // off to the next chunk.
   // =========================================================
+  // The one place that decides whether dev scaffolding exists in the lanes at
+  // all. Called at boot and again whenever the QA switch is flipped.
+  //
+  // ⚠ Switching OFF clears the injectors' own flag keys as well as sweeping the
+  // rows. Without that, switching back on would find the flags already set,
+  // decide the checklist had been injected, and inject nothing — a switch that
+  // works once and is then silently dead. (Found by trying it, not by reading it.)
+  function applyQaScaffolding(){
+    if (devGroupOn(DEV_GROUP_QA)){
+      injectQAChecklist(); // §8.1 replace-mode: one checklist, one flag key
+      injectChunkMap();    // §8.2 same discipline, its own flag key
+      return;
+    }
+    let touched = false;
+    // The checklist: groups titled "✅ QA …" in Next Actions, plus their items.
+    const qaGroups = new Set(state.tasks.next
+      .filter(function(t){ return t.isGroup && (t.title || "").indexOf("✅ QA") === 0; })
+      .map(function(t){ return t.id; }));
+    if (qaGroups.size){
+      state.tasks.next = state.tasks.next.filter(function(t){
+        return !qaGroups.has(t.id) && !qaGroups.has(t.parent);
+      });
+      saveTasksLocal("next");
+      touched = true;
+    }
+    // The chunk map: tagged by devContext, not by title (the title is free to change).
+    const mapGroups = new Set(state.tasks.current
+      .filter(function(t){ return t.isGroup && t.devContext === "chunk-map"; })
+      .map(function(t){ return t.id; }));
+    if (mapGroups.size){
+      state.tasks.current = state.tasks.current.filter(function(t){
+        return !mapGroups.has(t.id) && !mapGroups.has(t.parent);
+      });
+      saveTasksLocal("current");
+      touched = true;
+    }
+    // Let both injectors run again if the switch comes back on.
+    Object.keys(localStorage).forEach(function(k){
+      if (k.indexOf("gtd_qa_checklist_") === 0 || k.indexOf("gtd_chunk_map_") === 0) Storage.remove(k);
+    });
+    if (touched){ renderLane("next"); renderLane("current"); }
+  }
   function injectQAChecklist(){
     // POST-SPRINT round — replaces chunk 7, the per-occurrence follow-up AND
     // chunk 8 (the user has finished walking all three). §8.1's replace-don't-
@@ -7067,8 +7131,7 @@
     bindDrawerSwipe(); // finger-follow open/close on the intray drawer, same mechanic as the calendar month swipe
     initLocalData();
     initCompletedData();
-    injectQAChecklist(); // §8.1 replace-mode again: one checklist, one flag key
-    injectChunkMap();
+    applyQaScaffolding(); // §8.1/§8.2, but only when the QA switch is on
     state.habitDone = loadHabitDone();
     state.habitDoneOrder = loadHabitDoneOrder();
     state.habitRuns = loadHabitRuns();

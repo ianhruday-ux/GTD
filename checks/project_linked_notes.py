@@ -18,7 +18,9 @@ never looked at notes.
     included) is silently thrown away
 """
 import os, functools, http.server, socket, socketserver, threading, contextlib, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from playwright.sync_api import sync_playwright
+from _pickers import enable_qa_scaffolding
 
 DIST = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "dist")
 
@@ -67,6 +69,10 @@ with serve(DIST) as url, sync_playwright() as p:
     pg.on("pageerror", lambda e: errs.append("PAGEERROR " + str(e)))
     pg.on("console", lambda m: errs.append("CONSOLE " + m.text) if m.type == "error" else None)
     pg.goto(url); pg.wait_for_timeout(1100)
+    # ⚠ The 'dev scaffolding is kept out of the picker' assertion near the end
+    # needs scaffolding to EXIST. It is off by default now, so without this the
+    # check passes without testing anything.
+    enable_qa_scaffolding(pg)
 
     pg.evaluate("""([proj, ns]) => {
       const cur = JSON.parse(localStorage.getItem('gtd_tasks_current') || '[]');

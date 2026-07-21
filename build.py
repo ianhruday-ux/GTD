@@ -20,7 +20,6 @@ else the app needs is in the one HTML file.
 """
 import datetime
 import shutil
-import subprocess
 import sys
 import time
 from pathlib import Path
@@ -45,15 +44,20 @@ def build_stamp():
     minutes, so "is the fix in the build I am looking at?" is a question that has
     already cost a round trip. The settings menu shows this, so the answer is
     always on screen.
+
+    THE SHA IS GONE, and its absence is the point. This used to append
+    `git rev-parse --short HEAD`. That sha was RELIABLY WRONG BY ONE: dist/ is
+    built and THEN committed, so the sha read at build time always named the
+    commit before the one that ships the build. It looked authoritative and
+    answered "which commit am I on?" incorrectly every single time, which is
+    worse than saying nothing because it invites you to trust it.
+
+    Two ways to make it right were on the table: rebuild-then-amend after every
+    commit (a permanent second step on every change, to fix a label), or drop the
+    sha. Dropped. The timestamp alone answers the question this exists for --
+    "is this the build I just made?" -- and it cannot be wrong.
     """
-    when = datetime.datetime.now().strftime("%d %b %H:%M")
-    try:
-        sha = subprocess.run(["git", "rev-parse", "--short", "HEAD"],
-                             capture_output=True, text=True, timeout=5,
-                             cwd=str(REPO)).stdout.strip()
-    except Exception:
-        sha = ""
-    return (when + " · " + sha) if sha else when
+    return datetime.datetime.now().strftime("%d %b %H:%M")
 
 
 def build():

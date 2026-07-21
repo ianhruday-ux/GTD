@@ -90,3 +90,17 @@ def enable_dev_tools(pg):
       if (bar) bar.hidden = false;
       document.querySelectorAll('[data-dev-group]').forEach(e => { e.hidden = false; });
     }""")
+
+def enable_qa_scaffolding(pg):
+    """Turn the QA checklist + chunk map back on.
+
+    ⚠ They are OFF by default now (user: "noone wants to see the QA checklists
+    except me" — the app is shown to other people through GitHub Pages). Any check
+    that expects the checklist or the sprint map to exist has to switch them on
+    first, or it asserts against a deliberately clean app.
+
+    Sets the preference AND reloads, since the injectors run at boot.
+    """
+    pg.evaluate("() => localStorage.setItem('gtddev_show_qa', '1')")
+    pg.reload()
+    pg.wait_for_timeout(1200)

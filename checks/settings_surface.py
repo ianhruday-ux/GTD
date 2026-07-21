@@ -174,7 +174,13 @@ with serve(DIST) as url, sync_playwright() as p:
     pg.click('[data-action="open-overflow"]'); pg.wait_for_timeout(300)
     pg.click('[data-action="settings-debug"]'); pg.wait_for_timeout(300)
     switches = pg.locator('[data-action="settings-toggle-dev"]')
-    check(switches.count() == 3, f"Debugging offers three switches ({switches.count()})")
+    # ⚑ FOUR now: the QA checklist + chunk map moved behind a switch of their own
+    # (user: "noone wants to see the QA checklists except me"). Unlike the other
+    # three it has no toolbar buttons — it changes what is in the LANES — so it
+    # must not make the dev strip appear on its own; asserted below.
+    check(switches.count() == 4, f"Debugging offers four switches ({switches.count()})")
+    check(pg.locator('[data-action="settings-toggle-dev"][data-dev="qa"]').count() == 1,
+          "including the QA checklist & chunk map one")
     check(pg.locator(".settings-switch.on").count() == 0, "all off to begin with")
 
     pg.locator('[data-action="settings-toggle-dev"][data-dev="time"]').first.click()

@@ -7,7 +7,9 @@ three, that its items survive a reload, and that a Reset re-seeds exactly one
 set rather than stacking another.
 """
 import os, functools, http.server, socket, socketserver, threading, contextlib, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from playwright.sync_api import sync_playwright
+from _pickers import enable_qa_scaffolding
 
 DIST = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "dist")
 
@@ -60,6 +62,7 @@ with serve(DIST) as url, sync_playwright() as p:
     pg.on("pageerror", lambda e: errs.append("PAGEERROR " + str(e)))
     pg.on("console", lambda m: errs.append("CONSOLE " + m.text) if m.type == "error" else None)
     pg.goto(url); pg.wait_for_timeout(1000)
+    enable_qa_scaffolding(pg)   # OFF by default now — see the helper
 
     def groups():
         return pg.evaluate("""() => JSON.parse(localStorage.getItem('gtd_tasks_next'))
@@ -213,6 +216,48 @@ with serve(DIST) as url, sync_playwright() as p:
     stale_flags = pg.evaluate(
         "keys => keys.filter(k => localStorage.getItem(k) !== null)", SUPERSEDED_FLAGS)
     check(not stale_flags, f"superseded flag keys are retired (left: {stale_flags})")
+
+    # ---------- THE SWITCH: a visitor must see a CLEAN app ----------
+    # User: "noone wants to see the QA checklists except me." The app is shown to
+    # other people through GitHub Pages, and every visitor used to get a Next
+    # Actions lane full of "✅ QA — …" and a Current Projects lane holding the
+    # 26-row sprint map. Default is now OFF; ⋯ → Debugging turns it on.
+    pg.evaluate("""() => { Object.keys(localStorage)
+      .filter(k => k.indexOf('gtd_') === 0 || k.indexOf('gtddev_') === 0)
+      .forEach(k => localStorage.removeItem(k)); }""")
+    pg.reload(); pg.wait_for_timeout(1200)
+    check(len(groups()) == 0,
+          f"a first-time visitor gets NO QA checklist ({groups()})")
+    mapRows = pg.evaluate("""() => JSON.parse(localStorage.getItem('gtd_tasks_current') || '[]')
+      .filter(t => t.devContext === 'chunk-map').length""")
+    check(mapRows == 0, f"and no sprint map ({mapRows} rows)")
+    bar = pg.evaluate("() => { const b = document.querySelector('#dev-toolbar'); return b ? b.hidden : null; }")
+    check(bar is True, "and the dev toolbar stays hidden — the QA group has no buttons of its own")
+
+    # ⚠ Toggling must work MORE THAN ONCE. The injectors are flag-guarded, so
+    # switching off has to clear those flags as well as sweep the rows — otherwise
+    # switching back on finds the flags set, injects nothing, and the switch is
+    # silently dead after one use.
+    def flip():
+        pg.evaluate("() => { const r = document.querySelector('#tray-root'); if (r) r.innerHTML = ''; }")
+        pg.evaluate("() => document.querySelector('[data-action=\"open-overflow\"]').click()")
+        pg.wait_for_timeout(300)
+        pg.evaluate("() => document.querySelector('[data-action=\"settings-debug\"]').click()")
+        pg.wait_for_timeout(300)
+        pg.evaluate("() => document.querySelector('[data-action=\"settings-toggle-dev\"][data-dev=\"qa\"]').click()")
+        pg.wait_for_timeout(700)
+        pg.evaluate("() => { const d = document.querySelector('#dialog-root'); if (d) d.innerHTML = ''; }")
+        pg.wait_for_timeout(200)
+
+    flip()
+    check(len(groups()) == len(EXPECTED), f"switching it on injects the checklist ({groups()})")
+    flip()
+    check(len(groups()) == 0, f"switching it off sweeps it away again ({groups()})")
+    flip()
+    check(len(groups()) == len(EXPECTED),
+          f"and it can be switched on AGAIN — the flags were cleared, not just the rows ({groups()})")
+    pg.reload(); pg.wait_for_timeout(1200)
+    check(len(groups()) == len(EXPECTED), f"the choice survives a reload ({groups()})")
 
     check(not errs, f"no JS errors ({errs[:3]})")
     b.close()
