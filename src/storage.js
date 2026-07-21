@@ -1,3 +1,5 @@
+const BUILD_STAMP = "__BUILD_STAMP__";  // replaced by build.py
+
 // =========================================================
 // STORAGE ADAPTER (spec.md §3, known issue 4)
 //

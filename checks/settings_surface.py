@@ -161,6 +161,19 @@ with serve(DIST) as url, sync_playwright() as p:
     check(pg.evaluate("localStorage.getItem('gtd_surface')") is None, "a full gtd_ clear drops the surface preference")
     check(wood() == default_tile, "and the desk returns to the default Dark wood")
 
+    # ---------- which build am I running? ----------
+    # ⚑ Added after a fix was pushed, deployed, and reported as still broken —
+    # the phone was serving a cached copy. GitHub Pages caches the HTML for a
+    # few minutes, so "is this the new build?" is a question that costs a round
+    # trip every time it cannot be answered on the device.
+    pg.click('[data-action="open-overflow"]'); pg.wait_for_timeout(300)
+    stamp = pg.locator(".settings-build")
+    check(stamp.count() == 1, "the settings menu says which build this is")
+    txt = stamp.first.inner_text() if stamp.count() else ""
+    check("__BUILD_STAMP__" not in txt,
+          f"and the placeholder was actually substituted at build time ({txt})")
+    check(len(txt) > 8 and "Build" in txt, f"and it reads as a build marker ({txt})")
+
     check(not errs, f"no JS errors ({errs[:3]})")
     b.close()
 

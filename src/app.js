@@ -6169,7 +6169,13 @@
         '<span class="si-value">not built yet</span></button>' +
       '<div class="settings-sep"></div>' +
       '<button type="button" class="settings-item danger" data-action="clear-all-data">' +
-        '<span>&#8634;</span><span class="si-label">Restore app to defaults</span></button>'
+        '<span>&#8634;</span><span class="si-label">Restore app to defaults</span></button>' +
+      // ⚑ Which build this is. Not decoration: the app is tested on a phone
+      // against GitHub Pages, which caches the HTML for a few minutes, so
+      // "am I looking at the fix or at yesterday's copy?" is a real question
+      // that has already cost a round trip. Now it is answerable on the device,
+      // without a laptop.
+      '<div class="settings-build" title="Which build you are running">Build ' + escapeHtml(BUILD_STAMP) + '</div>'
     );
   }
   function settingsBackgroundsHtml(){

@@ -1578,6 +1578,14 @@ body.has-frame .tray-drawer::after{
 .project-add-row.field-invalid{
   border:1px dashed var(--red); border-radius:9px; padding:6px;
 }
+
+/* The build marker at the foot of the ⋯ menu. Deliberately dim and small: it is
+   there to be found when you need it, not to be read every time. */
+.settings-build{
+  font-family:var(--font-mono); font-size:9.5px; color:var(--text-soft);
+  opacity:0.65; padding:8px 12px 4px; text-align:right;
+  border-top:1px solid rgba(255,255,255,0.07); margin-top:4px;
+}
 </style>
 </head>
 <body>
@@ -1662,6 +1670,8 @@ body.has-frame .tray-drawer::after{
 <script>
 (function(){
 "use strict";
+
+const BUILD_STAMP = "21 Jul 02:06 · f419219";  // replaced by build.py
 
 // =========================================================
 // STORAGE ADAPTER (spec.md §3, known issue 4)
@@ -10457,7 +10467,13 @@ function injectChunkMap(){
         '<span class="si-value">not built yet</span></button>' +
       '<div class="settings-sep"></div>' +
       '<button type="button" class="settings-item danger" data-action="clear-all-data">' +
-        '<span>&#8634;</span><span class="si-label">Restore app to defaults</span></button>'
+        '<span>&#8634;</span><span class="si-label">Restore app to defaults</span></button>' +
+      // ⚑ Which build this is. Not decoration: the app is tested on a phone
+      // against GitHub Pages, which caches the HTML for a few minutes, so
+      // "am I looking at the fix or at yesterday's copy?" is a real question
+      // that has already cost a round trip. Now it is answerable on the device,
+      // without a laptop.
+      '<div class="settings-build" title="Which build you are running">Build ' + escapeHtml(BUILD_STAMP) + '</div>'
     );
   }
   function settingsBackgroundsHtml(){

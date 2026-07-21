@@ -18,7 +18,9 @@ The manifest and icons ship as separate files alongside dist/index.html
 (a web manifest has to be a fetchable resource, not inlined) — everything
 else the app needs is in the one HTML file.
 """
+import datetime
 import shutil
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -36,6 +38,24 @@ JS_MODULES = ["storage.js", "textures.js", "surface.js", "runner.js", "pickers.j
 ASSET_FILES = ["manifest.webmanifest", "icon.svg", "icon-192.png", "icon-512.png"]
 
 
+def build_stamp():
+    """A human-readable marker of WHICH build this is.
+
+    The user tests on a phone against GitHub Pages, which caches HTML for a few
+    minutes, so "is the fix in the build I am looking at?" is a question that has
+    already cost a round trip. The settings menu shows this, so the answer is
+    always on screen.
+    """
+    when = datetime.datetime.now().strftime("%d %b %H:%M")
+    try:
+        sha = subprocess.run(["git", "rev-parse", "--short", "HEAD"],
+                             capture_output=True, text=True, timeout=5,
+                             cwd=str(REPO)).stdout.strip()
+    except Exception:
+        sha = ""
+    return (when + " · " + sha) if sha else when
+
+
 def build():
     template = (SRC / "index.html").read_text(encoding="utf-8")
     styles = (SRC / "styles.css").read_text(encoding="utf-8")
@@ -44,6 +64,11 @@ def build():
     for name in JS_MODULES:
         script_parts.append((SRC / name).read_text(encoding="utf-8").rstrip("\n"))
     script = "(function(){\n\"use strict\";\n\n" + "\n\n".join(script_parts) + "\n\n})();\n"
+
+    # Stamp WHICH build this is, so the running app can say so on the device.
+    if "__BUILD_STAMP__" not in script:
+        sys.exit("build.py: __BUILD_STAMP__ placeholder is missing from src/")
+    script = script.replace("__BUILD_STAMP__", build_stamp())
 
     if "<!--BUILD:STYLES-->" not in template:
         sys.exit("build.py: src/index.html is missing the <!--BUILD:STYLES--> marker")
