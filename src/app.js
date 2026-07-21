@@ -2963,19 +2963,32 @@
   // a chip for it, but the project page was built from linked actions and linked
   // events and never looked at notes, so from the project's side they did not
   // exist.
-  function linkedNotesListHtml(projectId){
-    if (!projectId) return '<div class="empty-note">Save the project first, then link notes to it.</div>';
-    const linked = (state.notes || [])
+  function linkedNotesListHtml(s, projectId){
+    const linked = !projectId ? [] : (state.notes || [])
       .filter(function(n){ return (n.projectLinks || []).some(function(l){ return l.id === projectId; }); })
       .sort(function(a, b){ return (b.editedAt || 0) - (a.editedAt || 0); });
-    if (!linked.length){
-      return '<div class="empty-note">No notes linked yet. Open a note and use + to link it to this project.</div>';
-    }
-    return '<div class="linked-actions-list">' + linked.map(function(n){
-      return '<button type="button" class="linked-action-item" data-action="open-linked-note" data-id="' + n.id + '">' +
-        kindDot("notes") + escapeHtml(n.title || "Untitled") +
-      '</button>';
-    }).join("") + '</div>';
+    const rows = linked.length
+      ? '<div class="linked-actions-list">' + linked.map(function(n){
+          return '<button type="button" class="linked-action-item" data-action="open-linked-note" data-id="' + n.id + '">' +
+            kindDot("notes") + escapeHtml(n.title || "Untitled") +
+          '</button>';
+        }).join("") + '</div>'
+      : "";
+    // ⚑ "New note" is offered only once the project EXISTS (user asked for the
+    // button; this condition is mine). A note is written to storage the moment
+    // it is saved — there is no staging for notes the way there is for a
+    // project's child actions — so on an unsaved project page the button would
+    // create a note pointing at a project that ✕ might then discard, leaving a
+    // note linked to something that never existed. Every other control on a
+    // drafting page commits nothing until Save, and this is the one that could
+    // not honour that.
+    const canAdd = !!(s && s.taskId);
+    const add = canAdd
+      ? '<button type="button" class="btn btn-ghost btn-small project-add-note" data-action="new-linked-note">+ New note</button>'
+      : '<div class="empty-note">Save the project first, then you can add notes to it.</div>';
+    const hint = (canAdd && !linked.length)
+      ? '<div class="empty-note">No notes linked yet.</div>' : "";
+    return rows + hint + add;
   }
   // The two lists share one slot and you toggle between them (user: "you should
   // be able to toggle back and forth"). Reuses the segmented control the
@@ -2993,7 +3006,6 @@
     const actionsHtml = linkedActionsListHtml(s);
     // Nothing on either side and nothing to toggle between: stay silent rather
     // than showing an empty switch on a brand-new project.
-    if (!actionsHtml && !noteCount && !pid) return "";
     const seg =
       '<div class="cal-seg cal-seg-small project-linked-seg">' +
         '<button type="button" class="cal-seg-btn' + (tab === "actions" ? " active" : "") + '" data-action="project-linked-tab" data-tab="actions">Actions</button>' +
@@ -3002,7 +3014,7 @@
         '</button>' +
       '</div>';
     const body = tab === "notes"
-      ? linkedNotesListHtml(pid)
+      ? linkedNotesListHtml(s, pid)
       : (actionsHtml || '<div class="empty-note">Nothing linked yet.</div>');
     return '<div class="screen-hook-pick-label">Linked</div>' + seg + body;
   }
@@ -4527,6 +4539,18 @@
       if (linkedTabBtn){
         if (state.screen) state.screen.linkedTab = linkedTabBtn.getAttribute("data-tab");
         renderScreen();
+        return;
+      }
+      if (e.target.closest('[data-action="new-linked-note"]')){
+        const s = state.screen;
+        const pid = s && s.draft && s.draft.projectId;
+        const pname = (s && s.draft && s.draft.title) || findProjectTitle(pid) || "";
+        if (!pid) return;
+        // Same stack push as opening an existing note: openNoteScreen replaces
+        // state.screen, and this page has a draft worth keeping.
+        state.screenStack.push(state.screen);
+        state.screen = null;
+        openNoteScreen(null, { projectLinks: [{ id: pid, name: pname }] });
         return;
       }
       const linkedNoteBtn = e.target.closest('[data-action="open-linked-note"]');
@@ -6425,7 +6449,12 @@
       // "New checklist" (user) seeds the body with one empty checklist item so
       // the page IS a checklist from the first keystroke; "New note" is blank.
       const body = (opts && opts.checklist) ? '<ul class="checklist"><li></li></ul>' : "";
-      draft = { title: (opts && opts.title) || "", body: body, projectLinks: [], tagIds: [] };
+      // projectLinks can be seeded so a note created FROM a project page is
+      // already linked to it (user). The name is denormalised here the same way
+      // the link picker does it (§4.9).
+      draft = { title: (opts && opts.title) || "", body: body,
+                projectLinks: (opts && opts.projectLinks) ? opts.projectLinks.slice() : [],
+                tagIds: [] };
     }
     state.screen = { kind: "notes", taskId: noteId || null, noteId: noteId || null, noteView: true, draft: draft };
     if (opts && opts.fromCaptureId) state.screen.fromCaptureId = opts.fromCaptureId; // §4.8b: remove the capture when this note saves

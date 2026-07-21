@@ -1438,6 +1438,17 @@ body.has-frame .tray-drawer::after{
    switch in the middle of it read as borrowed from another screen. */
 .project-linked-seg{ margin:0 0 8px 0; border-color:color-mix(in srgb, var(--lane-accent, var(--brass)) 45%, transparent); }
 .project-linked-seg .cal-seg-btn.active{ background:var(--lane-accent, var(--brass)); }
+/* Sits under the note list as its own affordance, matching the lane accent the
+   rest of this page uses. Full width so it reads as "add to this list" rather
+   than as another list row. */
+.project-add-note{
+  width:100%; margin-top:8px;
+  border:1px dashed color-mix(in srgb, var(--lane-accent, var(--brass)) 55%, transparent);
+  color:var(--lane-accent, var(--brass)); background:transparent;
+}
+.project-add-note:hover{
+  background:color-mix(in srgb, var(--lane-accent, var(--brass)) 14%, transparent);
+}
 .seg-count{
   font-family:var(--font-mono); font-size:9.5px; opacity:0.75;
   margin-left:3px; vertical-align:1px;

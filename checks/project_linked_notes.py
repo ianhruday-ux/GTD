@@ -143,7 +143,7 @@ with serve(DIST) as url, sync_playwright() as p:
     pg.locator('[data-action="open-linked-note"]').first.click()
     pg.wait_for_timeout(700)
     on_note = pg.evaluate("""() => {
-      const el = document.querySelector('[data-field="title"], .screen-field-title');
+      const el = document.querySelector('[data-field="noteTitle"]');
       return el ? el.value : null;
     }""")
     check(on_note == "ZZ newest note", f"tapping a note opens that note ({on_note})")
@@ -159,6 +159,59 @@ with serve(DIST) as url, sync_playwright() as p:
     }""")
     check(back_on == "ZZ build the shed EDITED",
           f"and backing out returns to the project with its draft intact ({back_on})")
+
+    # ---------- the add button, pre-linked ----------
+    open_project()
+    pg.locator('[data-action="project-linked-tab"][data-tab="notes"]').first.click()
+    pg.wait_for_timeout(350)
+    add = pg.locator('[data-action="new-linked-note"]')
+    check(add.count() == 1, f"the Notes side offers a New note button ({add.count()})")
+    add.first.click(); pg.wait_for_timeout(700)
+
+    chips = pg.evaluate("""() => [...document.querySelectorAll('.note-chip, [data-action="note-unlink"]')]
+        .map(e => e.textContent.trim())""")
+    check(any("shed" in c.lower() for c in chips),
+          f"the new note opens ALREADY linked to the project ({chips})")
+
+    pg.fill('[data-field="noteTitle"]', "ZZ note made from the project")
+    pg.click('[data-action="screen-save"]'); pg.wait_for_timeout(800)
+    saved = pg.evaluate("""() => {
+      const ns = JSON.parse(localStorage.getItem('gtd_notes') || '[]');
+      const n = ns.find(x => x.title === 'ZZ note made from the project');
+      return n ? (n.projectLinks || []).map(l => l.id) : null;
+    }""")
+    check(saved == ["zz-proj"], f"and saves with that link ({saved})")
+
+    # it should now be at the TOP of the project's note list, being newest
+    open_project()
+    pg.locator('[data-action="project-linked-tab"][data-tab="notes"]').first.click()
+    pg.wait_for_timeout(400)
+    rows = pg.evaluate("""() => [...document.querySelectorAll('[data-action="open-linked-note"]')]
+        .map(e => e.textContent.trim())""")
+    check(rows and rows[0] == "ZZ note made from the project",
+          f"and appears at the top of the list, being the newest ({rows})")
+
+    # ---------- ⚑ not offered on an UNSAVED project ----------
+    # A note commits on save with no staging, so on a project that ✕ might still
+    # discard the button would create a note linked to something that never was.
+    pg.evaluate("""() => {
+      ['#tray-root', '#dialog-root', '#screen-root'].forEach(sel => {
+        const el = document.querySelector(sel); if (el) el.innerHTML = '';
+      });
+      document.body.classList.remove('screen-open');
+      window.scrollTo(0, 0);
+    }""")
+    pg.wait_for_timeout(250)
+    pg.click('.tab[data-kind="current"]'); pg.wait_for_timeout(350)
+    pg.click('[data-action="fab"]'); pg.wait_for_timeout(300)
+    pg.click('[data-action="new-primary"]'); pg.wait_for_timeout(500)
+    pg.locator('[data-action="project-linked-tab"][data-tab="notes"]').first.click()
+    pg.wait_for_timeout(350)
+    check(pg.locator('[data-action="new-linked-note"]').count() == 0,
+          "a brand-new project does not offer it yet")
+    body = pg.evaluate("() => document.body.innerText")
+    check("Save the project first" in body,
+          "and says why rather than just missing")
 
     check(not errs, f"no JS errors ({errs[:3]})")
     b.close()
