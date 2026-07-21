@@ -1,34 +1,67 @@
   "use strict";
 
-  const LIST_TITLES = {
-    next: "Next Actions", waiting: "Waiting On", current: "Current Projects",
-    future: "Future / Someday", habit: "Habits", notes: "Notes"
-  };
-  // \u2691 THE USER'S OWN COPY, transcribed from INFO-TEXT.txt ("Info text is now
-  // done"). Verbatim \u2014 this is authored prose, not generated text, so it is not
-  // silently edited here. If it needs a wording change, change it in
-  // INFO-TEXT.txt and re-transcribe, so the file stays the record.
+  // ⚑ TRANSLATED (Chinese round). These were `const` literals; they are now LIVE
+  // tables rebuilt by rebuildStringTables() at boot and again whenever the
+  // language changes. Deliberately kept as tables with the same names and shapes
+  // rather than replacing every `LIST_TITLES[k]` with `t("lane."+k+".title")` at
+  // the call sites: there are dozens of those, and rewriting them all would have
+  // put the whole translation's regression risk into one commit for no benefit.
+  // One place maps keys to strings; every existing reader is untouched.
   //
-  // TWO PARTS, and the split is load-bearing. The review's \u24d8 reuses these six
-  // lane descriptions (\u00a74.8b), and the user marked some paragraphs with a SECOND
-  // arrow in INFO-TEXT.txt: "some sections of the lane material shouldn't appear
-  // in the daily review." LANE_INFO is the shared half \u2014 lane \u24d8 AND review \u24d8.
-  // LANE_INFO_EXTRA is lane-only, and reviewInfoPanelHtml must never read it.
-  const LANE_INFO = {
-    next: "This lane is for \u201cnext actions\u201d and \u201ccontexts.\u201d A next action is the single next physical step you need to move something forward. It is not a whole project, only the next action you can take in a project.",
-    waiting: "A waiting action is something you can't act on yet because it depends on something else\u2014a reply from someone, a delivery, a decision, another action getting done, or a future event. Use the left arrow to promote a waiting action to the next action list, or hook it to a next action so it will promote automatically. Actions in a context will promote to their sibling context in the next action list.",
-    current: "A project is anything that takes more than one action to complete. It could be as simple as returning a library book or as involved as planning a vacation. Current projects should always have at least one step tied to them to prevent them from being stalled. This step might be an action, a waiting action, or even an event on the calendar.",
-    future: "This lane is for projects you're not committed to starting yet. Review this list at least once a month to keep the dreams alive.",
-    habit: "A habit is an automatic behaviour which is triggered by a cue. It's easiest to build habits when you're doing them at least once a week. Type in a cue when you're creating a habit or use the habit hook to create habit stacks in which one habit is the cue for the next habit in the stack.",
-    notes: "This lane is for notes. It's useful for keeping track of ideas, links, email addresses, and assorted reference materials related to current and future projects."
-  };
-  // The \u2192\u2192 paragraphs: shown on the lane's own \u201ci\u201d, withheld from the review.
-  const LANE_INFO_EXTRA = {
-    next: "A \u201ccontext\u201d is a recurring place or time which offers you the opportunity to take an action. Here, we have created contextual lists, so you can group all your \u201cat computer\u201d and \u201cgetting off work\u201d actions together.",
-    habit: "Some apps track streaks, but everyone misses a habit occasionally. We don't track streaks here, but we do track personal bests. If you break your streak, then maybe you'll have a new personal best to beat. After all: \u2018It's more important to be persistent than it is to be consistent.\u2019 \u2013 Rebecca"
-  };
+  // ⚠ They must NOT be read at module-evaluation time — only from inside
+  // functions, after boot() has called rebuildStringTables(). Everything here
+  // already did.
+  //
+  // The English side of the table lives in i18n.js now, including the user's own
+  // authored info-button prose (INFO-TEXT.txt stays the record of what was
+  // reviewed). Reword there, not here.
+  let LIST_TITLES = {}, LANE_INFO = {}, LANE_INFO_EXTRA = {},
+      FAB_MENU_LABELS = {}, TITLE_PLACEHOLDER = {}, KIND_BADGE_LABEL = {};
+  function rebuildStringTables(){
+    LIST_TITLES = {
+      next: t("lane.next.title"), waiting: t("lane.waiting.title"),
+      current: t("lane.current.title"), future: t("lane.future.title"),
+      habit: t("lane.habit.title"), notes: t("lane.notes.title")
+    };
+    LANE_INFO = {
+      next: t("info.lane.next"), waiting: t("info.lane.waiting"),
+      current: t("info.lane.current"), future: t("info.lane.future"),
+      habit: t("info.lane.habit"), notes: t("info.lane.notes")
+    };
+    // The →→ paragraphs: shown on the lane's own “i”, withheld from the review.
+    LANE_INFO_EXTRA = {
+      next: t("info.lane.next.more"), habit: t("info.lane.habit.more")
+    };
+    // §4.3e's FAB menu (New tag → Tags, user). Column-reversed: item[0] is nearest
+    // the badge. Notes has a third option; the action/project lanes have two.
+    FAB_MENU_LABELS = {
+      next: [t("fab.newAction"), t("fab.newContext")],
+      waiting: [t("fab.newAction"), t("fab.newContext")],
+      current: [t("fab.newProject"), t("fab.newList")],
+      future: [t("fab.newProject"), t("fab.newList")],
+      notes: [t("fab.newNote"), t("fab.newChecklist"), t("fab.tags")]
+    };
+    TITLE_PLACEHOLDER = {
+      next: t("placeholder.title.next"), waiting: t("placeholder.title.waiting"),
+      current: t("placeholder.title.current"), future: t("placeholder.title.future"),
+      habit: t("placeholder.title.habit"), notes: t("placeholder.title.notes")
+    };
+    KIND_BADGE_LABEL = {
+      next: t("badge.next"), waiting: t("badge.waiting"), current: t("badge.current"),
+      future: t("badge.future"), habit: t("badge.habit"), notes: t("badge.notes"),
+      tags: t("badge.tags"), event: t("badge.event")
+    };
+  }
+  // The tab strip's short names live in index.html as static markup, so they are
+  // stamped in rather than rendered — renderShell() does not own that element.
+  function renderTabLabels(){
+    ALL_LANES.forEach(function(k){
+      const el = qs('.tab[data-kind="' + k + '"] .tab-name');
+      if (el) el.textContent = t("tab." + k);
+    });
+  }
   // Task lanes (each backed by state.tasks[k]). Notes are a lane too but NOT a
-  // task kind \u2014 they have their own store \u2014 so KINDS stays task-only and
+  // task kind — they have their own store — so KINDS stays task-only and
   // ALL_LANES is what tab/lane rendering and visibility iterate (chunk 6).
   const KINDS = ["next", "waiting", "current", "future", "habit"];
   const ALL_LANES = ["next", "waiting", "current", "future", "habit", "notes"];
@@ -38,32 +71,9 @@
     next: "+ New Action", waiting: "+ New Waiting Item",
     current: "+ New Project", future: "+ New Project", habit: "+ New Habit", notes: "+ New Note"
   };
-  // §4.3e's label table — the FAB's two-option menu on every lane but
-  // Habits (which has no menu at all; the badge creates directly there).
-  const FAB_MENU_LABELS = {
-    next: ["New action", "New context"], waiting: ["New action", "New context"],
-    current: ["New project", "New list"], future: ["New project", "New list"],
-    // Notes (user): the menu is column-reversed, so item[0] renders NEAREST the
-    // badge (bottom). New note is the common one → bottom; checklist above it;
-    // Tags on top. DOM order here is bottom-up (item[0] = bottom).
-    // ⚑ "New tag" → "Tags" (user): the button opens the Tags PAGE, where you view,
-    // rename and delete every tag as well as add one. "New tag" named the least of
-    // what it does and made the other three jobs unfindable.
-    notes: ["New note", "New checklist", "Tags"]
-  };
-  const TITLE_PLACEHOLDER = {
-    next: "Next action\u2026", waiting: "What are you waiting on\u2026",
-    current: "Project title\u2026", future: "Project title\u2026", habit: "Habit title\u2026",
-    notes: "Note title\u2026"
-  };
   // Retained for chunk 7 (recurrence is a property of EVENTS, §4.13); no
   // longer used by deadlines, whose recurrence <select> was removed in chunk 3.
   const RECURRENCE_LABELS = { none: "Does not repeat", daily: "Daily", weekly: "Weekly", monthly: "Monthly", yearly: "Yearly" };
-  const KIND_BADGE_LABEL = {
-    next: "Next Action", waiting: "Waiting Action", current: "Current Project",
-    future: "Future Project", habit: "Habit", notes: "Note", tags: "Tags", event: "Event"
-  };
-
   const state = {
     tasks: {next: [], waiting: [], current: [], future: [], habit: []},
     completed: {next: [], waiting: [], current: [], future: []}, // permanent Completed archive per lane (habits use their own daily habitDone-based grouping instead — see habitCompletedTodayHtml)
@@ -5582,7 +5592,8 @@
   // Opening/closing changes nothing on the main screen — closing is a cancel.
   // =========================================================
   // ⚑ The user's own copy (INFO-TEXT.txt [INTRAY]), transcribed verbatim.
-  const TRAY_INFO = "The intray is a tray that holds everything that needs dealing with. Stalled projects, overdue deadlines, and waiting actions which have lost their waiting condition, all belong here. You can use the text box to quickly add thoughts or reminders if you don't have time to add them to the proper list. You can sort through and process everything using the tray's review feature.";
+  // ⚑ Translated: the user's own copy now lives in i18n.js under "info.tray".
+  function trayInfoText(){ return t("info.tray"); }
   function loadTray(){ return Storage.getJSON("gtd_tray", []); }
   function saveTray(){ Storage.setJSON("gtd_tray", state.tray); }
   // The eye toggle glyph (user follow-up). Crossed eye = captures are hidden
@@ -5721,7 +5732,7 @@
           '<button type="button" class="icon-btn" data-action="tray-info" title="Information">&#9432;</button>' +
           '<button type="button" class="icon-btn" data-action="close-tray" title="Close">&times;</button>' +
         '</div>' +
-        '<div class="tray-info-panel" hidden>' + escapeHtml(TRAY_INFO) + '</div>' +
+        '<div class="tray-info-panel" hidden>' + escapeHtml(trayInfoText()) + '</div>' +
         '<div class="tray-capture">' +
           '<input type="text" id="tray-input" placeholder="Capture a thought…" autocomplete="off">' +
           '<button type="button" data-action="tray-add" title="Add">+</button>' +
@@ -5983,16 +5994,17 @@
       '</div>'
     );
   }
-  const REVIEW_MENU_INFO = {
-    pastdue: "This was due and the moment has passed. Push it to a new date, tick it if it's actually done, delete it if it's dead — or Not now to see it again next time.",
-    // ⚑ The user's own copy (INFO-TEXT.txt [REV-3]), transcribed verbatim. The
-    // "Stalled project:" label they wrote above it is already emitted by
-    // reviewInfoPanelHtml as the bolded heading, so only the body lives here.
-    stalled: "This is a project with no way forward. Add the next physical step, a waiting action, or an event to keep it going, or move it to Someday if continuing the project isn't possible or practical. You can always come back to it in the future.",
-    orphaned: "This was waiting on something that no longer exists. Point it at something else, replace it with a note to yourself, promote it if you can act now, or close it out.",
-    missed: "A repeating thing whose day went by without being ticked. Often you did it and forgot to say so — 'I did it' records it on the day it happened. 'Let it go' clears it without pretending you did. Only the most recent one is ever kept, so this never piles up.",
-    capture: "A stray thought you haven't filed yet. Send it to a lane — or Not now to leave it for later."
-  };
+  // ⚑ Translated (i18n.js). Rebuilt per call rather than cached, so a language
+  // change is picked up without another table to remember to refresh.
+  function reviewMenuInfo(){
+    return {
+      pastdue: t("info.review.pastdue"),
+      stalled: t("info.review.stalled"),
+      orphaned: t("info.review.orphaned"),
+      missed: t("info.review.missed"),
+      capture: t("info.review.capture")
+    };
+  }
   function reviewInfoPanelHtml(){
     return (
       '<div class="review-info-panel" hidden>' +
@@ -6010,10 +6022,10 @@
         // The headings now describe the situation instead of naming it. "Stalled"
         // survives because it is ordinary English, not a term of art.
         '<div class="review-info-block"><b>When something needs a decision</b><br>' +
-          '<b>Past its date:</b> ' + escapeHtml(REVIEW_MENU_INFO.pastdue) + '<br>' +
-          '<b>Stalled project:</b> ' + escapeHtml(REVIEW_MENU_INFO.stalled) + '<br>' +
-          '<b>Waiting on something gone:</b> ' + escapeHtml(REVIEW_MENU_INFO.orphaned) + '<br>' +
-          '<b>A repeat you missed:</b> ' + escapeHtml(REVIEW_MENU_INFO.missed) +
+          '<b>Past its date:</b> ' + escapeHtml(reviewMenuInfo().pastdue) + '<br>' +
+          '<b>Stalled project:</b> ' + escapeHtml(reviewMenuInfo().stalled) + '<br>' +
+          '<b>Waiting on something gone:</b> ' + escapeHtml(reviewMenuInfo().orphaned) + '<br>' +
+          '<b>A repeat you missed:</b> ' + escapeHtml(reviewMenuInfo().missed) +
         '</div>' +
       '</div>'
     );
@@ -6411,11 +6423,11 @@
       '<button type="button" class="settings-item" data-action="settings-backgrounds">' +
         '<span>&#127912;</span><span class="si-label">Background</span>' +
         '<span class="si-value">' + escapeHtml(surf.label) + '</span><span class="si-caret">&#8250;</span></button>' +
-      // Listed, not hidden: the slot is real and the work is scheduled, so the
-      // menu says so rather than pretending the feature doesn't exist.
-      '<button type="button" class="settings-item disabled" data-action="settings-language" disabled>' +
-        '<span>&#127760;</span><span class="si-label">Language</span>' +
-        '<span class="si-value">not built yet</span></button>' +
+      // ⚑ BUILT (Chinese round): no longer a disabled "not built yet" row. Opens a
+      // sub-panel like Background; the current language shows in its own script.
+      '<button type="button" class="settings-item" data-action="settings-language">' +
+        '<span>&#127760;</span><span class="si-label">' + escapeHtml(t("settings.language")) + '</span>' +
+        '<span class="si-value">' + escapeHtml(localeLabel(currentLocale())) + '</span><span class="si-caret">&#8250;</span></button>' +
       // ⚑ Where the dev tools live now. A row rather than a permanent bar: they
       // are scaffolding for building the app, and having them across the top of
       // every screen was the clutter the user wanted gone.
@@ -6468,10 +6480,29 @@
     });
     return out;
   }
+  // Each row shows its language in its OWN script (native name), the way a real
+  // language switcher does — a menu that lists "简体中文" as "Chinese" is one you
+  // cannot use once you are already in the language you cannot read.
+  function settingsLanguageHtml(){
+    const cur = currentLocale();
+    let out =
+      '<button type="button" class="settings-item settings-back" data-action="settings-root">' +
+        '<span>&#8249;</span><span class="si-label">' + escapeHtml(t("settings.language")) + '</span></button>' +
+      '<div class="settings-sep"></div>';
+    LOCALES.forEach(function(l){
+      out +=
+        '<button type="button" class="settings-item" data-action="settings-pick-lang" data-lang="' + l.id + '">' +
+          '<span class="si-label">' + escapeHtml(l.native) + '</span>' +
+          (l.id === cur ? '<span class="settings-check">&#10003;</span>' : "") +
+        '</button>';
+    });
+    return out;
+  }
   function renderSettingsMenu(){
     const menu = qs(".settings-menu");
     if (!menu) return;
     menu.innerHTML = settingsPanel === "backgrounds" ? settingsBackgroundsHtml()
+      : settingsPanel === "language" ? settingsLanguageHtml()
       : settingsPanel === "debug" ? settingsDebugHtml()
       : settingsRootHtml();
   }
@@ -6489,8 +6520,17 @@
       if (action === "export-data"){ exportAllData(); return; }
       if (action === "import-data"){ importAllData(); return; }
       if (action === "settings-backgrounds"){ settingsPanel = "backgrounds"; renderSettingsMenu(); return; }
+      if (action === "settings-language"){ settingsPanel = "language"; renderSettingsMenu(); return; }
       if (action === "settings-root"){ settingsPanel = "root"; renderSettingsMenu(); return; }
       if (action === "settings-debug"){ settingsPanel = "debug"; renderSettingsMenu(); return; }
+      if (action === "settings-pick-lang"){
+        // Applies immediately and stays open, like the background picker. setLocale
+        // rebuilds the string tables and re-renders the lanes, the tab strip and any
+        // open screen; the menu itself is re-rendered here so its own labels flip too.
+        setLocale(item.getAttribute("data-lang"));
+        renderSettingsMenu();
+        return;
+      }
       if (action === "settings-toggle-dev"){
         // Applies straight away and stays open, like the background picker —
         // you switch one on to use it, not to admire the menu.
@@ -7126,10 +7166,16 @@
   }
 
   function boot(){
+    // ⚠ FIRST: every render below reads the live string tables, and they are
+    // empty objects until this runs. A blank app is what a missed call looks like.
+    state.locale = loadLocale();
+    document.documentElement.setAttribute("lang", state.locale);
+    rebuildStringTables();
     applySurface(loadSurfaceId()); // post-sprint: paint the desk before the shell lands on it
     initDeskFrame();               // the lacquer desk's gold border; a no-op for the rest
     applyChalkDust();              // §P6: the habit runner's board
     renderShell();
+    renderTabLabels();
     bindEvents();
     bindDrawerSwipe(); // finger-follow open/close on the intray drawer, same mechanic as the calendar month swipe
     initLocalData();

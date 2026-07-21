@@ -32,7 +32,10 @@ DIST = REPO / "dist"
 # first for readability; chunkMap depends on helpers app.js defines
 # (genId, saveTasksLocal, state) but that's fine because those are all
 # function declarations, hoisted before anything runs.
-JS_MODULES = ["storage.js", "textures.js", "surface.js", "runner.js", "pickers.js", "chunkMap.js", "app.js", "events.js"]
+# ⚠ i18n.js sits right after storage.js and must STAY early: its STRINGS/LOCALES
+# are `const`, so they are in the temporal dead zone until this file is
+# evaluated. Function declarations hoist and do not care about order; consts do.
+JS_MODULES = ["storage.js", "i18n.js", "textures.js", "surface.js", "runner.js", "pickers.js", "chunkMap.js", "app.js", "events.js"]
 
 ASSET_FILES = ["manifest.webmanifest", "icon.svg", "icon-192.png", "icon-512.png"]
 

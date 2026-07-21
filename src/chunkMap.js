@@ -20,10 +20,10 @@
 // (this file + its boot() call) if the convention is ever retired.
 // =========================================================
 function injectChunkMap(){
-  const FLAG = "gtd_chunk_map_v4";
+  const FLAG = "gtd_chunk_map_v5";
   if (Storage.get(FLAG)) return;
   Storage.set(FLAG, "1");
-  ["gtd_chunk_map_v1", "gtd_chunk_map_v2", "gtd_chunk_map_v3"].forEach(Storage.remove);  // retire superseded flags
+  ["gtd_chunk_map_v1", "gtd_chunk_map_v2", "gtd_chunk_map_v3", "gtd_chunk_map_v4"].forEach(Storage.remove);  // retire superseded flags
 
   // Replace, don't accumulate (8.2, mirroring 8.1): sweep any previous
   // chunk-map group (tagged via devContext, not a title match, since the
@@ -67,8 +67,8 @@ function injectChunkMap(){
     { title: "✓ Post-sprint — Pickers, deadlines, wording, decoration", notes: "DONE. The app's own time and date pickers, pushed deadlines that restart their bar and count the push, one clock app-wide, the jargon removed, the photographic desks and black lacquer, and the + on lists and contexts." },
     { title: "✓ Post-sprint — Your checklist findings", notes: "DONE. Six of the seven you reported: ticking a past-due repeat now clears it from the review; the QA clock buttons reach you inside the calendar and every other full-screen page; a revealed intray card opens its item; the review's quick-add boxes take typing again (they were opening the date picker) and gained a Full page button; a project's creation page can add an event, as a proper draft; and naming a new list or context no longer drags the screen to the bottom. The seventh — a delete dialog when leaving a repeating event — I could not reproduce; there is a question waiting for you in the QA checklist." },
 
-    { title: "Polish the writing", notes: "TO DO, and first — everything else that touches words waits on it. All the app's text is in COPY.txt and the information-button text is in INFO-TEXT.txt, both for you to mark up." },
-    { title: "Chinese translation", notes: "TO DO. Waits on the writing being final: translating text that is about to be rewritten is wasted work. The habit thought-bubbles already have Chinese; everything else does not." },
+    { title: "✓ Polish the writing", notes: "DONE. Ruled that the only text needing a review pass was the information-button copy; INFO-TEXT.txt was marked up and is now wired into the app. COPY.txt — the generated dump of all 236 strings — is OBSOLETE and was never filled in; the app's inline wording stands as written. This row used to say everything waited on it, which is what made the translation look blocked when it was not."},
+    { title: "Chinese translation", notes: "IN PROGRESS. No longer blocked — the writing is final (see the row above). Simplified Chinese, matching the habit thought-bubbles, which already carry both languages and are the pattern the rest follows. Needs a string table and a working Language switch as well as the words themselves." },
     { title: "Fix up the desktop layout", notes: "TO DO. Everything this sprint was designed and tested on a phone, and the desktop view has drifted — wide screens especially." },
     { title: "✓ Events on the project page", notes: "DONE. A project shows its linked events and can create them — including on the creation page, where the event is held as a draft and only becomes real when the project is saved. ‘Add an event’ in the daily review came with it." },
     { title: "✓ Linked notes on the project page", notes: "DONE. The link runs both ways now. A current project's Linked panel has an Actions side and a Notes side you toggle between, and a Someday project has a Linked notes section of its own — notes only, since a Someday project holds no actions by design." },

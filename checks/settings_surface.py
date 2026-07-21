@@ -58,9 +58,31 @@ with serve(DIST) as url, sync_playwright() as p:
     # ⚑ Debugging joined the menu when the dev toolbar was hidden by default.
     check(labels == ["Export a backup", "Import a backup", "Background", "Language",
                      "Debugging", "Restore app to defaults"], f"rows in order (got {labels})")
-    check(pg.locator('[data-action="settings-language"]').is_disabled(), "Language is disabled")
-    check("not built yet" in pg.locator('[data-action="settings-language"]').inner_text(),
-          "Language says it is not built yet")
+    # ⚑ Language is BUILT now (Chinese round) — no longer a disabled "not built
+    # yet" row. It is a live sub-panel like Background, and its value shows the
+    # current language in its OWN script.
+    check(not pg.locator('[data-action="settings-language"]').is_disabled(),
+          "Language is enabled")
+    check("English" in pg.locator('[data-action="settings-language"]').inner_text(),
+          "Language shows the current language, not 'not built yet'")
+
+    # opening it lists both languages, each named in its own script
+    pg.click('[data-action="settings-language"]'); pg.wait_for_timeout(250)
+    langs = pg.locator('[data-action="settings-pick-lang"]').all_inner_texts()
+    check(any("简体中文" in l for l in langs),
+          f"the picker names Chinese in Chinese ({langs})")
+    check(any("English" in l for l in langs), f"and English in English ({langs})")
+    # switch to Chinese and confirm a visible label actually changes
+    pg.click('[data-action="settings-pick-lang"][data-lang="zh-Hans"]'); pg.wait_for_timeout(400)
+    tabnames = pg.evaluate("() => [...document.querySelectorAll('.tab-name')].map(e => e.textContent)")
+    check("下一步" in tabnames, f"picking Chinese re-labels the tabs ({tabnames})")
+    persisted = pg.evaluate("() => localStorage.getItem('gtd_locale')")
+    check(persisted == "zh-Hans", f"and persists the choice ({persisted})")
+    # put it back so the rest of the suite sees English
+    pg.evaluate("() => { const d = document.querySelector('#dialog-root'); if (d) d.innerHTML = ''; }")
+    pg.click('[data-action="open-overflow"]'); pg.wait_for_timeout(250)
+    pg.click('[data-action="settings-language"]'); pg.wait_for_timeout(200)
+    pg.click('[data-action="settings-pick-lang"][data-lang="en"]'); pg.wait_for_timeout(300)
 
     # outside tap dismisses
     pg.click(".menu-scrim"); pg.wait_for_timeout(250)
