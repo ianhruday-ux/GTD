@@ -2483,21 +2483,55 @@
       conditionLabel: null, bundleText: null, contextId: null
     };
     const projectId = stagingProjectId(s);
-    if (!s.taskId){
-      const proj = Object.assign({ id: projectId, isGroup: false, parent: null, createdAt: nowMs() }, projData);
-      state.tasks[s.kind].unshift(proj);
-      saveTasksLocal(s.kind);
-    } else {
-      updateTask(s.kind, s.taskId, projData);
+    function commit(){
+      if (!s.taskId){
+        const proj = Object.assign({ id: projectId, isGroup: false, parent: null, createdAt: nowMs() }, projData);
+        state.tasks[s.kind].unshift(proj);
+        saveTasksLocal(s.kind);
+      } else {
+        updateTask(s.kind, s.taskId, projData);
+      }
+      applyProjectStaging(s);
+      if (willComplete && s.taskId){ completeProject(s.kind, s.taskId); closeScreen(); return; }
+      if (convertTo){
+        if (convertTo === "future" && s.kind === "current"){ demoteProjectToFuture(s.taskId); return; }
+        changeKind(s.kind, convertTo, s.taskId).then(closeScreen); return;
+      }
+      consumeCaptureForScreen(s); // §4.8b: a capture sorted to Project is now filed
+      closeScreen();
     }
-    applyProjectStaging(s);
-    if (willComplete && s.taskId){ completeProject(s.kind, s.taskId); closeScreen(); return; }
-    if (convertTo){
-      if (convertTo === "future" && s.kind === "current"){ demoteProjectToFuture(s.taskId); return; }
-      changeKind(s.kind, convertTo, s.taskId).then(closeScreen); return;
+    // ⚑ P-5 (user): moving a deadline EARLIER can strand events that were
+    // legitimate when they were made. Creation refuses a date past the deadline,
+    // but nothing at creation time can help here — the date that changed is the
+    // deadline's, not the event's. So warn at the moment the deadline moves,
+    // which is when you have the context to judge, and LET IT THROUGH: "give a
+    // warning, but let them continue if they really want to."
+    //
+    // Only when the deadline actually CHANGED. Checking on every save would nag
+    // forever after a repeating event rolls past a deadline that nobody touched,
+    // which is the state a linked repeat ends up in by design.
+    const oldDl = (s.taskId && findTaskAnywhere(s.taskId) &&
+                   findTaskAnywhere(s.taskId).task.deadline &&
+                   findTaskAnywhere(s.taskId).task.deadline.date) || null;
+    const newDl = (projData.deadline && projData.deadline.date) || null;
+    if (s.taskId && newDl && newDl !== oldDl){
+      const stranded = (state.events || []).filter(function(ev){
+        return ev.linkedProjectId === s.taskId && ev.date > newDl;
+      });
+      if (stranded.length){
+        const n = stranded.length;
+        openConfirmDialog(
+          n + " calendar " + (n === 1 ? "entry is" : "entries are") + " scheduled after this new deadline. " +
+          "You can keep " + (n === 1 ? "it" : "them") + " — nothing will be moved or deleted.",
+          [
+            { label: "Save anyway", style: "primary", action: commit },
+            { label: "Go back", action: function(){} }
+          ]
+        );
+        return;
+      }
     }
-    consumeCaptureForScreen(s); // §4.8b: a capture sorted to Project is now filed
-    closeScreen();
+    commit();
   }
   function deleteScreenItem(){
     const s = state.screen;

@@ -183,6 +183,57 @@ with serve(DIST) as url, sync_playwright() as p:
     check(not any(e["title"] == "ZZ late repeat" for e in events()),
           "and is not created")
 
+    # ---------- P-5: pulling the deadline EARLIER warns, but lets you through ----------
+    # User: "Give a warning, but let them continue if they really want to."
+    # Nothing at creation time can help here — the date that moved is the
+    # DEADLINE's, not the event's.
+    from _pickers import pick_date
+    open_project()
+    # the shed has a 30 Jun deadline and two linked events (20 Jun, 22 Jun weekly)
+    pick_date(pg, '[data-field="deadline-date"]', "2026-06-18")   # earlier than both
+    pg.click('[data-action="screen-save"]'); pg.wait_for_timeout(600)
+    dlg = pg.locator(".choice-dialog")
+    check(dlg.count() == 1, "pulling the deadline earlier warns")
+    msg = pg.locator(".choice-dialog p").first.inner_text()
+    check("calendar" in msg.lower() and "2" in msg,
+          f"and says how many entries are stranded ({msg})")
+    check("nothing will be moved or deleted" in msg.lower(),
+          f"and that it will not touch them ({msg})")
+
+    # "Go back" must change nothing
+    pg.locator('.choice-dialog button:has-text("Go back")').first.click()
+    pg.wait_for_timeout(500)
+    stored = pg.evaluate("""() => {
+      const cur = JSON.parse(localStorage.getItem('gtd_tasks_current'));
+      const p = cur.find(t => t.id === 'zz-proj');
+      return p && p.deadline ? p.deadline.date : null;
+    }""")
+    check(stored == "2026-06-30", f"Go back leaves the old deadline in place ({stored})")
+
+    # ...and Save anyway goes through, keeping the events
+    pg.click('[data-action="screen-save"]'); pg.wait_for_timeout(600)
+    pg.locator('.choice-dialog button:has-text("Save anyway")').first.click()
+    pg.wait_for_timeout(800)
+    after = pg.evaluate("""() => {
+      const cur = JSON.parse(localStorage.getItem('gtd_tasks_current'));
+      const p = cur.find(t => t.id === 'zz-proj');
+      const evs = JSON.parse(localStorage.getItem('gtd_events') || '[]');
+      return { dl: p && p.deadline ? p.deadline.date : null,
+               linked: evs.filter(e => e.linkedProjectId === 'zz-proj').length };
+    }""")
+    check(after["dl"] == "2026-06-18", f"Save anyway applies the new deadline ({after})")
+    check(after["linked"] == 2,
+          f"and the stranded entries are KEPT, not moved or deleted ({after})")
+
+    # ---------- an unchanged deadline does not nag ----------
+    # A linked repeat rolls past any deadline eventually, so re-warning on every
+    # save would make the dialog permanent noise.
+    open_project()
+    pg.fill('[data-field="title"]', "ZZ build the shed again")
+    pg.click('[data-action="screen-save"]'); pg.wait_for_timeout(700)
+    check(pg.locator(".choice-dialog").count() == 0,
+          "saving without touching the deadline does not warn again")
+
     check(not errs, f"no JS errors ({errs[:3]})")
     b.close()
 
