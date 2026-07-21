@@ -3855,6 +3855,40 @@
   let dragLogOn = false;
   let dragLogBuf = [];
   let dragLogT0 = 0;
+  // =========================================================
+  // DEV TOOL VISIBILITY (user: put the dev tools behind the settings surface)
+  // Each group is off until switched on under ⋯ → Debugging. Stored under
+  // gttdev_-style keys — gtddev_ — because these are dev preferences and must
+  // survive "Restore app to defaults" like the snapshot slot does; wiping them
+  // would turn every reset into a hunt through the menu to get the tools back.
+  // =========================================================
+  const DEV_GROUPS = [
+    { id: "time", key: "gtddev_show_time", label: "Time jump buttons",
+      note: "Move the app's clock to test days, hours and the 4am boundary." },
+    { id: "snapshot", key: "gtddev_show_snapshot", label: "Snapshot & restore",
+      note: "Save all data to one slot before something risky, and put it back after." },
+    { id: "draglog", key: "gtddev_show_draglog", label: "Drag log",
+      note: "Record a press-and-hold drag so a phone-only bug can be sent as text." }
+  ];
+  function devGroupOn(g){ return Storage.get(g.key) === "1"; }
+  function setDevGroup(g, on){ Storage.set(g.key, on ? "1" : "0"); applyDevVisibility(); }
+  function applyDevVisibility(){
+    let any = false;
+    DEV_GROUPS.forEach(function(g){
+      const on = devGroupOn(g);
+      if (on) any = true;
+      const el = qs('[data-dev-group="' + g.id + '"]');
+      if (el) el.hidden = !on;
+    });
+    const bar = qs("#dev-toolbar");
+    if (bar) bar.hidden = !any;
+    // The drag log's own panel has no business surviving its group being hidden.
+    if (!devGroupOn(DEV_GROUPS[2])){
+      const panel = qs("#drag-log-panel");
+      if (panel) panel.hidden = true;
+    }
+  }
+
   function dragLogInit(){ dragLogOn = Storage.get("gtddev_drag_log_on") === "1"; }
   function dragDesc(el){
     if (el && el.nodeType !== 1) el = el.parentElement;
@@ -3968,14 +4002,6 @@
   // EVENTS
   // =========================================================
   function bindEvents(){
-    qs("#reset-btn").addEventListener("click", function(){
-      // Dev Reset now shares the settings surface's clear (chunk 6) — one code
-      // path, so completed archives, the tray, tags, etc. can't be forgotten.
-      openConfirmDialog("Clear all local data and start fresh?", [
-        { label: "Clear data", style: "primary", action: clearAllAppData },
-        { label: "Cancel", action: function(){} }
-      ]);
-    });
 
     // Dev QA aid (not a real feature): jumps boundaryNow() forward and
     // re-runs the same boundary sweep that normally only fires on boot, so
@@ -6167,6 +6193,12 @@
       '<button type="button" class="settings-item disabled" data-action="settings-language" disabled>' +
         '<span>&#127760;</span><span class="si-label">Language</span>' +
         '<span class="si-value">not built yet</span></button>' +
+      // ⚑ Where the dev tools live now. A row rather than a permanent bar: they
+      // are scaffolding for building the app, and having them across the top of
+      // every screen was the clutter the user wanted gone.
+      '<button type="button" class="settings-item" data-action="settings-debug">' +
+        '<span>&#128295;</span><span class="si-label">Debugging</span>' +
+        '<span class="si-value">' + devOnCount() + '</span><span class="si-caret">&#8250;</span></button>' +
       '<div class="settings-sep"></div>' +
       '<button type="button" class="settings-item danger" data-action="clear-all-data">' +
         '<span>&#8634;</span><span class="si-label">Restore app to defaults</span></button>' +
@@ -6177,6 +6209,25 @@
       // without a laptop.
       '<div class="settings-build" title="Which build you are running">Build ' + escapeHtml(BUILD_STAMP) + '</div>'
     );
+  }
+  function devOnCount(){
+    const n = DEV_GROUPS.filter(devGroupOn).length;
+    return n ? (n + " on") : "off";
+  }
+  function settingsDebugHtml(){
+    let out =
+      '<button type="button" class="settings-item settings-back" data-action="settings-root">' +
+        '<span>&#8249;</span><span class="si-label">Debugging</span></button>' +
+      '<div class="settings-sep"></div>';
+    DEV_GROUPS.forEach(function(g){
+      const on = devGroupOn(g);
+      out +=
+        '<button type="button" class="settings-item" data-action="settings-toggle-dev" data-dev="' + g.id + '">' +
+          '<span class="settings-switch' + (on ? " on" : "") + '" aria-hidden="true"></span>' +
+          '<span class="si-label">' + escapeHtml(g.label) + '<span class="si-note">' + escapeHtml(g.note) + '</span></span>' +
+        '</button>';
+    });
+    return out;
   }
   function settingsBackgroundsHtml(){
     const cur = currentSurfaceId();
@@ -6196,7 +6247,10 @@
   }
   function renderSettingsMenu(){
     const menu = qs(".settings-menu");
-    if (menu) menu.innerHTML = settingsPanel === "backgrounds" ? settingsBackgroundsHtml() : settingsRootHtml();
+    if (!menu) return;
+    menu.innerHTML = settingsPanel === "backgrounds" ? settingsBackgroundsHtml()
+      : settingsPanel === "debug" ? settingsDebugHtml()
+      : settingsRootHtml();
   }
   function openSettings(){
     settingsPanel = "root";
@@ -6213,6 +6267,15 @@
       if (action === "import-data"){ importAllData(); return; }
       if (action === "settings-backgrounds"){ settingsPanel = "backgrounds"; renderSettingsMenu(); return; }
       if (action === "settings-root"){ settingsPanel = "root"; renderSettingsMenu(); return; }
+      if (action === "settings-debug"){ settingsPanel = "debug"; renderSettingsMenu(); return; }
+      if (action === "settings-toggle-dev"){
+        // Applies straight away and stays open, like the background picker —
+        // you switch one on to use it, not to admire the menu.
+        const g = DEV_GROUPS.find(function(x){ return x.id === item.getAttribute("data-dev"); });
+        if (g) setDevGroup(g, !devGroupOn(g));
+        renderSettingsMenu();
+        return;
+      }
       if (action === "settings-pick-bg"){
         // Applies immediately and stays open, so the surfaces can be compared
         // against the real desk instead of from memory.
@@ -6847,6 +6910,7 @@
     updateQaTimeReadout();
     dragLogInit();
     updateDragLogUI();
+    applyDevVisibility();   // dev tools start hidden unless switched on
     // Bug #2 / QA #15: the app's own time picker takes over every .screen-time
     // field. Delegated at the document, so it covers fields that do not exist
     // yet (the calendar creation row, an event page opened later).

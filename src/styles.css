@@ -201,6 +201,12 @@ header{
   padding:8px calc(16px + env(safe-area-inset-right)) 0 calc(16px + env(safe-area-inset-left));
   opacity:0.85;
 }
+/* ⚠ display:flex beats the browser's [hidden]{display:none}, so without these
+   the toolbar stays on screen with its `hidden` attribute set — which is the
+   whole point of hiding it. Same for each group inside it. */
+#dev-toolbar[hidden]{ display:none; }
+.dev-group{ display:inline-flex; align-items:center; gap:6px; }
+.dev-group[hidden]{ display:none; }
 
 /* ----------------------------------------------------------------------------
    BUTTONS  (= carried over =)
@@ -1559,4 +1565,21 @@ body.has-frame .tray-drawer::after{
   font-family:var(--font-mono); font-size:9.5px; color:var(--text-soft);
   opacity:0.65; padding:8px 12px 4px; text-align:right;
   border-top:1px solid rgba(255,255,255,0.07); margin-top:4px;
+}
+
+/* ⋯ → Debugging. A switch rather than a tick: these turn something on that
+   stays on, unlike the background rows which are a one-of-many choice. */
+.settings-switch{
+  flex:0 0 auto; width:26px; height:15px; border-radius:8px;
+  background:rgba(255,255,255,0.14); position:relative; transition:background .15s ease;
+}
+.settings-switch::after{
+  content:""; position:absolute; top:2px; left:2px; width:11px; height:11px;
+  border-radius:50%; background:var(--text-soft); transition:transform .15s ease, background .15s ease;
+}
+.settings-switch.on{ background:color-mix(in srgb, var(--brass) 55%, transparent); }
+.settings-switch.on::after{ transform:translateX(11px); background:var(--brass); }
+.si-note{
+  display:block; font-size:10.5px; color:var(--text-soft); font-weight:400;
+  margin-top:2px; line-height:1.35; white-space:normal;
 }

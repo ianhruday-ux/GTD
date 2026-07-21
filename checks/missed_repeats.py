@@ -17,6 +17,7 @@ a newer miss overwrites an older unhandled one.
 """
 import os, functools, http.server, socket, socketserver, threading, contextlib, sys, datetime
 from playwright.sync_api import sync_playwright
+from _pickers import enable_dev_tools
 
 DIST = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "dist")
 
@@ -68,6 +69,7 @@ with serve(DIST) as url, sync_playwright() as p:
     pg.on("console", lambda m: errs.append("CONSOLE " + m.text) if m.type == "error" else None)
     pg.clock.install(time=BASE)
     pg.goto(url); pg.wait_for_timeout(1000)
+    enable_dev_tools(pg)   # the dev toolbar is hidden until switched on
 
     def seed(e):
         pg.evaluate("""(e) => {

@@ -55,8 +55,9 @@ with serve(DIST) as url, sync_playwright() as p:
     check(pg.locator(".settings-menu").count() == 1, "⋯ opens a dropdown")
     check(pg.locator(".choice-dialog-backdrop").count() == 0, "it is not a modal sheet")
     labels = pg.locator(".settings-menu .si-label").all_inner_texts()
+    # ⚑ Debugging joined the menu when the dev toolbar was hidden by default.
     check(labels == ["Export a backup", "Import a backup", "Background", "Language",
-                     "Restore app to defaults"], f"rows in order (got {labels})")
+                     "Debugging", "Restore app to defaults"], f"rows in order (got {labels})")
     check(pg.locator('[data-action="settings-language"]').is_disabled(), "Language is disabled")
     check("not built yet" in pg.locator('[data-action="settings-language"]').inner_text(),
           "Language says it is not built yet")
@@ -160,6 +161,54 @@ with serve(DIST) as url, sync_playwright() as p:
     pg.reload(); load()
     check(pg.evaluate("localStorage.getItem('gtd_surface')") is None, "a full gtd_ clear drops the surface preference")
     check(wood() == default_tile, "and the desk returns to the default Dark wood")
+
+    # ---------- the dev tools live behind Debugging now ----------
+    # User: "put the developer tools behind the settings surface... I want to see
+    # what the app looks like without all the clutter."
+    check(pg.locator("#dev-toolbar").is_hidden(),
+          "the dev toolbar is hidden until something is switched on")
+    check(pg.locator("#reset-btn").count() == 0,
+          "and Reset local data is gone entirely, not just hidden")
+
+    # ⚠ The reload above closed the menu, so reopen it before reaching for a row.
+    pg.click('[data-action="open-overflow"]'); pg.wait_for_timeout(300)
+    pg.click('[data-action="settings-debug"]'); pg.wait_for_timeout(300)
+    switches = pg.locator('[data-action="settings-toggle-dev"]')
+    check(switches.count() == 3, f"Debugging offers three switches ({switches.count()})")
+    check(pg.locator(".settings-switch.on").count() == 0, "all off to begin with")
+
+    pg.locator('[data-action="settings-toggle-dev"][data-dev="time"]').first.click()
+    pg.wait_for_timeout(300)
+    check(pg.locator(".settings-switch.on").count() == 1, "switching one on shows it as on")
+    check(pg.locator(".settings-menu").count() == 1, "and leaves the menu open")
+    state = pg.evaluate("""() => ({
+      bar: !document.querySelector('#dev-toolbar').hidden,
+      time: !document.querySelector('[data-dev-group="time"]').hidden,
+      snap: !document.querySelector('[data-dev-group="snapshot"]').hidden
+    })""")
+    check(state["bar"] and state["time"] and not state["snap"],
+          f"the time buttons appear and nothing else does ({state})")
+
+    # off again, and the whole bar goes with it
+    pg.locator('[data-action="settings-toggle-dev"][data-dev="time"]').first.click()
+    pg.wait_for_timeout(300)
+    check(pg.locator("#dev-toolbar").is_hidden(),
+          "switching the last one off hides the bar completely")
+
+    # the preference survives a reload, and a Restore to defaults
+    pg.locator('[data-action="settings-toggle-dev"][data-dev="snapshot"]').first.click()
+    pg.wait_for_timeout(300)
+    pg.reload(); load()
+    check(pg.evaluate("() => !document.querySelector('[data-dev-group=\"snapshot\"]').hidden"),
+          "the choice survives a reload")
+    pg.evaluate("""() => { Object.keys(localStorage).filter(k => k.indexOf('gtd_') === 0)
+        .forEach(k => localStorage.removeItem(k)); }""")
+    pg.reload(); load()
+    check(pg.evaluate("() => !document.querySelector('[data-dev-group=\"snapshot\"]').hidden"),
+          "and a gtd_ clear too — these are gtddev_ keys, like the snapshot slot")
+    pg.evaluate("""() => { ['gtddev_show_time','gtddev_show_snapshot','gtddev_show_draglog']
+        .forEach(k => localStorage.removeItem(k)); }""")
+    pg.reload(); load()
 
     # ---------- which build am I running? ----------
     # ⚑ Added after a fix was pushed, deployed, and reported as still broken —

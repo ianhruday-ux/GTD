@@ -61,19 +61,29 @@
 </nav>
 <div class="tabbar-spacer" aria-hidden="true"></div>
 
-<!-- Dev-only scaffolding — not part of the app's designed surface. Scrolls
-     with content instead of living in the fixed chrome above, which is
-     reserved for the real header (chunk 2, §4.10). -->
-<div id="dev-toolbar">
-  <button class="btn btn-ghost btn-small" id="reset-btn">Reset local data</button>
-  <button class="btn btn-ghost btn-small" id="qa-day-btn" title="Dev QA aid: advances the app's clock by one day and re-runs habit boundary processing, so multi-day habit logic (stumbles, misses, run-ending, badges) can be tested without waiting">QA: +1 Day</button>
-  <button class="btn btn-ghost btn-small" id="qa-hour-btn" title="Dev QA aid: advances the app's clock by one hour and re-runs habit boundary processing">QA: +1 Hr</button>
-  <button class="btn btn-ghost btn-small" id="qa-min-btn" title="Dev QA aid: advances the app's clock by fifteen minutes and re-runs habit boundary processing — fine-grained enough to step through the midnight-4am window where the calendar date and the app's day boundary deliberately disagree">QA: +15 Min</button>
-  <span class="qa-time-readout" id="qa-time-readout" title="What the app currently thinks &lsquo;now&rsquo; is, after any QA time jumps"></span>
-  <button class="btn btn-ghost btn-small" id="qa-snapshot-btn" title="Dev QA aid: saves all current data to one snapshot slot (survives Reset), so you can try something destructive and get back to exactly this state">Snapshot</button>
-  <button class="btn btn-ghost btn-small" id="qa-restore-btn" title="Dev QA aid: replaces all current data with the last snapshot, then reloads">Restore</button>
-  <button class="btn btn-ghost btn-small" id="drag-log-toggle" title="Dev: record the press-and-hold drag lifecycle so a phone-only drag bug can be reported as copyable text">Drag log: off</button>
-  <button class="btn btn-ghost btn-small" id="drag-log-show" title="Dev: show the recorded drag log to copy or screenshot">Show drag log</button>
+<!-- Dev-only scaffolding — not part of the app's designed surface.
+     ⚑ HIDDEN BY DEFAULT now (user: "I want to see what the app looks like
+     without all the clutter"). Each group is revealed by its own toggle under
+     ⋯ → Debugging, and the whole bar collapses to nothing when none are on, so
+     the lanes start at the top of the page as they should.
+     ⚑ "Reset local data" is GONE, not hidden: Restore app to defaults does the
+     same job in the menu where a destructive action belongs, and snapshot /
+     restore covers the "put it back" case it was really being used for. -->
+<div id="dev-toolbar" hidden>
+  <span class="dev-group" data-dev-group="time" hidden>
+    <button class="btn btn-ghost btn-small" id="qa-day-btn" title="Dev QA aid: advances the app's clock by one day and re-runs habit boundary processing, so multi-day habit logic (stumbles, misses, run-ending, badges) can be tested without waiting">QA: +1 Day</button>
+    <button class="btn btn-ghost btn-small" id="qa-hour-btn" title="Dev QA aid: advances the app's clock by one hour and re-runs habit boundary processing">QA: +1 Hr</button>
+    <button class="btn btn-ghost btn-small" id="qa-min-btn" title="Dev QA aid: advances the app's clock by fifteen minutes and re-runs habit boundary processing — fine-grained enough to step through the midnight-4am window where the calendar date and the app's day boundary deliberately disagree">QA: +15 Min</button>
+    <span class="qa-time-readout" id="qa-time-readout" title="What the app currently thinks &lsquo;now&rsquo; is, after any QA time jumps"></span>
+  </span>
+  <span class="dev-group" data-dev-group="snapshot" hidden>
+    <button class="btn btn-ghost btn-small" id="qa-snapshot-btn" title="Dev QA aid: saves all current data to one snapshot slot (survives Reset), so you can try something destructive and get back to exactly this state">Snapshot</button>
+    <button class="btn btn-ghost btn-small" id="qa-restore-btn" title="Dev QA aid: replaces all current data with the last snapshot, then reloads">Restore</button>
+  </span>
+  <span class="dev-group" data-dev-group="draglog" hidden>
+    <button class="btn btn-ghost btn-small" id="drag-log-toggle" title="Dev: record the press-and-hold drag lifecycle so a phone-only drag bug can be reported as copyable text">Drag log: off</button>
+    <button class="btn btn-ghost btn-small" id="drag-log-show" title="Dev: show the recorded drag log to copy or screenshot">Show drag log</button>
+  </span>
 </div>
 <div id="drag-log-panel" hidden>
   <textarea id="drag-log-text" readonly rows="12" placeholder="Turn the drag log ON, reproduce the bug, then tap Show drag log."></textarea>

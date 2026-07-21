@@ -1,4 +1,4 @@
-"""Shared helpers for driving the app's own date/time pickers from a check.
+"""Shared helpers for checks — the pickers, and the dev tools.
 
 The date and time fields are readonly now (that is what stops the phone's own
 picker opening over ours), so `page.fill()` on one fails with "element is not
@@ -69,3 +69,24 @@ def clear_date(pg, selector):
     pg.wait_for_timeout(300)
     pg.click('[data-dp="clear"]')
     pg.wait_for_timeout(300)
+
+
+def enable_dev_tools(pg):
+    """Reveal the dev toolbar.
+
+    ⚠ It is HIDDEN by default now — the tools live behind ⋯ → Debugging, each
+    behind its own switch (user: "I want to see what the app looks like without
+    all the clutter"). Any check that clicks #qa-day-btn, Snapshot or the drag
+    log has to turn them on first or the click times out on an invisible button.
+
+    Sets the preferences AND un-hides in place, so it works whether or not the
+    check reloads afterwards: the keys are gtddev_, so they survive a reload and
+    a Reset the same way the snapshot slot does.
+    """
+    pg.evaluate("""() => {
+      ['gtddev_show_time', 'gtddev_show_snapshot', 'gtddev_show_draglog']
+        .forEach(k => localStorage.setItem(k, '1'));
+      const bar = document.querySelector('#dev-toolbar');
+      if (bar) bar.hidden = false;
+      document.querySelectorAll('[data-dev-group]').forEach(e => { e.hidden = false; });
+    }""")

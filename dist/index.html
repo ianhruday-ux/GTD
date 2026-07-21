@@ -227,6 +227,12 @@ header{
   padding:8px calc(16px + env(safe-area-inset-right)) 0 calc(16px + env(safe-area-inset-left));
   opacity:0.85;
 }
+/* ⚠ display:flex beats the browser's [hidden]{display:none}, so without these
+   the toolbar stays on screen with its `hidden` attribute set — which is the
+   whole point of hiding it. Same for each group inside it. */
+#dev-toolbar[hidden]{ display:none; }
+.dev-group{ display:inline-flex; align-items:center; gap:6px; }
+.dev-group[hidden]{ display:none; }
 
 /* ----------------------------------------------------------------------------
    BUTTONS  (= carried over =)
@@ -1586,6 +1592,23 @@ body.has-frame .tray-drawer::after{
   opacity:0.65; padding:8px 12px 4px; text-align:right;
   border-top:1px solid rgba(255,255,255,0.07); margin-top:4px;
 }
+
+/* ⋯ → Debugging. A switch rather than a tick: these turn something on that
+   stays on, unlike the background rows which are a one-of-many choice. */
+.settings-switch{
+  flex:0 0 auto; width:26px; height:15px; border-radius:8px;
+  background:rgba(255,255,255,0.14); position:relative; transition:background .15s ease;
+}
+.settings-switch::after{
+  content:""; position:absolute; top:2px; left:2px; width:11px; height:11px;
+  border-radius:50%; background:var(--text-soft); transition:transform .15s ease, background .15s ease;
+}
+.settings-switch.on{ background:color-mix(in srgb, var(--brass) 55%, transparent); }
+.settings-switch.on::after{ transform:translateX(11px); background:var(--brass); }
+.si-note{
+  display:block; font-size:10.5px; color:var(--text-soft); font-weight:400;
+  margin-top:2px; line-height:1.35; white-space:normal;
+}
 </style>
 </head>
 <body>
@@ -1622,19 +1645,29 @@ body.has-frame .tray-drawer::after{
 </nav>
 <div class="tabbar-spacer" aria-hidden="true"></div>
 
-<!-- Dev-only scaffolding — not part of the app's designed surface. Scrolls
-     with content instead of living in the fixed chrome above, which is
-     reserved for the real header (chunk 2, §4.10). -->
-<div id="dev-toolbar">
-  <button class="btn btn-ghost btn-small" id="reset-btn">Reset local data</button>
-  <button class="btn btn-ghost btn-small" id="qa-day-btn" title="Dev QA aid: advances the app's clock by one day and re-runs habit boundary processing, so multi-day habit logic (stumbles, misses, run-ending, badges) can be tested without waiting">QA: +1 Day</button>
-  <button class="btn btn-ghost btn-small" id="qa-hour-btn" title="Dev QA aid: advances the app's clock by one hour and re-runs habit boundary processing">QA: +1 Hr</button>
-  <button class="btn btn-ghost btn-small" id="qa-min-btn" title="Dev QA aid: advances the app's clock by fifteen minutes and re-runs habit boundary processing — fine-grained enough to step through the midnight-4am window where the calendar date and the app's day boundary deliberately disagree">QA: +15 Min</button>
-  <span class="qa-time-readout" id="qa-time-readout" title="What the app currently thinks &lsquo;now&rsquo; is, after any QA time jumps"></span>
-  <button class="btn btn-ghost btn-small" id="qa-snapshot-btn" title="Dev QA aid: saves all current data to one snapshot slot (survives Reset), so you can try something destructive and get back to exactly this state">Snapshot</button>
-  <button class="btn btn-ghost btn-small" id="qa-restore-btn" title="Dev QA aid: replaces all current data with the last snapshot, then reloads">Restore</button>
-  <button class="btn btn-ghost btn-small" id="drag-log-toggle" title="Dev: record the press-and-hold drag lifecycle so a phone-only drag bug can be reported as copyable text">Drag log: off</button>
-  <button class="btn btn-ghost btn-small" id="drag-log-show" title="Dev: show the recorded drag log to copy or screenshot">Show drag log</button>
+<!-- Dev-only scaffolding — not part of the app's designed surface.
+     ⚑ HIDDEN BY DEFAULT now (user: "I want to see what the app looks like
+     without all the clutter"). Each group is revealed by its own toggle under
+     ⋯ → Debugging, and the whole bar collapses to nothing when none are on, so
+     the lanes start at the top of the page as they should.
+     ⚑ "Reset local data" is GONE, not hidden: Restore app to defaults does the
+     same job in the menu where a destructive action belongs, and snapshot /
+     restore covers the "put it back" case it was really being used for. -->
+<div id="dev-toolbar" hidden>
+  <span class="dev-group" data-dev-group="time" hidden>
+    <button class="btn btn-ghost btn-small" id="qa-day-btn" title="Dev QA aid: advances the app's clock by one day and re-runs habit boundary processing, so multi-day habit logic (stumbles, misses, run-ending, badges) can be tested without waiting">QA: +1 Day</button>
+    <button class="btn btn-ghost btn-small" id="qa-hour-btn" title="Dev QA aid: advances the app's clock by one hour and re-runs habit boundary processing">QA: +1 Hr</button>
+    <button class="btn btn-ghost btn-small" id="qa-min-btn" title="Dev QA aid: advances the app's clock by fifteen minutes and re-runs habit boundary processing — fine-grained enough to step through the midnight-4am window where the calendar date and the app's day boundary deliberately disagree">QA: +15 Min</button>
+    <span class="qa-time-readout" id="qa-time-readout" title="What the app currently thinks &lsquo;now&rsquo; is, after any QA time jumps"></span>
+  </span>
+  <span class="dev-group" data-dev-group="snapshot" hidden>
+    <button class="btn btn-ghost btn-small" id="qa-snapshot-btn" title="Dev QA aid: saves all current data to one snapshot slot (survives Reset), so you can try something destructive and get back to exactly this state">Snapshot</button>
+    <button class="btn btn-ghost btn-small" id="qa-restore-btn" title="Dev QA aid: replaces all current data with the last snapshot, then reloads">Restore</button>
+  </span>
+  <span class="dev-group" data-dev-group="draglog" hidden>
+    <button class="btn btn-ghost btn-small" id="drag-log-toggle" title="Dev: record the press-and-hold drag lifecycle so a phone-only drag bug can be reported as copyable text">Drag log: off</button>
+    <button class="btn btn-ghost btn-small" id="drag-log-show" title="Dev: show the recorded drag log to copy or screenshot">Show drag log</button>
+  </span>
 </div>
 <div id="drag-log-panel" hidden>
   <textarea id="drag-log-text" readonly rows="12" placeholder="Turn the drag log ON, reproduce the bug, then tap Show drag log."></textarea>
@@ -1671,7 +1704,7 @@ body.has-frame .tray-drawer::after{
 (function(){
 "use strict";
 
-const BUILD_STAMP = "21 Jul 02:06 · f419219";  // replaced by build.py
+const BUILD_STAMP = "21 Jul 02:36 · de14476";  // replaced by build.py
 
 // =========================================================
 // STORAGE ADAPTER (spec.md §3, known issue 4)
@@ -8153,6 +8186,40 @@ function injectChunkMap(){
   let dragLogOn = false;
   let dragLogBuf = [];
   let dragLogT0 = 0;
+  // =========================================================
+  // DEV TOOL VISIBILITY (user: put the dev tools behind the settings surface)
+  // Each group is off until switched on under ⋯ → Debugging. Stored under
+  // gttdev_-style keys — gtddev_ — because these are dev preferences and must
+  // survive "Restore app to defaults" like the snapshot slot does; wiping them
+  // would turn every reset into a hunt through the menu to get the tools back.
+  // =========================================================
+  const DEV_GROUPS = [
+    { id: "time", key: "gtddev_show_time", label: "Time jump buttons",
+      note: "Move the app's clock to test days, hours and the 4am boundary." },
+    { id: "snapshot", key: "gtddev_show_snapshot", label: "Snapshot & restore",
+      note: "Save all data to one slot before something risky, and put it back after." },
+    { id: "draglog", key: "gtddev_show_draglog", label: "Drag log",
+      note: "Record a press-and-hold drag so a phone-only bug can be sent as text." }
+  ];
+  function devGroupOn(g){ return Storage.get(g.key) === "1"; }
+  function setDevGroup(g, on){ Storage.set(g.key, on ? "1" : "0"); applyDevVisibility(); }
+  function applyDevVisibility(){
+    let any = false;
+    DEV_GROUPS.forEach(function(g){
+      const on = devGroupOn(g);
+      if (on) any = true;
+      const el = qs('[data-dev-group="' + g.id + '"]');
+      if (el) el.hidden = !on;
+    });
+    const bar = qs("#dev-toolbar");
+    if (bar) bar.hidden = !any;
+    // The drag log's own panel has no business surviving its group being hidden.
+    if (!devGroupOn(DEV_GROUPS[2])){
+      const panel = qs("#drag-log-panel");
+      if (panel) panel.hidden = true;
+    }
+  }
+
   function dragLogInit(){ dragLogOn = Storage.get("gtddev_drag_log_on") === "1"; }
   function dragDesc(el){
     if (el && el.nodeType !== 1) el = el.parentElement;
@@ -8266,14 +8333,6 @@ function injectChunkMap(){
   // EVENTS
   // =========================================================
   function bindEvents(){
-    qs("#reset-btn").addEventListener("click", function(){
-      // Dev Reset now shares the settings surface's clear (chunk 6) — one code
-      // path, so completed archives, the tray, tags, etc. can't be forgotten.
-      openConfirmDialog("Clear all local data and start fresh?", [
-        { label: "Clear data", style: "primary", action: clearAllAppData },
-        { label: "Cancel", action: function(){} }
-      ]);
-    });
 
     // Dev QA aid (not a real feature): jumps boundaryNow() forward and
     // re-runs the same boundary sweep that normally only fires on boot, so
@@ -10465,6 +10524,12 @@ function injectChunkMap(){
       '<button type="button" class="settings-item disabled" data-action="settings-language" disabled>' +
         '<span>&#127760;</span><span class="si-label">Language</span>' +
         '<span class="si-value">not built yet</span></button>' +
+      // ⚑ Where the dev tools live now. A row rather than a permanent bar: they
+      // are scaffolding for building the app, and having them across the top of
+      // every screen was the clutter the user wanted gone.
+      '<button type="button" class="settings-item" data-action="settings-debug">' +
+        '<span>&#128295;</span><span class="si-label">Debugging</span>' +
+        '<span class="si-value">' + devOnCount() + '</span><span class="si-caret">&#8250;</span></button>' +
       '<div class="settings-sep"></div>' +
       '<button type="button" class="settings-item danger" data-action="clear-all-data">' +
         '<span>&#8634;</span><span class="si-label">Restore app to defaults</span></button>' +
@@ -10475,6 +10540,25 @@ function injectChunkMap(){
       // without a laptop.
       '<div class="settings-build" title="Which build you are running">Build ' + escapeHtml(BUILD_STAMP) + '</div>'
     );
+  }
+  function devOnCount(){
+    const n = DEV_GROUPS.filter(devGroupOn).length;
+    return n ? (n + " on") : "off";
+  }
+  function settingsDebugHtml(){
+    let out =
+      '<button type="button" class="settings-item settings-back" data-action="settings-root">' +
+        '<span>&#8249;</span><span class="si-label">Debugging</span></button>' +
+      '<div class="settings-sep"></div>';
+    DEV_GROUPS.forEach(function(g){
+      const on = devGroupOn(g);
+      out +=
+        '<button type="button" class="settings-item" data-action="settings-toggle-dev" data-dev="' + g.id + '">' +
+          '<span class="settings-switch' + (on ? " on" : "") + '" aria-hidden="true"></span>' +
+          '<span class="si-label">' + escapeHtml(g.label) + '<span class="si-note">' + escapeHtml(g.note) + '</span></span>' +
+        '</button>';
+    });
+    return out;
   }
   function settingsBackgroundsHtml(){
     const cur = currentSurfaceId();
@@ -10494,7 +10578,10 @@ function injectChunkMap(){
   }
   function renderSettingsMenu(){
     const menu = qs(".settings-menu");
-    if (menu) menu.innerHTML = settingsPanel === "backgrounds" ? settingsBackgroundsHtml() : settingsRootHtml();
+    if (!menu) return;
+    menu.innerHTML = settingsPanel === "backgrounds" ? settingsBackgroundsHtml()
+      : settingsPanel === "debug" ? settingsDebugHtml()
+      : settingsRootHtml();
   }
   function openSettings(){
     settingsPanel = "root";
@@ -10511,6 +10598,15 @@ function injectChunkMap(){
       if (action === "import-data"){ importAllData(); return; }
       if (action === "settings-backgrounds"){ settingsPanel = "backgrounds"; renderSettingsMenu(); return; }
       if (action === "settings-root"){ settingsPanel = "root"; renderSettingsMenu(); return; }
+      if (action === "settings-debug"){ settingsPanel = "debug"; renderSettingsMenu(); return; }
+      if (action === "settings-toggle-dev"){
+        // Applies straight away and stays open, like the background picker —
+        // you switch one on to use it, not to admire the menu.
+        const g = DEV_GROUPS.find(function(x){ return x.id === item.getAttribute("data-dev"); });
+        if (g) setDevGroup(g, !devGroupOn(g));
+        renderSettingsMenu();
+        return;
+      }
       if (action === "settings-pick-bg"){
         // Applies immediately and stays open, so the surfaces can be compared
         // against the real desk instead of from memory.
@@ -11145,6 +11241,7 @@ function injectChunkMap(){
     updateQaTimeReadout();
     dragLogInit();
     updateDragLogUI();
+    applyDevVisibility();   // dev tools start hidden unless switched on
     // Bug #2 / QA #15: the app's own time picker takes over every .screen-time
     // field. Delegated at the document, so it covers fields that do not exist
     // yet (the calendar creation row, an event page opened later).
