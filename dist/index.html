@@ -369,38 +369,38 @@ body.tabs-collapsed .tab.active.has-badge::before{ top:4px; left:6px; }
 ---------------------------------------------------------------------------- */
 /* ============================================================================
    THE GOLD LEAF FRAME (Black lacquer only)
-   Painted at z-index -1, in the same layer as the desk itself, so lane content
-   sits over it rather than under it. --frame-inset is 0 for every other
-   surface, so all of this collapses to nothing unless the lacquer desk is on.
+   ⚑ ABSOLUTE inside main, not fixed to the viewport (user: "it's fine if the
+   top and bottom of the gold leaf are at the top and bottom of the lanes...
+   the implication is that the border grows as the lane grows"). So it does —
+   the canvas is sized to main's own box, scrolls with it, and a longer lane
+   gets a longer border.
+
+   That also removes the scroll jump for free. A viewport-fixed frame had to be
+   resized every time the mobile URL bar slid, and between resizes the browser
+   scaled the stale bitmap: the gilding stretched while scrolling and snapped
+   back when the redraw landed. Nothing here resizes on scroll, so nothing can
+   stretch.
+
+   No width/height in CSS — the bitmap and the CSS box are both set in JS, in
+   one place, so the two can never disagree.
+
+   --frame-inset is 0 for every other surface, so all of this collapses to
+   nothing unless the lacquer desk is on.
    ========================================================================= */
 :root{ --frame-inset:0px; }
-/* ⚑ ABOVE the lane content, below the fixed chrome (tab bar 110, header 120).
-   At z-index -1 it sat behind the cards, so anything scrolling past the bottom
-   band painted over the gilding and it read as a z-order bug. Above the content
-   it reads as what it is: a physical border that the list slides underneath.
-   Content still never STARTS on the band — main is padded in by --frame-inset —
-   so the overlap only ever happens mid-scroll, which is the point. */
+main{ position:relative; }
 #desk-frame{
-  position:fixed; inset:0; z-index:105;
-  width:100%; height:100%;
+  position:absolute; top:0; left:0; z-index:1;
   pointer-events:none;
 }
 main{
-  padding:0 calc(20px + env(safe-area-inset-right) + var(--frame-inset))
-          40px calc(20px + env(safe-area-inset-left) + var(--frame-inset));
+  padding:0 calc(20px + env(safe-area-inset-right)) 40px calc(20px + env(safe-area-inset-left));
 }
-/* The header and the tab bar are fixed, so they need the inset too or the
-   wordmark and the lane letters sit on top of the border. */
-/* ⚑ The header and tab bar are NOT inset. The frame starts below them (see
-   drawDeskFrame) precisely because they are opaque and would hide its top band,
-   so insetting them as well would indent the chrome for no reason. */
-/* The lane content has to clear the bottom band, and so does the floating
-   create button — otherwise the one control that is always on screen sits on
-   top of the gilding. */
-body.has-frame main{
-  padding-top:var(--frame-inset);
-  padding-bottom:calc(40px + var(--frame-inset));
-}
+/* The lanes sit INSIDE the band rather than under it. The frame is drawn on
+   main's box, so this is the padding that keeps cards off the gilding. */
+body.has-frame .lanes{ padding:var(--frame-inset); }
+/* The floating create button is the one control always on screen, so it needs
+   the same clearance or it lands on the border. */
 body.has-frame #fab-create{
   right:calc(18px + env(safe-area-inset-right) + var(--frame-inset));
   bottom:calc(18px + env(safe-area-inset-bottom) + var(--frame-inset));
@@ -749,7 +749,9 @@ body.has-frame #fab-create{
   border-radius:10px; overflow:hidden;
 }
 .group.dragging{ opacity:0.35; }
-.group-header{ display:flex; align-items:center; gap:8px; padding:10px 11px; cursor:pointer; }
+/* gap tightened 8px -> 6px: the header gained a + beside the count, and at
+   8px that pushed list titles onto a second line on a phone. */
+.group-header{ display:flex; align-items:center; gap:6px; padding:10px 11px; cursor:pointer; }
 .group-header .chevron{ font-size:10px; color:var(--lane-accent); flex:0 0 auto; }
 .group-title{
   flex:1; font-size:13.5px; font-weight:600; color:var(--text-primary);
@@ -759,9 +761,25 @@ body.has-frame #fab-create{
   font-family:var(--font-mono); font-size:10.5px; color:var(--text-soft);
   background:rgba(255,255,255,0.06); padding:1px 7px; border-radius:9px;
 }
+/* The + beside the count — creation for a list or a context, replacing the
+   quick-add row that used to sit at the bottom of each open group (user).
+   ⚑ Carries the LANE'S accent, not a neutral grey, so it reads as "add to THIS
+   lane's list" and matches the badge and the floating button that already use
+   that colour. Sized to the count pill next to it rather than to a normal icon
+   button: it is a peer of the badge, not of the × that deletes the list. */
+.group-add{
+  flex:0 0 auto; width:18px; height:18px; padding:0; border-radius:50%;
+  border:1px solid color-mix(in srgb, var(--lane-accent, var(--brass)) 55%, transparent);
+  background:color-mix(in srgb, var(--lane-accent, var(--brass)) 20%, transparent);
+  color:var(--lane-accent, var(--brass));
+  font-size:13px; line-height:1; font-weight:600;
+  display:flex; align-items:center; justify-content:center;
+}
+.group-add:hover{
+  background:color-mix(in srgb, var(--lane-accent, var(--brass)) 38%, transparent);
+}
 .group-actions{ display:flex; gap:2px; }
 .group-body{ padding:0 11px 11px 11px; display:flex; flex-direction:column; gap:10px; }
-.group-body .add-row-mini input{ font-size:12.5px; padding:7px 9px; }
 
 /* ----------------------------------------------------------------------------
    COMPLETED ARCHIVE  (= carried over =)
@@ -1547,15 +1565,16 @@ body.has-frame .tray-drawer::after{
 </div>
 
 <main id="main">
+  <!-- The gold-leaf frame for the Black lacquer desk. Empty and invisible for
+       every other surface. It lives INSIDE main and scrolls with it, so the
+       border wraps the lanes and grows with them (user) rather than being
+       pinned to the viewport. It cannot be part of the desk tile: a border
+       baked into a repeating image would repeat as a grid every 512px. -->
+  <canvas id="desk-frame" aria-hidden="true"></canvas>
   <div class="lanes" id="lanes"></div>
 </main>
 
 <footer id="footer-note">Data lives in this browser's local storage.</footer>
-
-<!-- The gold-leaf frame for the Black lacquer desk. Empty and invisible for
-     every other surface. Sized to the viewport in JS, not the tile, because a
-     border baked into a repeating tile would repeat as a grid. -->
-<canvas id="desk-frame" aria-hidden="true"></canvas>
 
 <div id="tray-root"></div>
 <div id="screen-root"></div>
@@ -2453,13 +2472,18 @@ function fbm(noise, u, v, fx, fy, octaves){
 //   warp   how far the noise displaces them (0 = drawn with a ruler)
 //   fibre  weight of the along-grain streaking
 //   seed   which tree
+// ⚑ Walnut, Oak and Ebony are GONE (user: "remove the original wood
+// backgrounds"). They were the drawn woods this file was written for, and the
+// generator below still earns its place — Slate uses it (rings:0, so stone
+// rather than timber) and it is what a future drawn surface would use. But as
+// WOOD they were superseded the moment real photographs arrived: no ring
+// function produces knots or a bookmatched veneer, and side by side that showed.
+//
+// No migration. loadSurfaceId() already validates the stored id against this
+// table and falls back to the default, so anyone sitting on 'walnut' quietly
+// lands on Dark wood instead. That is the behaviour a migration would have had
+// to hand-write anyway.
 const SURFACES = {
-  walnut: { label: "Walnut", desk: "#171513", dark: "#0F0C0A", mid: "#241B15", light: "#38291D",
-            rings: 7, warp: 0.55, ringDepth: 0.50, fibre: 0.30, seed: 11 },
-  oak:    { label: "Oak", desk: "#1B1713", dark: "#150F08", mid: "#2C2117", light: "#453322",
-            rings: 5, warp: 0.42, ringDepth: 0.42, fibre: 0.34, seed: 7 },
-  ebony:  { label: "Ebony", desk: "#111010", dark: "#080707", mid: "#15120F", light: "#241E18",
-            rings: 9, warp: 0.70, ringDepth: 0.55, fibre: 0.26, seed: 23 },
   slate:  { label: "Slate", desk: "#15161A", dark: "#0E0F13", mid: "#1A1C21", light: "#292C33",
             rings: 0, warp: 0.0,  ringDepth: 0.0,  fibre: 0.55, seed: 5 },  // rings:0 → stone, not wood
   plain:  { label: "Plain", desk: "#171513", flat: true },
@@ -2556,7 +2580,9 @@ function jadeTile(){
   if (!jadeTileCache) jadeTileCache = renderJadeTile(16, 192);
   return jadeTileCache;
 }
-const DEFAULT_SURFACE = "walnut";
+// Dark wood inherits the default from Walnut: nearest in tone to what the app
+// has always opened on, and the one anybody stored as "walnut" now falls back to.
+const DEFAULT_SURFACE = "darkwood";
 // 512 rather than 256: at 256 the same ring wave recurs every 256px down the
 // page and the eye locks onto the repeat immediately. Doubling it quarters how
 // often that happens for ~40ms more generation, paid once at boot.
@@ -2725,8 +2751,8 @@ function surfaceTile(id){
 // this scale it read as a row of disconnected hooks.
 // =========================================================
 const FRAME_INSET = 9;    // gap from the screen edge to the band
-const FRAME_BAND = 24;    // the band's depth — mirrored by --frame-inset in CSS
-const FRAME_STEP = 30;    // one meander unit
+const FRAME_BAND = 20;    // the band's depth — mirrored by --frame-inset in CSS
+const FRAME_STEP = 26;    // one meander unit
 
 // Gold leaf is not a colour, it is uneven metal: the tone shifts across the
 // stroke and there are skips where the leaf did not take. Flat #d4af37 is what
@@ -2748,7 +2774,7 @@ function drawFretRun(ctx, len, band, seed){
   const step = len / units;
   const g = step * 0.20;
   ctx.strokeStyle = goldGradient(ctx, 0, band);
-  ctx.lineWidth = 2.2;
+  ctx.lineWidth = 1.5;
   ctx.lineCap = "butt";
   ctx.lineJoin = "miter";
   ctx.beginPath();
@@ -2770,28 +2796,27 @@ function drawFretRun(ctx, len, band, seed){
 }
 function drawDeskFrame(){
   const cv = document.getElementById("desk-frame");
-  if (!cv) return;
+  const host = document.getElementById("main");
+  if (!cv || !host) return;
   const cfg = SURFACES[currentSurfaceId()];
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  const W = window.innerWidth, H = window.innerHeight;
+  // main's OWN box, not the viewport: the border wraps the lanes and grows with
+  // them. offsetHeight rather than a viewport height is the whole change.
+  const W = host.offsetWidth, H = host.offsetHeight;
+  if (!W || !H) return;
   cv.width = Math.round(W * dpr);
   cv.height = Math.round(H * dpr);
+  cv.style.width = W + "px";
+  cv.style.height = H + "px";
   const ctx = cv.getContext("2d");
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, W, H);
   if (!cfg || !cfg.frame) return;
 
-  // ⚑ The frame starts BELOW the fixed chrome, not at the top of the screen.
-  // The header and tab bar are opaque and sit at z-index 110/120, so a frame
-  // drawn to y=0 has its top band and both top corners hidden behind them —
-  // which looks like a rendering bug rather than a border. Framing the desk
-  // area instead is also the more honest object: a lacquer panel lying on the
-  // desk, under the app's chrome.
-  const bar = document.querySelector(".tabbar");
-  const top = bar ? Math.round(bar.getBoundingClientRect().bottom) + 4 : 0;
   const i = FRAME_INSET, b = FRAME_BAND;
-  const x0 = i, y0 = top + i, x1 = W - i, y1 = H - i;
+  const x0 = i, y0 = i, x1 = W - i, y1 = H - i;
   const wRun = x1 - x0, hRun = y1 - y0;
+  if (wRun < b * 3 || hRun < b * 3) return;   // too small to carry a border
   // Each side is the same run, rotated into place, so the motif turns every
   // corner the same way instead of four separately-fudged edges.
   const sides = [
@@ -2815,15 +2840,34 @@ function drawDeskFrame(){
   ctx.strokeRect(x0 + b + 3, y0 + b + 3, wRun - (b + 3) * 2, hRun - (b + 3) * 2);
   ctx.globalAlpha = 1;
 }
-// Resize: phones fire this on rotate and on the keyboard opening, so it is
-// debounced — redrawing the fret on every intermediate size is wasted work.
-let frameResizeTimer = null;
-function initDeskFrame(){
-  window.addEventListener("resize", function(){
-    clearTimeout(frameResizeTimer);
-    frameResizeTimer = setTimeout(drawDeskFrame, 120);
-  });
+// ⚑ Redrawn whenever main's box changes — which now includes the lane content
+// getting longer or shorter, not just the window resizing. A ResizeObserver on
+// main is the honest way to say that; the old resize/visualViewport listeners
+// only knew about the window and would have left the border the wrong length
+// after adding a card. Guarded on the measured size so the observer's own
+// chatter costs nothing.
+let lastFrameW = -1, lastFrameH = -1;
+function refreshDeskFrame(){
+  const host = document.getElementById("main");
+  if (!host) return;
+  const W = host.offsetWidth, H = host.offsetHeight;
+  if (W === lastFrameW && H === lastFrameH) return;
+  lastFrameW = W; lastFrameH = H;
   drawDeskFrame();
+}
+// Bypasses the size guard — for when the SURFACE changed rather than the box.
+function forceDeskFrame(){
+  lastFrameW = -1; lastFrameH = -1;
+  refreshDeskFrame();
+}
+function initDeskFrame(){
+  const host = document.getElementById("main");
+  if (host && window.ResizeObserver){
+    new ResizeObserver(refreshDeskFrame).observe(host);
+  } else {
+    window.addEventListener("resize", refreshDeskFrame);
+  }
+  forceDeskFrame();
 }
 function applySurface(id){
   const cfg = SURFACES[id] || SURFACES[DEFAULT_SURFACE];
@@ -2839,7 +2883,7 @@ function applySurface(id){
   root.style.setProperty("--frame-inset", cfg.frame ? (FRAME_INSET + FRAME_BAND + 6) + "px" : "0px");
   if (cfg.jade) root.style.setProperty("--jade", 'url("' + jadeTile() + '")');
   if (document.body) document.body.classList.toggle("has-frame", !!cfg.frame);
-  drawDeskFrame();
+  forceDeskFrame();   // same viewport, different frame — the size guard would skip it
 }
 // The picker's swatch: the whole tile shrunk into a 20px square, which reads as
 // a sample of that surface rather than four near-identical dark chips (all the
@@ -5067,7 +5111,10 @@ function injectChunkMap(){
       conditionKind: data.conditionKind || null, conditionLabel: data.conditionLabel || null,
       bundleText: data.bundleText || null, contextId: data.contextId || null, createdAt: nowMs() // deadline-bar origin (§4.4b)
     };
-    const task = Object.assign({ id: genId(), title: data.title, isGroup: false, parent: null }, base);
+    // ⚑ parent comes from the caller now: creating from a list's + drops the new
+    // item straight into that list (user). Defaults to null — an item created
+    // from the FAB is still ungrouped, exactly as before.
+    const task = Object.assign({ id: genId(), title: data.title, isGroup: false, parent: data.parent || null }, base);
     state.tasks[kind].unshift(task);
     saveTasksLocal(kind);
     renderLane(kind);
@@ -5691,16 +5738,19 @@ function injectChunkMap(){
           '<span class="chevron">' + (collapsed ? "&#9656;" : "&#9662;") + '</span>' +
           '<span class="group-title" title="Tap to expand/collapse \u2014 press and hold to reorder">' + escapeHtml(group.title) + '</span>' +
           '<span class="count">' + children.length + '</span>' +
+          // \u2691 Replaces the quick-add row that used to sit at the bottom of every
+          // open list (user: "remove the quick add rows... they just clutter
+          // things up"). One tap opens the normal drafting page with this list
+          // already chosen, so a new item gets the same page \u2014 and the same
+          // fields \u2014 as every other way of creating one. It also works while the
+          // list is COLLAPSED, which the old row could not.
+          '<button class="group-add" data-action="add-to-list" data-kind="' + kind + '" data-id="' + group.id + '" title="Add to this list">+</button>' +
           '<span class="group-actions">' + moveBtn +
             '<button class="icon-btn" data-action="delete-group" data-id="' + group.id + '" title="' + deleteTitle + '">&times;</button>' +
           '</span>' +
         '</div>' +
         (collapsed ? "" :
-          '<div class="group-body" data-dropzone-parent="' + group.id + '">' + childrenHtml +
-            '<div class="add-row add-row-mini" data-kind="' + kind + '" data-parent="' + group.id + '">' +
-              '<input type="text" placeholder="Add to list\u2026" /><button type="button" data-role="add-mini">+</button>' +
-            '</div>' +
-          '</div>'
+          '<div class="group-body" data-dropzone-parent="' + group.id + '">' + childrenHtml + '</div>'
         ) +
       '</div>'
     );
@@ -5720,16 +5770,13 @@ function injectChunkMap(){
           '<span class="chevron">' + (collapsed ? "&#9656;" : "&#9662;") + '</span>' +
           '<span class="group-title" title="Tap to expand/collapse">' + escapeHtml(ctx.name) + '</span>' +
           '<span class="count">' + members.length + '</span>' +
+          '<button class="group-add" data-action="add-to-context" data-kind="' + kind + '" data-id="' + ctx.id + '" title="Add to this context">+</button>' +
           '<span class="group-actions">' +
             '<button class="icon-btn" data-action="delete-context" data-id="' + ctx.id + '" title="Delete context">&times;</button>' +
           '</span>' +
         '</div>' +
         (collapsed ? "" :
-          '<div class="group-body" data-dropzone-parent="' + ctx.id + '">' + childrenHtml +
-            '<div class="add-row add-row-mini" data-kind="' + kind + '" data-context="' + ctx.id + '">' +
-              '<input type="text" placeholder="Add to context…" /><button type="button" data-role="add-mini">+</button>' +
-            '</div>' +
-          '</div>'
+          '<div class="group-body" data-dropzone-parent="' + ctx.id + '">' + childrenHtml + '</div>'
         ) +
       '</div>'
     );
@@ -6407,7 +6454,12 @@ function injectChunkMap(){
       conditionKind: s.kind === "waiting" ? s.draft.conditionKind : null,
       conditionLabel: s.kind === "waiting" ? s.draft.conditionLabel : null,
       bundleText: (s.kind === "next" || s.kind === "waiting") ? ((s.draft.bundleText || "").trim() || null) : null,
-      contextId: isActionKind(s.kind) ? (s.draft.contextId || null) : null
+      contextId: isActionKind(s.kind) ? (s.draft.contextId || null) : null,
+      // The list this was drafted into, if it was opened from a list's +
+      // (user). Only meaningful on a create; an edit never moves an item
+      // between lists from here, so it is read off the draft rather than
+      // recomputed.
+      parent: s.taskId ? undefined : (s.draft.parent || null)
     };
     // Chunk 5 (§12.1): a child action page opened from a project stages into
     // that project's set instead of touching storage. Nothing is written until
@@ -8009,19 +8061,12 @@ function injectChunkMap(){
       input.classList.add("field-invalid");
       input.addEventListener("input", function h(){ input.classList.remove("field-invalid"); input.removeEventListener("input", h); });
     }
-    function submitAddMini(row){
-      const input = row.querySelector("input[type=text]");
-      const title = input.value.trim();
-      if (!title){ markInvalid(input); return; }
-      const kind = row.getAttribute("data-kind");
-      // Duplicate-title check (chunk 3, §2): reject a title already present in
-      // this lane (case-insensitive) with the standard dashed outline.
-      const dup = state.tasks[kind].some(function(t){ return !t.isGroup && (t.title || "").trim().toLowerCase() === title.toLowerCase(); });
-      if (dup){ markInvalid(input); return; }
-      input.classList.remove("field-invalid");
-      input.value = "";
-      addTask(kind, title, row.getAttribute("data-parent") || null, row.getAttribute("data-context") || null);
-    }
+    // (submitAddMini lived here. The quick-add rows it served are gone — the +
+    // beside a list's or context's count opens the real drafting page instead
+    // (user: "they just clutter things up"). Deleted rather than left dormant:
+    // it was the only caller of addTask's parent/context arguments, and a dead
+    // creation path is exactly the sort of thing that gets wired back up by
+    // accident.)
     // CHUNK 2 (spec 4.3e) -- the FAB menu's second option ("New context" /
     // "New list"). Replaces the old button-swap openNewListRow(): there's no
     // "+ New list" button to swap out anymore, so this targets the lane's
@@ -8066,10 +8111,6 @@ function injectChunkMap(){
         setTimeout(function(){ if (slot.isConnected && !slot.contains(document.activeElement)) clear(); }, 150);
       });
     }
-    document.addEventListener("click", function(e){
-      const addMiniBtn = e.target.closest('[data-role="add-mini"]');
-      if (addMiniBtn){ submitAddMini(addMiniBtn.closest(".add-row-mini")); return; }
-    });
     document.addEventListener("keydown", function(e){
       if (e.key === "Escape"){
         const fabMenuEl = qs("#fab-menu");
@@ -8087,8 +8128,6 @@ function injectChunkMap(){
         }
         return;
       }
-      const row = e.target.closest && e.target.closest(".add-row-mini");
-      if (row && e.target.matches("input[type=text]")){ e.preventDefault(); submitAddMini(row); }
       const quickAddInput = e.target.closest && e.target.closest("[data-quickadd]");
       if (quickAddInput){ e.preventDefault(); screenQuickAdd(quickAddInput.getAttribute("data-quickadd"), quickAddInput.value); }
     });
@@ -8214,6 +8253,25 @@ function injectChunkMap(){
         if (menu) menu.hidden = true;
         if (state.activeKind === "notes"){ openNoteScreen(null); return; } // primary = New note (bottom, nearest thumb)
         openScreen(state.activeKind, null);
+        return;
+      }
+      // The + beside a list's or a context's count (user). Both open the normal
+      // drafting page with the destination already chosen — a list fills in the
+      // parent, a context fills in the context field — so a created item gets
+      // the same page and the same fields however it was started.
+      // ⚠ stopPropagation: the + sits inside .group-header, whose own click
+      // toggles the list open/closed. Without it, tapping + also collapses the
+      // list you are adding to.
+      const addToList = e.target.closest('[data-action="add-to-list"]');
+      if (addToList){
+        e.stopPropagation();
+        openScreen(addToList.getAttribute("data-kind"), null, { parent: addToList.getAttribute("data-id") });
+        return;
+      }
+      const addToCtx = e.target.closest('[data-action="add-to-context"]');
+      if (addToCtx){
+        e.stopPropagation();
+        openScreen(addToCtx.getAttribute("data-kind"), null, { contextId: addToCtx.getAttribute("data-id") });
         return;
       }
       const fabSecondary = e.target.closest('[data-action="new-secondary"]');
@@ -8777,12 +8835,10 @@ function injectChunkMap(){
         const r = sibs[i].getBoundingClientRect();
         if (clientY < r.top + r.height / 2){ ref = sibs[i]; break; }
       }
-      // Past the last card: stay ABOVE a trailing non-draggable row (a group's
-      // "Add to list…" input) rather than dropping below it.
-      if (!ref){
-        const trailing = zone.querySelector(":scope > .add-row-mini");
-        if (trailing) ref = trailing;
-      }
+      // (A group's body used to end with a non-draggable "Add to list…" row,
+      // and a drop past the last card had to be kept ABOVE it. That row is gone
+      // — creation moved to the + beside the count — so a group body now holds
+      // nothing but cards and ref can simply stay null, meaning "append".)
       if (ref !== el && el.nextSibling !== ref){
         zone.insertBefore(el, ref);
       }

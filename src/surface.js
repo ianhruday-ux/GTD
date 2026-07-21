@@ -94,13 +94,18 @@ function fbm(noise, u, v, fx, fy, octaves){
 //   warp   how far the noise displaces them (0 = drawn with a ruler)
 //   fibre  weight of the along-grain streaking
 //   seed   which tree
+// ⚑ Walnut, Oak and Ebony are GONE (user: "remove the original wood
+// backgrounds"). They were the drawn woods this file was written for, and the
+// generator below still earns its place — Slate uses it (rings:0, so stone
+// rather than timber) and it is what a future drawn surface would use. But as
+// WOOD they were superseded the moment real photographs arrived: no ring
+// function produces knots or a bookmatched veneer, and side by side that showed.
+//
+// No migration. loadSurfaceId() already validates the stored id against this
+// table and falls back to the default, so anyone sitting on 'walnut' quietly
+// lands on Dark wood instead. That is the behaviour a migration would have had
+// to hand-write anyway.
 const SURFACES = {
-  walnut: { label: "Walnut", desk: "#171513", dark: "#0F0C0A", mid: "#241B15", light: "#38291D",
-            rings: 7, warp: 0.55, ringDepth: 0.50, fibre: 0.30, seed: 11 },
-  oak:    { label: "Oak", desk: "#1B1713", dark: "#150F08", mid: "#2C2117", light: "#453322",
-            rings: 5, warp: 0.42, ringDepth: 0.42, fibre: 0.34, seed: 7 },
-  ebony:  { label: "Ebony", desk: "#111010", dark: "#080707", mid: "#15120F", light: "#241E18",
-            rings: 9, warp: 0.70, ringDepth: 0.55, fibre: 0.26, seed: 23 },
   slate:  { label: "Slate", desk: "#15161A", dark: "#0E0F13", mid: "#1A1C21", light: "#292C33",
             rings: 0, warp: 0.0,  ringDepth: 0.0,  fibre: 0.55, seed: 5 },  // rings:0 → stone, not wood
   plain:  { label: "Plain", desk: "#171513", flat: true },
@@ -197,7 +202,9 @@ function jadeTile(){
   if (!jadeTileCache) jadeTileCache = renderJadeTile(16, 192);
   return jadeTileCache;
 }
-const DEFAULT_SURFACE = "walnut";
+// Dark wood inherits the default from Walnut: nearest in tone to what the app
+// has always opened on, and the one anybody stored as "walnut" now falls back to.
+const DEFAULT_SURFACE = "darkwood";
 // 512 rather than 256: at 256 the same ring wave recurs every 256px down the
 // page and the eye locks onto the repeat immediately. Doubling it quarters how
 // often that happens for ~40ms more generation, paid once at boot.
@@ -366,8 +373,8 @@ function surfaceTile(id){
 // this scale it read as a row of disconnected hooks.
 // =========================================================
 const FRAME_INSET = 9;    // gap from the screen edge to the band
-const FRAME_BAND = 24;    // the band's depth — mirrored by --frame-inset in CSS
-const FRAME_STEP = 30;    // one meander unit
+const FRAME_BAND = 20;    // the band's depth — mirrored by --frame-inset in CSS
+const FRAME_STEP = 26;    // one meander unit
 
 // Gold leaf is not a colour, it is uneven metal: the tone shifts across the
 // stroke and there are skips where the leaf did not take. Flat #d4af37 is what
@@ -389,7 +396,7 @@ function drawFretRun(ctx, len, band, seed){
   const step = len / units;
   const g = step * 0.20;
   ctx.strokeStyle = goldGradient(ctx, 0, band);
-  ctx.lineWidth = 2.2;
+  ctx.lineWidth = 1.5;
   ctx.lineCap = "butt";
   ctx.lineJoin = "miter";
   ctx.beginPath();
@@ -411,28 +418,27 @@ function drawFretRun(ctx, len, band, seed){
 }
 function drawDeskFrame(){
   const cv = document.getElementById("desk-frame");
-  if (!cv) return;
+  const host = document.getElementById("main");
+  if (!cv || !host) return;
   const cfg = SURFACES[currentSurfaceId()];
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  const W = window.innerWidth, H = window.innerHeight;
+  // main's OWN box, not the viewport: the border wraps the lanes and grows with
+  // them. offsetHeight rather than a viewport height is the whole change.
+  const W = host.offsetWidth, H = host.offsetHeight;
+  if (!W || !H) return;
   cv.width = Math.round(W * dpr);
   cv.height = Math.round(H * dpr);
+  cv.style.width = W + "px";
+  cv.style.height = H + "px";
   const ctx = cv.getContext("2d");
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, W, H);
   if (!cfg || !cfg.frame) return;
 
-  // ⚑ The frame starts BELOW the fixed chrome, not at the top of the screen.
-  // The header and tab bar are opaque and sit at z-index 110/120, so a frame
-  // drawn to y=0 has its top band and both top corners hidden behind them —
-  // which looks like a rendering bug rather than a border. Framing the desk
-  // area instead is also the more honest object: a lacquer panel lying on the
-  // desk, under the app's chrome.
-  const bar = document.querySelector(".tabbar");
-  const top = bar ? Math.round(bar.getBoundingClientRect().bottom) + 4 : 0;
   const i = FRAME_INSET, b = FRAME_BAND;
-  const x0 = i, y0 = top + i, x1 = W - i, y1 = H - i;
+  const x0 = i, y0 = i, x1 = W - i, y1 = H - i;
   const wRun = x1 - x0, hRun = y1 - y0;
+  if (wRun < b * 3 || hRun < b * 3) return;   // too small to carry a border
   // Each side is the same run, rotated into place, so the motif turns every
   // corner the same way instead of four separately-fudged edges.
   const sides = [
@@ -456,15 +462,34 @@ function drawDeskFrame(){
   ctx.strokeRect(x0 + b + 3, y0 + b + 3, wRun - (b + 3) * 2, hRun - (b + 3) * 2);
   ctx.globalAlpha = 1;
 }
-// Resize: phones fire this on rotate and on the keyboard opening, so it is
-// debounced — redrawing the fret on every intermediate size is wasted work.
-let frameResizeTimer = null;
-function initDeskFrame(){
-  window.addEventListener("resize", function(){
-    clearTimeout(frameResizeTimer);
-    frameResizeTimer = setTimeout(drawDeskFrame, 120);
-  });
+// ⚑ Redrawn whenever main's box changes — which now includes the lane content
+// getting longer or shorter, not just the window resizing. A ResizeObserver on
+// main is the honest way to say that; the old resize/visualViewport listeners
+// only knew about the window and would have left the border the wrong length
+// after adding a card. Guarded on the measured size so the observer's own
+// chatter costs nothing.
+let lastFrameW = -1, lastFrameH = -1;
+function refreshDeskFrame(){
+  const host = document.getElementById("main");
+  if (!host) return;
+  const W = host.offsetWidth, H = host.offsetHeight;
+  if (W === lastFrameW && H === lastFrameH) return;
+  lastFrameW = W; lastFrameH = H;
   drawDeskFrame();
+}
+// Bypasses the size guard — for when the SURFACE changed rather than the box.
+function forceDeskFrame(){
+  lastFrameW = -1; lastFrameH = -1;
+  refreshDeskFrame();
+}
+function initDeskFrame(){
+  const host = document.getElementById("main");
+  if (host && window.ResizeObserver){
+    new ResizeObserver(refreshDeskFrame).observe(host);
+  } else {
+    window.addEventListener("resize", refreshDeskFrame);
+  }
+  forceDeskFrame();
 }
 function applySurface(id){
   const cfg = SURFACES[id] || SURFACES[DEFAULT_SURFACE];
@@ -480,7 +505,7 @@ function applySurface(id){
   root.style.setProperty("--frame-inset", cfg.frame ? (FRAME_INSET + FRAME_BAND + 6) + "px" : "0px");
   if (cfg.jade) root.style.setProperty("--jade", 'url("' + jadeTile() + '")');
   if (document.body) document.body.classList.toggle("has-frame", !!cfg.frame);
-  drawDeskFrame();
+  forceDeskFrame();   // same viewport, different frame — the size guard would skip it
 }
 // The picker's swatch: the whole tile shrunk into a 20px square, which reads as
 // a sample of that surface rather than four near-identical dark chips (all the

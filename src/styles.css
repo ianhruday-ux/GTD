@@ -349,38 +349,38 @@ body.tabs-collapsed .tab.active.has-badge::before{ top:4px; left:6px; }
 ---------------------------------------------------------------------------- */
 /* ============================================================================
    THE GOLD LEAF FRAME (Black lacquer only)
-   Painted at z-index -1, in the same layer as the desk itself, so lane content
-   sits over it rather than under it. --frame-inset is 0 for every other
-   surface, so all of this collapses to nothing unless the lacquer desk is on.
+   ⚑ ABSOLUTE inside main, not fixed to the viewport (user: "it's fine if the
+   top and bottom of the gold leaf are at the top and bottom of the lanes...
+   the implication is that the border grows as the lane grows"). So it does —
+   the canvas is sized to main's own box, scrolls with it, and a longer lane
+   gets a longer border.
+
+   That also removes the scroll jump for free. A viewport-fixed frame had to be
+   resized every time the mobile URL bar slid, and between resizes the browser
+   scaled the stale bitmap: the gilding stretched while scrolling and snapped
+   back when the redraw landed. Nothing here resizes on scroll, so nothing can
+   stretch.
+
+   No width/height in CSS — the bitmap and the CSS box are both set in JS, in
+   one place, so the two can never disagree.
+
+   --frame-inset is 0 for every other surface, so all of this collapses to
+   nothing unless the lacquer desk is on.
    ========================================================================= */
 :root{ --frame-inset:0px; }
-/* ⚑ ABOVE the lane content, below the fixed chrome (tab bar 110, header 120).
-   At z-index -1 it sat behind the cards, so anything scrolling past the bottom
-   band painted over the gilding and it read as a z-order bug. Above the content
-   it reads as what it is: a physical border that the list slides underneath.
-   Content still never STARTS on the band — main is padded in by --frame-inset —
-   so the overlap only ever happens mid-scroll, which is the point. */
+main{ position:relative; }
 #desk-frame{
-  position:fixed; inset:0; z-index:105;
-  width:100%; height:100%;
+  position:absolute; top:0; left:0; z-index:1;
   pointer-events:none;
 }
 main{
-  padding:0 calc(20px + env(safe-area-inset-right) + var(--frame-inset))
-          40px calc(20px + env(safe-area-inset-left) + var(--frame-inset));
+  padding:0 calc(20px + env(safe-area-inset-right)) 40px calc(20px + env(safe-area-inset-left));
 }
-/* The header and the tab bar are fixed, so they need the inset too or the
-   wordmark and the lane letters sit on top of the border. */
-/* ⚑ The header and tab bar are NOT inset. The frame starts below them (see
-   drawDeskFrame) precisely because they are opaque and would hide its top band,
-   so insetting them as well would indent the chrome for no reason. */
-/* The lane content has to clear the bottom band, and so does the floating
-   create button — otherwise the one control that is always on screen sits on
-   top of the gilding. */
-body.has-frame main{
-  padding-top:var(--frame-inset);
-  padding-bottom:calc(40px + var(--frame-inset));
-}
+/* The lanes sit INSIDE the band rather than under it. The frame is drawn on
+   main's box, so this is the padding that keeps cards off the gilding. */
+body.has-frame .lanes{ padding:var(--frame-inset); }
+/* The floating create button is the one control always on screen, so it needs
+   the same clearance or it lands on the border. */
 body.has-frame #fab-create{
   right:calc(18px + env(safe-area-inset-right) + var(--frame-inset));
   bottom:calc(18px + env(safe-area-inset-bottom) + var(--frame-inset));
@@ -729,7 +729,9 @@ body.has-frame #fab-create{
   border-radius:10px; overflow:hidden;
 }
 .group.dragging{ opacity:0.35; }
-.group-header{ display:flex; align-items:center; gap:8px; padding:10px 11px; cursor:pointer; }
+/* gap tightened 8px -> 6px: the header gained a + beside the count, and at
+   8px that pushed list titles onto a second line on a phone. */
+.group-header{ display:flex; align-items:center; gap:6px; padding:10px 11px; cursor:pointer; }
 .group-header .chevron{ font-size:10px; color:var(--lane-accent); flex:0 0 auto; }
 .group-title{
   flex:1; font-size:13.5px; font-weight:600; color:var(--text-primary);
@@ -739,9 +741,25 @@ body.has-frame #fab-create{
   font-family:var(--font-mono); font-size:10.5px; color:var(--text-soft);
   background:rgba(255,255,255,0.06); padding:1px 7px; border-radius:9px;
 }
+/* The + beside the count — creation for a list or a context, replacing the
+   quick-add row that used to sit at the bottom of each open group (user).
+   ⚑ Carries the LANE'S accent, not a neutral grey, so it reads as "add to THIS
+   lane's list" and matches the badge and the floating button that already use
+   that colour. Sized to the count pill next to it rather than to a normal icon
+   button: it is a peer of the badge, not of the × that deletes the list. */
+.group-add{
+  flex:0 0 auto; width:18px; height:18px; padding:0; border-radius:50%;
+  border:1px solid color-mix(in srgb, var(--lane-accent, var(--brass)) 55%, transparent);
+  background:color-mix(in srgb, var(--lane-accent, var(--brass)) 20%, transparent);
+  color:var(--lane-accent, var(--brass));
+  font-size:13px; line-height:1; font-weight:600;
+  display:flex; align-items:center; justify-content:center;
+}
+.group-add:hover{
+  background:color-mix(in srgb, var(--lane-accent, var(--brass)) 38%, transparent);
+}
 .group-actions{ display:flex; gap:2px; }
 .group-body{ padding:0 11px 11px 11px; display:flex; flex-direction:column; gap:10px; }
-.group-body .add-row-mini input{ font-size:12.5px; padding:7px 9px; }
 
 /* ----------------------------------------------------------------------------
    COMPLETED ARCHIVE  (= carried over =)

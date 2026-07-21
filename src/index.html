@@ -79,15 +79,16 @@
 </div>
 
 <main id="main">
+  <!-- The gold-leaf frame for the Black lacquer desk. Empty and invisible for
+       every other surface. It lives INSIDE main and scrolls with it, so the
+       border wraps the lanes and grows with them (user) rather than being
+       pinned to the viewport. It cannot be part of the desk tile: a border
+       baked into a repeating image would repeat as a grid every 512px. -->
+  <canvas id="desk-frame" aria-hidden="true"></canvas>
   <div class="lanes" id="lanes"></div>
 </main>
 
 <footer id="footer-note">Data lives in this browser's local storage.</footer>
-
-<!-- The gold-leaf frame for the Black lacquer desk. Empty and invisible for
-     every other surface. Sized to the viewport in JS, not the tile, because a
-     border baked into a repeating tile would repeat as a grid. -->
-<canvas id="desk-frame" aria-hidden="true"></canvas>
 
 <div id="tray-root"></div>
 <div id="screen-root"></div>

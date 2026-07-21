@@ -919,7 +919,10 @@
       conditionKind: data.conditionKind || null, conditionLabel: data.conditionLabel || null,
       bundleText: data.bundleText || null, contextId: data.contextId || null, createdAt: nowMs() // deadline-bar origin (§4.4b)
     };
-    const task = Object.assign({ id: genId(), title: data.title, isGroup: false, parent: null }, base);
+    // ⚑ parent comes from the caller now: creating from a list's + drops the new
+    // item straight into that list (user). Defaults to null — an item created
+    // from the FAB is still ungrouped, exactly as before.
+    const task = Object.assign({ id: genId(), title: data.title, isGroup: false, parent: data.parent || null }, base);
     state.tasks[kind].unshift(task);
     saveTasksLocal(kind);
     renderLane(kind);
@@ -1543,16 +1546,19 @@
           '<span class="chevron">' + (collapsed ? "&#9656;" : "&#9662;") + '</span>' +
           '<span class="group-title" title="Tap to expand/collapse \u2014 press and hold to reorder">' + escapeHtml(group.title) + '</span>' +
           '<span class="count">' + children.length + '</span>' +
+          // \u2691 Replaces the quick-add row that used to sit at the bottom of every
+          // open list (user: "remove the quick add rows... they just clutter
+          // things up"). One tap opens the normal drafting page with this list
+          // already chosen, so a new item gets the same page \u2014 and the same
+          // fields \u2014 as every other way of creating one. It also works while the
+          // list is COLLAPSED, which the old row could not.
+          '<button class="group-add" data-action="add-to-list" data-kind="' + kind + '" data-id="' + group.id + '" title="Add to this list">+</button>' +
           '<span class="group-actions">' + moveBtn +
             '<button class="icon-btn" data-action="delete-group" data-id="' + group.id + '" title="' + deleteTitle + '">&times;</button>' +
           '</span>' +
         '</div>' +
         (collapsed ? "" :
-          '<div class="group-body" data-dropzone-parent="' + group.id + '">' + childrenHtml +
-            '<div class="add-row add-row-mini" data-kind="' + kind + '" data-parent="' + group.id + '">' +
-              '<input type="text" placeholder="Add to list\u2026" /><button type="button" data-role="add-mini">+</button>' +
-            '</div>' +
-          '</div>'
+          '<div class="group-body" data-dropzone-parent="' + group.id + '">' + childrenHtml + '</div>'
         ) +
       '</div>'
     );
@@ -1572,16 +1578,13 @@
           '<span class="chevron">' + (collapsed ? "&#9656;" : "&#9662;") + '</span>' +
           '<span class="group-title" title="Tap to expand/collapse">' + escapeHtml(ctx.name) + '</span>' +
           '<span class="count">' + members.length + '</span>' +
+          '<button class="group-add" data-action="add-to-context" data-kind="' + kind + '" data-id="' + ctx.id + '" title="Add to this context">+</button>' +
           '<span class="group-actions">' +
             '<button class="icon-btn" data-action="delete-context" data-id="' + ctx.id + '" title="Delete context">&times;</button>' +
           '</span>' +
         '</div>' +
         (collapsed ? "" :
-          '<div class="group-body" data-dropzone-parent="' + ctx.id + '">' + childrenHtml +
-            '<div class="add-row add-row-mini" data-kind="' + kind + '" data-context="' + ctx.id + '">' +
-              '<input type="text" placeholder="Add to context…" /><button type="button" data-role="add-mini">+</button>' +
-            '</div>' +
-          '</div>'
+          '<div class="group-body" data-dropzone-parent="' + ctx.id + '">' + childrenHtml + '</div>'
         ) +
       '</div>'
     );
@@ -2259,7 +2262,12 @@
       conditionKind: s.kind === "waiting" ? s.draft.conditionKind : null,
       conditionLabel: s.kind === "waiting" ? s.draft.conditionLabel : null,
       bundleText: (s.kind === "next" || s.kind === "waiting") ? ((s.draft.bundleText || "").trim() || null) : null,
-      contextId: isActionKind(s.kind) ? (s.draft.contextId || null) : null
+      contextId: isActionKind(s.kind) ? (s.draft.contextId || null) : null,
+      // The list this was drafted into, if it was opened from a list's +
+      // (user). Only meaningful on a create; an edit never moves an item
+      // between lists from here, so it is read off the draft rather than
+      // recomputed.
+      parent: s.taskId ? undefined : (s.draft.parent || null)
     };
     // Chunk 5 (§12.1): a child action page opened from a project stages into
     // that project's set instead of touching storage. Nothing is written until
@@ -3861,19 +3869,12 @@
       input.classList.add("field-invalid");
       input.addEventListener("input", function h(){ input.classList.remove("field-invalid"); input.removeEventListener("input", h); });
     }
-    function submitAddMini(row){
-      const input = row.querySelector("input[type=text]");
-      const title = input.value.trim();
-      if (!title){ markInvalid(input); return; }
-      const kind = row.getAttribute("data-kind");
-      // Duplicate-title check (chunk 3, §2): reject a title already present in
-      // this lane (case-insensitive) with the standard dashed outline.
-      const dup = state.tasks[kind].some(function(t){ return !t.isGroup && (t.title || "").trim().toLowerCase() === title.toLowerCase(); });
-      if (dup){ markInvalid(input); return; }
-      input.classList.remove("field-invalid");
-      input.value = "";
-      addTask(kind, title, row.getAttribute("data-parent") || null, row.getAttribute("data-context") || null);
-    }
+    // (submitAddMini lived here. The quick-add rows it served are gone — the +
+    // beside a list's or context's count opens the real drafting page instead
+    // (user: "they just clutter things up"). Deleted rather than left dormant:
+    // it was the only caller of addTask's parent/context arguments, and a dead
+    // creation path is exactly the sort of thing that gets wired back up by
+    // accident.)
     // CHUNK 2 (spec 4.3e) -- the FAB menu's second option ("New context" /
     // "New list"). Replaces the old button-swap openNewListRow(): there's no
     // "+ New list" button to swap out anymore, so this targets the lane's
@@ -3918,10 +3919,6 @@
         setTimeout(function(){ if (slot.isConnected && !slot.contains(document.activeElement)) clear(); }, 150);
       });
     }
-    document.addEventListener("click", function(e){
-      const addMiniBtn = e.target.closest('[data-role="add-mini"]');
-      if (addMiniBtn){ submitAddMini(addMiniBtn.closest(".add-row-mini")); return; }
-    });
     document.addEventListener("keydown", function(e){
       if (e.key === "Escape"){
         const fabMenuEl = qs("#fab-menu");
@@ -3939,8 +3936,6 @@
         }
         return;
       }
-      const row = e.target.closest && e.target.closest(".add-row-mini");
-      if (row && e.target.matches("input[type=text]")){ e.preventDefault(); submitAddMini(row); }
       const quickAddInput = e.target.closest && e.target.closest("[data-quickadd]");
       if (quickAddInput){ e.preventDefault(); screenQuickAdd(quickAddInput.getAttribute("data-quickadd"), quickAddInput.value); }
     });
@@ -4066,6 +4061,25 @@
         if (menu) menu.hidden = true;
         if (state.activeKind === "notes"){ openNoteScreen(null); return; } // primary = New note (bottom, nearest thumb)
         openScreen(state.activeKind, null);
+        return;
+      }
+      // The + beside a list's or a context's count (user). Both open the normal
+      // drafting page with the destination already chosen — a list fills in the
+      // parent, a context fills in the context field — so a created item gets
+      // the same page and the same fields however it was started.
+      // ⚠ stopPropagation: the + sits inside .group-header, whose own click
+      // toggles the list open/closed. Without it, tapping + also collapses the
+      // list you are adding to.
+      const addToList = e.target.closest('[data-action="add-to-list"]');
+      if (addToList){
+        e.stopPropagation();
+        openScreen(addToList.getAttribute("data-kind"), null, { parent: addToList.getAttribute("data-id") });
+        return;
+      }
+      const addToCtx = e.target.closest('[data-action="add-to-context"]');
+      if (addToCtx){
+        e.stopPropagation();
+        openScreen(addToCtx.getAttribute("data-kind"), null, { contextId: addToCtx.getAttribute("data-id") });
         return;
       }
       const fabSecondary = e.target.closest('[data-action="new-secondary"]');
@@ -4629,12 +4643,10 @@
         const r = sibs[i].getBoundingClientRect();
         if (clientY < r.top + r.height / 2){ ref = sibs[i]; break; }
       }
-      // Past the last card: stay ABOVE a trailing non-draggable row (a group's
-      // "Add to list…" input) rather than dropping below it.
-      if (!ref){
-        const trailing = zone.querySelector(":scope > .add-row-mini");
-        if (trailing) ref = trailing;
-      }
+      // (A group's body used to end with a non-draggable "Add to list…" row,
+      // and a drop past the last card had to be kept ABOVE it. That row is gone
+      // — creation moved to the + beside the count — so a group body now holds
+      // nothing but cards and ref can simply stay null, meaning "append".)
       if (ref !== el && el.nextSibling !== ref){
         zone.insertBefore(el, ref);
       }
