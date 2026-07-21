@@ -1441,6 +1441,13 @@ body.has-frame .tray-drawer::after{
 /* Sits under the note list as its own affordance, matching the lane accent the
    rest of this page uses. Full width so it reads as "add to this list" rather
    than as another list row. */
+/* A note staged on an unsaved project: present, but not yet a thing you can
+   open. Dashed to say "not committed", matching the app's other provisional
+   states rather than inventing a look for it. */
+.staged-note{
+  border-style:dashed !important;
+  opacity:0.82; cursor:default;
+}
 .project-add-note{
   width:100%; margin-top:8px;
   border:1px dashed color-mix(in srgb, var(--lane-accent, var(--brass)) 55%, transparent);

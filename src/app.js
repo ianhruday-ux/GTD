@@ -1935,7 +1935,13 @@
   // their REAL, FINAL id at stage time, so references are by real id and no
   // remapping is ever needed.
   // =========================================================
-  function newStagedSet(){ return { creates: [], edits: {}, deletes: {}, completes: {} }; }
+  // ⚑ noteCreates (user: "give notes the same staging treatment"). A note is
+  // its own store, not a task, so it cannot ride in `creates` — but it needs the
+  // same contract: made on an unsaved project page, it exists only in the draft
+  // until that project saves, and ✕ takes it with it. Without this, a note
+  // created from a project that was then discarded stayed behind linked to a
+  // project that never existed.
+  function newStagedSet(){ return { creates: [], edits: {}, deletes: {}, completes: {}, noteCreates: [] }; }
   // The project id a project draft stages against — the live id when editing,
   // or the id minted at open for a brand-new project (so children can link).
   function stagingProjectId(s){ return (s && (s.taskId || (s.draft && s.draft.projectId))) || null; }
@@ -2057,6 +2063,7 @@
     const staged = s.draft.staged;
     if (staged){
       if ((staged.creates || []).length) return true;
+      if ((staged.noteCreates || []).length) return true;
       if (Object.keys(staged.deletes).length) return true;
       if (Object.keys(staged.completes).length) return true;
       for (const id in staged.edits){
@@ -2106,6 +2113,12 @@
       state.tasks[kind].unshift(task);
       touched.push(task.id);
     });
+    // Notes staged from this project page become real here, and only here.
+    if ((staged.noteCreates || []).length){
+      (staged.noteCreates || []).forEach(function(n){ state.notes.unshift(Object.assign({}, n)); });
+      saveNotes();
+      renderLane("notes");
+    }
     for (const id in staged.edits){
       const found = findTaskAnywhere(id);
       if (found){
@@ -2964,31 +2977,31 @@
   // events and never looked at notes, so from the project's side they did not
   // exist.
   function linkedNotesListHtml(s, projectId){
-    const linked = !projectId ? [] : (state.notes || [])
-      .filter(function(n){ return (n.projectLinks || []).some(function(l){ return l.id === projectId; }); })
-      .sort(function(a, b){ return (b.editedAt || 0) - (a.editedAt || 0); });
-    const rows = linked.length
-      ? '<div class="linked-actions-list">' + linked.map(function(n){
+    const live = !projectId ? [] : (state.notes || [])
+      .filter(function(n){ return (n.projectLinks || []).some(function(l){ return l.id === projectId; }); });
+    // Notes STAGED on this page count as linked while you are looking at it —
+    // otherwise you add one, come back, and the list looks like it did nothing.
+    const staged = (s && s.draft && s.draft.staged && s.draft.staged.noteCreates) || [];
+    const all = live.concat(staged).sort(function(a, b){ return (b.editedAt || 0) - (a.editedAt || 0); });
+    const stagedIds = {};
+    staged.forEach(function(n){ stagedIds[n.id] = 1; });
+    const rows = all.length
+      ? '<div class="linked-actions-list">' + all.map(function(n){
+          // A staged one is not tappable: there is no note to open yet, and it
+          // would have to be opened out of a set that has not been applied.
+          if (stagedIds[n.id]){
+            return '<div class="linked-action-item staged-note">' +
+              kindDot("notes") + escapeHtml(n.title || "Untitled") +
+              ' <span class="cal-agenda-kind">saves with the project</span></div>';
+          }
           return '<button type="button" class="linked-action-item" data-action="open-linked-note" data-id="' + n.id + '">' +
             kindDot("notes") + escapeHtml(n.title || "Untitled") +
           '</button>';
         }).join("") + '</div>'
       : "";
-    // ⚑ "New note" is offered only once the project EXISTS (user asked for the
-    // button; this condition is mine). A note is written to storage the moment
-    // it is saved — there is no staging for notes the way there is for a
-    // project's child actions — so on an unsaved project page the button would
-    // create a note pointing at a project that ✕ might then discard, leaving a
-    // note linked to something that never existed. Every other control on a
-    // drafting page commits nothing until Save, and this is the one that could
-    // not honour that.
-    const canAdd = !!(s && s.taskId);
-    const add = canAdd
-      ? '<button type="button" class="btn btn-ghost btn-small project-add-note" data-action="new-linked-note">+ New note</button>'
-      : '<div class="empty-note">Save the project first, then you can add notes to it.</div>';
-    const hint = (canAdd && !linked.length)
-      ? '<div class="empty-note">No notes linked yet.</div>' : "";
-    return rows + hint + add;
+    const hint = all.length ? "" : '<div class="empty-note">No notes linked yet.</div>';
+    return rows + hint +
+      '<button type="button" class="btn btn-ghost btn-small project-add-note" data-action="new-linked-note">+ New note</button>';
   }
   // The two lists share one slot and you toggle between them (user: "you should
   // be able to toggle back and forth"). Reuses the segmented control the
@@ -4548,9 +4561,13 @@
         if (!pid) return;
         // Same stack push as opening an existing note: openNoteScreen replaces
         // state.screen, and this page has a draft worth keeping.
+        // ⚑ On an UNSAVED project the note stages instead of committing, the
+        // same contract every other control on this page follows. On a saved
+        // one it commits normally — there is nothing to wait for.
+        const staging = s.taskId ? null : { parent: s, projectId: pid };
         state.screenStack.push(state.screen);
         state.screen = null;
-        openNoteScreen(null, { projectLinks: [{ id: pid, name: pname }] });
+        openNoteScreen(null, { projectLinks: [{ id: pid, name: pname }], staging: staging });
         return;
       }
       const linkedNoteBtn = e.target.closest('[data-action="open-linked-note"]');
@@ -6456,7 +6473,8 @@
                 projectLinks: (opts && opts.projectLinks) ? opts.projectLinks.slice() : [],
                 tagIds: [] };
     }
-    state.screen = { kind: "notes", taskId: noteId || null, noteId: noteId || null, noteView: true, draft: draft };
+    state.screen = { kind: "notes", taskId: noteId || null, noteId: noteId || null, noteView: true, draft: draft,
+                     noteStaging: (opts && opts.staging) || null };
     if (opts && opts.fromCaptureId) state.screen.fromCaptureId = opts.fromCaptureId; // §4.8b: remove the capture when this note saves
     renderScreen();
   }
@@ -6605,6 +6623,19 @@
     if (s.noteId){
       const n = findNote(s.noteId);
       if (n){ n.title = title; n.body = body; n.projectLinks = s.draft.projectLinks || []; n.tagIds = s.draft.tagIds || []; n.editedAt = nowMs(); }
+    } else if (s.noteStaging && s.noteStaging.parent && s.noteStaging.parent.draft && s.noteStaging.parent.draft.staged){
+      // ⚑ Staged, not written (user). The project page that opened this is still
+      // a draft; the note joins its staged set and becomes real when — and only
+      // when — that project saves. The id is minted now and never remapped,
+      // matching §12.1b's rule for staged child actions.
+      s.noteStaging.parent.draft.staged.noteCreates.push({
+        id: genId(), title: title, body: body,
+        projectLinks: s.draft.projectLinks || [], tagIds: s.draft.tagIds || [],
+        editedAt: nowMs()
+      });
+      consumeCaptureForScreen(s);
+      closeScreen();
+      return;
     } else {
       state.notes.unshift({ id: genId(), title: title, body: body, projectLinks: s.draft.projectLinks || [], tagIds: s.draft.tagIds || [], editedAt: nowMs() });
     }

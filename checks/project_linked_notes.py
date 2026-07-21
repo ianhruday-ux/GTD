@@ -191,27 +191,80 @@ with serve(DIST) as url, sync_playwright() as p:
     check(rows and rows[0] == "ZZ note made from the project",
           f"and appears at the top of the list, being the newest ({rows})")
 
-    # ---------- ⚑ not offered on an UNSAVED project ----------
-    # A note commits on save with no staging, so on a project that ✕ might still
-    # discard the button would create a note linked to something that never was.
-    pg.evaluate("""() => {
-      ['#tray-root', '#dialog-root', '#screen-root'].forEach(sel => {
-        const el = document.querySelector(sel); if (el) el.innerHTML = '';
-      });
-      document.body.classList.remove('screen-open');
-      window.scrollTo(0, 0);
-    }""")
-    pg.wait_for_timeout(250)
-    pg.click('.tab[data-kind="current"]'); pg.wait_for_timeout(350)
-    pg.click('[data-action="fab"]'); pg.wait_for_timeout(300)
-    pg.click('[data-action="new-primary"]'); pg.wait_for_timeout(500)
+    # ---------- ⚑ on an UNSAVED project the note STAGES ----------
+    # User ruling: notes get the same staging treatment as child actions. A note
+    # made here exists only in the project's draft until that project saves —
+    # so ✕ takes it with it, and it never leaves a note linked to a project that
+    # never existed.
+    def fresh_project():
+        pg.evaluate("""() => {
+          ['#tray-root', '#dialog-root', '#screen-root'].forEach(sel => {
+            const el = document.querySelector(sel); if (el) el.innerHTML = '';
+          });
+          document.body.classList.remove('screen-open');
+          window.scrollTo(0, 0);
+        }""")
+        pg.wait_for_timeout(250)
+        pg.click('.tab[data-kind="current"]'); pg.wait_for_timeout(350)
+        pg.click('[data-action="fab"]'); pg.wait_for_timeout(300)
+        pg.click('[data-action="new-primary"]'); pg.wait_for_timeout(500)
+
+    def note_count():
+        return pg.evaluate("() => JSON.parse(localStorage.getItem('gtd_notes') || '[]').length")
+
+    before = note_count()
+    fresh_project()
+    pg.fill('[data-field="title"]', "ZZ unsaved project")
     pg.locator('[data-action="project-linked-tab"][data-tab="notes"]').first.click()
     pg.wait_for_timeout(350)
-    check(pg.locator('[data-action="new-linked-note"]').count() == 0,
-          "a brand-new project does not offer it yet")
-    body = pg.evaluate("() => document.body.innerText")
-    check("Save the project first" in body,
-          "and says why rather than just missing")
+    check(pg.locator('[data-action="new-linked-note"]').count() == 1,
+          "a brand-new project DOES offer the button now")
+    pg.locator('[data-action="new-linked-note"]').first.click(); pg.wait_for_timeout(600)
+    pg.fill('[data-field="noteTitle"]', "ZZ staged note")
+    pg.click('[data-action="screen-save"]'); pg.wait_for_timeout(700)
+    check(note_count() == before,
+          f"saving it writes NOTHING yet ({note_count()} vs {before})")
+    listed = pg.evaluate("() => document.body.innerText")
+    check("ZZ staged note" in listed,
+          "but it is listed on the project page so the add did not look like a no-op")
+    check(pg.locator('.staged-note').count() == 1,
+          "marked as provisional rather than looking like a saved note")
+
+    # discarding the project must take the staged note with it
+    pg.click('[data-action="screen-cancel"]'); pg.wait_for_timeout(500)
+    d = pg.locator('.choice-dialog button:has-text("Discard changes")')
+    check(d.count() == 1, "and X warns, because a staged note IS unsaved work")
+    if d.count():
+        d.first.click(); pg.wait_for_timeout(600)
+    check(note_count() == before,
+          f"discarding the project takes the staged note with it ({note_count()})")
+
+    # and saving the project writes it
+    before = note_count()
+    fresh_project()
+    pg.fill('[data-field="title"]', "ZZ kept project")
+    # ⚠ A NEW Current project must have at least one NEXT ACTION before it can
+    # save (§4.3) — and a staged note deliberately does not satisfy that: a note
+    # is not a next step. So stage an action too, or the save is blocked and the
+    # note never lands. (An earlier draft of this check missed that and read as
+    # a staging bug.)
+    pg.fill('.quick-add-row [data-quickadd="next"]', "ZZ first step")
+    pg.keyboard.press("Enter"); pg.wait_for_timeout(400)
+    pg.locator('[data-action="project-linked-tab"][data-tab="notes"]').first.click()
+    pg.wait_for_timeout(350)
+    pg.locator('[data-action="new-linked-note"]').first.click(); pg.wait_for_timeout(600)
+    pg.fill('[data-field="noteTitle"]', "ZZ kept note")
+    pg.click('[data-action="screen-save"]'); pg.wait_for_timeout(600)
+    pg.click('[data-action="screen-save"]'); pg.wait_for_timeout(900)   # save the project
+    check(note_count() == before + 1, f"saving the project writes the note ({note_count()})")
+    linked_to = pg.evaluate("""() => {
+      const ns = JSON.parse(localStorage.getItem('gtd_notes') || '[]');
+      const n = ns.find(x => x.title === 'ZZ kept note');
+      const cur = JSON.parse(localStorage.getItem('gtd_tasks_current') || '[]');
+      const proj = cur.find(t => t.title === 'ZZ kept project');
+      return n && proj ? (n.projectLinks || []).some(l => l.id === proj.id) : false;
+    }""")
+    check(linked_to, "and it is linked to the project that was just created")
 
     check(not errs, f"no JS errors ({errs[:3]})")
     b.close()
