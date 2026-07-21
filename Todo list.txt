@@ -41,3 +41,19 @@ After hitting the complete button
 1. Running clean: A single figure running clean: after 5, 6, and sometimes 1 if there is no past run
 2. Both running clean: After 2, 3, 4, 7, 8, 9, 10, and 1 if there is a past run to compare against.
 3. Show the passing animation with the high five if the completion beats your personal best.
+Still to do (as of 20 July, end of day)
+- Polish the writing. COPY.txt (all 236 strings) and INFO-TEXT.txt (the 17
+  information-button ones) are both waiting for me. Everything else that
+  touches words waits on this.
+- Chinese translation, once the writing is final.
+- Fix up the desktop layout. Everything this sprint was designed and tested on
+  a phone.
+- Events on the project page. The collision analysis is at the bottom of
+  INFO-TEXT.txt and needs my rulings before it can be built. Also unblocks
+  "create event" in the daily review.
+- Re-test export/import against the fields added today: deadline.setAt,
+  deadline.pushCount, missedOcc, and the new background ids. Backups are the
+  one thing that has to survive real use, and nothing has exercised them
+  against these.
+- Chunk 9: service worker + offline + install polish. Deliberately last.
+- A drawing tool for Notes, only if there is time. First thing to cut.

@@ -137,3 +137,87 @@ What you see if you hover, or long-press on a phone.
   [TIP-3] on the review's ⓘ
     What do these do?
      →
+
+==============================================================================
+
+PROJECTS AND THE CALENDAR — the collision analysis you asked for
+------------------------------------------------------------------------------
+Not copy to review. A design brief, put here because you said you would read
+this file tonight. Nothing below is built; it is all waiting on your rulings.
+
+THE SURPRISE: MOST OF IT ALREADY EXISTS
+  A project page ALREADY lists its linked events, nearest first, and tapping one
+  opens it. A linked event ALREADY counts as "a way forward", so a project with
+  a scheduled event is not reported as stalled. An event ALREADY carries a
+  project link, and the action it creates on its day inherits that link.
+  What is missing is smaller than it sounds: you cannot CREATE an event from the
+  project page. Everything else is plumbed.
+
+THE REAL PROBLEM IS NOT THE FEATURE, IT IS THE ENDINGS
+  I went looking for what happens when a project ends. Nothing in the app's
+  project handling touches events at all — not completing, not deleting, not
+  moving to Someday. So today, all three of these are already true:
+
+  [P-1] Complete a project, and its events keep going.
+        Linked waiting items get archived, with a dialog telling you so.
+        Linked events are not mentioned and not touched. A weekly "site
+        meeting" on a finished project keeps appearing in Next Actions every
+        week, forever.
+        → What should completing a project do to its events?
+          (a) archive them the way waiting items are archived, with the same
+              "you can restore these" dialog — my recommendation, it matches
+              what the app already does one line above
+          (b) leave them and just say so
+          (c) delete them outright
+
+  [P-2] Delete a project, and its events survive pointing at nothing.
+        They keep firing, now belonging to a project that does not exist.
+        → Delete them with it, or unlink them and leave them as ordinary
+          events? I would unlink: the meeting may still be real even if the
+          project is cancelled, and deleting someone's calendar entries as a
+          side effect of deleting a project is a nasty surprise.
+
+  [P-3] Move a project to Someday, and its events keep firing.
+        Someday means "not now" — but the calendar keeps interrupting you about
+        it. This one I think is clearly wrong.
+        → Pause the series and hide the events while parked, restoring them if
+          the project comes back? That is what Pause already does for habits.
+
+  These are not new problems and this feature does not cause them. But building
+  "create an event from a project" makes them much easier to hit, because it
+  makes linked events something you actually use.
+
+YOUR PROPOSED CONSTRAINT
+  "Scheduled events, including repeated events, should not extend beyond the
+  project deadline."
+  Reasonable, and it needs one decision to be buildable, because a repeating
+  event has no end date at all today — it rolls forward forever by design.
+
+  [P-4] What does "not extend beyond" DO?
+        (a) refuse the date, with the dashed outline the app uses elsewhere
+        (b) allow it but warn
+        (c) allow it, and treat it as evidence the DEADLINE is wrong — offer to
+            push the deadline instead
+        And for a repeat, capping it means recurrence needs an end date, which
+        is a new field and a new control on the event page. Worth knowing that
+        this one clause is the most expensive thing on this page.
+
+  [P-5] Two follow-on cases the rule does not cover:
+        · A project with NO deadline — then there is nothing to exceed, and the
+          rule simply does not apply. Fine, but worth saying out loud.
+        · The deadline gets PULLED EARLIER, leaving events already scheduled
+          past it. Blocking creation cannot help here. Warn, or move nothing
+          and let the review surface it?
+
+  ⚑ My honest view: the constraint is right in spirit but I would not build it
+  first. P-1 to P-3 are live bugs today and cost nothing to decide. P-4 is a new
+  field on the recurrence model, and the sprint has a service worker and a
+  desktop pass still to land.
+
+WHAT I WOULD BUILD, IN ORDER
+  1. The three endings (P-1, P-2, P-3). Small, and they are broken now.
+  2. "New event" on the project page, pre-linked — the actual request. Small,
+     because everything downstream already exists.
+  3. "Create event" in the daily review for a stalled project, which you parked
+     behind exactly this work.
+  4. The deadline constraint, once P-4 is decided.

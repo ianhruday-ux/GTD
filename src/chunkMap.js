@@ -7,7 +7,9 @@
 //
 // Injects one Current Project per sprint chunk (§2), grouped under a
 // single "Sprint chunks" project so the plan is visible from inside the
-// app while testing. Every entry is deliberately unlinked — each shows
+// app while testing. As of v2 it also carries the post-sprint rounds and
+// marks what is done, because with every numbered chunk but 9 built, a bare
+// plan no longer answers the question it is opened for. Every entry is deliberately unlinked — each shows
 // the lane's own "no linked actions" flag, which is expected and useful
 // here (it's a plan, not a real project).
 //
@@ -18,9 +20,10 @@
 // (this file + its boot() call) if the convention is ever retired.
 // =========================================================
 function injectChunkMap(){
-  const FLAG = "gtd_chunk_map_v1";
+  const FLAG = "gtd_chunk_map_v2";
   if (Storage.get(FLAG)) return;
   Storage.set(FLAG, "1");
+  Storage.remove("gtd_chunk_map_v1");   // retire the superseded flag
 
   // Replace, don't accumulate (8.2, mirroring 8.1): sweep any previous
   // chunk-map group (tagged via devContext, not a title match, since the
@@ -37,20 +40,39 @@ function injectChunkMap(){
   // Regenerated from spec.md §2 each time this file is touched — this is a
   // derived view of the plan, not a document of record. If §2 changes,
   // this list is what's stale.
+  // Regenerated from spec.md §2 each time this file is touched — this is a
+  // derived view of the plan, not a document of record. If §2 changes, this
+  // list is what's stale.
+  //
+  // ⚑ It now shows STATE, not just the plan. Every numbered chunk except 9 is
+  // built, so a bare list of chunk titles had stopped answering the question
+  // anybody actually opens it for — what is left. Done rows are ticked and say
+  // what landed; the rest is what remains, including the post-sprint work that
+  // never had chunk numbers and so was invisible here.
   const CHUNKS = [
-    { title: "0a — Remove Google + points", notes: "Disconnects the app from Google Tasks entirely and removes the points/score counter. The app is now fully local-only, with nothing to score." },
-    { title: "0b — Restructure + storage + install", notes: "No visible change to how the app behaves. Under the hood the code is reorganized into maintainable pieces, local storage now fails safely instead of crashing if your device runs low on space, and the app becomes installable to your home screen with its own icon and window." },
-    { title: "0c — Dev tools: snapshot & restore", notes: "A developer-only safety net: one button to snapshot all your data before risky testing, one to roll it back. Nothing you'll notice day to day." },
-    { title: "1 — Navigation stack", notes: "Fixes Back so it always returns you to the right previous screen, even several screens deep (lane → project → linked action). No new screens — just correct backing-out behavior." },
-    { title: "2 — Main UI redesign", notes: "A visual overhaul: a floating tab bar that collapses as you scroll, a progress bar on deadlines, a new + button for creating lists and actions, and layout tuned for a phone's notch and gesture bar." },
-    { title: "3 — Contexts + retire old dates", notes: "Adds shared contexts (like @home, @errands) you can tag Next/Waiting actions with, and removes the old date-based waiting/recurrence options the calendar (chunk 7) will replace properly." },
-    { title: "4 — Completed items overhaul", notes: "Reworks how finished items are archived and shown, so your completed history is easier to browse — and to undo a mistaken completion from." },
-    { title: "5 — Staged child actions", notes: "On a project page, actions you create while editing are staged as drafts and only really created once you save the project — matching the app's ‘nothing commits until Save’ rule everywhere else." },
-    { title: "6 — Tray, Notes, header, settings", notes: "Adds a slide-out capture drawer for quick notes on the go, a Notes tab, and a settings menu (behind the header's ⋯) that holds Reset and, later, Export/Import." },
-    { title: "6b — The daily review", notes: "A guided daily review: one queue that walks you through anything stalled, overdue, or waiting on someone, one at a time, with clear next-step choices." },
-    { title: "7 — Calendar + events + recurrence", notes: "The biggest chunk: a real calendar with events, appointments, and repeating items. Events are new and separate from your task lanes — a due event shows up as a linked action right when it's time." },
-    { title: "8 — Export / import", notes: "Adds Export to save all your data to a file, and Import to restore from one, replacing whatever's currently in the app. This is what makes it safe to move to a new device or a native wrapper." },
-    { title: "9 — Service worker + offline + install polish", notes: "The app can be used with no internet connection at all, and installs/updates behave like a proper app. Deliberately last — caching an in-progress app makes testing painful." }
+    { title: "✓ 0a — Remove Google + points", notes: "DONE. Disconnected the app from Google Tasks entirely and removed the points counter. Fully local-only, with nothing to score." },
+    { title: "✓ 0b — Restructure + storage + install", notes: "DONE. The code became maintainable pieces, storage fails safely instead of crashing when a device runs low, and the app installs to a home screen with its own icon." },
+    { title: "✓ 0c — Dev tools: snapshot & restore", notes: "DONE. A developer safety net: snapshot everything before risky testing, roll it back after. The QA time-jump buttons live here too." },
+    { title: "✓ 1 — Navigation stack", notes: "DONE. Back always returns to the right previous screen, however many deep you went." },
+    { title: "✓ 2 — Main UI redesign", notes: "DONE. The tab bar, the deadline progress bars, the floating + and the phone-shaped layout all came from here." },
+    { title: "✓ 3 — Contexts + retire old dates", notes: "DONE. Contexts you can tag actions with, and the old date-based waiting options removed so the calendar could do it properly." },
+    { title: "✓ 4 — Completed items overhaul", notes: "DONE. Finished items archive properly and can be un-finished if you tick something by mistake." },
+    { title: "✓ 5 — Staged child actions", notes: "DONE. Actions created on a project page are drafts until the project itself is saved — the same nothing-commits-until-Save rule as everywhere else." },
+    { title: "✓ 6 — Tray, Notes, header, settings", notes: "DONE. The capture drawer, the Notes tab, tags, and the ⋯ settings menu." },
+    { title: "✓ 6b — The daily review", notes: "DONE, and extended since: it now also asks about repeats you forgot to tick, and can add a waiting action to a stalled project." },
+    { title: "✓ 7 — Calendar + events + recurrence", notes: "DONE. The calendar, events, appointments and repeats. A List view was added afterwards." },
+    { title: "✓ 8 — Export / import", notes: "DONE. Save everything to a file and restore from one. ⚠ Not re-tested since several new fields were added — see the ‘Re-test backups’ row below." },
+    { title: "✓ Post-sprint — Desks, habit runner, settings", notes: "DONE. The settings dropdown, the background picker, the chalkboard habit runner, and the app being named OELA." },
+    { title: "✓ Post-sprint — Calendar and review follow-ups", notes: "DONE. Repeating events stopped projecting into the past, past-due events can be deleted from the review, and the pickers were unified." },
+    { title: "✓ Post-sprint — Pickers, deadlines, wording, decoration", notes: "DONE. The app's own time and date pickers, pushed deadlines that restart their bar and count the push, one clock app-wide, the jargon removed, the photographic desks and black lacquer, and the + on lists and contexts." },
+
+    { title: "Polish the writing", notes: "TO DO, and first — everything else that touches words waits on it. All the app's text is in COPY.txt and the information-button text is in INFO-TEXT.txt, both for you to mark up." },
+    { title: "Chinese translation", notes: "TO DO. Waits on the writing being final: translating text that is about to be rewritten is wasted work. The habit thought-bubbles already have Chinese; everything else does not." },
+    { title: "Fix up the desktop layout", notes: "TO DO. Everything this sprint was designed and tested on a phone, and the desktop view has drifted — wide screens especially." },
+    { title: "Events on the project page", notes: "TO DO. Lets a project show and create calendar events. Needs a design pass first (written up for you in INFO-TEXT.txt) because projects and the calendar have overlapping ideas about dates. Also unblocks ‘create event’ in the daily review." },
+    { title: "Re-test backups against the new fields", notes: "TO DO. Export and import have not been exercised since deadlines gained a start date and a push counter, repeats gained a missed-day marker, and the backgrounds changed names. Backups are the one thing that has to survive real use." },
+    { title: "9 — Service worker + offline + install polish", notes: "TO DO, and deliberately LAST. Makes the app work with no internet and update like a proper app. Scheduled last on purpose: caching an app while it is still changing costs hours of chasing stale builds." },
+    { title: "A drawing tool for Notes — only if there is time", notes: "MAYBE. The first thing to cut if the month runs out." }
   ];
 
   const groupId = genId();
