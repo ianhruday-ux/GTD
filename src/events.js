@@ -330,6 +330,20 @@ function onPseudoActionCompleted(task){
   const occ = task.occCanon || ev.date; // completion is tracked by CANONICAL date (roll math)
   ev.completedOccs = ev.completedOccs || [];
   if (ev.completedOccs.indexOf(occ) === -1) ev.completedOccs.push(occ);
+  // ⚑ QA (user): "I completed the pay rent event after it was past due in the
+  // lane, but it still showed up in the daily review." Both halves were behaving
+  // as written and the pair was still wrong. A series can hold BOTH a live
+  // past-due row (today's occurrence, unticked) and a recorded miss from an
+  // earlier day; computeOpenLoops deliberately shows only the live one, because
+  // the single-slot design exists to stop one series filling the queue. Ticking
+  // the live row removed it — and the older miss, which the user had never been
+  // shown, took its place. From the outside that is completion doing nothing.
+  //
+  // Answering the more recent question retires the older one: the review only
+  // ever promises the MOST RECENT miss (§4.8b), and resurrecting a stale one the
+  // moment its successor is settled breaks that promise. Guarded on the date so
+  // this can only ever clear a miss the completion actually supersedes.
+  if (ev.missedOcc && ev.missedOcc <= occ) ev.missedOcc = null;
   if (isRecurring(ev)){
     ev.completedAt = nowInstant();
     ev.completedFrom = occ;

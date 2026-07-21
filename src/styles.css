@@ -208,6 +208,28 @@ header{
 .dev-group{ display:inline-flex; align-items:center; gap:6px; }
 .dev-group[hidden]{ display:none; }
 
+/* ⚑ QA (user): "It's not possible to advance the day and time from within the
+   list view on the calendar." Not specific to the list view — the toolbar sits in
+   normal document flow under the lanes, and .screen-overlay is position:fixed at
+   z-index 200, so EVERY full-screen page (calendar, event, review, any drafting
+   page) buried it completely. Anything whose behaviour depends on the clock could
+   only be time-jumped by backing out to the lanes first, which is exactly the
+   thing you cannot do while watching a view update.
+
+   While a page is open the toolbar floats to the bottom instead, above the
+   overlay (200) and below dialogs (300) so a confirm still takes precedence. It
+   keeps its in-flow position on the lanes, where it was never in the way. */
+body.screen-open #dev-toolbar:not([hidden]){
+  position:fixed; left:0; right:0; bottom:0; z-index:250;
+  justify-content:center;
+  max-width:none; margin:0;
+  padding:8px calc(10px + env(safe-area-inset-right))
+          calc(8px + env(safe-area-inset-bottom)) calc(10px + env(safe-area-inset-left));
+  background:rgba(20,18,16,0.94); backdrop-filter:blur(6px);
+  border-top:1px solid rgba(237,231,218,0.14);
+  opacity:1;
+}
+
 /* ----------------------------------------------------------------------------
    BUTTONS  (= carried over =)
 ---------------------------------------------------------------------------- */
@@ -1098,6 +1120,10 @@ body.has-frame .tray-drawer::after{
 .tray-card-loop{ border-left:2px solid var(--text-soft); }
 .tray-card-loop.tray-card-redacted{ border-left-color:var(--text-soft); }
 .tray-card-kind{ font-family:var(--font-mono); font-size:10px; color:var(--text-soft); white-space:nowrap; }
+/* A revealed open-loop card is a <button> now (it opens its real page), so it has
+   to be talked back out of the UA's button styling and told it is tappable. */
+.tray-card-open{ width:100%; text-align:left; font:inherit; cursor:pointer; }
+.tray-card-open:hover{ border-color:rgba(255,255,255,0.22); }
 .tray-list-head{ display:flex; justify-content:flex-end; margin-bottom:8px; }
 .tray-reveal-btn{ display:inline-flex; align-items:center; gap:6px; background:transparent;
   border:1px solid rgba(255,255,255,0.18); color:var(--text-soft); border-radius:8px;
@@ -1139,8 +1165,11 @@ body.has-frame .tray-drawer::after{
   border-radius:8px; padding:10px 12px; font-size:15px; }
 .review-form-input:focus{ outline:2px solid var(--brass); outline-offset:1px; }
 .review-form-input.field-invalid{ outline:1.5px dashed var(--red); outline-offset:2px; }
-.review-inline-form-btns{ display:flex; gap:8px; }
-.review-inline-form-btns .review-menu-btn{ flex:1; text-align:center; }
+.review-inline-form-btns{ display:flex; gap:8px; flex-wrap:wrap; }
+/* Three buttons now (Cancel · Full page → · Add) rather than two, so they need a
+   floor to sit on: below it they wrap instead of squeezing the labels to ellipses
+   on a narrow phone. */
+.review-inline-form-btns .review-menu-btn{ flex:1 1 96px; text-align:center; }
 /* Redaction: visible-but-sealed. You can see one more loop exists and count
    them; you cannot read or tap it (§4.8b). */
 .review-redaction{ height:56px; border-radius:10px; border:1px solid rgba(255,255,255,0.08);

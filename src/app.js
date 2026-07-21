@@ -4071,7 +4071,20 @@
       const placeholder = (kind === "current" || kind === "future") ? "List name\u2026" : "Context name\u2026";
       slot.innerHTML = '<div class="inline-name-row"><input type="text" placeholder="' + escapeHtml(placeholder) + '" /><button type="button" data-role="inline-name-confirm">+</button></div>';
       const input = slot.querySelector("input");
-      input.focus();
+      // ⚑ QA (user): "the viewport force scrolls to the bottom and keeps you
+      // there." A bare focus() lets the BROWSER decide the camera: it scrolls the
+      // field into view, and on a phone it does that again after the on-screen
+      // keyboard resizes the layout viewport — which is the "keeps you there"
+      // half, and why it cannot be scrolled away from.
+      //
+      // The row is injected at the TOP of the lane (laneShellHtml puts the
+      // inline-slot above cards-root), so the honest camera move is the top of the
+      // page — the same place a save-exiting create sends it, and for the same
+      // reason (the thing you just made is up there). preventScroll stops the
+      // browser adding its own opinion on top of that.
+      window.scrollTo(0, 0);
+      resyncTabScroll(); // a programmatic jump, not a gesture — don't bounce the tab bar
+      try { input.focus({ preventScroll: true }); } catch (_){ input.focus(); }
       function clear(){ slot.innerHTML = ""; }
       function commit(){
         const name = input.value.trim();
@@ -4148,6 +4161,18 @@
       const trayDelBtn = e.target.closest('[data-action="tray-delete"]');
       if (trayDelBtn){ trayDelete(trayDelBtn.getAttribute("data-id")); return; }
       if (e.target.closest('[data-action="tray-reveal"]')){ state.trayReveal = !state.trayReveal; refreshTrayList(); return; }
+      // A revealed open-loop card opens its real page (see trayLoopCardHtml).
+      // Closing the drawer first is the same move open-review makes: the drawer is
+      // a cancel-on-close overlay, not a screen, so it must not be left underneath.
+      const trayOpenLoop = e.target.closest('[data-action="tray-open-loop"]');
+      if (trayOpenLoop){
+        const evId = trayOpenLoop.getAttribute("data-event");
+        const lane = trayOpenLoop.getAttribute("data-lane");
+        const id = trayOpenLoop.getAttribute("data-id");
+        closeTray();
+        if (evId) openEventScreen(evId); else if (lane && id) openScreen(lane, id);
+        return;
+      }
       if (e.target.closest('[data-action="tray-info"]')){
         const panel = qs(".tray-info-panel"); if (panel) panel.hidden = !panel.hidden; return;
       }
@@ -4191,6 +4216,22 @@
       if (revDelete){ reviewDelete(revDelete.getAttribute("data-lane"), revDelete.getAttribute("data-id")); return; }
       const revDeleteEvent = e.target.closest('[data-action="review-delete-event"]');
       if (revDeleteEvent){ reviewDeleteEvent(revDeleteEvent.getAttribute("data-id")); return; }
+      // ⚑ QA (user): the quick-add's escape hatch to the real creation page,
+      // carrying whatever has been typed so far. Same reviewOpenChild contract as
+      // the tap-through and the calendar: the review is pushed, so save-exiting
+      // the page returns here and the queue recomputes.
+      const revFormFull = e.target.closest('[data-action="review-form-full"]');
+      if (revFormFull){
+        const kind = revFormFull.getAttribute("data-kind");
+        const pid = revFormFull.getAttribute("data-project");
+        // Read the boxes BEFORE navigating — reviewOpenChild re-renders them away.
+        const t = qs("#review-form-input"), w = qs("#review-form-input2");
+        const prefill = { linkedProjectId: pid, title: (t ? t.value : "").trim() };
+        if (kind === "waiting" && w && w.value.trim()) prefill.whenText = w.value.trim();
+        if (state.screen) state.screen.reviewForm = null;
+        reviewOpenChild(function(){ openScreen(kind, null, prefill); });
+        return;
+      }
       const revAddEvent = e.target.closest('[data-action="review-add-event"]');
       if (revAddEvent){
         const pid = revAddEvent.getAttribute("data-id");
@@ -5476,15 +5517,33 @@
     if (loop.kind === "missed") return effTitle(loop.ev, loop.occ);
     return (loop.task && loop.task.title) || "";
   }
+  // ⚑ QA (user): "It's too strict to prevent people from entering a revealed card
+  // in the intray. Once they've hit that reveal button, they've basically opted
+  // out of the one at a time rule anyway." Correct, and it repairs an
+  // inconsistency rather than making one: the no-tapping rule is the REVIEW's
+  // (§4.8b), where it stops you cherry-picking blind through a redacted queue.
+  // Reveal is already the sanctioned way out of that discipline, so a card you
+  // have deliberately unsealed has no discipline left to protect — it was just
+  // inert. UNREVEALED cards stay untappable, which is the half that was ever
+  // load-bearing.
+  //
+  // Where it goes: the item's real page, the same destination as the review's
+  // tap-through. A missed repeat and a past-due pseudo-action are views of an
+  // EVENT, so they open the event page; everything else opens its lane row.
   function trayLoopCardHtml(loop, revealed){
     if (!revealed){
       return '<div class="tray-card tray-card-redacted tray-card-loop">' +
         '<span class="tray-card-redaction" aria-hidden="true"></span></div>';
     }
-    return '<div class="tray-card tray-card-loop">' +
+    const eventId = loop.kind === "missed" ? loop.id : (loop.task && loop.task.eventId) || "";
+    const attrs = eventId
+      ? ' data-event="' + escapeHtml(eventId) + '"'
+      : ' data-lane="' + escapeHtml(loop.laneKind || "") + '" data-id="' + escapeHtml(loop.id) + '"';
+    return '<button type="button" class="tray-card tray-card-loop tray-card-open" ' +
+      'data-action="tray-open-loop"' + attrs + '>' +
       '<span class="tray-card-text">' + escapeHtml(trayLoopTitle(loop)) +
         ' <span class="tray-card-kind">' + (TRAY_LOOP_LABEL[loop.kind] || "needs a decision") + '</span>' +
-      '</span></div>';
+      '</span></button>';
   }
   function trayListHtml(){
     const items = state.tray || [];
@@ -5833,15 +5892,36 @@
   // this card, if any. One at a time, held on the screen (draft-free — these
   // are review decisions, applied immediately, not armed edits).
   function reviewFormFor(s, key){ return (s.reviewForm && s.reviewForm.key === key) ? s.reviewForm : null; }
-  function reviewInlineFormHtml(placeholder, type, saveAction, saveLabel, value, invalid){
+  // ⚑ QA (user): "keep the quick add options, but we should also make it possible
+  // to open the full creation page from the daily review, since there are options
+  // someone might want to add to their newly minted action."
+  //
+  // So the quick-add is the default and the full page is the escape hatch beside
+  // it, carrying whatever has already been typed. It is NOT a fourth menu item:
+  // the fence (§4.8b) says the review offers decisions, and "add a next action" is
+  // already the decision — which page you type it on is not a second choice to
+  // make before you have typed anything.
+  //
+  // The full page goes through reviewOpenChild, so save-exiting lands back on the
+  // review and the queue recomputes (the project drops out if it now has a way
+  // forward). Draft isolation is intact: nothing is written until that page saves.
+  function reviewFullPageBtn(kind, projectId){
+    return '<button type="button" class="review-menu-btn review-form-full" ' +
+      'data-action="review-form-full" data-kind="' + kind + '" data-project="' + projectId + '" ' +
+      'title="More fields — context, deadline, description">Full page &#8594;</button>';
+  }
+  function reviewInlineFormHtml(placeholder, type, saveAction, saveLabel, value, invalid, fullKind, projectId){
     const isDate = type === "date";
     return (
       '<div class="review-inline-form">' +
         (isDate
-          ? '<input type="text" readonly inputmode="none" id="review-form-input" data-field="reviewForm" placeholder="Pick a date" class="review-form-input' + (invalid ? " field-invalid" : "") + '" value="' + escapeHtml(value || "") + '">'
+          // review-form-date is the PICKER hook (pickers.js); review-form-input is
+          // only the shared layout class. Keep them separate — see the note there.
+          ? '<input type="text" readonly inputmode="none" id="review-form-input" data-field="reviewForm" placeholder="Pick a date" class="review-form-input review-form-date' + (invalid ? " field-invalid" : "") + '" value="' + escapeHtml(value || "") + '">'
           : '<input type="text" id="review-form-input" data-field="reviewForm" class="review-form-input' + (invalid ? " field-invalid" : "") + '" placeholder="' + escapeHtml(placeholder) + '" value="' + escapeHtml(value || "") + '" autocomplete="off">') +
         '<div class="review-inline-form-btns">' +
           '<button type="button" class="review-menu-btn" data-action="review-form-cancel">Cancel</button>' +
+          (fullKind ? reviewFullPageBtn(fullKind, projectId) : "") +
           '<button type="button" class="review-menu-btn" data-action="' + saveAction + '">' + saveLabel + '</button>' +
         '</div>' +
       '</div>'
@@ -5865,6 +5945,7 @@
         box("review-form-input2", "Until what, or until when?", f.value2, "when") +
         '<div class="review-inline-form-btns">' +
           '<button type="button" class="review-menu-btn" data-action="review-form-cancel">Cancel</button>' +
+          reviewFullPageBtn("waiting", key) +
           '<button type="button" class="review-menu-btn" data-action="review-addwaiting-save">Add</button>' +
         '</div>' +
       '</div>'
@@ -5954,7 +6035,7 @@
       }
     } else if (l.kind === "stalled"){
       if (form && form.type === "text"){
-        menuHtml = reviewInlineFormHtml("What's the very next physical action?", "text", "review-addnext-save", "Add", "", invalid);
+        menuHtml = reviewInlineFormHtml("What's the very next physical action?", "text", "review-addnext-save", "Add", "", invalid, "next", l.id);
       } else if (form && form.type === "waiting"){
         // ⚑ Two fields, not one (user: stalled projects need a waiting action
         // here too). A Waiting action is invalid without something to wait ON

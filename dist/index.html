@@ -234,6 +234,28 @@ header{
 .dev-group{ display:inline-flex; align-items:center; gap:6px; }
 .dev-group[hidden]{ display:none; }
 
+/* ⚑ QA (user): "It's not possible to advance the day and time from within the
+   list view on the calendar." Not specific to the list view — the toolbar sits in
+   normal document flow under the lanes, and .screen-overlay is position:fixed at
+   z-index 200, so EVERY full-screen page (calendar, event, review, any drafting
+   page) buried it completely. Anything whose behaviour depends on the clock could
+   only be time-jumped by backing out to the lanes first, which is exactly the
+   thing you cannot do while watching a view update.
+
+   While a page is open the toolbar floats to the bottom instead, above the
+   overlay (200) and below dialogs (300) so a confirm still takes precedence. It
+   keeps its in-flow position on the lanes, where it was never in the way. */
+body.screen-open #dev-toolbar:not([hidden]){
+  position:fixed; left:0; right:0; bottom:0; z-index:250;
+  justify-content:center;
+  max-width:none; margin:0;
+  padding:8px calc(10px + env(safe-area-inset-right))
+          calc(8px + env(safe-area-inset-bottom)) calc(10px + env(safe-area-inset-left));
+  background:rgba(20,18,16,0.94); backdrop-filter:blur(6px);
+  border-top:1px solid rgba(237,231,218,0.14);
+  opacity:1;
+}
+
 /* ----------------------------------------------------------------------------
    BUTTONS  (= carried over =)
 ---------------------------------------------------------------------------- */
@@ -1124,6 +1146,10 @@ body.has-frame .tray-drawer::after{
 .tray-card-loop{ border-left:2px solid var(--text-soft); }
 .tray-card-loop.tray-card-redacted{ border-left-color:var(--text-soft); }
 .tray-card-kind{ font-family:var(--font-mono); font-size:10px; color:var(--text-soft); white-space:nowrap; }
+/* A revealed open-loop card is a <button> now (it opens its real page), so it has
+   to be talked back out of the UA's button styling and told it is tappable. */
+.tray-card-open{ width:100%; text-align:left; font:inherit; cursor:pointer; }
+.tray-card-open:hover{ border-color:rgba(255,255,255,0.22); }
 .tray-list-head{ display:flex; justify-content:flex-end; margin-bottom:8px; }
 .tray-reveal-btn{ display:inline-flex; align-items:center; gap:6px; background:transparent;
   border:1px solid rgba(255,255,255,0.18); color:var(--text-soft); border-radius:8px;
@@ -1165,8 +1191,11 @@ body.has-frame .tray-drawer::after{
   border-radius:8px; padding:10px 12px; font-size:15px; }
 .review-form-input:focus{ outline:2px solid var(--brass); outline-offset:1px; }
 .review-form-input.field-invalid{ outline:1.5px dashed var(--red); outline-offset:2px; }
-.review-inline-form-btns{ display:flex; gap:8px; }
-.review-inline-form-btns .review-menu-btn{ flex:1; text-align:center; }
+.review-inline-form-btns{ display:flex; gap:8px; flex-wrap:wrap; }
+/* Three buttons now (Cancel · Full page → · Add) rather than two, so they need a
+   floor to sit on: below it they wrap instead of squeezing the labels to ellipses
+   on a narrow phone. */
+.review-inline-form-btns .review-menu-btn{ flex:1 1 96px; text-align:center; }
 /* Redaction: visible-but-sealed. You can see one more loop exists and count
    them; you cannot read or tap it (§4.8b). */
 .review-redaction{ height:56px; border-radius:10px; border:1px solid rgba(255,255,255,0.08);
@@ -1704,7 +1733,7 @@ body.has-frame .tray-drawer::after{
 (function(){
 "use strict";
 
-const BUILD_STAMP = "21 Jul 02:36 · de14476";  // replaced by build.py
+const BUILD_STAMP = "21 Jul 12:55 · f817a72";  // replaced by build.py
 
 // =========================================================
 // STORAGE ADAPTER (spec.md §3, known issue 4)
@@ -4208,7 +4237,19 @@ function openDatePicker(value, opts, onDone){
  * [data-calfield]) run exactly as they did when the native picker committed a
  * value. Setting .value alone would update the box and silently drop the write.
  */
-const PICKER_SELECTOR = "input.screen-time, input.screen-date, input.review-form-input";
+// ⚑ QA (user): this used to end `input.review-form-input`, which is the class on
+// EVERY inline box the review renders — including the plain-text "What's the very
+// next physical action?" and both waiting-action fields. Tapping any of them
+// opened the date picker and swallowed the focus, so a stalled project's quick-add
+// could not be typed into at all.
+//
+// The hook is now a dedicated marker class carried only by the push-date field.
+// The rule to keep: a picker field is identified by a class that means "this is a
+// picker", never by the class that means "this is a review box" — otherwise every
+// future field added to that layout inherits a date picker it never asked for.
+// (Checked the other two: .screen-date / .screen-time appear only on genuine
+// readonly date and time fields, so this was the only place it leaked.)
+const PICKER_SELECTOR = "input.screen-time, input.screen-date, input.review-form-date";
 function initTimePickerFields(){
   document.addEventListener("mousedown", function(e){
     const el = e.target.closest && e.target.closest(PICKER_SELECTOR);
@@ -4230,7 +4271,7 @@ function initTimePickerFields(){
       // ⚑ The review's push-date field gets no Clear: "push this deadline to
       // nowhere" is not a thing, and the menu it sits in already has other
       // exits. Deadline and event dates can be cleared.
-      const allowClear = !el.classList.contains("review-form-input");
+      const allowClear = !el.classList.contains("review-form-date");
       openDatePicker(el.value || "", { allowClear: allowClear }, commit);
     }
   }, true);
@@ -8402,7 +8443,20 @@ function injectChunkMap(){
       const placeholder = (kind === "current" || kind === "future") ? "List name\u2026" : "Context name\u2026";
       slot.innerHTML = '<div class="inline-name-row"><input type="text" placeholder="' + escapeHtml(placeholder) + '" /><button type="button" data-role="inline-name-confirm">+</button></div>';
       const input = slot.querySelector("input");
-      input.focus();
+      // ⚑ QA (user): "the viewport force scrolls to the bottom and keeps you
+      // there." A bare focus() lets the BROWSER decide the camera: it scrolls the
+      // field into view, and on a phone it does that again after the on-screen
+      // keyboard resizes the layout viewport — which is the "keeps you there"
+      // half, and why it cannot be scrolled away from.
+      //
+      // The row is injected at the TOP of the lane (laneShellHtml puts the
+      // inline-slot above cards-root), so the honest camera move is the top of the
+      // page — the same place a save-exiting create sends it, and for the same
+      // reason (the thing you just made is up there). preventScroll stops the
+      // browser adding its own opinion on top of that.
+      window.scrollTo(0, 0);
+      resyncTabScroll(); // a programmatic jump, not a gesture — don't bounce the tab bar
+      try { input.focus({ preventScroll: true }); } catch (_){ input.focus(); }
       function clear(){ slot.innerHTML = ""; }
       function commit(){
         const name = input.value.trim();
@@ -8479,6 +8533,18 @@ function injectChunkMap(){
       const trayDelBtn = e.target.closest('[data-action="tray-delete"]');
       if (trayDelBtn){ trayDelete(trayDelBtn.getAttribute("data-id")); return; }
       if (e.target.closest('[data-action="tray-reveal"]')){ state.trayReveal = !state.trayReveal; refreshTrayList(); return; }
+      // A revealed open-loop card opens its real page (see trayLoopCardHtml).
+      // Closing the drawer first is the same move open-review makes: the drawer is
+      // a cancel-on-close overlay, not a screen, so it must not be left underneath.
+      const trayOpenLoop = e.target.closest('[data-action="tray-open-loop"]');
+      if (trayOpenLoop){
+        const evId = trayOpenLoop.getAttribute("data-event");
+        const lane = trayOpenLoop.getAttribute("data-lane");
+        const id = trayOpenLoop.getAttribute("data-id");
+        closeTray();
+        if (evId) openEventScreen(evId); else if (lane && id) openScreen(lane, id);
+        return;
+      }
       if (e.target.closest('[data-action="tray-info"]')){
         const panel = qs(".tray-info-panel"); if (panel) panel.hidden = !panel.hidden; return;
       }
@@ -8522,6 +8588,22 @@ function injectChunkMap(){
       if (revDelete){ reviewDelete(revDelete.getAttribute("data-lane"), revDelete.getAttribute("data-id")); return; }
       const revDeleteEvent = e.target.closest('[data-action="review-delete-event"]');
       if (revDeleteEvent){ reviewDeleteEvent(revDeleteEvent.getAttribute("data-id")); return; }
+      // ⚑ QA (user): the quick-add's escape hatch to the real creation page,
+      // carrying whatever has been typed so far. Same reviewOpenChild contract as
+      // the tap-through and the calendar: the review is pushed, so save-exiting
+      // the page returns here and the queue recomputes.
+      const revFormFull = e.target.closest('[data-action="review-form-full"]');
+      if (revFormFull){
+        const kind = revFormFull.getAttribute("data-kind");
+        const pid = revFormFull.getAttribute("data-project");
+        // Read the boxes BEFORE navigating — reviewOpenChild re-renders them away.
+        const t = qs("#review-form-input"), w = qs("#review-form-input2");
+        const prefill = { linkedProjectId: pid, title: (t ? t.value : "").trim() };
+        if (kind === "waiting" && w && w.value.trim()) prefill.whenText = w.value.trim();
+        if (state.screen) state.screen.reviewForm = null;
+        reviewOpenChild(function(){ openScreen(kind, null, prefill); });
+        return;
+      }
       const revAddEvent = e.target.closest('[data-action="review-add-event"]');
       if (revAddEvent){
         const pid = revAddEvent.getAttribute("data-id");
@@ -9807,15 +9889,33 @@ function injectChunkMap(){
     if (loop.kind === "missed") return effTitle(loop.ev, loop.occ);
     return (loop.task && loop.task.title) || "";
   }
+  // ⚑ QA (user): "It's too strict to prevent people from entering a revealed card
+  // in the intray. Once they've hit that reveal button, they've basically opted
+  // out of the one at a time rule anyway." Correct, and it repairs an
+  // inconsistency rather than making one: the no-tapping rule is the REVIEW's
+  // (§4.8b), where it stops you cherry-picking blind through a redacted queue.
+  // Reveal is already the sanctioned way out of that discipline, so a card you
+  // have deliberately unsealed has no discipline left to protect — it was just
+  // inert. UNREVEALED cards stay untappable, which is the half that was ever
+  // load-bearing.
+  //
+  // Where it goes: the item's real page, the same destination as the review's
+  // tap-through. A missed repeat and a past-due pseudo-action are views of an
+  // EVENT, so they open the event page; everything else opens its lane row.
   function trayLoopCardHtml(loop, revealed){
     if (!revealed){
       return '<div class="tray-card tray-card-redacted tray-card-loop">' +
         '<span class="tray-card-redaction" aria-hidden="true"></span></div>';
     }
-    return '<div class="tray-card tray-card-loop">' +
+    const eventId = loop.kind === "missed" ? loop.id : (loop.task && loop.task.eventId) || "";
+    const attrs = eventId
+      ? ' data-event="' + escapeHtml(eventId) + '"'
+      : ' data-lane="' + escapeHtml(loop.laneKind || "") + '" data-id="' + escapeHtml(loop.id) + '"';
+    return '<button type="button" class="tray-card tray-card-loop tray-card-open" ' +
+      'data-action="tray-open-loop"' + attrs + '>' +
       '<span class="tray-card-text">' + escapeHtml(trayLoopTitle(loop)) +
         ' <span class="tray-card-kind">' + (TRAY_LOOP_LABEL[loop.kind] || "needs a decision") + '</span>' +
-      '</span></div>';
+      '</span></button>';
   }
   function trayListHtml(){
     const items = state.tray || [];
@@ -10164,15 +10264,36 @@ function injectChunkMap(){
   // this card, if any. One at a time, held on the screen (draft-free — these
   // are review decisions, applied immediately, not armed edits).
   function reviewFormFor(s, key){ return (s.reviewForm && s.reviewForm.key === key) ? s.reviewForm : null; }
-  function reviewInlineFormHtml(placeholder, type, saveAction, saveLabel, value, invalid){
+  // ⚑ QA (user): "keep the quick add options, but we should also make it possible
+  // to open the full creation page from the daily review, since there are options
+  // someone might want to add to their newly minted action."
+  //
+  // So the quick-add is the default and the full page is the escape hatch beside
+  // it, carrying whatever has already been typed. It is NOT a fourth menu item:
+  // the fence (§4.8b) says the review offers decisions, and "add a next action" is
+  // already the decision — which page you type it on is not a second choice to
+  // make before you have typed anything.
+  //
+  // The full page goes through reviewOpenChild, so save-exiting lands back on the
+  // review and the queue recomputes (the project drops out if it now has a way
+  // forward). Draft isolation is intact: nothing is written until that page saves.
+  function reviewFullPageBtn(kind, projectId){
+    return '<button type="button" class="review-menu-btn review-form-full" ' +
+      'data-action="review-form-full" data-kind="' + kind + '" data-project="' + projectId + '" ' +
+      'title="More fields — context, deadline, description">Full page &#8594;</button>';
+  }
+  function reviewInlineFormHtml(placeholder, type, saveAction, saveLabel, value, invalid, fullKind, projectId){
     const isDate = type === "date";
     return (
       '<div class="review-inline-form">' +
         (isDate
-          ? '<input type="text" readonly inputmode="none" id="review-form-input" data-field="reviewForm" placeholder="Pick a date" class="review-form-input' + (invalid ? " field-invalid" : "") + '" value="' + escapeHtml(value || "") + '">'
+          // review-form-date is the PICKER hook (pickers.js); review-form-input is
+          // only the shared layout class. Keep them separate — see the note there.
+          ? '<input type="text" readonly inputmode="none" id="review-form-input" data-field="reviewForm" placeholder="Pick a date" class="review-form-input review-form-date' + (invalid ? " field-invalid" : "") + '" value="' + escapeHtml(value || "") + '">'
           : '<input type="text" id="review-form-input" data-field="reviewForm" class="review-form-input' + (invalid ? " field-invalid" : "") + '" placeholder="' + escapeHtml(placeholder) + '" value="' + escapeHtml(value || "") + '" autocomplete="off">') +
         '<div class="review-inline-form-btns">' +
           '<button type="button" class="review-menu-btn" data-action="review-form-cancel">Cancel</button>' +
+          (fullKind ? reviewFullPageBtn(fullKind, projectId) : "") +
           '<button type="button" class="review-menu-btn" data-action="' + saveAction + '">' + saveLabel + '</button>' +
         '</div>' +
       '</div>'
@@ -10196,6 +10317,7 @@ function injectChunkMap(){
         box("review-form-input2", "Until what, or until when?", f.value2, "when") +
         '<div class="review-inline-form-btns">' +
           '<button type="button" class="review-menu-btn" data-action="review-form-cancel">Cancel</button>' +
+          reviewFullPageBtn("waiting", key) +
           '<button type="button" class="review-menu-btn" data-action="review-addwaiting-save">Add</button>' +
         '</div>' +
       '</div>'
@@ -10285,7 +10407,7 @@ function injectChunkMap(){
       }
     } else if (l.kind === "stalled"){
       if (form && form.type === "text"){
-        menuHtml = reviewInlineFormHtml("What's the very next physical action?", "text", "review-addnext-save", "Add", "", invalid);
+        menuHtml = reviewInlineFormHtml("What's the very next physical action?", "text", "review-addnext-save", "Add", "", invalid, "next", l.id);
       } else if (form && form.type === "waiting"){
         // ⚑ Two fields, not one (user: stalled projects need a waiting action
         // here too). A Waiting action is invalid without something to wait ON
@@ -11583,6 +11705,20 @@ function onPseudoActionCompleted(task){
   const occ = task.occCanon || ev.date; // completion is tracked by CANONICAL date (roll math)
   ev.completedOccs = ev.completedOccs || [];
   if (ev.completedOccs.indexOf(occ) === -1) ev.completedOccs.push(occ);
+  // ⚑ QA (user): "I completed the pay rent event after it was past due in the
+  // lane, but it still showed up in the daily review." Both halves were behaving
+  // as written and the pair was still wrong. A series can hold BOTH a live
+  // past-due row (today's occurrence, unticked) and a recorded miss from an
+  // earlier day; computeOpenLoops deliberately shows only the live one, because
+  // the single-slot design exists to stop one series filling the queue. Ticking
+  // the live row removed it — and the older miss, which the user had never been
+  // shown, took its place. From the outside that is completion doing nothing.
+  //
+  // Answering the more recent question retires the older one: the review only
+  // ever promises the MOST RECENT miss (§4.8b), and resurrecting a stale one the
+  // moment its successor is settled breaks that promise. Guarded on the date so
+  // this can only ever clear a miss the completion actually supersedes.
+  if (ev.missedOcc && ev.missedOcc <= occ) ev.missedOcc = null;
   if (isRecurring(ev)){
     ev.completedAt = nowInstant();
     ev.completedFrom = occ;

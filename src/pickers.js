@@ -499,7 +499,19 @@ function openDatePicker(value, opts, onDone){
  * [data-calfield]) run exactly as they did when the native picker committed a
  * value. Setting .value alone would update the box and silently drop the write.
  */
-const PICKER_SELECTOR = "input.screen-time, input.screen-date, input.review-form-input";
+// ⚑ QA (user): this used to end `input.review-form-input`, which is the class on
+// EVERY inline box the review renders — including the plain-text "What's the very
+// next physical action?" and both waiting-action fields. Tapping any of them
+// opened the date picker and swallowed the focus, so a stalled project's quick-add
+// could not be typed into at all.
+//
+// The hook is now a dedicated marker class carried only by the push-date field.
+// The rule to keep: a picker field is identified by a class that means "this is a
+// picker", never by the class that means "this is a review box" — otherwise every
+// future field added to that layout inherits a date picker it never asked for.
+// (Checked the other two: .screen-date / .screen-time appear only on genuine
+// readonly date and time fields, so this was the only place it leaked.)
+const PICKER_SELECTOR = "input.screen-time, input.screen-date, input.review-form-date";
 function initTimePickerFields(){
   document.addEventListener("mousedown", function(e){
     const el = e.target.closest && e.target.closest(PICKER_SELECTOR);
@@ -521,7 +533,7 @@ function initTimePickerFields(){
       // ⚑ The review's push-date field gets no Clear: "push this deadline to
       // nowhere" is not a thing, and the menu it sits in already has other
       // exits. Deadline and event dates can be cleared.
-      const allowClear = !el.classList.contains("review-form-input");
+      const allowClear = !el.classList.contains("review-form-date");
       openDatePicker(el.value || "", { allowClear: allowClear }, commit);
     }
   }, true);
