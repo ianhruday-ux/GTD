@@ -333,6 +333,68 @@ with serve(DIST) as url, sync_playwright() as p:
     check(not any(t.startswith("✓") or "—" in t for t in cur_sec),
           f"dev scaffolding rows are kept out of the picker ({cur_sec[:6]})")
 
+    # ---------- converting Current → Someday KEEPS the linked notes ----------
+    # User: "make sure that converting a current project to a future project
+    # doesn't remove the notes. The dialogue should reflect this if it doesn't
+    # already." It never did remove them — demoteProjectToFuture only touches
+    # linked actions and events — but the dialog listed only what gets unlinked or
+    # deleted, so a reader had no reason to believe the notes were safe.
+    #
+    # ⚠ Why this matters beyond wording: the user's stated purpose for notes on
+    # Someday projects is planning and sketching ideas out. That is exactly the
+    # material nobody writes if they think a conversion eats it.
+    pg.evaluate("""() => {
+      ['#tray-root', '#dialog-root', '#screen-root'].forEach(s => {
+        const el = document.querySelector(s); if (el) el.innerHTML = '';
+      });
+      document.body.classList.remove('screen-open');
+      window.scrollTo(0, 0);
+      localStorage.setItem('gtd_tasks_current', JSON.stringify([
+        {id:'zz-conv', title:'ZZ convert me', notesClean:'', linkedProjectId:null,
+         isGroup:false, parent:null}]));
+      localStorage.setItem('gtd_tasks_next', JSON.stringify([
+        {id:'zz-act', title:'ZZ a step', notesClean:'', linkedProjectId:'zz-conv',
+         isGroup:false, parent:null, contextId:null}]));
+      localStorage.setItem('gtd_notes', JSON.stringify([
+        {id:'zz-n1', title:'ZZ plan sketch', body:'', projectLinks:[{id:'zz-conv',name:'ZZ convert me'}],
+         tagIds:[], editedAt: Date.now()}]));
+      localStorage.setItem('gtd_events', '[]');
+      localStorage.setItem('gtd_tray', '[]');
+    }""")
+    pg.reload(); pg.wait_for_timeout(1000)
+    pg.evaluate("() => { const r = document.querySelector('#tray-root'); if (r) r.innerHTML = ''; }")
+    pg.click('.tab[data-kind="current"]'); pg.wait_for_timeout(400)
+    pg.locator('.card-title:has-text("ZZ convert me")').first.click(); pg.wait_for_timeout(600)
+    pg.locator('[data-action="make-kind"][data-dest="future"]').first.click(); pg.wait_for_timeout(300)
+    pg.locator('[data-action="screen-save"]').first.click(); pg.wait_for_timeout(700)
+    dlg = pg.evaluate("""() => { const d = document.querySelector('.choice-dialog-backdrop');
+      return d ? d.textContent : null; }""")
+    check(dlg is not None, "converting a project with links asks first")
+    check(dlg and "notes are kept" in dlg.lower().replace("linked notes are kept", "notes are kept"),
+          f"and the dialog SAYS the notes are kept ({(dlg or '')[:150]})")
+    pg.evaluate("""() => { const d = document.querySelector('.choice-dialog-backdrop');
+      const b = [...d.querySelectorAll('button')].find(x => /unlink/i.test(x.textContent));
+      if (b) b.click(); }""")
+    pg.wait_for_timeout(900)
+    after = pg.evaluate("""() => {
+      const n = JSON.parse(localStorage.getItem('gtd_notes') || '[]').find(x => x.id === 'zz-n1');
+      const fut = JSON.parse(localStorage.getItem('gtd_tasks_future') || '[]')
+        .some(t => t.id === 'zz-conv');
+      return { noteAlive: !!n, stillLinked: n ? (n.projectLinks||[]).some(l => l.id === 'zz-conv') : false,
+               nowFuture: fut }; }""")
+    check(after["nowFuture"], f"the project really did convert ({after})")
+    check(after["noteAlive"], f"and the note survived ({after})")
+    check(after["stillLinked"], f"and is still linked to it ({after})")
+
+    pg.click('.tab[data-kind="future"]'); pg.wait_for_timeout(450)
+    pg.locator('.card-title:has-text("ZZ convert me")').first.click(); pg.wait_for_timeout(600)
+    rows = pg.evaluate("""() => [...document.querySelectorAll('.linked-action-item')]
+      .map(e => e.textContent.trim())""")
+    check(any("ZZ plan sketch" in r for r in rows),
+          f"and the converted Someday page still lists it ({rows})")
+    check(pg.locator('[data-action="new-linked-note"]').count() == 1,
+          "with the + New note button still there")
+
     check(not errs, f"no JS errors ({errs[:3]})")
     b.close()
 

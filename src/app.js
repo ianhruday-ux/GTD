@@ -15,10 +15,10 @@
   // in the daily review." LANE_INFO is the shared half \u2014 lane \u24d8 AND review \u24d8.
   // LANE_INFO_EXTRA is lane-only, and reviewInfoPanelHtml must never read it.
   const LANE_INFO = {
-    next: "This lane is for \u201cnext actions\u201d and \u201ccontexts.\u201d A next action is the single next physical step you needed to move something forward. It is not a whole project, only the next action you can take in a project.",
+    next: "This lane is for \u201cnext actions\u201d and \u201ccontexts.\u201d A next action is the single next physical step you need to move something forward. It is not a whole project, only the next action you can take in a project.",
     waiting: "A waiting action is something you can't act on yet because it depends on something else\u2014a reply from someone, a delivery, a decision, another action getting done, or a future event. Use the left arrow to promote a waiting action to the next action list, or hook it to a next action so it will promote automatically. Actions in a context will promote to their sibling context in the next action list.",
     current: "A project is anything that takes more than one action to complete. It could be as simple as returning a library book or as involved as planning a vacation. Current projects should always have at least one step tied to them to prevent them from being stalled. This step might be an action, a waiting action, or even an event on the calendar.",
-    future: "This lane is for projects you're not committed starting yet. Review this list at least once a month to keep the dreams alive.",
+    future: "This lane is for projects you're not committed to starting yet. Review this list at least once a month to keep the dreams alive.",
     habit: "A habit is an automatic behaviour which is triggered by a cue. It's easiest to build habits when you're doing them at least once a week. Type in a cue when you're creating a habit or use the habit hook to create habit stacks in which one habit is the cue for the next habit in the stack.",
     notes: "This lane is for notes. It's useful for keeping track of ideas, links, email addresses, and assorted reference materials related to current and future projects."
   };
@@ -1315,8 +1315,25 @@
     if (linked.length) nouns.push("actions");
     if (linkedEvents.length) nouns.push("calendar entries");
     const what = nouns.join(" or ");
+    // ⚑ SAY WHAT SURVIVES, not just what goes (user: "make sure that converting a
+    // current project to a future project doesn't remove the notes. The dialogue
+    // should reflect this if it doesn't already.")
+    //
+    // It never did remove them — this function only touches linked actions and
+    // events — but the dialog listed only casualties, so a reader had no reason
+    // to believe the notes were safe and every reason to fear they weren't. That
+    // is a real cost even when the code is right: the user's stated purpose for
+    // notes on Someday projects is planning and sketching out ideas, which is
+    // exactly the material you will not write if you think a conversion eats it.
+    // Only stated when there ARE notes, or it is noise.
+    const noteCount = (state.notes || []).filter(function(n){
+      return (n.projectLinks || []).some(function(l){ return l.id === projectId; });
+    }).length;
+    const keeps = noteCount
+      ? " Linked notes are kept either way — " + (noteCount === 1 ? "the note" : "all " + noteCount + " notes") + " will still be on the project."
+      : "";
     openConfirmDialog(
-      "Someday projects can't hold linked " + what + ". Unlink " + (nouns.length > 1 ? "them" : "them") + ", or delete " + (nouns.length > 1 ? "them" : "them") + "?",
+      "Someday projects can't hold linked " + what + ". Unlink them, or delete them?" + keeps,
       [
         { label: "Unlink", style: "primary", action: function(){
             linked.forEach(function(l){ setLink(l.kind, l.task.id, null); });
@@ -3710,8 +3727,22 @@
         // kind that accumulates thinking rather than steps, which is what a note
         // is for — the link already worked in one direction (a note could name a
         // Future project) and the page simply never showed it.
-        fields += '<div class="screen-hook-pick-label">Linked notes</div>' +
-          linkedNotesListHtml(s, s.draft && s.draft.projectId);
+        // Same notes interface as a Current project's Notes side, count badge and
+        // all — deliberately WITHOUT the Actions/Notes segmented control, which is
+        // the one part that cannot carry over: demoteProjectToFuture exists
+        // precisely because a Someday project may not hold linked actions, so a
+        // toggle to that list would offer what the conversion just refused.
+        {
+          const fpid = s.draft && s.draft.projectId;
+          const fCount = fpid ? (state.notes || []).filter(function(n){
+            return (n.projectLinks || []).some(function(l){ return l.id === fpid; });
+          }).length : 0;
+          const fStaged = ((s.draft && s.draft.staged && s.draft.staged.noteCreates) || []).length;
+          const fTotal = fCount + fStaged;
+          fields += '<div class="screen-hook-pick-label">Linked notes' +
+            (fTotal ? ' <span class="seg-count">' + fTotal + '</span>' : "") + '</div>' +
+            linkedNotesListHtml(s, fpid);
+        }
         if (s.taskId) fields += makeKindBtnHtml("current", "Make Current Project", "", draft.convertTo === "current", !!draft.willComplete);
       }
     } else if (kind === "habit"){
@@ -5876,7 +5907,7 @@
     // ⚑ The user's own copy (INFO-TEXT.txt [REV-3]), transcribed verbatim. The
     // "Stalled project:" label they wrote above it is already emitted by
     // reviewInfoPanelHtml as the bolded heading, so only the body lives here.
-    stalled: "This is a project with no way forward. Add the next physical step, a waiting action, or an event to keep it going, or move it to future projects if continuing the project isn't possible or practical. You can always come back to it in the future.",
+    stalled: "This is a project with no way forward. Add the next physical step, a waiting action, or an event to keep it going, or move it to Someday if continuing the project isn't possible or practical. You can always come back to it in the future.",
     orphaned: "This was waiting on something that no longer exists. Point it at something else, replace it with a note to yourself, promote it if you can act now, or close it out.",
     missed: "A repeating thing whose day went by without being ticked. Often you did it and forgot to say so — 'I did it' records it on the day it happened. 'Let it go' clears it without pretending you did. Only the most recent one is ever kept, so this never piles up.",
     capture: "A stray thought you haven't filed yet. Send it to a lane — or Not now to leave it for later."

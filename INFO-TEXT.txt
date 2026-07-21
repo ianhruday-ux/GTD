@@ -37,7 +37,7 @@ These are the six lists down the side of the app. Each has a small "i".
   [LANE-1] Next Actions
     The single next physical step for anything you're actively moving forward —
     not the whole project, just what you'd do next if you sat down right now.
-     → This lane is for "next actions" and "contexts." A next action is the single next physical step you needed to move something forward. It is not a whole project, only the next action you can take in a project.
+     → This lane is for "next actions" and "contexts." A next action is the single next physical step you need to move something forward. It is not a whole project, only the next action you can take in a project.
      →→ A "context" is a recurring place or time which offers you the opportunity to take an action. Here, we have created contextual lists, so you can group all your "at computer" actions and "getting off work" actions together.
 
   [LANE-2] Waiting On                                    ⚑ "event" appears here
@@ -59,7 +59,7 @@ These are the six lists down the side of the app. Each has a small "i".
     Ideas and projects you're not committing to yet — no pressure, just a
     parking lot. Use the arrow to promote one to Current Projects when you're
     ready to start.
-     → This lane is for projects you're not committed starting yet. Review this list at least once a month to keep the dreams alive. 
+     → This lane is for projects you're not committed to starting yet. Review this list at least once a month to keep the dreams alive.
 
   [LANE-5] Habits
     Things you want to do every day, not just once. Checking one off only counts
@@ -117,7 +117,7 @@ part below.
     very next physical step, move it to Someday (an honest answer, not a
     failure), finish it, or delete it.
      → Stalled project:
-       This is a project with no way forward. Add the next physical step, a waiting action, or an event to keep it going, or move it to future projects if continuing the project isn't possible or practical. You can always come back to it in the future.
+       This is a project with no way forward. Add the next physical step, a waiting action, or an event to keep it going, or move it to Someday if continuing the project isn't possible or practical. You can always come back to it in the future.
 
   [REV-4] label + text for a waiting item whose trigger was deleted
     Waiting on something gone:
