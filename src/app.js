@@ -3305,7 +3305,7 @@
   // Border/text color for the Make-Waiting/Next/Current/Future pill —
   // tinted with the *destination* kind's accent, per the guide.
   function accentVarForKind(kind){
-    return kind === "next" ? "--red" : kind === "waiting" ? "--yellow" : kind === "current" ? "--moss" : kind === "future" ? "--dusty" : kind === "notes" ? "--teal" : kind === "tags" ? "--brass" : kind === "review" ? "--brass" : kind === "event" ? "--yellow" : kind === "calendar" ? "--brass" : "--purple";
+    return kind === "next" ? "--red" : kind === "waiting" ? "--yellow" : kind === "current" ? "--forest" : kind === "future" ? "--royal" : kind === "notes" ? "--teal" : kind === "tags" ? "--brass" : kind === "review" ? "--brass" : kind === "event" ? "--yellow" : kind === "calendar" ? "--brass" : "--purple";
   }
   // DRAFT ISOLATION (§13.0 Chunk A): armed renders a filled pill reading
   // "Converting to X on save", the same "nothing has happened yet, but
@@ -5024,7 +5024,7 @@
     // chunk 8 (the user has finished walking all three). §8.1's replace-don't-
     // accumulate discipline is restored: this is the ONLY injector again, and
     // the two additive ones are deleted rather than left dormant.
-    const FLAG = "gtd_qa_checklist_postsprint_v4";
+    const FLAG = "gtd_qa_checklist_postsprint_v5";
     if (Storage.get(FLAG)) return;
     Storage.set(FLAG, "1");
     // Retire the superseded flags so they can't resurrect their injectors, and
@@ -5032,7 +5032,7 @@
     ["gtd_qa_checklist_chunk7_v1", "gtd_qa_checklist_override_v1",
      "gtd_qa_checklist_override_v2", "gtd_qa_checklist_chunk8_v1",
      "gtd_qa_checklist_postsprint_v1", "gtd_qa_checklist_postsprint_v2",
-     "gtd_qa_checklist_postsprint_v3"].forEach(Storage.remove);
+     "gtd_qa_checklist_postsprint_v3", "gtd_qa_checklist_postsprint_v4"].forEach(Storage.remove);
 
     // Replace, don't accumulate (8.1) — and actually mean it this time.
     // Earlier rounds bumped the flag but left the previous rounds' groups
@@ -5092,17 +5092,49 @@
       { title: 'The add controls sit still now', notes: 'Your note about spacing. Switch between Month, Day and List. The Add controls at the bottom should start at the SAME height on all three, including on a day with nothing on it. A long list can push them further down — that is intended — but they should never ride up under the header.' }
     ]);
 
-    addGroupWithItems('✅ QA — The review and the intray', [
-      { title: 'The intray tells the truth now', notes: 'Your note. Empty the intray of everything you have jotted down, but leave a stalled project, or an action waiting on something you deleted. The drawer should NOT say “nothing slipping through the cracks” — those loops now appear as blacked-out cards, and the number of cards matches the number on the Review button above them. Tap Reveal to read them: each says what is wrong with it (“no way forward”, “waiting on something gone”).' },
-      { title: 'Those cards cannot be poked at', notes: 'A revealed stalled project in the drawer has no ✕ and does not open when tapped — same rule as the review itself. You clear it by giving it a way forward, not by dismissing it. Tell me if that feels too strict.' },
-      { title: 'Adding a waiting action to a stalled project', notes: 'The other half of your note. Open 🔍 Review until a stalled project comes up. Alongside “Add a next action” there is now “Add a waiting action”. It asks two things: what you are waiting on, and what has to happen first. Both are required — a waiting action with nothing to wait on would come straight back at you as a new problem, which is the thing this is meant to close.' },
-      { title: 'The form tells you which box is wrong', notes: 'In that form, fill in only one of the two boxes and tap Add. The EMPTY one gets a dashed outline, and whatever you already typed stays put. No popup. Then fill both and tap Add — the project should stop appearing as stalled, and the new waiting action should NOT turn up as a problem of its own.' },
-      { title: 'Creating an event from here is still to come', notes: 'You asked for “create waiting action and create event”. Only the waiting half is built — the event half waits on the projects page being able to see the calendar, which is its own piece of work. Nothing to test here; it is a note so the gap is not a surprise.' }
+    addGroupWithItems('✅ QA — The daily review and the intray', [
+      { title: 'The intray tells the truth now', notes: 'Your note. Empty the intray of everything you have jotted down, but leave something outstanding — a project with no next step, an action waiting on something you deleted, or anything past its date. The drawer must NOT say “nothing slipping through the cracks”. Those appear as blacked-out cards, and the number of cards matches the number on the Review button above them. Tap Reveal to read them; each says what is wrong with it.' },
+      { title: 'Those cards cannot be poked at', notes: 'A revealed card in the drawer has no ✕ and does not open when tapped — the same rule the review itself follows. You clear it by dealing with it, not by dismissing it. Tell me if that feels too strict.' },
+      { title: 'Adding a waiting action to a stalled project', notes: 'Open 🔍 Review until a project with no way forward comes up. Alongside “Add a next action” there is now “Add a waiting action”. It asks two things: what you are waiting on, and what has to happen first. Both are required — one without the other would come straight back at you as a new problem, which is the thing this is meant to close.' },
+      { title: 'The form tells you which box is wrong', notes: 'In that form fill only one of the two boxes and tap Add. The EMPTY one gets a dashed outline and whatever you typed stays put. No popup. Then fill both: the project should stop being reported, and the new waiting action should not turn up as a problem of its own.' },
+      { title: 'A repeat you forgot to tick still gets asked about', notes: 'This is the one you asked for. Make something repeat daily, then use QA ‘+1 Day’ WITHOUT ticking it. Open 🔍 Review: it should ask about the day you missed, saying which day it was. “I did it” records it on THAT day, not today. “Let it go” clears it without pretending you did it.' },
+      { title: 'Only the most recent miss is kept', notes: 'Following on: skip several days of a daily thing in a row. You should be asked about the LAST missed day only, once — not once per day. A month of ignoring something must never produce a month of questions.' },
+      { title: 'Creating an event from the review is still to come', notes: 'You asked for “create waiting action and create event”. Only the waiting half is built; the event half waits on the projects page being able to see the calendar. Nothing to test — a note so the gap is not a surprise.' }
     ]);
 
     addGroupWithItems('✅ QA — Repeating events and habits', [
-      { title: 'Waiting on a repeating event', notes: 'The bug where repeating events went missing. Tick off a repeating event for today. Now make a Waiting action and tap 🪝 to pick what it waits on — under ‘Upcoming events’ the repeating one should be offered, showing its NEXT date. Before, once you ticked it off it vanished from that list until the next morning.' },
-      { title: 'The runner after a run ends', notes: 'You thought this already worked and it does — worth confirming on the phone. When a habit run ends you get a celebration on the chalkboard. Leave the habit page and come back: the figure is now STRETCHING, ready for the next lap, and stays that way on every visit until you tick the habit again. The celebration is a one-time thing, not something that nags.' }
+      { title: 'Waiting on a repeating event', notes: 'Tick off a repeating event for today. Now make a Waiting action and tap 🪝 to pick what it waits on — under “Upcoming events” the repeating one should be offered, showing its NEXT date. Before, ticking it off made it vanish from that list until the next morning.' },
+      { title: 'The runner after a run ends', notes: 'You thought this already worked and it does — worth confirming on the phone. When a habit run ends you get a celebration on the chalkboard. Leave the page and come back: the figure is STRETCHING, ready for the next lap, and stays that way every visit until you tick the habit again. The celebration happens once; it does not nag.' }
+    ]);
+
+    addGroupWithItems('✅ QA — How the app talks', [
+      { title: 'The jargon is gone', notes: 'You flagged “open loop”. Tap ⓘ on the daily review: the second heading now reads “When something needs a decision”, and the three kinds under it are “Past its date”, “Stalled project” and “Waiting on something gone”. Tell me if any of those still read like a manual.' },
+      { title: 'Someday is called Someday everywhere', notes: 'In 🔍 Review, on a project with no way forward, the option now says “Move to Someday” — matching the lane’s actual name. It used to say “Someday/Maybe”, which is a name that exists nowhere in the app.' },
+      { title: 'Nothing explains appointments at you any more', notes: 'Add a time to an event and take it away again. Nothing anywhere should tell you that a time “makes it an appointment” — you can see that it has a time. The word still appears as a plain label on the event page badge; tell me if even that should go.' },
+      { title: 'Have a read of the information buttons', notes: 'The small i on each lane, and the ⓘ on the intray and the review. I have sent you all of that text in a file to mark up, so this is only worth doing if you would rather read it in place.' }
+    ]);
+
+    addGroupWithItems('✅ QA — Desks and decoration', [
+      { title: 'Two real wood desks', notes: '⋯ → Background. Dark wood and Rosewood are photographs of real timber, not drawn by the app — look for knots and the mirrored grain down the middle of the rosewood. Dark wood is the new default and is darkened to sit with the cards; rosewood is deliberately the bright one.' },
+      { title: 'The old drawn woods are gone', notes: 'Walnut, Oak and Ebony have been removed, as you asked. If your app was set to one of them it should quietly open on Dark wood instead — no error, no blank desk. Worth confirming, since that is the one thing that could go wrong for you specifically.' },
+      { title: 'Black lacquer, with the gold border', notes: '⋯ → Background → Black lacquer. Deep black with a warm sheen, and a gold key-fret border around the lanes. Scroll: the border must NOT jump, stretch or shimmer — that was the bug you spotted. A longer list gets a longer border, so the bottom edge moves down as you add things.' },
+      { title: 'The jade inlay', notes: 'On the lacquer desk, open the intray. Down the drawer’s inner edge is a jade strip — cloudy green, lit along one side. Tell me if it wants to be wider, or a different green.' },
+      { title: 'Every background survives a restart', notes: 'Pick any of them, then fully close and reopen the app. Same desk. Then ⋯ → Restore app to defaults: back to Dark wood.' }
+    ]);
+
+    addGroupWithItems('✅ QA — Adding to a list or a context', [
+      { title: 'The quick-add rows are gone', notes: 'As you asked. No list or context has a text box at the bottom any more.' },
+      { title: 'The + beside the count', notes: 'Open a lane with a list or a context in it. Beside the number there is a small round + in that lane’s own colour. Tapping it opens the normal page for a new item — not a cramped inline box — so you get every field.' },
+      { title: 'It puts the item where you asked', notes: 'Use the + on a LIST, fill in a title, save: the new item should appear inside that list, not loose at the top. Use the + on a CONTEXT: the context should already be filled in on the page before you type anything.' },
+      { title: 'Tapping + must not collapse the list', notes: 'The + sits in the list’s header, and tapping the header opens and closes the list. Tapping + should ONLY open the new-item page. If the list also folds shut behind it, tell me.' },
+      { title: 'It works on a closed list too', notes: 'Collapse a list, then tap its +. This works now; the old text box could not, because it lived inside the part that gets hidden.' },
+      { title: 'Long list names wrap', notes: 'The + takes a little room, so a long list name now runs onto a second line. You said that is fine — this is here so you can change your mind after living with it.' }
+    ]);
+
+    addGroupWithItems('✅ QA — Lane colours', [
+      { title: 'Projects and Notes are no longer twins', notes: 'Projects is a deeper forest green now; Notes keeps its teal. Look at the six tabs together — the two greens should read as different colours at a glance, which was the problem.' },
+      { title: 'Someday is royal blue', notes: 'The S tab, its lane header, its + button and its checkboxes should all be a clear blue rather than the old grey-blue.' },
+      { title: 'The colours follow through everywhere', notes: 'On a project, check the round jump-to-project button and the checkbox are the new green. On the calendar, a PROJECT deadline mark should be that green too. Anything still showing the old colours is a miss — tell me where.' }
     ]);
     saveTasksLocal("next");
   }

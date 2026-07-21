@@ -47,6 +47,19 @@
   --dusty:#6E90AC;
   --purple:#8E6FB0;
   --teal:#4FB3A6;
+  /* ⚑ LANE accents for Projects and Someday (user). Projects was --moss, which
+     sat close enough to Notes' teal to be confusable at a glance — a deeper,
+     greener forest reads as its own colour beside it. Someday was --dusty, a
+     muted slate; royal blue is a decision rather than a hedge.
+     Both are tuned to a floor, not picked by eye: every lane accent is used BOTH
+     as text on the near-black desk AND as a fill carrying --dark-on-accent text,
+     so it has to clear ~4.5:1 in both directions. #4C9155 lands at 4.8, #5B7FE8
+     at 4.9. Going the obvious shade darker on either (a true forest, a true
+     royal #4169E1) drops the fill under 4 and the badge text starts to muddy.
+     --moss and --dusty stay: they still carry non-lane meanings (a completed
+     chip, the paused pill) that are about green-ness and blue-ness, not lanes. */
+  --forest:#4C9155;
+  --royal:#5B7FE8;
   --bezel:#0F0E0C;
   --dark-on-accent:#1a1408;
   --paper-shadow: 0 6px 14px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.03) inset;
@@ -314,8 +327,8 @@ body.drag-active .tabbar{ transition:none; }
    background can tint itself from the same variable. Mirror the lane map. */
 .tab[data-kind="next"]    { --lane-accent:var(--red);    }
 .tab[data-kind="waiting"] { --lane-accent:var(--yellow); }
-.tab[data-kind="current"] { --lane-accent:var(--moss);   }
-.tab[data-kind="future"]  { --lane-accent:var(--dusty);  }
+.tab[data-kind="current"] { --lane-accent:var(--forest); }
+.tab[data-kind="future"]  { --lane-accent:var(--royal);  }
 .tab[data-kind="habit"]   { --lane-accent:var(--purple); }
 .tab[data-kind="notes"]   { --lane-accent:var(--teal);   }
 
@@ -406,8 +419,8 @@ body.has-frame #fab-create{
    deadline bar, checkboxes, pills, and the active tab. */
 .lane[data-kind="next"]    { --lane-accent:var(--red);    }
 .lane[data-kind="waiting"] { --lane-accent:var(--yellow); }
-.lane[data-kind="current"] { --lane-accent:var(--moss);   }
-.lane[data-kind="future"]  { --lane-accent:var(--dusty);  }
+.lane[data-kind="current"] { --lane-accent:var(--forest); }
+.lane[data-kind="future"]  { --lane-accent:var(--royal);  }
 .lane[data-kind="habit"]   { --lane-accent:var(--purple); }
 .lane[data-kind="notes"]   { --lane-accent:var(--teal);   }
 
@@ -523,8 +536,8 @@ body.has-frame #fab-create{
 .pill-target{ color:var(--text-primary); }
 .project-jump{
   display:inline-flex; align-items:center; justify-content:center; margin-top:6px; margin-left:6px;
-  width:22px; height:22px; border-radius:50%; border:1px solid var(--moss); color:var(--moss);
-  background:rgba(107,158,107,0.1); font-size:11px; padding:0;
+  width:22px; height:22px; border-radius:50%; border:1px solid var(--forest); color:var(--forest);
+  background:rgba(76,145,85,0.12); font-size:11px; padding:0;
 }
 .project-jump:hover{ background:rgba(107,158,107,0.25); }
 .card-project-flag{
@@ -1364,7 +1377,7 @@ body.has-frame .tray-drawer::after{
 .cal-mark-event{ background:var(--text-primary); }
 .cal-mark-dl-next, .cal-mark-dl-current{ width:3px; height:11px; border-radius:1px; }
 .cal-mark-dl-next{ background:var(--red); }
-.cal-mark-dl-current{ background:var(--moss); }
+.cal-mark-dl-current{ background:var(--forest); }  /* a project deadline — same colour as its lane */
 .cal-mark-proj.cal-mark-appt{ background:transparent; border:1.5px solid var(--yellow); }
 .cal-mark-proj.cal-mark-event{ background:transparent; border:1.5px solid var(--text-soft); }
 .cal-mark-done{ opacity:0.4; }

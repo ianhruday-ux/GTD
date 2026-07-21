@@ -38,14 +38,16 @@ def check(cond, msg):
 # rewritten — the sweep test works by clearing the CURRENT flag to force a
 # re-injection, so a stale flag name here makes the whole file pass vacuously.
 EXPECTED = ["The new time picker", "The new date picker", "Deadlines that get pushed",
-            "List view", "The review and the intray", "Repeating events and habits"]
+            "List view", "The daily review and the intray", "Repeating events and habits",
+            "How the app talks", "Desks and decoration",
+            "Adding to a list or a context", "Lane colours"]
 RETIRED = ["Chunk 7", "Chunk 8", "Per-occurrence", "Recheck chunk 6b",
            "Settings & appearance", "Calendar & review fixes", "Progress bars", "Pickers"]
-CURRENT_FLAG = "gtd_qa_checklist_postsprint_v4"
+CURRENT_FLAG = "gtd_qa_checklist_postsprint_v5"
 SUPERSEDED_FLAGS = ["gtd_qa_checklist_chunk7_v1", "gtd_qa_checklist_override_v1",
                     "gtd_qa_checklist_override_v2", "gtd_qa_checklist_chunk8_v1",
                     "gtd_qa_checklist_postsprint_v1", "gtd_qa_checklist_postsprint_v2",
-                    "gtd_qa_checklist_postsprint_v3"]
+                    "gtd_qa_checklist_postsprint_v3", "gtd_qa_checklist_postsprint_v4"]
 
 with serve(DIST) as url, sync_playwright() as p:
     b = p.chromium.launch()
@@ -150,6 +152,7 @@ with serve(DIST) as url, sync_playwright() as p:
       localStorage.setItem('gtd_qa_checklist_postsprint_v1', '1');
       localStorage.setItem('gtd_qa_checklist_postsprint_v2', '1');
       localStorage.setItem('gtd_qa_checklist_postsprint_v3', '1');
+      localStorage.setItem('gtd_qa_checklist_postsprint_v4', '1');
       localStorage.removeItem(cur);
     }""", CURRENT_FLAG)
     pg.reload(); pg.wait_for_timeout(1100)
