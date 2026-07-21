@@ -123,13 +123,29 @@ with serve(DIST) as url, sync_playwright() as p:
     check("orphan" not in joined.lower(),
           f"and the word 'orphan' does not reach the user ({joined[:140]})")
 
-    # ---------- not discardable, not tappable ----------
+    # ---------- not discardable; tappable ONLY once revealed ----------
     dis = pg.evaluate("""() => [...document.querySelectorAll('.tray-card-loop')]
       .filter(c => c.querySelector('[data-action="tray-delete"]')).length""")
     check(dis == 0, f"a derived loop has no discard button ({dis})")
+    # ⚠ REVERSED (user QA): this used to assert a revealed loop card was NOT
+    # tappable, on the review's no-cherry-picking rule (§4.8b). The user's ruling:
+    # "Once they've hit that reveal button, they've basically opted out of the one
+    # at a time rule anyway." The discipline lives in the redaction, so a card you
+    # have deliberately unsealed has none left to protect — it was merely inert.
+    # The UNREVEALED half is the part that was ever load-bearing, and it is
+    # asserted below.
     tappable = pg.evaluate("""() => [...document.querySelectorAll('.tray-card-loop')]
+      .filter(c => c.matches('[data-action="tray-open-loop"]')).length""")
+    check(tappable == st["cards"],
+          f"revealed, every loop card opens its real page ({tappable} of {st['cards']})")
+
+    pg.evaluate("() => document.querySelector('[data-action=\"tray-reveal\"]').click()")
+    pg.wait_for_timeout(400)
+    sealed = pg.evaluate("""() => [...document.querySelectorAll('.tray-card-loop')]
       .filter(c => c.tagName === 'BUTTON' || c.querySelector('button')).length""")
-    check(tappable == 0, f"and is not tappable — no cherry-picking ({tappable})")
+    check(sealed == 0, f"but sealed again, none of them is tappable ({sealed})")
+    pg.evaluate("() => document.querySelector('[data-action=\"tray-reveal\"]').click()")
+    pg.wait_for_timeout(400)
 
     # ---------- captures list alongside them ----------
     before_cards = st["cards"]

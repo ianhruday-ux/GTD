@@ -228,6 +228,35 @@ body.screen-open #dev-toolbar:not([hidden]){
   background:rgba(20,18,16,0.94); backdrop-filter:blur(6px);
   border-top:1px solid rgba(237,231,218,0.14);
   opacity:1;
+  /* Only the buttons should catch taps. The bar's own background must not eat a
+     press aimed at whatever sits behind it. */
+  pointer-events:none;
+}
+body.screen-open #dev-toolbar:not([hidden]) > *{ pointer-events:auto; }
+/* ⚠ A floating bar COVERS the bottom of the page it floats over — which on a
+   drafting page is exactly where Complete, Pause and Make-kind live. Reserve room
+   for it so it hides nothing.
+   Keyed off the toolbar's own [hidden] via the sibling combinator (#dev-toolbar
+   precedes #screen-root in the body), NOT off a JS-set class: that way there is
+   no second piece of state to fall out of sync, and anything that un-hides the
+   bar directly gets the padding for free.
+   The constant is deliberate rather than measured — the bar wraps to two rows at
+   phone width, ~110px covers it, and dev-only scaffolding does not warrant a
+   ResizeObserver to get a few pixels exact. It is additive to .screen-body's own
+   96px. */
+#dev-toolbar:not([hidden]) ~ #screen-root .screen-body{
+  padding-bottom:calc(206px + env(safe-area-inset-bottom));
+}
+/* ⚠ Padding only moves things that are IN FLOW. The Complete pill is a fixed
+   bottom-right FAB (z-index 5) and the "it moved" banner is fixed bottom-centre,
+   so both sat squarely under the floating bar and no amount of padding touched
+   them — the Complete pill on every drafting page was the concrete casualty.
+   Lift them clear by the same allowance. */
+#dev-toolbar:not([hidden]) ~ #screen-root .screen-complete-pill{
+  bottom:calc(124px + env(safe-area-inset-bottom));
+}
+body.screen-open #dev-toolbar:not([hidden]) ~ .it-moved-banner{
+  bottom:calc(128px + env(safe-area-inset-bottom));
 }
 
 /* ----------------------------------------------------------------------------
@@ -974,6 +1003,11 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 }
 .linked-action-item:hover{ background:rgba(255,255,255,0.1); }
 .linked-action-item.indented{ margin-left:22px; }
+/* Staged, not yet committed: an event added from an unsaved project page. Dashed
+   because it is a promise rather than a thing, and inert because it has no page
+   to open until the project save makes it real. */
+.linked-action-staged{ border-style:dashed; cursor:default; }
+.linked-action-staged:hover{ background:rgba(255,255,255,0.04); }
 .linked-action-kind{ font-size:10px; font-family:var(--font-mono); color:var(--text-soft); flex:0 0 auto; }
 /* Coloured kind bullets (user tweak): red next, yellow waiting, cream event. */
 .kind-dot{ display:inline-block; width:8px; height:8px; border-radius:50%; flex:0 0 auto; }

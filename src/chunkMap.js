@@ -20,10 +20,10 @@
 // (this file + its boot() call) if the convention is ever retired.
 // =========================================================
 function injectChunkMap(){
-  const FLAG = "gtd_chunk_map_v3";
+  const FLAG = "gtd_chunk_map_v4";
   if (Storage.get(FLAG)) return;
   Storage.set(FLAG, "1");
-  ["gtd_chunk_map_v1", "gtd_chunk_map_v2"].forEach(Storage.remove);  // retire superseded flags
+  ["gtd_chunk_map_v1", "gtd_chunk_map_v2", "gtd_chunk_map_v3"].forEach(Storage.remove);  // retire superseded flags
 
   // Replace, don't accumulate (8.2, mirroring 8.1): sweep any previous
   // chunk-map group (tagged via devContext, not a title match, since the
@@ -65,11 +65,12 @@ function injectChunkMap(){
     { title: "✓ Post-sprint — Desks, habit runner, settings", notes: "DONE. The settings dropdown, the background picker, the chalkboard habit runner, and the app being named OELA." },
     { title: "✓ Post-sprint — Calendar and review follow-ups", notes: "DONE. Repeating events stopped projecting into the past, past-due events can be deleted from the review, and the pickers were unified." },
     { title: "✓ Post-sprint — Pickers, deadlines, wording, decoration", notes: "DONE. The app's own time and date pickers, pushed deadlines that restart their bar and count the push, one clock app-wide, the jargon removed, the photographic desks and black lacquer, and the + on lists and contexts." },
+    { title: "✓ Post-sprint — Your checklist findings", notes: "DONE. Six of the seven you reported: ticking a past-due repeat now clears it from the review; the QA clock buttons reach you inside the calendar and every other full-screen page; a revealed intray card opens its item; the review's quick-add boxes take typing again (they were opening the date picker) and gained a Full page button; a project's creation page can add an event, as a proper draft; and naming a new list or context no longer drags the screen to the bottom. The seventh — a delete dialog when leaving a repeating event — I could not reproduce; there is a question waiting for you in the QA checklist." },
 
     { title: "Polish the writing", notes: "TO DO, and first — everything else that touches words waits on it. All the app's text is in COPY.txt and the information-button text is in INFO-TEXT.txt, both for you to mark up." },
     { title: "Chinese translation", notes: "TO DO. Waits on the writing being final: translating text that is about to be rewritten is wasted work. The habit thought-bubbles already have Chinese; everything else does not." },
     { title: "Fix up the desktop layout", notes: "TO DO. Everything this sprint was designed and tested on a phone, and the desktop view has drifted — wide screens especially." },
-    { title: "Events on the project page", notes: "TO DO. Lets a project show and create calendar events. Needs a design pass first (written up for you in INFO-TEXT.txt) because projects and the calendar have overlapping ideas about dates. Also unblocks ‘create event’ in the daily review." },
+    { title: "✓ Events on the project page", notes: "DONE. A project shows its linked events and can create them — including on the creation page, where the event is held as a draft and only becomes real when the project is saved. ‘Add an event’ in the daily review came with it." },
     { title: "Linked notes on the project page", notes: "TO DO. The link only runs one way today: a note can link to a project and shows a chip for it, but the project page lists linked actions and linked events and nothing for notes. One decision first — that page has no tabs at all, so a ‘notes tab’ either introduces tabs to it or becomes a third section." },
     { title: "Re-test backups against the new fields", notes: "TO DO. Export and import have not been exercised since deadlines gained a start date and a push counter, repeats gained a missed-day marker, and the backgrounds changed names. Backups are the one thing that has to survive real use." },
     { title: "9 — Service worker + offline + install polish", notes: "TO DO, and deliberately LAST. Makes the app work with no internet and update like a proper app. Scheduled last on purpose: caching an app while it is still changing costs hours of chasing stale builds." },

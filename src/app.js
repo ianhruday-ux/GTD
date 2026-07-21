@@ -1941,7 +1941,18 @@
   // until that project saves, and ✕ takes it with it. Without this, a note
   // created from a project that was then discarded stayed behind linked to a
   // project that never existed.
-  function newStagedSet(){ return { creates: [], edits: {}, deletes: {}, completes: {}, noteCreates: [] }; }
+  // ⚑ eventCreates (user QA: "The add an event button doesn't appear on the
+  // project creation page"). It used to be hidden there, and the flag on it said
+  // why: adding an event goes through the CALENDAR, a separate full screen with
+  // its own commit, so there was no draft to stage it into.
+  //
+  // There is now — and it is the same shape noteCreates already established. An
+  // event, like a note, lives in its own store rather than in `creates`, so it
+  // rides here as a whole object and is only pushed to state.events when the
+  // project saves. That keeps DRAFT ISOLATION exactly: an event added while
+  // drafting a project that is then ✕'d out of goes with it, instead of being
+  // stranded in the calendar linked to a project that never existed.
+  function newStagedSet(){ return { creates: [], edits: {}, deletes: {}, completes: {}, noteCreates: [], eventCreates: [] }; }
   // The project id a project draft stages against — the live id when editing,
   // or the id minted at open for a brand-new project (so children can link).
   function stagingProjectId(s){ return (s && (s.taskId || (s.draft && s.draft.projectId))) || null; }
@@ -1961,6 +1972,18 @@
   }
   // The project's linked actions AS THE DRAFT SEES THEM: live links minus
   // staged deletes/completes, staged edits applied, plus staged creates.
+  function stagedEventCreates(s){ return (s && s.draft && s.draft.staged && s.draft.staged.eventCreates) || []; }
+  // §4.3b's "way forward" as the DRAFT sees it: a linked action, or a linked
+  // event — live or staged. This is what the new-Current-project save gate asks,
+  // and the user's QA made the event half explicit ("without creating an action
+  // or event"). projectHasWayForward answers the same question for committed
+  // state; this one has to include the staged set, which storage cannot see yet.
+  function projectDraftHasWayForward(s){
+    if (projectDraftLinked(s).length) return true;
+    if (stagedEventCreates(s).length) return true;
+    const pid = stagingProjectId(s);
+    return !!(pid && typeof projectHasLinkedEvent === "function" && projectHasLinkedEvent(pid));
+  }
   function projectDraftLinked(s){
     const pid = stagingProjectId(s);
     const staged = s.draft.staged || newStagedSet();
@@ -2064,6 +2087,7 @@
     if (staged){
       if ((staged.creates || []).length) return true;
       if ((staged.noteCreates || []).length) return true;
+      if ((staged.eventCreates || []).length) return true;
       if (Object.keys(staged.deletes).length) return true;
       if (Object.keys(staged.completes).length) return true;
       for (const id in staged.edits){
@@ -2118,6 +2142,15 @@
       (staged.noteCreates || []).forEach(function(n){ state.notes.unshift(Object.assign({}, n)); });
       saveNotes();
       renderLane("notes");
+    }
+    // Same contract for events (§4.15d). processEventBoundaries runs after they
+    // land so an event dated today mints its pseudo-action immediately, exactly
+    // as it would have if the calendar had written it directly.
+    if ((staged.eventCreates || []).length){
+      (staged.eventCreates || []).forEach(function(ev){ state.events.push(Object.assign({}, ev)); });
+      saveEvents();
+      processEventBoundaries();
+      renderLane("next"); renderLane("waiting");
     }
     for (const id in staged.edits){
       const found = findTaskAnywhere(id);
@@ -2470,7 +2503,10 @@
     // Drafting-page-only, Current-only, at-creation-only — the calendar row and
     // the QA/chunk-map injectors deliberately make actionless projects and go
     // nowhere near this handler. Standard dashed-outline block.
-    if (s.kind === "current" && !s.taskId && projectDraftLinked(s).length === 0){
+    // ⚑ An event now satisfies this too (user QA). It always should have — §4.3b
+    // has always counted a linked event as a way forward — but until this round a
+    // creation page could not make one, so the gate never had to ask.
+    if (s.kind === "current" && !s.taskId && !projectDraftHasWayForward(s)){
       s.invalidField = "projectActions";
       renderScreen();
       return;
@@ -2900,7 +2936,7 @@
     // ⚑ Simplification: events sit as a dated band above the action sub-tree
     // rather than being interleaved with deadlined actions; nested dependents
     // on events are chunk 8.
-    const eventRows = projectLinkedEventRowsHtml(s.draft && s.draft.projectId);
+    const eventRows = projectLinkedEventRowsHtml(s.draft && s.draft.projectId, stagedEventCreates(s));
     if (!linked.length) return eventRows ? ('<div class="screen-hook-pick-label">Linked actions</div><div class="linked-actions-list">' + eventRows + '</div>') : "";
     const byId = {};
     linked.forEach(function(l){ byId[l.task.id] = l; });
@@ -3008,11 +3044,12 @@
     // ⚑ "New event" sits on the ACTIONS side, not its own: a linked event
     // already renders in that list as a dated band above the actions, so this
     // is the add button for a list that exists rather than a new place.
-    // ⚑ Saved projects only, and flagged. Adding an event goes through the
-    // CALENDAR, which is a separate full screen with its own commit — there is
-    // no draft to stage it into the way a note stages. Building that would mean
-    // teaching the calendar to defer a write back to a page it does not know
-    // about, which is a bigger change than the button.
+    // ⚑ WAS saved-projects-only. That restriction is GONE (user QA: "The add an
+    // event button doesn't appear on the project creation page"). The old flag
+    // said adding an event goes through the calendar, which has its own commit
+    // and no draft to stage into — so the calendar now defers the write back to
+    // the page that opened it, via staged.eventCreates, the same contract notes
+    // already had. See newStagedSet and calAdd.
     // The Actions side owns every way of adding something that lands in it.
     // ⚑ invalidField "projectActions" moves here with them: §4.3 blocks saving a
     // new Current project with no action, and the dashed outline has to be on
@@ -3023,7 +3060,7 @@
       '<div class="project-add-row' + bad + '">' +
         '<button type="button" class="btn btn-ghost btn-small project-add-note" data-action="generate-action" data-gen-kind="next">+ New action</button>' +
         '<button type="button" class="btn btn-ghost btn-small project-add-note" data-action="generate-action" data-gen-kind="waiting">+ New waiting action</button>' +
-        (s.taskId ? '<button type="button" class="btn btn-ghost btn-small project-add-note" data-action="new-linked-event">+ New event</button>' : "") +
+        '<button type="button" class="btn btn-ghost btn-small project-add-note" data-action="new-linked-event">+ New event</button>' +
       '</div>';
     const body = tab === "notes"
       ? linkedNotesListHtml(s, pid)
@@ -3622,7 +3659,7 @@
       fields += deadlineFieldsHtml(draft, kind);
       if (kind === "current"){
         { // §4.3/§12.1: renders on NEW project pages too (staged children)
-          const linkedCount = projectDraftLinked(s).length;
+          const hasWay = projectDraftHasWayForward(s);
           fields += projectLinkedPanelHtml(s);
           // ⚑ The two quick-add rows that used to sit here are GONE (user).
           // Two reasons, and the second is a bug rather than taste:
@@ -3635,7 +3672,15 @@
           // Their creation paths move into the panel's Actions side as buttons
           // (see projectLinkedPanelHtml), which is where the things they create
           // actually appear.
-          if (!linkedCount) fields += '<div class="screen-project-flag">No linked actions yet \u2014 every active project should have at least one next step.</div>';
+          // \u2691 QA (user): "the warning about the unlinked action shouldn't appear on
+          // the creation page unless someone tries to leave without creating an
+          // action or event." It used to render the instant the page opened, which
+          // told a user who had not yet typed the title that they had already got
+          // it wrong \u2014 a scold for being at step one. On an EXISTING project it is
+          // a true statement about a saved thing and stays live; on a NEW one it
+          // waits for the blocked save (invalidField) to have something to report.
+          const showFlag = s.taskId ? !hasWay : (s.invalidField === "projectActions");
+          if (showFlag) fields += '<div class="screen-project-flag">No linked actions yet \u2014 every active project should have at least one next step.</div>';
         }
         if (s.taskId) fields += makeKindBtnHtml("future", "Make Future / Someday", "", draft.convertTo === "future", !!draft.willComplete);
       } else {
@@ -3882,6 +3927,10 @@
     });
     const bar = qs("#dev-toolbar");
     if (bar) bar.hidden = !any;
+    // (While a full-screen page is open the bar floats over it, so the clock is
+    // reachable from the calendar and the drafting pages — see styles.css. The
+    // room the page reserves for it is keyed off this `hidden` attribute directly,
+    // so there is no extra state to keep in step here.)
     // The drag log's own panel has no business surviving its group being hidden.
     if (!devGroupOn(DEV_GROUPS[2])){
       const panel = qs("#drag-log-panel");
@@ -4627,7 +4676,10 @@
       }
       if (e.target.closest('[data-action="new-linked-event"]')){
         const s = state.screen;
-        const pid = s && s.taskId;
+        // ⚑ stagingProjectId, not s.taskId: a brand-new project page mints its
+        // real id at open (§12.1b), so a staged event can carry the final
+        // linkedProjectId and needs no remapping when the project is created.
+        const pid = stagingProjectId(s);
         if (!pid) return;
         const dl = (s.draft && s.draft.deadline && s.draft.deadline.date) || null;
         state.screenStack.push(state.screen);
@@ -4637,7 +4689,10 @@
           forProjectName: (s.draft && s.draft.title) || findProjectTitle(pid) || "",
           // ⚑ Read off the DRAFT, not the stored task: if you have just typed a
           // new deadline and not saved, that is the deadline you are working to.
-          forProjectDeadline: dl
+          forProjectDeadline: dl,
+          // Unsaved project → the event stages into this page's draft instead of
+          // being written now (calAdd). A saved one writes through as it always did.
+          forProjectStaging: s.taskId ? null : { parent: s }
         });
         return;
       }
@@ -5317,7 +5372,7 @@
     // chunk 8 (the user has finished walking all three). §8.1's replace-don't-
     // accumulate discipline is restored: this is the ONLY injector again, and
     // the two additive ones are deleted rather than left dormant.
-    const FLAG = "gtd_qa_checklist_postsprint_v5";
+    const FLAG = "gtd_qa_checklist_postsprint_v6";
     if (Storage.get(FLAG)) return;
     Storage.set(FLAG, "1");
     // Retire the superseded flags so they can't resurrect their injectors, and
@@ -5325,7 +5380,8 @@
     ["gtd_qa_checklist_chunk7_v1", "gtd_qa_checklist_override_v1",
      "gtd_qa_checklist_override_v2", "gtd_qa_checklist_chunk8_v1",
      "gtd_qa_checklist_postsprint_v1", "gtd_qa_checklist_postsprint_v2",
-     "gtd_qa_checklist_postsprint_v3", "gtd_qa_checklist_postsprint_v4"].forEach(Storage.remove);
+     "gtd_qa_checklist_postsprint_v3", "gtd_qa_checklist_postsprint_v4",
+     "gtd_qa_checklist_postsprint_v5"].forEach(Storage.remove);
 
     // Replace, don't accumulate (8.1) — and actually mean it this time.
     // Earlier rounds bumped the flag but left the previous rounds' groups
@@ -5354,80 +5410,22 @@
       });
     }
 
-    addGroupWithItems('✅ QA — The new time picker', [
-      { title: 'AM and PM are finally readable', notes: 'This is the one you reported twice. Open any event or deadline and tap the time box. The picker is now the app’s own, not your phone’s — dark wood colours, brass highlights. The selected one of AM / PM is FILLED IN solid brass; the other is just an outline. Check it in a dim room and in daylight. If it is still not obvious at a glance, say so.' },
-      { title: 'Setting a time by dragging', notes: 'Tap the time box. Drag the hand around the clock face to an hour — it jumps to the minutes on its own when you let go, which is the usual next thing you want. Drag again for the minutes. The two big boxes at the top show what you have picked; tap either one to go back to it.' },
-      { title: 'Midnight and midday', notes: 'The two that computers usually get wrong. Set 12:00 AM, save, and reopen — it should read 00:00, not 12:00. Then set 12:30 PM and reopen — that one SHOULD read 12:30. Tell me if either comes back different from what you set.' },
-      { title: 'Backing out of the time picker', notes: 'Open the time picker and change the time, then tap Cancel — nothing should change. Do it again and tap outside the box instead. Important one: cancelling the time picker must leave you on the page you were on, NOT throw you back to the lanes.' },
-      { title: 'Clearing a time', notes: 'Open an event that has a time on it, tap the time box, then tap Clear. The time empties and the event goes back to lasting the whole day.' }
+    addGroupWithItems('✅ QA — The seven things you reported', [
+      { title: '1. Ticking a past-due repeat clears it from the review', notes: 'Your report: you completed Pay rent after it was past due in the lane and it still turned up in the daily review. What was happening: a repeating thing can be BOTH past due today and have an older day you missed. The review only ever shows you one of them — the recent one — so ticking that one let the older one pop up in its place, and it looked like completing had done nothing. Now, answering the recent question retires the older one too. To try it: make something repeat daily, tap QA +1 Day a few times without ticking it, then tick it in the lane. Open 🔍 Review — it should be gone, and the number on the Review button should have dropped.' },
+      { title: '2. The dialog when leaving a repeating event — I could not reproduce this', notes: 'I could not make this happen, and I need one more detail from you. I armed Complete on a repeating event and left with ←, and with ✕, and from the lane, the calendar and the review — no dialog appeared in any of them. Two dialogs on that page look nearly identical, so: was it the one headed "This event repeats. What would you like to do?" with Skip this one / Delete series / Cancel? Or "Apply your changes to..." with This occurrence only / All occurrences / Cancel? Worth knowing: on that page 🗑 sits immediately LEFT of the ✕, both in the top-right corner — so reaching for the exit and catching the bin would produce exactly the first dialog. If that is what happened, say so and I will move the bin somewhere it cannot be hit by accident.' },
+      { title: '3. The clock buttons now work from inside the calendar', notes: 'You could not advance the day or time from the calendar list view. It was not the list view — the QA buttons sit under the lanes, and every full-screen page covered them completely. They now float along the BOTTOM of the screen whenever a page is open, so you can jump the clock while watching the calendar, an event page or the review update. Check they do not cover anything you need — particularly the green Complete button on a drafting page, which used to sit exactly where the bar now goes.' },
+      { title: '4. You can open a revealed card in the intray', notes: 'You said stopping people entering a revealed card was too strict, and that hitting Reveal is already opting out of the one-at-a-time rule. Agreed. Open the intray, tap Reveal, then tap any of the blacked-out-now-readable cards — it should close the drawer and open that item’s real page. Blacked-out cards still cannot be tapped, which is the part that was actually doing a job.' },
+      { title: '5. The quick-add box in the review takes typing again', notes: 'The bad one. In 🔍 Review, on a project with no way forward, tapping "Add a next action" and then the text box opened the DATE PICKER instead of the keyboard — so the box could not be typed in at all. Cause: every box in the review shared a class name with the date field, and that class was what summoned the picker. Try typing in it now. Also check the two boxes on "Add a waiting action". (I checked the rest of the app for the same mistake — the date and time fields elsewhere are hooked up properly, so this was the only place it leaked.)' },
+      { title: '5b. And there is a Full page button beside the quick add', notes: 'You asked to keep the quick add but be able to reach the real creation page for the extra fields. In that same form, between Cancel and Add, there is now "Full page →". It carries across whatever you have already typed and pre-fills the project link, and saving it brings you back to the review with the project no longer listed. Nothing is written unless you save that page.' },
+      { title: '6. New event on the project CREATION page', notes: 'The + New event button used to appear only on projects you had already saved. It is now on the creation page too. The important bit to test is that it stays a DRAFT: start a new project, add an event to it, then leave with ✕ and choose Discard. Check your calendar — that event must NOT be there. Then do it again and save with ←: the project and the event should both appear, and the project should not be flagged as having no next step. While unsaved, the event shows on the page as a dashed row you cannot tap — it has no page of its own until it is real.' },
+      { title: '6b. The no-actions warning waits until you try to leave', notes: 'Also yours. Start a new project: the "No linked actions yet" line should NOT be there while the page is blank — it used to appear immediately, telling you off before you had typed the title. Type a title and tap ← with nothing linked: NOW it appears, along with the dashed outline. Add an action OR an event and it clears. On a project you have already saved it still shows live, because there it is a true statement about a real thing.' },
+      { title: '7. Naming a new list or context no longer drags the screen', notes: 'You reported the viewport force-scrolling to the bottom and pinning you there. The naming box was being focused without telling the browser where to point the camera, so it picked — and on a phone it picked again after the keyboard opened, which is why you could not scroll away. It now jumps to the top of the lane, which is where the box actually is. This one I could not reproduce on a desktop browser, so it needs your phone: use the + button, choose New context or New list, and tell me where the screen ends up.' }
     ]);
 
-    addGroupWithItems('✅ QA — The new date picker', [
-      { title: 'Dates use the app’s calendar now too', notes: 'Tap any date box — on a deadline, on an event, on Push the date in the review. You get the app’s own month grid instead of your phone’s. Move between months with the arrows, tap a day to choose it. Cancel and Escape should change nothing.' },
-      { title: 'The circled day follows the QA clock', notes: 'THIS IS THE FIX for the thing that was confusing you during testing. Open a date box and note which day has a brass ring — it should be today. Close it, tap QA ‘+1 Day’ a few times, then open a date box again. The ring should have MOVED to match the app’s new today. It used to stay stuck on the real date, which is what made progress bars look wrong.' },
-      { title: 'The Today button', notes: 'In the date picker, tap Today. It jumps to the app’s today — the same day that has the ring — not the real one. Worth checking after a few QA day jumps.' }
-    ]);
-
-    addGroupWithItems('✅ QA — Deadlines that get pushed', [
-      { title: 'Pushing a deadline restarts its bar', notes: 'You asked for this one. Give something a deadline about two weeks out, then use QA ‘+1 Day’ until the bar is half full. Now change the deadline to two weeks from the new today. The bar should drop back to EMPTY — it measures the new stretch of time, not the old one.' },
-      { title: 'And it remembers that you pushed it', notes: 'After the push above, look at the card. Next to the bar there is a small brass tag reading ↻1. Push it again and it becomes ↻2. Press and hold the tag to see ‘Deadline pushed 2 times’. It is deliberately not red — a pushed deadline is not late, it has been moved.' },
-      { title: 'Pushing from the review counts the same', notes: 'Let a deadline go past due, open 🔍 Review, and use ‘Push the date’ there. You should get the same brass ↻ tag and the same restarted bar as doing it from the item’s own page. The two ways must not behave differently.' },
-      { title: 'Bringing a date FORWARD is not a push', notes: 'Judgment call I made — tell me if you disagree. Move a deadline EARLIER instead of later. The bar restarts (the stretch of time really did change), but the ↻ counter does NOT go up, because pulling something forward is not putting it off.' },
-      { title: 'Changing a date then backing out', notes: 'A real bug I found while building this. Open something with a deadline, change the date, then leave with ✕ instead of ←. Reopen it — the OLD date must still be there. Changing a date used to take effect even when you backed out.' }
-    ]);
-
-    addGroupWithItems('✅ QA — The calendar’s new List view', [
-      { title: 'There is a third tab', notes: 'Open the calendar. Alongside Month and Day there is now List — everything you have coming up, in the order it happens, grouped by day. This is the view for answering ‘what is coming’, which neither of the other two really did.' },
-      { title: 'Overdue things come first', notes: 'The list starts with a red PAST DUE group — anything whose day has gone by without being ticked. Below that, today onwards. A past thing you already ticked off does NOT appear; it is history, not something you still owe.' },
-      { title: 'A repeating event appears once', notes: 'Make something repeat daily. In List view it should appear ONCE, on its next date — not once per day forever. It also carries a small ‘daily’ tag so you know why it is only there once.' },
-      { title: 'Hidden and paused things still show here', notes: 'This view deliberately shows more than the month grid. A hidden event (‘hide until the day it happens’) appears, tagged ‘hidden’. A PAUSED repeating event appears at its next date, tagged ‘paused’, even though the month grid draws nothing for it. A list that quietly leaves things out is not a list.' },
-      { title: 'The list keeps up with the clock', notes: 'Open List view and leave it open. Tap QA ‘+1 Day’. The list should redraw on its own — a day that has passed drops out of the headings. It used to sit there showing yesterday until you left and came back.' },
-      { title: 'The add controls sit still now', notes: 'Your note about spacing. Switch between Month, Day and List. The Add controls at the bottom should start at the SAME height on all three, including on a day with nothing on it. A long list can push them further down — that is intended — but they should never ride up under the header.' }
-    ]);
-
-    addGroupWithItems('✅ QA — The daily review and the intray', [
-      { title: 'The intray tells the truth now', notes: 'Your note. Empty the intray of everything you have jotted down, but leave something outstanding — a project with no next step, an action waiting on something you deleted, or anything past its date. The drawer must NOT say “nothing slipping through the cracks”. Those appear as blacked-out cards, and the number of cards matches the number on the Review button above them. Tap Reveal to read them; each says what is wrong with it.' },
-      { title: 'Those cards cannot be poked at', notes: 'A revealed card in the drawer has no ✕ and does not open when tapped — the same rule the review itself follows. You clear it by dealing with it, not by dismissing it. Tell me if that feels too strict.' },
-      { title: 'Adding a waiting action to a stalled project', notes: 'Open 🔍 Review until a project with no way forward comes up. Alongside “Add a next action” there is now “Add a waiting action”. It asks two things: what you are waiting on, and what has to happen first. Both are required — one without the other would come straight back at you as a new problem, which is the thing this is meant to close.' },
-      { title: 'The form tells you which box is wrong', notes: 'In that form fill only one of the two boxes and tap Add. The EMPTY one gets a dashed outline and whatever you typed stays put. No popup. Then fill both: the project should stop being reported, and the new waiting action should not turn up as a problem of its own.' },
-      { title: 'A repeat you forgot to tick still gets asked about', notes: 'This is the one you asked for. Make something repeat daily, then use QA ‘+1 Day’ WITHOUT ticking it. Open 🔍 Review: it should ask about the day you missed, saying which day it was. “I did it” records it on THAT day, not today. “Let it go” clears it without pretending you did it.' },
-      { title: 'Only the most recent miss is kept', notes: 'Following on: skip several days of a daily thing in a row. You should be asked about the LAST missed day only, once — not once per day. A month of ignoring something must never produce a month of questions.' },
-      { title: 'Creating an event from the review is still to come', notes: 'You asked for “create waiting action and create event”. Only the waiting half is built; the event half waits on the projects page being able to see the calendar. Nothing to test — a note so the gap is not a surprise.' }
-    ]);
-
-    addGroupWithItems('✅ QA — Repeating events and habits', [
-      { title: 'Waiting on a repeating event', notes: 'Tick off a repeating event for today. Now make a Waiting action and tap 🪝 to pick what it waits on — under “Upcoming events” the repeating one should be offered, showing its NEXT date. Before, ticking it off made it vanish from that list until the next morning.' },
-      { title: 'The runner after a run ends', notes: 'You thought this already worked and it does — worth confirming on the phone. When a habit run ends you get a celebration on the chalkboard. Leave the page and come back: the figure is STRETCHING, ready for the next lap, and stays that way every visit until you tick the habit again. The celebration happens once; it does not nag.' }
-    ]);
-
-    addGroupWithItems('✅ QA — How the app talks', [
-      { title: 'The jargon is gone', notes: 'You flagged “open loop”. Tap ⓘ on the daily review: the second heading now reads “When something needs a decision”, and the three kinds under it are “Past its date”, “Stalled project” and “Waiting on something gone”. Tell me if any of those still read like a manual.' },
-      { title: 'Someday is called Someday everywhere', notes: 'In 🔍 Review, on a project with no way forward, the option now says “Move to Someday” — matching the lane’s actual name. It used to say “Someday/Maybe”, which is a name that exists nowhere in the app.' },
-      { title: 'Nothing explains appointments at you any more', notes: 'Add a time to an event and take it away again. Nothing anywhere should tell you that a time “makes it an appointment” — you can see that it has a time. The word still appears as a plain label on the event page badge; tell me if even that should go.' },
-      { title: 'Have a read of the information buttons', notes: 'The small i on each lane, and the ⓘ on the intray and the review. I have sent you all of that text in a file to mark up, so this is only worth doing if you would rather read it in place.' }
-    ]);
-
-    addGroupWithItems('✅ QA — Desks and decoration', [
-      { title: 'Two real wood desks', notes: '⋯ → Background. Dark wood and Rosewood are photographs of real timber, not drawn by the app — look for knots and the mirrored grain down the middle of the rosewood. Dark wood is the new default and is darkened to sit with the cards; rosewood is deliberately the bright one.' },
-      { title: 'The old drawn woods are gone', notes: 'Walnut, Oak and Ebony have been removed, as you asked. If your app was set to one of them it should quietly open on Dark wood instead — no error, no blank desk. Worth confirming, since that is the one thing that could go wrong for you specifically.' },
-      { title: 'Black lacquer, with the gold border', notes: '⋯ → Background → Black lacquer. Deep black with a warm sheen, and a gold key-fret border around the lanes. Scroll: the border must NOT jump, stretch or shimmer — that was the bug you spotted. A longer list gets a longer border, so the bottom edge moves down as you add things.' },
-      { title: 'The jade inlay', notes: 'On the lacquer desk, open the intray. Down the drawer’s inner edge is a jade strip — cloudy green, lit along one side. Tell me if it wants to be wider, or a different green.' },
-      { title: 'Every background survives a restart', notes: 'Pick any of them, then fully close and reopen the app. Same desk. Then ⋯ → Restore app to defaults: back to Dark wood.' }
-    ]);
-
-    addGroupWithItems('✅ QA — Adding to a list or a context', [
-      { title: 'The quick-add rows are gone', notes: 'As you asked. No list or context has a text box at the bottom any more.' },
-      { title: 'The + beside the count', notes: 'Open a lane with a list or a context in it. Beside the number there is a small round + in that lane’s own colour. Tapping it opens the normal page for a new item — not a cramped inline box — so you get every field.' },
-      { title: 'It puts the item where you asked', notes: 'Use the + on a LIST, fill in a title, save: the new item should appear inside that list, not loose at the top. Use the + on a CONTEXT: the context should already be filled in on the page before you type anything.' },
-      { title: 'Tapping + must not collapse the list', notes: 'The + sits in the list’s header, and tapping the header opens and closes the list. Tapping + should ONLY open the new-item page. If the list also folds shut behind it, tell me.' },
-      { title: 'It works on a closed list too', notes: 'Collapse a list, then tap its +. This works now; the old text box could not, because it lived inside the part that gets hidden.' },
-      { title: 'Long list names wrap', notes: 'The + takes a little room, so a long list name now runs onto a second line. You said that is fine — this is here so you can change your mind after living with it.' }
-    ]);
-
-    addGroupWithItems('✅ QA — Lane colours', [
-      { title: 'Projects and Notes are no longer twins', notes: 'Projects is a deeper forest green now; Notes keeps its teal. Look at the six tabs together — the two greens should read as different colours at a glance, which was the problem.' },
-      { title: 'Someday is royal blue', notes: 'The S tab, its lane header, its + button and its checkboxes should all be a clear blue rather than the old grey-blue.' },
-      { title: 'The colours follow through everywhere', notes: 'On a project, check the round jump-to-project button and the checkbox are the new green. On the calendar, a PROJECT deadline mark should be that green too. Anything still showing the old colours is a miss — tell me where.' }
+    addGroupWithItems('✅ QA — Worth a second look after these fixes', [
+      { title: 'The review still empties properly', notes: 'General sweep, since I changed several things that feed it. Work through 🔍 Review to the end. Every option should still do what it says, the count on the Review button should agree with the number of cards in the drawer, and dealing with something should make it drop out on the way back.' },
+      { title: 'The dev bar does not get in the way', notes: 'Follow-on from 3. Open a drafting page, an event page, the calendar and the review in turn with the QA time tools switched on. The floating bar should never sit on top of a button you need. If it does anywhere, tell me which page — that is a straight fix.' },
+      { title: 'Switch the dev tools off and look at it clean', notes: '⋯ → Debugging, turn everything off. The floating bar should disappear entirely and every page should go back to its normal spacing with nothing left reserved for it.' }
     ]);
     saveTasksLocal("next");
   }

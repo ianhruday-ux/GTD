@@ -190,6 +190,37 @@ with serve(DIST) as url, sync_playwright() as p:
     check(seen == 1, f"the series contributes exactly ONE review row ({seen})")
     close_review()
 
+    # ---------- ticking the LIVE past-due row retires the miss it supersedes ----
+    # ⚠ User QA: "I completed the pay rent event after it was passed due in the
+    # lane, but it still showed up in the daily review." Both halves were behaving
+    # as written and the pair was still wrong. This fixture has both a recorded
+    # miss (the 12th–14th) and a live past-due row (today, 09:00); the case above
+    # asserts only ONE row reaches the review, and it is the live one. So ticking
+    # that row was answering the only question the user had been ASKED — and the
+    # older miss, which they had never been shown, silently took its place. From
+    # the outside, completion did nothing.
+    seed(ev(recurrence="daily", date="2026-06-12", time="09:00"))
+    st = stored()
+    check(st["missed"] is not None and st["date"] == "2026-06-15",
+          f"fixture: a recorded miss AND a past-due row today ({st})")
+    ticked = pg.evaluate("""() => {
+      const row = [...document.querySelectorAll('.card')].find(c => c.textContent.includes('ZZ standup'));
+      if (!row) return 'no row';
+      const cb = row.querySelector('.checkbox, [data-action="complete"], input[type=checkbox]');
+      if (!cb) return 'no checkbox';
+      cb.click(); return 'ok';
+    }""")
+    pg.wait_for_timeout(700)
+    check(ticked == "ok", f"the past-due row is tickable in the lane ({ticked})")
+    st = stored()
+    check("2026-06-15" in st["done"], f"ticking records today's occurrence ({st})")
+    check(st["missed"] is None,
+          f"and retires the older miss it supersedes — the review only ever "
+          f"promises the MOST RECENT one ({st})")
+    check(not find_in_review("ZZ standup"),
+          "so completing it in the lane really does clear it from the review")
+    close_review()
+
     # ---------- a completed occurrence is never reported as missed ----------
     seed(ev(date="2026-06-12", completedOccs=["2026-06-12"]))
     st = stored()

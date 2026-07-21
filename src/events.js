@@ -525,18 +525,33 @@ function collapseCompletedSeries(items){
 
 // Linked-event rows for a project page (§4.15d) — displays-as-an-action,
 // nearest→farthest. Tapping opens the event page as a child screen.
-function projectLinkedEventRowsHtml(projectId){
+// `stagedEvents` are events added from an UNSAVED project page: they are not in
+// state.events yet (§12.1 staging) but the page must still show what it is about
+// to create, or adding one looks like it did nothing.
+function projectLinkedEventRowsHtml(projectId, stagedEvents){
   if (!projectId) return "";
-  const evs = (state.events || []).filter(function(ev){ return ev.linkedProjectId === projectId; });
+  const evs = (state.events || []).filter(function(ev){ return ev.linkedProjectId === projectId; })
+    .concat((stagedEvents || []).filter(function(ev){ return ev.linkedProjectId === projectId; }));
   if (!evs.length) return "";
   // Show the live occurrence at its EFFECTIVE date/time (a moved one included).
   evs.sort(function(a, b){ return (effDate(a, a.date) + (effTime(a, a.date) || "99:99")).localeCompare(effDate(b, b.date) + (effTime(b, b.date) || "99:99")); });
+  const stagedIds = {};
+  (stagedEvents || []).forEach(function(ev){ stagedIds[ev.id] = 1; });
   return evs.map(function(ev){
     const d = dateStrToDate(effDate(ev, ev.date));
     const when = d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) + (effTime(ev, ev.date) ? " · " + effTime(ev, ev.date) : "");
-    let row = '<button type="button" class="linked-action-item" data-action="open-event" data-id="' + ev.id + '">' +
-      '<span class="kind-dot kind-event" aria-hidden="true"></span>' + escapeHtml(effTitle(ev, ev.date)) +
-      ' <span class="cal-agenda-kind">' + escapeHtml(when) + '</span></button>';
+    // A staged event has no event page to open — it is not in state.events yet, so
+    // openEventScreen would find nothing. It renders as an inert row until the
+    // project save makes it real, which is also the honest signal that it is not
+    // committed.
+    const staged = !!stagedIds[ev.id];
+    let row = staged
+      ? '<span class="linked-action-item linked-action-staged" title="Saves with this project">' +
+          '<span class="kind-dot kind-event" aria-hidden="true"></span>' + escapeHtml(effTitle(ev, ev.date)) +
+          ' <span class="cal-agenda-kind">' + escapeHtml(when) + '</span></span>'
+      : '<button type="button" class="linked-action-item" data-action="open-event" data-id="' + ev.id + '">' +
+          '<span class="kind-dot kind-event" aria-hidden="true"></span>' + escapeHtml(effTitle(ev, ev.date)) +
+          ' <span class="cal-agenda-kind">' + escapeHtml(when) + '</span></button>';
     // §4.15d: a Waiting action hooked to this linked event nests beneath it,
     // the same as one hooked to a linked action (chunk 8 event-conditioning).
     state.tasks.waiting.forEach(function(t){
@@ -569,6 +584,9 @@ function openCalendarScreen(prefill){
     calForProjectId: (prefill && prefill.forProjectId) || null,
     calForProjectName: (prefill && prefill.forProjectName) || "",
     calForProjectDeadline: (prefill && prefill.forProjectDeadline) || null,
+    // Set only when the project page that opened this is UNSAVED — calAdd then
+    // stages the event into that page's draft instead of writing it (§12.1).
+    calForProjectStaging: (prefill && prefill.forProjectStaging) || null,
     calError: null
   };
   renderScreen();
@@ -1392,10 +1410,22 @@ function calAdd(){
       paused: false, contextId: null, linkedProjectId: forProject,
       seriesId: (s.calRecur && s.calRecur !== "none") ? genId() : null, tickler: !!s.calTickler, completedOccs: []
     };
-    state.events.push(ev);
-    saveEvents();
-    processEventBoundaries();
-    renderLane("next"); renderLane("waiting");
+    // ⚑ Opened from an UNSAVED project page (§12.1): stage the event into that
+    // page's draft rather than writing it, so ✕ takes it with the project and
+    // Save lands them together. calForProjectStaging is only set on that path —
+    // every other caller writes straight through, as before.
+    const staging = s.calForProjectStaging;
+    if (staging && staging.parent && staging.parent.draft && staging.parent.draft.staged){
+      staging.parent.draft.staged.eventCreates.push(ev);
+      // Clear the parent's blocked-save outline the same way stageChildSave does:
+      // an event IS a way forward (§4.3b), so it satisfies the requirement.
+      if (staging.parent.invalidField === "projectActions") staging.parent.invalidField = null;
+    } else {
+      state.events.push(ev);
+      saveEvents();
+      processEventBoundaries();
+      renderLane("next"); renderLane("waiting");
+    }
     consumeCalCapture();
   } else {
     // Deadline → a Next Action or Current Project due that day (§4.15a).
