@@ -883,6 +883,21 @@
         }
       }
     }
+    // ⚑ A deleted PROJECT leaves its events pointing at nothing. Their
+    // behaviour was already right — an event with a dangling link keeps firing
+    // as an ordinary calendar entry, which is the "unlink, don't delete" answer
+    // — so this is hygiene rather than a behaviour change: clear the id so the
+    // event page's project dropdown does not carry a reference to a project
+    // that is gone. Deliberately NOT deleting the events: a meeting can outlive
+    // the project it was booked for, and silently deleting calendar entries as
+    // a side effect of deleting a project would be a nasty surprise.
+    if (isProjectKind(kind)){
+      let touched = false;
+      (state.events || []).forEach(function(ev){
+        if (ev.linkedProjectId === taskId){ ev.linkedProjectId = null; touched = true; }
+      });
+      if (touched) saveEvents();
+    }
     state.tasks[kind] = state.tasks[kind].filter(function(t){ return t.id !== taskId && t.parent !== taskId; });
     if (kind === "habit" && state.habitRuns[taskId]){ delete state.habitRuns[taskId]; saveHabitRuns(); }
     saveTasksLocal(kind);
@@ -1136,6 +1151,41 @@
     archived[projectId] = (archived[projectId] || []).concat(tasks.map(function(t){ return Object.assign({}, t); }));
     saveArchivedWaiting(archived);
   }
+  // ⚑ The same treatment for a completed project's linked EVENTS, which nothing
+  // used to do. Completing a project archived its waiting items — with a dialog
+  // saying so — and silently left its events running: a weekly site meeting on a
+  // finished project kept minting a Next Action every week, for ever. Archived
+  // rather than deleted for exactly the reason the waiting items are: completing
+  // a project is easy to do by mistake, and a deleted series cannot be got back.
+  function loadArchivedEvents(){ return Storage.getJSON("gtd_archived_events", {}); }
+  function saveArchivedEvents(obj){ Storage.setJSON("gtd_archived_events", obj); }
+  function archiveEventsForProject(projectId){
+    const linked = (state.events || []).filter(function(ev){ return ev.linkedProjectId === projectId; });
+    if (!linked.length) return 0;
+    const archived = loadArchivedEvents();
+    archived[projectId] = (archived[projectId] || []).concat(linked.map(function(ev){ return Object.assign({}, ev); }));
+    saveArchivedEvents(archived);
+    // Take the live rows with them: an archived event must stop appearing in
+    // Next Actions, which is the whole point.
+    linked.forEach(function(ev){ removePseudoRow(ev.id); });
+    const ids = new Set(linked.map(function(ev){ return ev.id; }));
+    state.events = state.events.filter(function(ev){ return !ids.has(ev.id); });
+    saveEvents();
+    return linked.length;
+  }
+  // The mirror, ready for the un-complete control the same way
+  // restoreWaitingForProject is. Not wired to a button yet.
+  function restoreEventsForProject(projectId){
+    const archived = loadArchivedEvents();
+    const rows = archived[projectId];
+    if (!rows || !rows.length) return 0;
+    state.events = (state.events || []).concat(rows.map(function(ev){ return Object.assign({}, ev); }));
+    delete archived[projectId];
+    saveArchivedEvents(archived);
+    saveEvents();
+    processEventBoundaries();
+    return rows.length;
+  }
   // Restores a project's archived Waiting actions back into the live
   // Waiting list. Not wired to any button yet — the un-complete-project
   // control that would call this is chunk 5's Completed section; this is
@@ -1181,17 +1231,35 @@
     const linked = linkedActionsForProject(projectId);
     const waitingLinked = linked.filter(function(l){ return l.kind === "waiting"; });
     const nextLinked = linked.filter(function(l){ return l.kind === "next"; });
+    // \u2691 Events are counted and archived alongside the waiting items now. They
+    // were previously left running, which meant a repeating event on a finished
+    // project went on producing a Next Action indefinitely.
+    const eventCount = (state.events || []).filter(function(ev){ return ev.linkedProjectId === projectId; }).length;
     function doComplete(){
       nextLinked.forEach(function(l){ completeTask(l.kind, l.task.id); });
       if (waitingLinked.length){
         archiveWaitingForProject(projectId, waitingLinked.map(function(l){ return l.task; }));
         waitingLinked.forEach(function(l){ deleteTask(l.kind, l.task.id); });
       }
+      if (eventCount){
+        archiveEventsForProject(projectId);
+        renderLane("next"); renderLane("waiting");
+      }
       completeTask(kind, projectId);
     }
-    if (waitingLinked.length){
+    // One sentence per thing that is about to happen, naming both \u2014 a dialog
+    // that mentioned only the waiting items while also archiving the calendar
+    // entries would be worse than the silent version it replaces.
+    const parts = [];
+    if (waitingLinked.length) parts.push(waitingLinked.length + " linked waiting item" + (waitingLinked.length === 1 ? "" : "s"));
+    if (eventCount) parts.push(eventCount + " linked calendar " + (eventCount === 1 ? "entry" : "entries"));
+    if (parts.length){
+      const what = parts.join(" and ");
+      const many = (waitingLinked.length + eventCount) > 1;
       openConfirmDialog(
-        "This project has " + waitingLinked.length + " linked waiting item" + (waitingLinked.length === 1 ? "" : "s") + ". Completing the project will archive " + (waitingLinked.length === 1 ? "it" : "them") + " \u2014 you can restore " + (waitingLinked.length === 1 ? "it" : "them") + " later if this was a mistake.",
+        "This project has " + what + ". Completing it will put " + (many ? "them" : "it") +
+        " aside \u2014 " + (many ? "they" : "it") + " will stop appearing, and " +
+        (many ? "they" : "it") + " can be brought back if this was a mistake.",
         [
           { label: "Complete project", style: "primary", action: doComplete },
           { label: "Cancel", action: function(){} }
@@ -1203,18 +1271,46 @@
   }
 
   // Current -> Future demotion: future projects can't have linked actions.
+  //
+  // ⚑ Nor linked EVENTS, and that is the fix here. A project moved to Someday
+  // used to keep its calendar entries firing — the app interrupting you about
+  // something you had explicitly parked. The rule already existed for actions;
+  // events were simply never included in it.
+  //
+  // ⚑ I had proposed pausing the series instead. The codebase had already ruled
+  // on this exact shape and the precedent is better: a Someday project holds no
+  // links at all, and the user chooses unlink or delete. An unlinked event keeps
+  // firing as an ordinary calendar entry, exactly as an unlinked action stays in
+  // its lane — the meeting may still be real even if the project is parked.
   function demoteProjectToFuture(projectId){
     const linked = linkedActionsForProject(projectId);
-    if (!linked.length){ changeKind("current", "future", projectId).then(function(){ if (state.screen) closeScreen(); }); return; }
+    const linkedEvents = (state.events || []).filter(function(ev){ return ev.linkedProjectId === projectId; });
+    if (!linked.length && !linkedEvents.length){
+      changeKind("current", "future", projectId).then(function(){ if (state.screen) closeScreen(); });
+      return;
+    }
+    function unlinkEvents(){
+      linkedEvents.forEach(function(ev){ ev.linkedProjectId = null; });
+      if (linkedEvents.length){ saveEvents(); renderLane("next"); }
+    }
+    function deleteEvents(){
+      linkedEvents.forEach(function(ev){ deleteEventEntirely(ev); });
+    }
+    const nouns = [];
+    if (linked.length) nouns.push("actions");
+    if (linkedEvents.length) nouns.push("calendar entries");
+    const what = nouns.join(" or ");
     openConfirmDialog(
-      "Future projects can't have linked actions. Do you want to unlink your actions or delete them?",
+      "Someday projects can't hold linked " + what + ". Unlink " + (nouns.length > 1 ? "them" : "them") + ", or delete " + (nouns.length > 1 ? "them" : "them") + "?",
       [
-        { label: "Unlink actions", style: "primary", action: function(){
+        { label: "Unlink", style: "primary", action: function(){
             linked.forEach(function(l){ setLink(l.kind, l.task.id, null); });
+            unlinkEvents();
             changeKind("current", "future", projectId).then(function(){ if (state.screen) closeScreen(); });
           } },
-        { label: "Delete actions", style: "danger", action: function(){
+        { label: "Delete", style: "danger", action: function(){
             linked.forEach(function(l){ deleteTask(l.kind, l.task.id); });
+            deleteEvents();
             changeKind("current", "future", projectId).then(function(){ if (state.screen) closeScreen(); });
           } },
         { label: "Cancel", action: function(){} }
