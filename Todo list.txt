@@ -51,6 +51,12 @@ Still to do (as of 20 July, end of day)
 - Events on the project page. The collision analysis is at the bottom of
   INFO-TEXT.txt and needs my rulings before it can be built. Also unblocks
   "create event" in the daily review.
+- Linked notes on the project page. Checked: the link only runs one way today.
+  A note can link to a project and shows a chip for it, but the project page
+  lists linked ACTIONS and linked EVENTS and nothing for notes. One thing to
+  decide before it gets built: the project page has no tabs at all right now,
+  so "a tab for linked notes" either introduces tabs to that page or becomes a
+  third section alongside the other two.
 - Re-test export/import against the fields added today: deadline.setAt,
   deadline.pushCount, missedOcc, and the new background ids. Backups are the
   one thing that has to survive real use, and nothing has exercised them
