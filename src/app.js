@@ -1374,7 +1374,13 @@
     let html = '<option value="">No linked project</option>';
     if (state.tasks.current.length){
       html += '<optgroup label="' + escapeHtml(LIST_TITLES.current) + '">';
-      state.tasks.current.filter(function(t){ return !t.isGroup; }).forEach(function(t){
+      // ⚑ Dev scaffolding excluded, same reasoning as the note picker: the chunk
+      // map injects ~26 rows into Current Projects, and a chooser that buries the
+      // two real ones under them is not a chooser. An item ALREADY linked to one
+      // still lists it, so an existing selection can never silently vanish.
+      state.tasks.current.filter(function(t){
+        return !t.isGroup && (!isDevScaffold(t) || t.id === selectedId);
+      }).forEach(function(t){
         html += '<option value="' + t.id + '"' + (t.id === selectedId ? " selected" : "") + '>' + escapeHtml(t.title) + '</option>';
       });
       html += '</optgroup>';
@@ -5431,7 +5437,7 @@
     // chunk 8 (the user has finished walking all three). §8.1's replace-don't-
     // accumulate discipline is restored: this is the ONLY injector again, and
     // the two additive ones are deleted rather than left dormant.
-    const FLAG = "gtd_qa_checklist_postsprint_v6";
+    const FLAG = "gtd_qa_checklist_postsprint_v7";
     if (Storage.get(FLAG)) return;
     Storage.set(FLAG, "1");
     // Retire the superseded flags so they can't resurrect their injectors, and
@@ -5440,7 +5446,7 @@
      "gtd_qa_checklist_override_v2", "gtd_qa_checklist_chunk8_v1",
      "gtd_qa_checklist_postsprint_v1", "gtd_qa_checklist_postsprint_v2",
      "gtd_qa_checklist_postsprint_v3", "gtd_qa_checklist_postsprint_v4",
-     "gtd_qa_checklist_postsprint_v5"].forEach(Storage.remove);
+     "gtd_qa_checklist_postsprint_v5", "gtd_qa_checklist_postsprint_v6"].forEach(Storage.remove);
 
     // Replace, don't accumulate (8.1) — and actually mean it this time.
     // Earlier rounds bumped the flag but left the previous rounds' groups
@@ -5471,14 +5477,22 @@
 
     addGroupWithItems('✅ QA — The seven things you reported', [
       { title: '1. Ticking a past-due repeat clears it from the review', notes: 'Your report: you completed Pay rent after it was past due in the lane and it still turned up in the daily review. What was happening: a repeating thing can be BOTH past due today and have an older day you missed. The review only ever shows you one of them — the recent one — so ticking that one let the older one pop up in its place, and it looked like completing had done nothing. Now, answering the recent question retires the older one too. To try it: make something repeat daily, tap QA +1 Day a few times without ticking it, then tick it in the lane. Open 🔍 Review — it should be gone, and the number on the Review button should have dropped.' },
-      { title: '2. The dialog when leaving a repeating event — I could not reproduce this', notes: 'I could not make this happen, and I need one more detail from you. I armed Complete on a repeating event and left with ←, and with ✕, and from the lane, the calendar and the review — no dialog appeared in any of them. Two dialogs on that page look nearly identical, so: was it the one headed "This event repeats. What would you like to do?" with Skip this one / Delete series / Cancel? Or "Apply your changes to..." with This occurrence only / All occurrences / Cancel? Worth knowing: on that page 🗑 sits immediately LEFT of the ✕, both in the top-right corner — so reaching for the exit and catching the bin would produce exactly the first dialog. If that is what happened, say so and I will move the bin somewhere it cannot be hit by accident.' },
+      { title: '2. The repeating-event dialog — closed, not reproducible', notes: 'You reported a delete dialog when leaving a repeating event after completing it. Neither of us could reproduce it: I tried every exit path (←, ✕, from the lane, the calendar and the review) and you could not make it happen again either. Closing it as either hyper-specific or a mis-tap — worth knowing that 🗑 sits immediately left of ✕ on that page, so reaching for the exit and catching the bin produces exactly that dialog. Nothing to test; reopen it if you ever see it again, and note what you tapped.' },
       { title: '3. The clock buttons now work from inside the calendar', notes: 'You could not advance the day or time from the calendar list view. It was not the list view — the QA buttons sit under the lanes, and every full-screen page covered them completely. They now float along the BOTTOM of the screen whenever a page is open, so you can jump the clock while watching the calendar, an event page or the review update. Check they do not cover anything you need — particularly the green Complete button on a drafting page, which used to sit exactly where the bar now goes.' },
       { title: '4. You can open a revealed card in the intray', notes: 'You said stopping people entering a revealed card was too strict, and that hitting Reveal is already opting out of the one-at-a-time rule. Agreed. Open the intray, tap Reveal, then tap any of the blacked-out-now-readable cards — it should close the drawer and open that item’s real page. Blacked-out cards still cannot be tapped, which is the part that was actually doing a job.' },
       { title: '5. The quick-add box in the review takes typing again', notes: 'The bad one. In 🔍 Review, on a project with no way forward, tapping "Add a next action" and then the text box opened the DATE PICKER instead of the keyboard — so the box could not be typed in at all. Cause: every box in the review shared a class name with the date field, and that class was what summoned the picker. Try typing in it now. Also check the two boxes on "Add a waiting action". (I checked the rest of the app for the same mistake — the date and time fields elsewhere are hooked up properly, so this was the only place it leaked.)' },
       { title: '5b. And there is a Full page button beside the quick add', notes: 'You asked to keep the quick add but be able to reach the real creation page for the extra fields. In that same form, between Cancel and Add, there is now "Full page →". It carries across whatever you have already typed and pre-fills the project link, and saving it brings you back to the review with the project no longer listed. Nothing is written unless you save that page.' },
       { title: '6. New event on the project CREATION page', notes: 'The + New event button used to appear only on projects you had already saved. It is now on the creation page too. The important bit to test is that it stays a DRAFT: start a new project, add an event to it, then leave with ✕ and choose Discard. Check your calendar — that event must NOT be there. Then do it again and save with ←: the project and the event should both appear, and the project should not be flagged as having no next step. While unsaved, the event shows on the page as a dashed row you cannot tap — it has no page of its own until it is real.' },
       { title: '6b. The no-actions warning waits until you try to leave', notes: 'Also yours. Start a new project: the "No linked actions yet" line should NOT be there while the page is blank — it used to appear immediately, telling you off before you had typed the title. Type a title and tap ← with nothing linked: NOW it appears, along with the dashed outline. Add an action OR an event and it clears. On a project you have already saved it still shows live, because there it is a true statement about a real thing.' },
-      { title: '7. Naming a new list or context no longer drags the screen', notes: 'You reported the viewport force-scrolling to the bottom and pinning you there. The naming box was being focused without telling the browser where to point the camera, so it picked — and on a phone it picked again after the keyboard opened, which is why you could not scroll away. It now jumps to the top of the lane, which is where the box actually is. This one I could not reproduce on a desktop browser, so it needs your phone: use the + button, choose New context or New list, and tell me where the screen ends up.' }
+      { title: '7. Naming a new list or context — CONFIRMED FIXED on your phone', notes: 'You confirmed this now works on a phone. Nothing to retest; here so the round’s record is complete. The cause was the naming box being focused without telling the browser where to point the camera, so it chose — and chose again once the keyboard resized the viewport, which is why you could not scroll away from it.' },
+    ]);
+
+    addGroupWithItems('✅ QA — The full event creation page', [
+      { title: 'More options opens the real event page', notes: 'You asked for this: you could not link an event to a project or give it a context while creating one. Open the calendar and look under the creation controls — there is now “More options →”. It opens the same event page you get when you tap an existing event, with everything you have already typed carried across. It is only on the Event side; the Deadline side creates an action or project, which has its own page already.' },
+      { title: 'The two fields you actually wanted', notes: 'On that page, set a context and a linked project, then save. Check the event afterwards: both should have stuck. If it repeats and has a context, the action it creates on its day should land inside that context in Next Actions.' },
+      { title: 'The buttons that should NOT be there', notes: 'You said to remove Complete and Delete. Confirm both are gone on the creation page — and tell me if you disagree with two more I also hid for the same reason: Pause (pausing a repeat that does not exist yet) and “make this a habit instead” (which needs a real event; the calendar row still offers it before you come here).' },
+      { title: 'Backing out creates nothing', notes: 'The important one. Type a title, tap More options, fill things in, then leave with ✕. Nothing should appear in your calendar. Do it again and leave with ← and an EMPTY title — also nothing, silently, the same as every other creation page in the app.' },
+      { title: 'Adding an event to a project from its own page', notes: 'Worth rechecking together with the above, since they share the same plumbing: open a project, use + New event, and confirm the event still lands linked to that project.' }
     ]);
 
     addGroupWithItems('✅ QA — Worth a second look after these fixes', [

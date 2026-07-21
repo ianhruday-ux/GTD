@@ -921,6 +921,12 @@ function calCreateRowHtml(s){
         '</div>' +
         habitBubble +
         '<label class="cal-tickler-row"><input type="checkbox" data-calfield="tickler"' + (s.calTickler ? " checked" : "") + '> Hide until the day it happens</label>' +
+        // ⚑ The way to a context and a project link (user). Events only: the
+        // Deadline side of this row creates a TASK, which has its own drafting
+        // page and its own route to those fields already.
+        '<button type="button" class="cal-advanced-btn" data-action="cal-advanced" ' +
+          'title="Open the full page — context, project link, and everything here">' +
+          'More options &#8594;</button>' +
       '</div>';
   } else {
     controls =
@@ -1043,14 +1049,57 @@ function openEventScreen(eventId, occDate){
   };
   renderScreen();
 }
+// ⚑ THE ADVANCED CREATION PAGE (user: "It's currently not possible to link an
+// event to a project, or add it to a context during event creation. I suggest
+// putting an advanced options button that will open a full creation page near
+// the calendar controls. The page is already built. You just need to reuse the
+// drafting page and remove the complete and delete buttons.")
+//
+// Exactly that: the same eventView screen, opened with no eventId. Everything
+// the quick-add row already holds is carried across so nothing typed is lost on
+// the way in, and the two fields the row cannot offer — context and project link
+// — are the reason to come here at all.
+//
+// WHAT IS HIDDEN IN CREATE MODE, and why each one has to be:
+//   · 🗑 Delete   — screenHeaderHtml already keys it to s.taskId, so it drops out
+//                   on its own once taskId is null. Nothing to delete.
+//   · Complete    — "this thing I have not made yet is done" is incoherent.
+//   · Pause       — pausing a series that does not exist yet is the same shape.
+//   · Make habit  — makeHabitFromEvent needs a real event; the quick-add row
+//                   already offers this affordance, so nothing is lost.
+//   · The "editing the occurrence on…" hint — there is no occurrence yet, and
+//     no this-one-or-all question at save.
+function openEventCreateScreen(){
+  const s = state.screen;   // the calendar screen we are leaving
+  state.screenStack.push(s);
+  state.screen = {
+    kind: "event", eventView: true, eventCreate: true,
+    taskId: null, eventId: null, occDate: null,
+    // Carried so the advanced page can honour a project-page origin exactly as
+    // the quick-add row does — including the staging contract (§12.1).
+    calForProjectStaging: s.calForProjectStaging || null,
+    calFromCaptureId: s.calFromCaptureId || null,
+    draft: {
+      title: s.calName || "", notesClean: s.calDesc || "",
+      date: s.calSel, time: s.calTime || null,
+      recurrence: s.calRecur || "none", interval: s.calInterval || 1,
+      paused: false, contextId: null,
+      linkedProjectId: s.calForProjectId || null,
+      tickler: !!s.calTickler, willComplete: false
+    }
+  };
+  renderScreen();
+}
+
 function eventBodyHtml(s){
   const d = s.draft;
+  const creating = !s.eventId;
   const ev = findEvent(s.eventId) || {};
   const doneToday = (ev.completedOccs || []).indexOf(s.occDate || d.date) !== -1; // completion keyed by canonical
   let fields = "";
   // On a recurring series, name the occurrence being edited so "this occurrence
   // only" vs "all occurrences" (offered at save) has a clear referent.
-  if (isRecurring({ recurrence: d.recurrence })){
+  if (!creating && isRecurring({ recurrence: d.recurrence })){
     const occ = dateStrToDate(s.occDate || d.date);
     fields += '<div class="event-occ-hint">Editing the occurrence on ' +
       escapeHtml(occ.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })) +
@@ -1083,22 +1132,31 @@ function eventBodyHtml(s){
     (d.recurrence !== "none" ? '<span class="cal-hint">every</span><input type="number" min="1" class="cal-interval" data-field="event-interval" value="' + (d.interval || 1) + '">' : "") +
     '</div></div>';
   // "Make this a habit instead" (§4.15b) — daily/weekly only, load-bearing.
-  if (d.recurrence === "daily" || d.recurrence === "weekly"){
+  // Edit-only: makeHabitFromEvent needs a real event, and the calendar's quick-add
+  // row already carries this same offer for something being created.
+  if (!creating && (d.recurrence === "daily" || d.recurrence === "weekly")){
     fields += '<button type="button" class="cal-habit-bubble" data-action="event-make-habit">Recurring chore? Make this a habit instead &#8594;</button>';
   }
-  // Context (edit-only, §4.15a) + project link (§4.15d)
+  // Context + project link (§4.15a/§4.15d) — the two fields the calendar's
+  // quick-add row cannot offer, and therefore the whole reason this page has an
+  // "advanced options" entry point of its own.
   fields += contextRowHtml(d);
   fields += '<div class="screen-row"><div class="screen-boxed-row"><span class="field-icon">&#128279;</span>' +
     '<select class="screen-link-select" data-field="linkedProjectId">' + projectOptionsHtml(d.linkedProjectId) + '</select></div></div>';
   // Tickler toggle (user addition)
   fields += '<label class="cal-tickler-row"><input type="checkbox" data-field="event-tickler"' + (d.tickler ? " checked" : "") + '> Hide until the day it happens</label>';
-  // Pause — recurring only, draft-only + armed (§4.15b, golden-rule sibling)
-  if (isRecurring({ recurrence: d.recurrence })){
+  // Pause — recurring only, draft-only + armed (§4.15b, golden-rule sibling).
+  // Edit-only: pausing a series that does not exist yet is incoherent.
+  if (!creating && isRecurring({ recurrence: d.recurrence })){
     fields += '<button type="button" class="btn screen-pause-btn' + (d.paused ? " armed" : "") + '" data-action="event-toggle-pause">' +
       (d.paused ? "&#9208; Paused — resume on save" : "&#9208; Pause series") + '</button>';
   }
-  // Complete — draft-only, arms on save (§4.14: completes like a Next Action)
+  // Complete — draft-only, arms on save (§4.14: completes like a Next Action).
+  // Edit-only (user: "remove the complete and delete buttons"): marking something
+  // done before it has been created is incoherent, and 🗑 drops out on its own
+  // because screenHeaderHtml keys it to s.taskId, which is null here.
   const armed = !!d.willComplete;
+  if (!creating){
   // ⚑ QA #27: this emitted `armed`, but .screen-complete-pill only styles
   // `.done` (and `.paused`) — .screen-complete-pill.armed matches no rule
   // anywhere, so the armed state on THIS page alone rendered unshaded. The
@@ -1108,6 +1166,7 @@ function eventBodyHtml(s){
   // .screen-make-kind-btn, which do define it.)
   fields += '<button type="button" class="btn screen-complete-pill' + (armed ? " done" : "") + '" data-action="event-complete">' +
     (armed ? "&#10003; Completing on save" : (doneToday ? "&#10003; Completed today — tap to reopen on save" : "Mark complete")) + '</button>';
+  }
   return '<div class="screen-body">' + fields + '</div>';
 }
 
@@ -1118,6 +1177,40 @@ function eventBodyHtml(s){
 // a dialog that mirrors the recurring-delete one (user #3).
 function saveEventScreen(s){
   const d = s.draft;
+  // ---- CREATE (the advanced options page, §4.15a) ----
+  // Deliberately its own short path rather than a branch woven through the edit
+  // logic below: there is no occurrence to scope to, no this-one-or-all question,
+  // and no override to reconcile. Sharing that machinery would mean guarding
+  // every step of it against a state it can never be in.
+  if (s.eventCreate){
+    const title = (d.title || "").trim();
+    // House rule (§4.6): an empty title on a CREATE is a silent discard, exactly
+    // as it is on every other drafting page.
+    if (!title){ closeScreen(); return; }
+    if (eventTitleClashes(title, null)){ s.invalidField = "title"; renderScreen(); return; }
+    const recur = d.recurrence || "none";
+    const newEv = {
+      id: genId(), taskId: genId(), title: title,
+      date: d.date || todayStr(), time: d.time || null,
+      notesClean: d.notesClean || "", recurrence: recur,
+      interval: Math.max(1, d.interval || 1), paused: false,
+      contextId: d.contextId || null, linkedProjectId: d.linkedProjectId || null,
+      seriesId: recur !== "none" ? genId() : null,
+      tickler: !!d.tickler, completedOccs: []
+    };
+    commitNewEvent(newEv, s.calForProjectStaging);
+    // The capture that sent us here is filed by the same rule the quick-add row
+    // uses — but consumeCalCapture reads state.screen, and this screen is the
+    // event page rather than the calendar, so hand it the id directly.
+    if (s.calFromCaptureId){
+      removeCapture(s.calFromCaptureId);
+      s.calFromCaptureId = null;
+      const cd = dateStrToDate(newEv.date);
+      showItMovedBanner("Scheduled for " + cd.toLocaleDateString(undefined, { month: "short", day: "numeric" }) + " — in your calendar");
+    }
+    closeScreen();
+    return;
+  }
   const ev = findEvent(s.eventId);
   if (!ev){ closeScreen(); return; }
   const occDate = s.occDate || ev.date; // canonical key of the occurrence being edited
@@ -1341,6 +1434,7 @@ function eventsHandleClick(e){
     const dlf = e.target.closest('[data-action="cal-dlfor"]');
     if (dlf){ s.calDeadlineFor = dlf.getAttribute("data-for"); renderScreen(); return true; }
     if (e.target.closest('[data-action="cal-add"]')){ calAdd(); return true; }
+    if (e.target.closest('[data-action="cal-advanced"]')){ openEventCreateScreen(); return true; }
     if (e.target.closest('[data-action="cal-make-habit"]')){ calMakeHabit(); return true; }
     const openEvt = e.target.closest('[data-action="cal-open-event"]');
     if (openEvt){ state.screenStack.push(s); state.screen = null; openEventScreen(openEvt.getAttribute("data-id"), openEvt.getAttribute("data-date") || null); return true; }
@@ -1410,22 +1504,7 @@ function calAdd(){
       paused: false, contextId: null, linkedProjectId: forProject,
       seriesId: (s.calRecur && s.calRecur !== "none") ? genId() : null, tickler: !!s.calTickler, completedOccs: []
     };
-    // ⚑ Opened from an UNSAVED project page (§12.1): stage the event into that
-    // page's draft rather than writing it, so ✕ takes it with the project and
-    // Save lands them together. calForProjectStaging is only set on that path —
-    // every other caller writes straight through, as before.
-    const staging = s.calForProjectStaging;
-    if (staging && staging.parent && staging.parent.draft && staging.parent.draft.staged){
-      staging.parent.draft.staged.eventCreates.push(ev);
-      // Clear the parent's blocked-save outline the same way stageChildSave does:
-      // an event IS a way forward (§4.3b), so it satisfies the requirement.
-      if (staging.parent.invalidField === "projectActions") staging.parent.invalidField = null;
-    } else {
-      state.events.push(ev);
-      saveEvents();
-      processEventBoundaries();
-      renderLane("next"); renderLane("waiting");
-    }
+    commitNewEvent(ev, s.calForProjectStaging);
     consumeCalCapture();
   } else {
     // Deadline → a Next Action or Current Project due that day (§4.15a).
@@ -1448,6 +1527,28 @@ function calAdd(){
   s.calName = ""; s.calDesc = ""; s.calTime = ""; s.calInvalid = false;
   renderScreen();
 }
+// The single place a NEW event becomes real. Both creation routes go through it
+// — the calendar's quick-add row and the advanced page (§4.15a) — so the staging
+// rule can never drift between them.
+//
+// ⚑ Opened from an UNSAVED project page (§12.1): stage the event into that
+// page's draft rather than writing it, so ✕ takes it with the project and Save
+// lands them together. `staging` is only set on that path; every other caller
+// writes straight through.
+function commitNewEvent(ev, staging){
+  if (staging && staging.parent && staging.parent.draft && staging.parent.draft.staged){
+    staging.parent.draft.staged.eventCreates.push(ev);
+    // Clear the parent's blocked-save outline the same way stageChildSave does:
+    // an event IS a way forward (§4.3b), so it satisfies the requirement.
+    if (staging.parent.invalidField === "projectActions") staging.parent.invalidField = null;
+    return;
+  }
+  state.events.push(ev);
+  saveEvents();
+  processEventBoundaries();
+  renderLane("next"); renderLane("waiting");
+}
+
 // A capture sorted to Calendar (§4.8b Calendar chip) is filed once something
 // is created from it; fire the "it moved" banner (§4.15e).
 function consumeCalCapture(dateStr){

@@ -1567,6 +1567,15 @@ body.has-frame .tray-drawer::after{
   color:var(--purple); border-radius:8px; padding:7px 12px; font-size:12px; font-weight:600; text-align:left;
 }
 .cal-habit-bubble:hover{ background:rgba(142,111,176,0.2); }
+/* "More options →" — the way from the quick-add row to the full event page.
+   Deliberately quieter than the habit bubble beside it: that one makes a
+   suggestion about what you are building, this one just opens a door. */
+.cal-advanced-btn{
+  align-self:flex-start; border:1px solid rgba(255,255,255,0.18); background:transparent;
+  color:var(--text-soft); border-radius:8px; padding:7px 12px; font-size:12px;
+  font-weight:600; text-align:left;
+}
+.cal-advanced-btn:hover{ background:rgba(255,255,255,0.08); color:var(--text-primary); }
 .screen-pause-btn{
   align-self:stretch; border:1px solid var(--dusty); background:transparent; color:var(--dusty);
   border-radius:8px; padding:9px 12px; font-size:13px; font-weight:600; text-align:center;
