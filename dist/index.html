@@ -8295,26 +8295,39 @@ function injectChunkMap(){
   //     redaction (§4.8b): cherry-picking blind makes the discipline decorative
   //   · revealed, they name the kind ("stalled project"), because the title
   //     alone does not say why it is in the list
-  // ⚑ Past-due items are deliberately NOT included: they are time-driven, they
-  // already carry their own bar and chip in the lanes, and putting them here
-  // would make the drawer a second review rather than a way in to the first.
+  // ⚑ EVERY kind the badge counts, past-due included (user: "passed due should
+  // show up"). An earlier version left past-due out, reasoning that those items
+  // already carry a bar and chip in the lanes — but that reasoning reproduced
+  // the exact bug this feature exists to fix: with two overdue items and no
+  // captures, the badge read 2 and the drawer still said "nothing slipping
+  // through the cracks". The invariant is simple and worth stating: the list
+  // shows one card per thing the badge counts, always.
   function trayDerivedLoops(){
-    return computeOpenLoops().filter(function(l){
-      return l.kind === "stalled" || l.kind === "orphaned";
-    });
+    return computeOpenLoops().filter(function(l){ return l.kind !== "capture"; });
   }
   // ⚑ Plain descriptions, not the internal kind names (user: the jargon pass).
-  // "no way forward" is the same wording the review card already uses for a
-  // stalled project, so the drawer and the review say the same thing.
-  const TRAY_LOOP_LABEL = { stalled: "no way forward", orphaned: "waiting on something gone" };
+  // "no way forward" is the wording the review card already uses for a stalled
+  // project, so the drawer and the review say the same thing about it.
+  const TRAY_LOOP_LABEL = {
+    stalled: "no way forward",
+    orphaned: "waiting on something gone",
+    pastdue: "past its date",
+    missed: "a repeat you missed"
+  };
+  // A loop's title comes from different places by kind: a lane row for most, but
+  // a missed repeat has no row at all — it is the event plus a date.
+  function trayLoopTitle(loop){
+    if (loop.kind === "missed") return effTitle(loop.ev, loop.occ);
+    return (loop.task && loop.task.title) || "";
+  }
   function trayLoopCardHtml(loop, revealed){
     if (!revealed){
       return '<div class="tray-card tray-card-redacted tray-card-loop">' +
         '<span class="tray-card-redaction" aria-hidden="true"></span></div>';
     }
     return '<div class="tray-card tray-card-loop">' +
-      '<span class="tray-card-text">' + escapeHtml(loop.task.title || "") +
-        ' <span class="tray-card-kind">' + TRAY_LOOP_LABEL[loop.kind] + '</span>' +
+      '<span class="tray-card-text">' + escapeHtml(trayLoopTitle(loop)) +
+        ' <span class="tray-card-kind">' + (TRAY_LOOP_LABEL[loop.kind] || "needs a decision") + '</span>' +
       '</span></div>';
   }
   function trayListHtml(){

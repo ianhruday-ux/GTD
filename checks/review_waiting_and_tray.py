@@ -139,6 +139,40 @@ with serve(DIST) as url, sync_playwright() as p:
     check(st["cards"] == before_cards + 1, f"a capture adds one card ({st['cards']})")
     check(st["badge"] == str(st["cards"]), f"and the badge keeps up ({st['badge']})")
 
+    # ---------- PAST-DUE counts too ----------
+    # ⚠ This case is why the earlier version of the feature was wrong, and why
+    # this file previously passed while the bug was live: every fixture above
+    # happens to have no overdue items, so "list length == badge" held by
+    # accident. With an overdue deadline and an overdue event and nothing else,
+    # the badge read 2 and the drawer still said "nothing slipping through the
+    # cracks" — the exact complaint the feature was built for.
+    pg.evaluate("""() => {
+      ['next','waiting','current','future'].forEach(k =>
+        localStorage.setItem('gtd_tasks_' + k, '[]'));
+      localStorage.setItem('gtd_tasks_next', JSON.stringify([{
+        id: 'zz-dl', title: 'ZZ overdue deadline', notesClean: '', linkedProjectId: null,
+        isGroup: false, parent: null, whenText: null, hooks: [], contextId: null,
+        deadline: { date: '2026-06-01', time: null } }]));
+      localStorage.setItem('gtd_events', JSON.stringify([{
+        id: 'zz-ev', taskId: 'zz-evt', title: 'ZZ overdue event', date: '2026-06-05',
+        time: null, notesClean: '', recurrence: 'none', interval: 1, paused: false,
+        contextId: null, linkedProjectId: null, seriesId: null, tickler: false,
+        completedOccs: [] }]));
+      localStorage.setItem('gtd_tray', '[]');
+    }""")
+    pg.reload(); pg.wait_for_timeout(1000)
+    open_tray()
+    st = tray_state()
+    check(not st["empty"],
+          f"with only overdue items the drawer does not claim to be empty ({st})")
+    check(st["badge"] == str(st["cards"]),
+          f"the list still matches the badge when the loops are overdue ({st})")
+    pg.evaluate("() => document.querySelector('[data-action=\"tray-reveal\"]').click()")
+    pg.wait_for_timeout(400)
+    joined = " | ".join(tray_state()["texts"])
+    check("past its date" in joined,
+          f"and an overdue item says what is wrong with it ({joined[:140]})")
+
     # ---------- genuinely empty still says so ----------
     pg.evaluate("""() => {
       localStorage.setItem('gtd_tray', '[]');

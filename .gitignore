@@ -3,3 +3,9 @@ __pycache__/
 *.pyc
 dist/index.baseline.html
 drag log*.txt
+
+# Source texture packs (Poly Haven .blend + 4K PBR maps). ~187 MB, and git
+# history cannot be trimmed afterwards — for a product whose whole build output
+# is under a megabyte, that is a permanent tax for files the app never loads.
+# Only the derived, downscaled diffuse map ships; keep the packs locally.
+*.blend.zip
