@@ -401,6 +401,50 @@ with serve(DIST) as url, sync_playwright() as p:
     check(pg.locator('[data-action="new-linked-note"]').count() == 1,
           "with the + New note button still there")
 
+    # ---------- Someday projects have NO deadline field ----------
+    # User: "Future projects don't have deadlines by definition." The field is gone
+    # from the Someday creation AND drafting pages; a Current project keeps it.
+    def has_deadline_field():
+        return pg.evaluate("""() => !!document.querySelector(
+          '[data-field="deadline-date"], .screen-date[data-field^="deadline"]')""")
+    pg.evaluate("""() => { ['#tray-root','#dialog-root','#screen-root'].forEach(s => {
+      const el = document.querySelector(s); if (el) el.innerHTML = ''; });
+      document.body.classList.remove('screen-open'); window.scrollTo(0,0); }""")
+    pg.wait_for_timeout(200)
+    pg.click('.tab[data-kind="current"]'); pg.wait_for_timeout(300)
+    pg.locator('#fab-create').click(); pg.wait_for_timeout(200)
+    pg.locator('[data-action="new-primary"]').click(); pg.wait_for_timeout(400)
+    check(has_deadline_field(), "a Current project's creation page KEEPS the deadline field")
+    pg.locator('[data-action="screen-cancel"]').click(); pg.wait_for_timeout(300)
+    pg.click('.tab[data-kind="future"]'); pg.wait_for_timeout(300)
+    pg.locator('#fab-create').click(); pg.wait_for_timeout(200)
+    pg.locator('[data-action="new-primary"]').click(); pg.wait_for_timeout(400)
+    check(not has_deadline_field(), "but a Someday creation page has NO deadline field")
+    pg.locator('[data-action="screen-cancel"]').click(); pg.wait_for_timeout(300)
+
+    # ---------- Current → Someday drops a deadline SILENTLY ----------
+    # User: "we don't need to warn anyone that they're getting stripped away."
+    pg.evaluate("""() => {
+      localStorage.setItem('gtd_tasks_current', JSON.stringify([
+        {id:'zz-dated', title:'ZZ dated proj', notesClean:'', linkedProjectId:null,
+         isGroup:false, parent:null,
+         deadline:{date:'2026-08-01', time:null, setAt:Date.now(), pushCount:0}}]));
+      localStorage.setItem('gtd_tasks_next','[]'); localStorage.setItem('gtd_events','[]');
+      localStorage.setItem('gtd_tray','[]'); }""")
+    pg.reload(); pg.wait_for_timeout(900)
+    pg.evaluate("() => { const r=document.querySelector('#tray-root'); if(r) r.innerHTML=''; }")
+    pg.click('.tab[data-kind="current"]'); pg.wait_for_timeout(300)
+    pg.locator('.card-title:has-text("ZZ dated proj")').click(); pg.wait_for_timeout(500)
+    pg.locator('[data-action="make-kind"][data-dest="future"]').click(); pg.wait_for_timeout(300)
+    pg.locator('[data-action="screen-save"]').click(); pg.wait_for_timeout(600)
+    # no linked actions/events, so no dialog at all — the convert just happens
+    check(pg.locator('.choice-dialog-backdrop').count() == 0,
+          "a dateless-but-deadlined project converts with NO warning dialog")
+    conv = pg.evaluate("""() => { const f=JSON.parse(localStorage.getItem('gtd_tasks_future')||'[]')
+      .find(t => t.id === 'zz-dated'); return f ? {inFuture:true, deadline:f.deadline} : {inFuture:false}; }""")
+    check(conv.get("inFuture"), f"it landed in Someday ({conv})")
+    check(conv.get("deadline") is None, f"and its deadline was dropped ({conv})")
+
     check(not errs, f"no JS errors ({errs[:3]})")
     b.close()
 

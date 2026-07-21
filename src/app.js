@@ -1041,6 +1041,12 @@
     if (idx === -1) return Promise.resolve(null);
     const task = list.splice(idx, 1)[0];
     task.parent = null;
+    // ⚑ A Someday project holds no deadline (user). Converting Current → Someday
+    // drops it SILENTLY — no warning: a Future project by definition has no due
+    // date, so there is nothing to preserve and nothing lost that the user did not
+    // ask for by moving it here. (This is the deadline sibling of the
+    // whenText/condition drop below — same "the destination lacks this field" rule.)
+    if (toKind === "future") task.deadline = null;
     task.linkedProjectId = (toKind === "current" || toKind === "future") ? null : task.linkedProjectId;
     // "Waiting for" only makes sense on the Waiting lane itself — Next
     // Actions can't have conditions (4.2), and Projects don't have this
@@ -3710,7 +3716,11 @@
       fields += advancedRowHtml(draft);
     } else if (isProjectKind(kind)){
       fields += '<textarea class="screen-field-desc" data-field="notesClean" placeholder="Description (optional)\u2026">' + escapeHtml(draft.notesClean) + '</textarea>';
-      fields += deadlineFieldsHtml(draft, kind);
+      // \u2691 Deadlines are CURRENT-only (user): "Future projects don't have deadlines
+      // by definition." A Someday project is one you have NOT committed to starting
+      // (\u00a74.3 / the lane's own info text), and a due date is a commitment \u2014 the two
+      // contradict. Both the creation page and the drafting page drop the field.
+      if (kind === "current") fields += deadlineFieldsHtml(draft, kind);
       if (kind === "current"){
         { // §4.3/§12.1: renders on NEW project pages too (staged children)
           const hasWay = projectDraftHasWayForward(s);
