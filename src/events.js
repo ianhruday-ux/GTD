@@ -548,7 +548,14 @@ function openCalendarScreen(prefill){
     calTab: "month", calY: d.getFullYear(), calM: d.getMonth(), calSel: sel,
     calKind: "event", calName: (prefill && prefill.name) || "", calTime: "", calDesc: "",
     calRecur: "none", calInterval: 1, calDeadlineFor: "next", calTickler: false,
-    calInvalid: false, calFromCaptureId: (prefill && prefill.fromCaptureId) || null
+    calInvalid: false, calFromCaptureId: (prefill && prefill.fromCaptureId) || null,
+    // Opened from a project page (user): the event that gets added is linked to
+    // that project, the project's deadline caps the date, and adding returns
+    // you there rather than parking you in the calendar.
+    calForProjectId: (prefill && prefill.forProjectId) || null,
+    calForProjectName: (prefill && prefill.forProjectName) || "",
+    calForProjectDeadline: (prefill && prefill.forProjectDeadline) || null,
+    calError: null
   };
   renderScreen();
 }
@@ -848,6 +855,17 @@ function calListHtml(){
 // controls beneath, quick-add rulings apply (dup check, dashed-empty).
 function calCreateRowHtml(s){
   const isEvent = s.calKind === "event";
+  // Opened from a project: say so, and say why a date might be refused, ABOVE
+  // the field rather than beside it (user). A bare dashed outline cannot
+  // explain "after the deadline" — the reason is not guessable from the field.
+  const forProject = s.calForProjectId
+    ? '<div class="cal-for-project">Adding to <b>' + escapeHtml(s.calForProjectName || "this project") + '</b>' +
+      (s.calForProjectDeadline
+        ? ' &middot; due ' + escapeHtml(dateStrToDate(s.calForProjectDeadline).toLocaleDateString(undefined, { day: "numeric", month: "short" }))
+        : "") +
+      '</div>'
+    : "";
+  const errMsg = s.calError ? '<div class="cal-error">' + escapeHtml(s.calError) + '</div>' : "";
   const seg =
     '<div class="cal-seg">' +
       '<button type="button" class="cal-seg-btn' + (isEvent ? " active" : "") + '" data-action="cal-kind" data-kind="event">Event</button>' +
@@ -891,6 +909,8 @@ function calCreateRowHtml(s){
   // calendar is fine, a collapsible creation section is not).
   return (
     '<div class="cal-create">' +
+      forProject +
+      errMsg +
       seg +
       '<div class="cal-create-main">' +
         '<input type="text" class="cal-name' + (s.calInvalid ? " field-invalid" : "") + '" data-calfield="name" placeholder="' + (isEvent ? "Event on " : "Due ") + escapeHtml(selLabel) + '…" value="' + escapeHtml(s.calName || "") + '" autocomplete="off">' +
@@ -1279,6 +1299,9 @@ function eventsHandleClick(e){
       const dt = cell.getAttribute("data-date");
       // Second tap on the already-selected day opens Day view (§4.15).
       if (s.calSel === dt && s.calTab === "month"){ s.calTab = "day"; } else { s.calSel = dt; }
+      // Picking a different day is the fix for "after the deadline", so the
+      // message clears on that input — same rule as the dashed outline.
+      s.calError = null; s.calInvalid = false;
       renderScreen(); return true;
     }
     const kb = e.target.closest('[data-action="cal-kind"]');
@@ -1316,6 +1339,7 @@ function shiftSelectedDay(dir){
   const s = state.screen;
   const d = addDaysToDate(dateStrToDate(s.calSel), dir);
   s.calSel = dateToStr(d); s.calY = d.getFullYear(); s.calM = d.getMonth();
+  s.calError = null; s.calInvalid = false;
   renderScreen();
 }
 
@@ -1329,12 +1353,29 @@ function calAdd(){
   // as its first act, so by the time the add finishes there is no longer any
   // record that this calendar was opened from the review.
   const cameFromReview = !!s.calFromCaptureId;
+  const forProject = s.calForProjectId || null;
+  // ⚑ THE DEADLINE RULE (user): an event scheduled after the project's deadline
+  // is refused, with the reason stated above the field rather than left to a
+  // bare outline.
+  //
+  // ⚑ For a REPEAT this checks the FIRST occurrence only, which is the cheap
+  // option the user chose over giving recurrence an end date. A series whose
+  // first occurrence is inside the deadline is linked and then runs on past it;
+  // the ruling was that clutter can be dealt with by deleting the series, and
+  // that an end date is its own feature rather than a rider on this one.
+  if (forProject && s.calForProjectDeadline && s.calSel > s.calForProjectDeadline){
+    s.calError = "This is scheduled after the project deadline.";
+    s.calInvalid = true;
+    renderScreen();
+    return;
+  }
+  s.calError = null;
   if (s.calKind === "event"){
     if (eventTitleClashes(name, null)){ s.calInvalid = true; renderScreen(); const el = qs(".cal-name"); if (el) el.focus(); return; }
     const ev = {
       id: genId(), taskId: genId(), title: name, date: s.calSel, time: s.calTime || null,
       notesClean: s.calDesc || "", recurrence: s.calRecur || "none", interval: Math.max(1, s.calInterval || 1),
-      paused: false, contextId: null, linkedProjectId: null,
+      paused: false, contextId: null, linkedProjectId: forProject,
       seriesId: (s.calRecur && s.calRecur !== "none") ? genId() : null, tickler: !!s.calTickler, completedOccs: []
     };
     state.events.push(ev);
@@ -1355,7 +1396,9 @@ function calAdd(){
   // review instead of leaving the user parked in the calendar to find their own
   // way home. closeScreen() pops the stack the review pushed. The "it moved"
   // banner has already said where it went, so nothing is lost by leaving.
-  if (cameFromReview){ closeScreen(); return; }
+  // Same reasoning as the review's return (QA #19): placing the thing was the
+  // whole errand, so go back where it started from.
+  if (cameFromReview || forProject){ closeScreen(); return; }
   // Otherwise the calendar is where the user chose to be: reset the row for the
   // next entry and stay put, keeping the toggles where they are.
   s.calName = ""; s.calDesc = ""; s.calTime = ""; s.calInvalid = false;

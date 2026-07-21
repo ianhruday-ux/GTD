@@ -1528,3 +1528,16 @@ body.has-frame .tray-drawer::after{
 @media (prefers-reduced-motion: reduce){
   *, *::before, *::after{ animation-duration:.001ms !important; transition-duration:.001ms !important; }
 }
+
+/* The calendar opened FROM a project (user): a line saying which project the
+   event will attach to, and — when the date is refused — why. The message goes
+   ABOVE the field because "after the deadline" is not a reason a dashed outline
+   can carry on its own. */
+.cal-for-project{
+  font-size:12px; color:var(--text-soft); margin-bottom:6px;
+}
+.cal-for-project b{ color:var(--text-primary); font-weight:600; }
+.cal-error{
+  font-size:12.5px; color:var(--red); margin-bottom:6px;
+  border-left:2px solid var(--red); padding-left:8px;
+}

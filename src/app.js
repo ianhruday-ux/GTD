@@ -3026,9 +3026,20 @@
           (noteCount ? ' <span class="seg-count">' + noteCount + '</span>' : "") +
         '</button>' +
       '</div>';
+    // ⚑ "New event" sits on the ACTIONS side, not its own: a linked event
+    // already renders in that list as a dated band above the actions, so this
+    // is the add button for a list that exists rather than a new place.
+    // ⚑ Saved projects only, and flagged. Adding an event goes through the
+    // CALENDAR, which is a separate full screen with its own commit — there is
+    // no draft to stage it into the way a note stages. Building that would mean
+    // teaching the calendar to defer a write back to a page it does not know
+    // about, which is a bigger change than the button.
+    const addEvent = s.taskId
+      ? '<button type="button" class="btn btn-ghost btn-small project-add-note" data-action="new-linked-event">+ New event</button>'
+      : "";
     const body = tab === "notes"
       ? linkedNotesListHtml(s, pid)
-      : (actionsHtml || '<div class="empty-note">Nothing linked yet.</div>');
+      : ((actionsHtml || '<div class="empty-note">Nothing linked yet.</div>') + addEvent);
     return '<div class="screen-hook-pick-label">Linked</div>' + seg + body;
   }
   // `locked` (chunk 5, §12.1): when an action is opened as a child of the
@@ -4568,6 +4579,22 @@
         state.screenStack.push(state.screen);
         state.screen = null;
         openNoteScreen(null, { projectLinks: [{ id: pid, name: pname }], staging: staging });
+        return;
+      }
+      if (e.target.closest('[data-action="new-linked-event"]')){
+        const s = state.screen;
+        const pid = s && s.taskId;
+        if (!pid) return;
+        const dl = (s.draft && s.draft.deadline && s.draft.deadline.date) || null;
+        state.screenStack.push(state.screen);
+        state.screen = null;
+        openCalendarScreen({
+          forProjectId: pid,
+          forProjectName: (s.draft && s.draft.title) || findProjectTitle(pid) || "",
+          // ⚑ Read off the DRAFT, not the stored task: if you have just typed a
+          // new deadline and not saved, that is the deadline you are working to.
+          forProjectDeadline: dl
+        });
         return;
       }
       const linkedNoteBtn = e.target.closest('[data-action="open-linked-note"]');
