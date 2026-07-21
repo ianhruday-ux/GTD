@@ -1430,6 +1430,18 @@ body.has-frame .tray-drawer::after{
 .cal-seg-btn{ background:transparent; color:var(--text-soft); border:none; font-family:var(--font-body); font-weight:600; font-size:12px; padding:6px 16px; }
 .cal-seg-btn.active{ background:var(--brass); color:var(--dark-on-accent); }
 .cal-seg-small .cal-seg-btn{ padding:5px 12px; font-size:11.5px; }
+/* The project page's Actions | Notes switch. Same control as the calendar's
+   creation row — deliberately not a new pattern for a new place. */
+/* ⚑ The lane's accent, not brass. The calendar's copy of this control is brass
+   because the calendar has no lane; on a project page everything else — the
+   badge, the Complete pill, the checkboxes — is the Projects green, and a brass
+   switch in the middle of it read as borrowed from another screen. */
+.project-linked-seg{ margin:0 0 8px 0; border-color:color-mix(in srgb, var(--lane-accent, var(--brass)) 45%, transparent); }
+.project-linked-seg .cal-seg-btn.active{ background:var(--lane-accent, var(--brass)); }
+.seg-count{
+  font-family:var(--font-mono); font-size:9.5px; opacity:0.75;
+  margin-left:3px; vertical-align:1px;
+}
 .cal-create-main{ display:flex; gap:6px; }
 .cal-name{
   flex:1; min-width:0; border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.06);

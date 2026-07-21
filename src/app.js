@@ -2952,9 +2952,59 @@
     // left over flat rather than dropping it.
     linked.forEach(function(l){ if (!rendered[l.task.id]) itemHtml(l, 0); });
     return (
-      '<div class="screen-hook-pick-label">Linked actions</div>' +
       '<div class="linked-actions-list">' + eventRows + html + '</div>'
     );
+  }
+  // Notes linked to this project (user). Titles only, most recently edited
+  // first — no tags, no preview, no chips: "just the note titles from most
+  // recent to least recent".
+  //
+  // ⚑ The link ran ONE WAY until now. A note could point at a project and show
+  // a chip for it, but the project page was built from linked actions and linked
+  // events and never looked at notes, so from the project's side they did not
+  // exist.
+  function linkedNotesListHtml(projectId){
+    if (!projectId) return '<div class="empty-note">Save the project first, then link notes to it.</div>';
+    const linked = (state.notes || [])
+      .filter(function(n){ return (n.projectLinks || []).some(function(l){ return l.id === projectId; }); })
+      .sort(function(a, b){ return (b.editedAt || 0) - (a.editedAt || 0); });
+    if (!linked.length){
+      return '<div class="empty-note">No notes linked yet. Open a note and use + to link it to this project.</div>';
+    }
+    return '<div class="linked-actions-list">' + linked.map(function(n){
+      return '<button type="button" class="linked-action-item" data-action="open-linked-note" data-id="' + n.id + '">' +
+        kindDot("notes") + escapeHtml(n.title || "Untitled") +
+      '</button>';
+    }).join("") + '</div>';
+  }
+  // The two lists share one slot and you toggle between them (user: "you should
+  // be able to toggle back and forth"). Reuses the segmented control the
+  // calendar's creation row already uses, so this is not a new pattern.
+  //
+  // ⚠ The chosen side lives on the SCREEN, not the draft. It is a view
+  // preference, not an edit — putting it in the draft would make merely looking
+  // at the notes count as an unsaved change and trip the ✕ warning.
+  function projectLinkedPanelHtml(s){
+    const tab = s.linkedTab === "notes" ? "notes" : "actions";
+    const pid = s.draft && s.draft.projectId;
+    const noteCount = pid ? (state.notes || []).filter(function(n){
+      return (n.projectLinks || []).some(function(l){ return l.id === pid; });
+    }).length : 0;
+    const actionsHtml = linkedActionsListHtml(s);
+    // Nothing on either side and nothing to toggle between: stay silent rather
+    // than showing an empty switch on a brand-new project.
+    if (!actionsHtml && !noteCount && !pid) return "";
+    const seg =
+      '<div class="cal-seg cal-seg-small project-linked-seg">' +
+        '<button type="button" class="cal-seg-btn' + (tab === "actions" ? " active" : "") + '" data-action="project-linked-tab" data-tab="actions">Actions</button>' +
+        '<button type="button" class="cal-seg-btn' + (tab === "notes" ? " active" : "") + '" data-action="project-linked-tab" data-tab="notes">Notes' +
+          (noteCount ? ' <span class="seg-count">' + noteCount + '</span>' : "") +
+        '</button>' +
+      '</div>';
+    const body = tab === "notes"
+      ? linkedNotesListHtml(pid)
+      : (actionsHtml || '<div class="empty-note">Nothing linked yet.</div>');
+    return '<div class="screen-hook-pick-label">Linked</div>' + seg + body;
   }
   // `locked` (chunk 5, §12.1): when an action is opened as a child of the
   // project it is a member of, its project link is shown-but-disabled — you
@@ -3555,7 +3605,7 @@
       if (kind === "current"){
         { // §4.3/§12.1: renders on NEW project pages too (staged children)
           const linkedCount = projectDraftLinked(s).length;
-          fields += linkedActionsListHtml(s);
+          fields += projectLinkedPanelHtml(s);
           // Quick-add rows (doc 4.3's design, pulled forward by the
           // overnight notes): type + Enter/+ creates without leaving this
           // page; the ✎ opens the full drafting page and returns here.
@@ -4473,6 +4523,22 @@
         return;
       }
 
+      const linkedTabBtn = e.target.closest('[data-action="project-linked-tab"]');
+      if (linkedTabBtn){
+        if (state.screen) state.screen.linkedTab = linkedTabBtn.getAttribute("data-tab");
+        renderScreen();
+        return;
+      }
+      const linkedNoteBtn = e.target.closest('[data-action="open-linked-note"]');
+      if (linkedNoteBtn){
+        // ⚠ Push the stack first. openNoteScreen REPLACES state.screen, so
+        // opening a note straight from a project page would throw away that
+        // page's draft — including any staged children — with no warning.
+        state.screenStack.push(state.screen);
+        state.screen = null;
+        openNoteScreen(linkedNoteBtn.getAttribute("data-id"));
+        return;
+      }
       const linkedActionBtn = e.target.closest('[data-action="open-linked-action"]');
       if (linkedActionBtn){
         openLinkedActionChild(linkedActionBtn.getAttribute("data-kind"), linkedActionBtn.getAttribute("data-id"));
