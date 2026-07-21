@@ -114,8 +114,89 @@ const SURFACES = {
   darkwood: { label: "Dark wood", desk: "#2c160d", dark: "#1f0d09", mid: "#2d160e", light: "#361f12",
               photo: TEX_DARK_WOOD },
   rosewood: { label: "Rosewood", desk: "#6d3210", dark: "#57230b", mid: "#6f330f", light: "#7d3f16",
-              photo: TEX_ROSEWOOD }
+              photo: TEX_ROSEWOOD },
+  // ⚑ The one surface that is more than a texture (user). Black lacquer, a gold
+  // leaf key-fret frame around the viewport, and a jade inlay down the intray
+  // drawer's inner edge. `frame` and `jade` are what make it different; nothing
+  // else in the picker sets them, and everything is a no-op without them.
+  lacquer: { label: "Black lacquer", desk: "#0a0908", dark: "#050404", mid: "#0d0b09", light: "#241a10",
+             lacquer: true, frame: true, jade: true }
 };
+
+// ---- Black lacquer -------------------------------------------------------
+// Lacquer is many thin polished coats over a dark ground. It is NOT wood: no
+// rings, no fibre. What makes it read as lacquer is depth — a very low black
+// floor with a narrow, warm specular catch on top.
+//
+// ⚑ Tuned by looking at it. A first attempt sat around 0.10–0.26 luminance with
+// a broad soft sheen and read as grey concrete; the fix was to drop the floor to
+// ~0.02 and raise a much tighter highlight (the pow(...,3.2)), then warm ONLY
+// the highlight. Black lacquer picks up an amber note where light catches it,
+// and stays near-neutral in shadow — that split is the whole difference between
+// lacquer and a board painted black.
+function renderLacquerTile(N){
+  const cv = document.createElement("canvas");
+  cv.width = N; cv.height = N;
+  const ctx = cv.getContext("2d");
+  const img = ctx.createImageData(N, N), d = img.data;
+  const noise = makePerlin(3);
+  for (let y = 0; y < N; y++){
+    const v = y / N;
+    for (let x = 0; x < N; x++){
+      const u = x / N;
+      const broad = fbm(noise, u, v, 2, 2, 3);    // where the light sits at all
+      const spec  = fbm(noise, u, v, 6, 6, 4);    // the polished catch
+      const grit  = fbm(noise, u, v, 90, 90, 2);  // dust in the finish
+      const s = Math.pow(Math.max(0, spec * 0.65 + broad * 0.35), 3.2);
+      let L = 0.022 + 0.30 * s + 0.012 * (grit - 0.5);
+      L = Math.max(0, Math.min(1, L));
+      const warm = Math.pow(Math.min(1, L / 0.32), 1.4);
+      const o = (y * N + x) * 4;
+      d[o]     = Math.round(255 * Math.min(1, L * (1.00 + 0.55 * warm)));
+      d[o + 1] = Math.round(255 * Math.min(1, L * (0.86 + 0.30 * warm)));
+      d[o + 2] = Math.round(255 * Math.min(1, L * (0.80 + 0.10 * warm)));
+      d[o + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return cv.toDataURL("image/jpeg", 0.80);
+}
+
+// ---- Jade ----------------------------------------------------------------
+// A narrow vertical strip, tiled down the drawer's inner edge. Jade reads as
+// jade because it is TRANSLUCENT and unevenly so: cloudy pale veins drifting
+// through a deeper green, not a flat colour with a highlight.
+function renderJadeTile(w, h){
+  const cv = document.createElement("canvas");
+  cv.width = w; cv.height = h;
+  const ctx = cv.getContext("2d");
+  const img = ctx.createImageData(w, h), d = img.data;
+  const noise = makePerlin(61);
+  for (let y = 0; y < h; y++){
+    const v = y / h;
+    for (let x = 0; x < w; x++){
+      const u = x / w;
+      // Stretched along the strip so the cloudiness runs with it, not across.
+      const cloud = fbm(noise, u, v, 2, 5, 4);
+      const vein  = fbm(noise, u, v, 5, 13, 3);
+      const t = Math.max(0, Math.min(1, 0.42 + 0.75 * (cloud - 0.5) + 0.35 * (vein - 0.5)));
+      // deep green -> pale celadon, with the pale end desaturating rather than
+      // just brightening, which is what stops it looking like plastic.
+      const o = (y * h === 0 ? 0 : 0) + (y * w + x) * 4;
+      d[o]     = Math.round(28 + 168 * Math.pow(t, 1.6));
+      d[o + 1] = Math.round(74 + 150 * Math.pow(t, 1.1));
+      d[o + 2] = Math.round(58 + 128 * Math.pow(t, 1.3));
+      d[o + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return cv.toDataURL("image/jpeg", 0.82);
+}
+let jadeTileCache = null;
+function jadeTile(){
+  if (!jadeTileCache) jadeTileCache = renderJadeTile(16, 192);
+  return jadeTileCache;
+}
 const DEFAULT_SURFACE = "walnut";
 // 512 rather than 256: at 256 the same ring wave recurs every 256px down the
 // page and the eye locks onto the repeat immediately. Doubling it quarters how
@@ -261,8 +342,129 @@ function surfaceTile(id){
   const cfg = SURFACES[id];
   if (!cfg || cfg.flat) return null;
   if (cfg.photo) return cfg.photo;   // baked: nothing to generate, nothing to cache
-  if (!surfaceTileCache[id]) surfaceTileCache[id] = renderSurfaceTile(cfg);
+  if (!surfaceTileCache[id]){
+    surfaceTileCache[id] = cfg.lacquer ? renderLacquerTile(SURFACE_TILE) : renderSurfaceTile(cfg);
+  }
   return surfaceTileCache[id];
+}
+
+// =========================================================
+// THE GOLD LEAF FRAME (user)
+//
+// ⚑ WHY THIS IS NOT PART OF THE TILE. Every other surface is one repeating
+// image. A border baked into a repeating image is not a border — it is a grid,
+// drawn every 512px down the page. So the frame is a separate fixed layer sized
+// to the VIEWPORT, redrawn on resize, and it is the only thing in the app that
+// works this way. It sits at z-index -1 alongside the desk, so lane content
+// paints over it; `body.has-frame` pads the content in so nothing lands on the
+// band in the first place.
+//
+// The motif is a key fret (回紋). ⚑ A first attempt drew each unit as a separate
+// bracket, which is the usual way this pattern is got wrong: a real meander is
+// ONE line that never lifts, spiralling in and back out so consecutive units
+// interlock. A cloud scroll (雲紋) was tried alongside it and abandoned — at
+// this scale it read as a row of disconnected hooks.
+// =========================================================
+const FRAME_INSET = 9;    // gap from the screen edge to the band
+const FRAME_BAND = 24;    // the band's depth — mirrored by --frame-inset in CSS
+const FRAME_STEP = 30;    // one meander unit
+
+// Gold leaf is not a colour, it is uneven metal: the tone shifts across the
+// stroke and there are skips where the leaf did not take. Flat #d4af37 is what
+// makes gilding look like a highlighter pen.
+function goldGradient(ctx, y, depth){
+  const g = ctx.createLinearGradient(0, y, 0, y + depth);
+  g.addColorStop(0, "#f6dd94");
+  g.addColorStop(0.38, "#c9a24a");
+  g.addColorStop(0.62, "#8c6a24");
+  g.addColorStop(1, "#e3c476");
+  return g;
+}
+// One run of meander along a band of length `len`, drawn from (0,0).
+// ⚑ The step is stretched so a whole number of units fits the run exactly —
+// otherwise the last unit is clipped mid-spiral, which is instantly visible at
+// a corner and changes with every screen size.
+function drawFretRun(ctx, len, band, seed){
+  const units = Math.max(1, Math.round(len / FRAME_STEP));
+  const step = len / units;
+  const g = step * 0.20;
+  ctx.strokeStyle = goldGradient(ctx, 0, band);
+  ctx.lineWidth = 2.2;
+  ctx.lineCap = "butt";
+  ctx.lineJoin = "miter";
+  ctx.beginPath();
+  ctx.moveTo(0, band);
+  for (let i = 0; i < units; i++){
+    const ox = i * step;
+    ctx.lineTo(ox, g);
+    ctx.lineTo(ox + step - g, g);
+    ctx.lineTo(ox + step - g, band - g);
+    ctx.lineTo(ox + g * 2, band - g);
+    ctx.lineTo(ox + g * 2, g * 2.6);
+    ctx.lineTo(ox + step - g * 2.2, g * 2.6);
+    ctx.lineTo(ox + step - g * 2.2, band - g * 2.4);
+    ctx.lineTo(ox + step * 0.5, band - g * 2.4);
+    ctx.lineTo(ox + step * 0.5, band);
+    ctx.lineTo(ox + step, band);
+  }
+  ctx.stroke();
+}
+function drawDeskFrame(){
+  const cv = document.getElementById("desk-frame");
+  if (!cv) return;
+  const cfg = SURFACES[currentSurfaceId()];
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const W = window.innerWidth, H = window.innerHeight;
+  cv.width = Math.round(W * dpr);
+  cv.height = Math.round(H * dpr);
+  const ctx = cv.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  if (!cfg || !cfg.frame) return;
+
+  // ⚑ The frame starts BELOW the fixed chrome, not at the top of the screen.
+  // The header and tab bar are opaque and sit at z-index 110/120, so a frame
+  // drawn to y=0 has its top band and both top corners hidden behind them —
+  // which looks like a rendering bug rather than a border. Framing the desk
+  // area instead is also the more honest object: a lacquer panel lying on the
+  // desk, under the app's chrome.
+  const bar = document.querySelector(".tabbar");
+  const top = bar ? Math.round(bar.getBoundingClientRect().bottom) + 4 : 0;
+  const i = FRAME_INSET, b = FRAME_BAND;
+  const x0 = i, y0 = top + i, x1 = W - i, y1 = H - i;
+  const wRun = x1 - x0, hRun = y1 - y0;
+  // Each side is the same run, rotated into place, so the motif turns every
+  // corner the same way instead of four separately-fudged edges.
+  const sides = [
+    { x: x0, y: y0, rot: 0,            len: wRun },
+    { x: x1, y: y0, rot: Math.PI / 2,  len: hRun },
+    { x: x1, y: y1, rot: Math.PI,      len: wRun },
+    { x: x0, y: y1, rot: -Math.PI / 2, len: hRun }
+  ];
+  sides.forEach(function(s, n){
+    ctx.save();
+    ctx.translate(s.x, s.y);
+    ctx.rotate(s.rot);
+    drawFretRun(ctx, s.len, b, n);
+    ctx.restore();
+  });
+  // A hairline inside the band, the way a real panel has a scribed line
+  // separating the decorated border from the field.
+  ctx.strokeStyle = goldGradient(ctx, 0, 2);
+  ctx.globalAlpha = 0.5;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x0 + b + 3, y0 + b + 3, wRun - (b + 3) * 2, hRun - (b + 3) * 2);
+  ctx.globalAlpha = 1;
+}
+// Resize: phones fire this on rotate and on the keyboard opening, so it is
+// debounced — redrawing the fret on every intermediate size is wasted work.
+let frameResizeTimer = null;
+function initDeskFrame(){
+  window.addEventListener("resize", function(){
+    clearTimeout(frameResizeTimer);
+    frameResizeTimer = setTimeout(drawDeskFrame, 120);
+  });
+  drawDeskFrame();
 }
 function applySurface(id){
   const cfg = SURFACES[id] || SURFACES[DEFAULT_SURFACE];
@@ -272,6 +474,13 @@ function applySurface(id){
   root.style.setProperty("--wood-size", SURFACE_TILE + "px");
   const tile = surfaceTile(state.surfaceId);
   root.style.setProperty("--wood", tile ? 'url("' + tile + '")' : "none");
+  // The framed surface pads the content in so nothing sits on the gold band,
+  // and lights the jade inlay on the drawer's inner edge. Both are driven off
+  // one class, so a surface without them costs nothing.
+  root.style.setProperty("--frame-inset", cfg.frame ? (FRAME_INSET + FRAME_BAND + 6) + "px" : "0px");
+  if (cfg.jade) root.style.setProperty("--jade", 'url("' + jadeTile() + '")');
+  if (document.body) document.body.classList.toggle("has-frame", !!cfg.frame);
+  drawDeskFrame();
 }
 // The picker's swatch: the whole tile shrunk into a 20px square, which reads as
 // a sample of that surface rather than four near-identical dark chips (all the

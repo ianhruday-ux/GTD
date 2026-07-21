@@ -68,7 +68,7 @@ with serve(DIST) as url, sync_playwright() as p:
     # Dark wood and Rosewood are PHOTOGRAPHS (user-supplied), not drawn like the
     # first four — they sit last in the list for that reason.
     check(names == ["Background", "Walnut", "Oak", "Ebony", "Slate", "Plain",
-                    "Dark wood", "Rosewood"], f"surfaces listed (got {names})")
+                    "Dark wood", "Rosewood", "Black lacquer"], f"surfaces listed (got {names})")
 
     check(pg.locator('[data-bg="walnut"] .settings-check').count() == 1, "current surface is ticked")
 

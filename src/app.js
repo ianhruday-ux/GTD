@@ -6504,6 +6504,7 @@
 
   function boot(){
     applySurface(loadSurfaceId()); // post-sprint: paint the desk before the shell lands on it
+    initDeskFrame();               // the lacquer desk's gold border; a no-op for the rest
     applyChalkDust();              // §P6: the habit runner's board
     renderShell();
     bindEvents();

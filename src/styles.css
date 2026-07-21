@@ -347,8 +347,43 @@ body.tabs-collapsed .tab.active.has-badge::before{ top:4px; left:6px; }
 /* ----------------------------------------------------------------------------
    MAIN / LANES SHELL
 ---------------------------------------------------------------------------- */
+/* ============================================================================
+   THE GOLD LEAF FRAME (Black lacquer only)
+   Painted at z-index -1, in the same layer as the desk itself, so lane content
+   sits over it rather than under it. --frame-inset is 0 for every other
+   surface, so all of this collapses to nothing unless the lacquer desk is on.
+   ========================================================================= */
+:root{ --frame-inset:0px; }
+/* ⚑ ABOVE the lane content, below the fixed chrome (tab bar 110, header 120).
+   At z-index -1 it sat behind the cards, so anything scrolling past the bottom
+   band painted over the gilding and it read as a z-order bug. Above the content
+   it reads as what it is: a physical border that the list slides underneath.
+   Content still never STARTS on the band — main is padded in by --frame-inset —
+   so the overlap only ever happens mid-scroll, which is the point. */
+#desk-frame{
+  position:fixed; inset:0; z-index:105;
+  width:100%; height:100%;
+  pointer-events:none;
+}
 main{
-  padding:0 calc(20px + env(safe-area-inset-right)) 40px calc(20px + env(safe-area-inset-left));
+  padding:0 calc(20px + env(safe-area-inset-right) + var(--frame-inset))
+          40px calc(20px + env(safe-area-inset-left) + var(--frame-inset));
+}
+/* The header and the tab bar are fixed, so they need the inset too or the
+   wordmark and the lane letters sit on top of the border. */
+/* ⚑ The header and tab bar are NOT inset. The frame starts below them (see
+   drawDeskFrame) precisely because they are opaque and would hide its top band,
+   so insetting them as well would indent the chrome for no reason. */
+/* The lane content has to clear the bottom band, and so does the floating
+   create button — otherwise the one control that is always on screen sits on
+   top of the gilding. */
+body.has-frame main{
+  padding-top:var(--frame-inset);
+  padding-bottom:calc(40px + var(--frame-inset));
+}
+body.has-frame #fab-create{
+  right:calc(18px + env(safe-area-inset-right) + var(--frame-inset));
+  bottom:calc(18px + env(safe-area-inset-bottom) + var(--frame-inset));
 }
 .lanes{ max-width:640px; margin:0 auto; }
 
@@ -986,6 +1021,26 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
   transform:translateX(-100%); transition:transform .28s ease; /* .2s read too fast on desktop (user) */
 }
 .tray-drawer.open{ transform:translateX(0); }
+/* ⚑ Jade inlay down the drawer's INNER edge (user), lacquer desk only. The
+   inner edge is the one you actually see — the outer three are off-screen or
+   under the bezel — so it is the only edge worth inlaying, and it reads as the
+   drawer being a piece of the same object as the desk rather than a panel
+   floating over it. ::after rather than a border so the jade can carry its own
+   texture and a bevel highlight; a border-image would tile the same strip with
+   no way to shade the lit edge. */
+body.has-frame .tray-drawer{ box-shadow:6px 0 24px rgba(0,0,0,0.6); }
+body.has-frame .tray-drawer::after{
+  /* ⚑ 11px, not 7. At 7 the jade tile is squeezed past the point where its
+     cloudiness survives and it reads as a flat teal rule — the mottling IS the
+     material, so the strip has to be wide enough to show some. */
+  content:""; position:absolute; top:0; right:0; bottom:0; width:11px;
+  background:#2c5a45 var(--jade, none);
+  background-size:11px 132px; background-repeat:repeat-y;
+  /* a lit top-left arris and a dark underside: the inlay is proud of the wood */
+  box-shadow:inset 1px 0 0 rgba(255,255,255,0.30), inset -1px 0 0 rgba(0,0,0,0.55),
+             -1px 0 5px rgba(0,0,0,0.45);
+  pointer-events:none;
+}
 .tray-head{ display:flex; align-items:center; gap:8px; margin-bottom:10px; }
 .tray-title{ font-family:var(--font-display); font-weight:700; font-size:18px; color:var(--text-primary); }
 .tray-info-panel{ font-size:12.5px; color:var(--text-soft); background:rgba(255,255,255,0.05); border-radius:8px; padding:9px 11px; margin-bottom:10px; line-height:1.45; }
