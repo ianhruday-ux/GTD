@@ -82,23 +82,33 @@ with serve(DIST) as url, sync_playwright() as p:
         pg.locator('.card-title:has-text("ZZ build the shed")').first.click()
         pg.wait_for_timeout(600)
 
+    MONTHS = ["January","February","March","April","May","June","July",
+              "August","September","October","November","December"]
+
     def goto_day(iso):
-        """Select a day in the open calendar, paging months as needed."""
-        MONTHS = ["January","February","March","April","May","June","July",
-                  "August","September","October","November","December"]
+        """Select a day in the open calendar.
+
+        ⚠ Navigate by MONTH LABEL, not by whether the cell exists. The calendar
+        renders a three-panel swipe track (prev / current / next), so a
+        neighbouring month's cells are in the DOM but positioned outside the
+        viewport — clicking one fails with "element is outside of the viewport"
+        after Playwright has already tried to scroll to it.
+        """
         y, m, _d = iso.split("-")
         target = int(y) * 12 + int(m) - 1
         for _ in range(24):
-            cell = pg.locator('.cal-cell[data-date="%s"]' % iso)
-            if cell.count():
-                cell.first.click(); pg.wait_for_timeout(350)
-                return True
             lab = pg.locator(".cal-monthlabel").first.inner_text().strip()
             name, yr = lab.split()
             cur = int(yr) * 12 + MONTHS.index(name)
+            if cur == target:
+                break
             pg.click('[data-action="cal-month"][data-dir="%d"]' % (1 if target > cur else -1))
-            pg.wait_for_timeout(250)
-        return False
+            pg.wait_for_timeout(280)
+        cell = pg.locator('.cal-cell[data-date="%s"]' % iso)
+        if not cell.count():
+            return False
+        cell.first.click(); pg.wait_for_timeout(350)
+        return True
 
     def events():
         return pg.evaluate("() => JSON.parse(localStorage.getItem('gtd_events') || '[]')")
@@ -233,6 +243,76 @@ with serve(DIST) as url, sync_playwright() as p:
     pg.click('[data-action="screen-save"]'); pg.wait_for_timeout(700)
     check(pg.locator(".choice-dialog").count() == 0,
           "saving without touching the deadline does not warn again")
+
+    # ---------- and the same thing from the DAILY REVIEW ----------
+    # The third option the user asked for originally, parked until a project
+    # could see the calendar. A stalled project's menu now offers it, and adding
+    # returns to the REVIEW rather than to the project page.
+    pg.evaluate("""() => {
+      // strip the project's ways forward so it is reported as stalled
+      const nxt = JSON.parse(localStorage.getItem('gtd_tasks_next') || '[]');
+      localStorage.setItem('gtd_tasks_next',
+        JSON.stringify(nxt.filter(t => t.linkedProjectId !== 'zz-proj')));
+      localStorage.setItem('gtd_events', '[]');
+      localStorage.setItem('gtd_tray', '[]');
+      ['#tray-root', '#dialog-root', '#screen-root'].forEach(sel => {
+        const el = document.querySelector(sel); if (el) el.innerHTML = '';
+      });
+    }""")
+    pg.reload(); pg.wait_for_timeout(1100)
+    pg.evaluate("() => { const r=document.querySelector('#tray-root'); if(r) r.innerHTML=''; }")
+    pg.evaluate("() => document.querySelector('[data-action=\"open-tray\"]').click()")
+    pg.wait_for_timeout(400)
+    pg.evaluate("() => document.querySelector('[data-action=\"open-review\"]').click()")
+    pg.wait_for_timeout(700)
+
+    found_it = False
+    for _ in range(14):
+        btn = pg.locator('[data-action="review-add-event"][data-id="zz-proj"]')
+        if btn.count():
+            found_it = True
+            break
+        nn = pg.locator('[data-action="review-defer"]')
+        if not nn.count():
+            break
+        nn.first.click(); pg.wait_for_timeout(250)
+    check(found_it, "a stalled project in the review offers Add an event")
+
+    if found_it:
+        pg.locator('[data-action="review-add-event"][data-id="zz-proj"]').first.click()
+        pg.wait_for_timeout(800)
+        check(pg.locator(".cal-create").count() == 1, "which opens the calendar")
+        check(pg.locator(".cal-for-project").count() == 1,
+              "still saying which project it is for")
+        # the deadline rule applies here too
+        goto_day("2026-08-01")
+        pg.fill(".cal-name", "ZZ review event too late")
+        pg.click('[data-action="cal-add"]'); pg.wait_for_timeout(500)
+        check(pg.locator(".cal-error").count() == 1,
+              "and the deadline still refuses a date past it")
+        goto_day("2026-06-17")
+        pg.fill(".cal-name", "ZZ review event")
+        pg.click('[data-action="cal-add"]'); pg.wait_for_timeout(900)
+        made = pg.evaluate("""() => {
+          const evs = JSON.parse(localStorage.getItem('gtd_events') || '[]');
+          const e = evs.find(x => x.title === 'ZZ review event');
+          return e ? e.linkedProjectId : null;
+        }""")
+        check(made == "zz-proj", f"adding creates it linked to the project ({made})")
+        # ⚠ Assert the review SURFACE, not that a card is on it. Adding the
+        # event gives the project a way forward, so it stops being reported —
+        # if that was the only loop, the queue is legitimately empty. An earlier
+        # version of this check looked for a card and read the feature working
+        # as a failure.
+        on_review = pg.locator('[data-action="review-close"]').count()
+        check(on_review == 1,
+              f"and returns to the REVIEW, not the project page ({on_review})")
+        still_stalled = pg.evaluate("""() => {
+          const el = document.querySelector('.review-card-title');
+          return el ? el.textContent.trim() : null;
+        }""")
+        check(still_stalled != "ZZ build the shed",
+              f"and the project is no longer reported as stalled ({still_stalled})")
 
     check(not errs, f"no JS errors ({errs[:3]})")
     b.close()

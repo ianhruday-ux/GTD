@@ -8495,6 +8495,20 @@ function injectChunkMap(){
       if (revDelete){ reviewDelete(revDelete.getAttribute("data-lane"), revDelete.getAttribute("data-id")); return; }
       const revDeleteEvent = e.target.closest('[data-action="review-delete-event"]');
       if (revDeleteEvent){ reviewDeleteEvent(revDeleteEvent.getAttribute("data-id")); return; }
+      const revAddEvent = e.target.closest('[data-action="review-add-event"]');
+      if (revAddEvent){
+        const pid = revAddEvent.getAttribute("data-id");
+        const found = findTaskAnywhere(pid);
+        const proj = found && found.task;
+        reviewOpenChild(function(){
+          openCalendarScreen({
+            forProjectId: pid,
+            forProjectName: (proj && proj.title) || "",
+            forProjectDeadline: (proj && proj.deadline && proj.deadline.date) || null
+          });
+        });
+        return;
+      }
       const revSomeday = e.target.closest('[data-action="review-someday"]');
       if (revSomeday){ changeKind("current", "future", revSomeday.getAttribute("data-id")).then(function(){ renderScreen(); }); return; }
       const revPromote = e.target.closest('[data-action="review-promote"]');
@@ -10251,6 +10265,12 @@ function injectChunkMap(){
         menuHtml =
           reviewMenuBtn("review-form-start", "Add a next action", ' data-key="' + l.key + '" data-type="text"') +
           reviewMenuBtn("review-form-start", "Add a waiting action", ' data-key="' + l.key + '" data-type="waiting"') +
+          // ⚑ The third one the user asked for originally, parked until a project
+          // could see the calendar. It can now: this opens the calendar for this
+          // project, capped by its deadline, and returns HERE rather than to the
+          // project page — the review pushed the stack, so closeScreen lands back
+          // in the queue where you left off.
+          reviewMenuBtn("review-add-event", "Add an event", ' data-id="' + l.id + '"') +
           reviewMenuBtn("review-someday", "Move to Someday", ' data-id="' + l.id + '"') +
           reviewMenuBtn("review-complete", "Complete it", ' data-lane="current" data-id="' + l.id + '"') +
           reviewMenuBtn("review-delete", "Delete it", ' data-lane="current" data-id="' + l.id + '"', true) +
@@ -10819,6 +10839,20 @@ function injectChunkMap(){
   // the mousedown-preventDefault (bindEvents) keeps the caret in the editable.
   function noteToolbarHtml(){
     return '<div class="note-toolbar">' +
+      // ⚑ Undo / redo (user), leading the bar. They earn that position on a
+      // rich-text field more than any format button does: a mis-aimed Heading or
+      // Checklist on a selection can rewrite a whole block at once, and until now
+      // the only way back was to retype it.
+      //
+      // ⚠ execCommand("undo") is used deliberately rather than a hand-rolled
+      // history. Every format button above already goes through execCommand, so
+      // the browser's own undo stack ALREADY contains both the typing and the
+      // formatting, correctly interleaved. A separate stack would have to
+      // duplicate that and would drift out of step with the caret the moment
+      // the two disagreed.
+      '<button type="button" class="note-tool" data-md="undo" title="Undo">&#8630;</button>' +
+      '<button type="button" class="note-tool" data-md="redo" title="Redo">&#8631;</button>' +
+      '<span class="note-tool-sep"></span>' +
       '<button type="button" class="note-tool" data-md="bold" title="Bold"><b>B</b></button>' +
       '<button type="button" class="note-tool" data-md="italic" title="Italic"><i>I</i></button>' +
       '<button type="button" class="note-tool" data-md="underline" title="Underline"><span style="text-decoration:underline">U</span></button>' +
@@ -10859,7 +10893,9 @@ function injectChunkMap(){
     if (!el) return;
     el.focus();
     try {
-      if (cmd === "bold") document.execCommand("bold");
+      if (cmd === "undo") document.execCommand("undo");
+      else if (cmd === "redo") document.execCommand("redo");
+      else if (cmd === "bold") document.execCommand("bold");
       else if (cmd === "italic") document.execCommand("italic");
       else if (cmd === "underline") document.execCommand("underline");
       else if (cmd === "ul") document.execCommand("insertUnorderedList");
