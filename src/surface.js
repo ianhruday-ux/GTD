@@ -103,7 +103,18 @@ const SURFACES = {
             rings: 9, warp: 0.70, ringDepth: 0.55, fibre: 0.26, seed: 23 },
   slate:  { label: "Slate", desk: "#15161A", dark: "#0E0F13", mid: "#1A1C21", light: "#292C33",
             rings: 0, warp: 0.0,  ringDepth: 0.0,  fibre: 0.55, seed: 5 },  // rings:0 → stone, not wood
-  plain:  { label: "Plain", desk: "#171513", flat: true }
+  plain:  { label: "Plain", desk: "#171513", flat: true },
+  // ⚑ PHOTOGRAPHS, not drawn (user-supplied). A `photo` surface skips the
+  // generator entirely and hands its baked tile straight to CSS. Real wood has
+  // figure — knots, medullary rays, the mirrored bookmatch down the centre of a
+  // veneer — that a ring function does not produce and should not fake. The
+  // drawn surfaces above stay because they cost nothing and tile forever.
+  // Tones are sampled from each image (see textures.js) so the picker's swatch
+  // is an honest ramp of that surface's own colours rather than a guess.
+  darkwood: { label: "Dark wood", desk: "#2c160d", dark: "#1f0d09", mid: "#2d160e", light: "#361f12",
+              photo: TEX_DARK_WOOD },
+  rosewood: { label: "Rosewood", desk: "#6d3210", dark: "#57230b", mid: "#6f330f", light: "#7d3f16",
+              photo: TEX_ROSEWOOD }
 };
 const DEFAULT_SURFACE = "walnut";
 // 512 rather than 256: at 256 the same ring wave recurs every 256px down the
@@ -249,6 +260,7 @@ const surfaceTileCache = {};
 function surfaceTile(id){
   const cfg = SURFACES[id];
   if (!cfg || cfg.flat) return null;
+  if (cfg.photo) return cfg.photo;   // baked: nothing to generate, nothing to cache
   if (!surfaceTileCache[id]) surfaceTileCache[id] = renderSurfaceTile(cfg);
   return surfaceTileCache[id];
 }

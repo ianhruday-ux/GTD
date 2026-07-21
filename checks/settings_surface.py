@@ -65,7 +65,11 @@ with serve(DIST) as url, sync_playwright() as p:
     pg.click('[data-action="open-overflow"]'); pg.wait_for_timeout(250)
     pg.click('[data-action="settings-backgrounds"]'); pg.wait_for_timeout(250)
     names = pg.locator(".settings-menu .si-label").all_inner_texts()
-    check(names == ["Background", "Walnut", "Oak", "Ebony", "Slate", "Plain"], f"surfaces listed (got {names})")
+    # Dark wood and Rosewood are PHOTOGRAPHS (user-supplied), not drawn like the
+    # first four — they sit last in the list for that reason.
+    check(names == ["Background", "Walnut", "Oak", "Ebony", "Slate", "Plain",
+                    "Dark wood", "Rosewood"], f"surfaces listed (got {names})")
+
     check(pg.locator('[data-bg="walnut"] .settings-check').count() == 1, "current surface is ticked")
 
     pg.click('[data-bg="oak"]'); pg.wait_for_timeout(400)
@@ -73,6 +77,23 @@ with serve(DIST) as url, sync_playwright() as p:
     check(pg.locator('[data-bg="oak"] .settings-check').count() == 1, "the tick moves to the pick")
     oak_tile = wood()
     check(oak_tile != default_tile and oak_tile.startswith('url("data:image/png'), "the desk texture changed")
+
+    # --- a PHOTO surface takes a different path through surfaceTile() ---
+    # It must hand over its baked tile rather than falling through to the
+    # generator, which would silently render it as one of the drawn woods.
+    pg.click('[data-bg="darkwood"]'); pg.wait_for_timeout(400)
+    applied = pg.evaluate("""() => ({
+      wood: getComputedStyle(document.documentElement).getPropertyValue('--wood').trim().slice(0, 40),
+      desk: getComputedStyle(document.documentElement).getPropertyValue('--desk').trim()
+    })""")
+    check("data:image/jpeg" in applied["wood"],
+          f"a photo surface applies a JPEG tile, not a generated PNG ({applied})")
+    check(applied["desk"].lower() == "#2c160d", f"and brings its own desk colour ({applied})")
+    pg.click('[data-bg="rosewood"]'); pg.wait_for_timeout(400)
+    check("data:image/jpeg" in wood(), "the second photo surface applies too")
+    check(wood() != applied["wood"], "and it is a different image, not a cached one")
+    pg.click('[data-bg="oak"]'); pg.wait_for_timeout(400)   # back to a drawn one
+    check(wood() == oak_tile, "returning to a drawn surface regenerates it unchanged")
 
     pg.click('[data-action="settings-root"]'); pg.wait_for_timeout(250)
     check(pg.locator(".settings-menu").count() == 1, "Back returns to the root panel, still one layer")
