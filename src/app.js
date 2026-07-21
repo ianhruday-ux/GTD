@@ -2650,44 +2650,12 @@
   // actions can't exist without a "waiting for" (4.2), so their quick-add
   // routes through the drafting page pre-filled with the typed title —
   // and returns here on save (judgment call, flagged in the doc).
-  function screenQuickAdd(destKind, title){
-    const s = state.screen;
-    if (!s || s.kind !== "current") return;
-    title = (title || "").trim();
-    if (!title) return; // silent no-op, same rule as empty-title creates
-    if (destKind === "waiting"){
-      // §12.1b: Enter on the Waiting row opens the hook picker (the single-tap
-      // fast path). The ✎ still opens the drafting page for free text.
-      openWaitingHookPicker(title);
-      return;
-    }
-    // Duplicate-title check (§7), now spanning live ∪ staged (§12.1b) so a
-    // staged sibling collides too. No popup channel: flash the input red and
-    // KEEP the text. The Waiting path routes through the drafting page.
-    const dup = draftAllActions(s).some(function(l){
-      return l.kind === "next" && (l.task.title || "").trim().toLowerCase() === title.toLowerCase();
-    });
-    if (dup){
-      const input = qs('.quick-add-row [data-quickadd="next"]');
-      if (input){
-        input.classList.add("field-invalid");
-        input.addEventListener("input", function h(){ input.classList.remove("field-invalid"); input.removeEventListener("input", h); });
-      }
-      return;
-    }
-    // Chunk 5: stage the create (real id now, written at project save).
-    s.draft.staged.creates.push({
-      id: genId(), kind: "next", title: title, notesClean: "", linkedProjectId: stagingProjectId(s),
-      isGroup: false, parent: null, deadline: null, contextId: null, whenText: null,
-      conditionId: null, conditionKind: null, conditionLabel: null, bundleText: null, createdAt: nowMs()
-    });
-    if (s.invalidField === "projectActions") s.invalidField = null;
-    renderScreen();
-  }
-  // (screenSuggestHabit removed in chunk 3 -- the "make it a habit" bubble
-  // that triggered it hung off a deadline's daily/weekly recurrence, and
-  // recurrence left the deadline picker with the date-model retirement.)
-  // ---- habit hook-picker sub-view within the screen ----
+  // (screenQuickAdd and openWaitingHookPicker lived here — the project page's
+  // type-and-Enter creation and its Waiting hook-tap. Both belonged to the
+  // quick-add rows, which are gone; creation opens the drafting page now, so a
+  // staged action gets the same fields as anything else. The duplicate-title
+  // check screenQuickAdd carried is not lost — saveScreen runs the same check
+  // for every create.)
   function screenOpenHookPick(rowIdx){
     if (!state.screen) return;
     state.screen.draft.hookPicker = true;
@@ -2851,15 +2819,6 @@
   // Open the project's Waiting quick-add hook picker (§12.1b): stash the typed
   // title and show the condition picker. Empty text is a no-op (the hook reads
   // as greyed until you type).
-  function openWaitingHookPicker(title){
-    const s = state.screen;
-    if (!s || s.kind !== "current") return;
-    title = (title || "").trim();
-    if (!title) return;
-    s.draft.waitingHookTitle = title;
-    s.draft.waitingHookPicker = true;
-    renderScreen();
-  }
   function screenPickCondition(targetId, targetKind){
     const s = state.screen;
     if (!s) return;
@@ -2869,23 +2828,9 @@
       if (ctx.proj) target = (ctx.proj.draft.staged.creates || []).find(function(c){ return c.id === targetId; }) || null;
     }
     const label = target ? target.title : "";
-    // Quick-add-hook mode (§12.1b): picking a target CREATES a staged Waiting
-    // action immediately — no trip to the drafting page.
-    if (s.draft.waitingHookPicker){
-      s.draft.staged.creates.push({
-        id: genId(), kind: "waiting", title: (s.draft.waitingHookTitle || "").trim(),
-        notesClean: "", linkedProjectId: stagingProjectId(s), isGroup: false, parent: null,
-        deadline: null, contextId: null, whenText: null,
-        conditionId: targetId, conditionKind: targetKind, conditionLabel: label, bundleText: null,
-        createdAt: nowMs()
-      });
-      if (s.invalidField === "projectActions") s.invalidField = null;
-      s.draft.waitingHookPicker = false;
-      s.draft.waitingHookTitle = "";
-      playHookChime();
-      renderScreen();
-      return;
-    }
+    // (The quick-add-hook branch lived here: picking a target created a staged
+    // Waiting action outright, skipping the drafting page. It was only ever
+    // reachable from the project page's Waiting quick-add row, which is gone.)
     if (s.draft.conditionId !== targetId) playHookChime();
     s.draft.conditionId = targetId;
     s.draft.conditionKind = targetKind;
@@ -3068,12 +3013,21 @@
     // no draft to stage it into the way a note stages. Building that would mean
     // teaching the calendar to defer a write back to a page it does not know
     // about, which is a bigger change than the button.
-    const addEvent = s.taskId
-      ? '<button type="button" class="btn btn-ghost btn-small project-add-note" data-action="new-linked-event">+ New event</button>'
-      : "";
+    // The Actions side owns every way of adding something that lands in it.
+    // ⚑ invalidField "projectActions" moves here with them: §4.3 blocks saving a
+    // new Current project with no action, and the dashed outline has to be on
+    // the control the user would use to fix it. It used to mark the quick-add
+    // row that no longer exists.
+    const bad = s.invalidField === "projectActions" ? " field-invalid" : "";
+    const addAction =
+      '<div class="project-add-row' + bad + '">' +
+        '<button type="button" class="btn btn-ghost btn-small project-add-note" data-action="generate-action" data-gen-kind="next">+ New action</button>' +
+        '<button type="button" class="btn btn-ghost btn-small project-add-note" data-action="generate-action" data-gen-kind="waiting">+ New waiting action</button>' +
+        (s.taskId ? '<button type="button" class="btn btn-ghost btn-small project-add-note" data-action="new-linked-event">+ New event</button>' : "") +
+      '</div>';
     const body = tab === "notes"
       ? linkedNotesListHtml(s, pid)
-      : ((actionsHtml || '<div class="empty-note">Nothing linked yet.</div>') + addEvent);
+      : ((actionsHtml || '<div class="empty-note">Nothing linked yet.</div>') + addAction);
     return '<div class="screen-hook-pick-label">Linked</div>' + seg + body;
   }
   // `locked` (chunk 5, §12.1): when an action is opened as a child of the
@@ -3465,8 +3419,10 @@
     // Quick-add-hook mode (§12.1b): opened from the project's Waiting quick-add
     // row — picking a target CREATES a staged Waiting action, so there is no
     // "No condition" escape (a waiting can't wait on nothing).
-    const isQuickAdd = !!(s.draft && s.draft.waitingHookPicker);
-    const excludeId = isQuickAdd ? null : s.taskId;
+    // ⚑ Was `isQuickAdd ? null : s.taskId` — the quick-add hook picker had no
+    // task of its own to exclude. That mode is gone, so the picker always
+    // excludes the item it belongs to, which is the only case left.
+    const excludeId = s.taskId;
     const targets = conditionTargetsForScreen(s, excludeId);
     const ctx = conditionContext(s);
     function itemBtn(t){
@@ -3493,8 +3449,7 @@
     // Empty state is a teaching surface, not an error (§12.1b) — name the exits.
     const empty = !targets.length
       ? '<div class="empty-note">No actions to wait on yet. Add a next action first — or use ✎ to say what you’re waiting for.</div>' : "";
-    const noneHtml = isQuickAdd ? ""
-      : '<div class="screen-hook-pick-list"><button type="button" class="screen-hook-pick-item screen-hook-pick-none" data-action="screen-clear-condition-pick">No condition</button></div>';
+    const noneHtml = '<div class="screen-hook-pick-list"><button type="button" class="screen-hook-pick-item screen-hook-pick-none" data-action="screen-clear-condition-pick">No condition</button></div>';
     return (
       '<div class="pick-body">' +
         noneHtml + body + empty +
@@ -3630,16 +3585,9 @@
         conditionPickerHtml(s) +
       '</div>';
     }
-    // §12.1b: the project's Waiting quick-add hook picker (creates a staged
-    // Waiting on pick). Title shown read-only above the target list.
-    if (isProjectKind(kind) && draft.waitingHookPicker){
-      return '<div class="screen-body pick-body">' +
-        '<div class="screen-hook-pick-label">New waiting action</div>' +
-        '<input type="text" class="screen-field-title" value="' + escapeHtml(draft.waitingHookTitle || "") + '" readonly>' +
-        '<div class="screen-hook-pick-label">Waiting on…</div>' +
-        conditionPickerHtml(s) +
-      '</div>';
-    }
+    // (The Waiting quick-add hook picker's own sub-view lived here — a
+    // read-only title above the target list. Same story: its entry point was
+    // the quick-add row.)
 
     let fields = '<input type="text" class="screen-field-title' + (s.invalidField === "title" ? " field-invalid" : "") + '" data-field="title" placeholder="' + escapeHtml(TITLE_PLACEHOLDER[kind]) + '" value="' + escapeHtml(draft.title) + '">';
 
@@ -3676,22 +3624,17 @@
         { // §4.3/§12.1: renders on NEW project pages too (staged children)
           const linkedCount = projectDraftLinked(s).length;
           fields += projectLinkedPanelHtml(s);
-          // Quick-add rows (doc 4.3's design, pulled forward by the
-          // overnight notes): type + Enter/+ creates without leaving this
-          // page; the ✎ opens the full drafting page and returns here.
-          fields += '<div class="quick-add-row' + (s.invalidField === "projectActions" ? " field-invalid" : "") + '">' +
-            '<input type="text" data-quickadd="next" placeholder="Next action\u2026">' +
-            '<button type="button" data-action="quick-add-submit" data-gen-kind="next" title="Add">+</button>' +
-            '<button type="button" data-action="generate-action" data-gen-kind="next" title="Open full editor">&#9998;</button>' +
-          '</div>';
-          // \u00a712.1b: the Waiting row's trigger is a HOOK (single tap), not a
-          // "+": type a title, tap the hook, pick a condition \u2192 staged Waiting.
-          // Free text still goes through \u270e.
-          fields += '<div class="quick-add-row">' +
-            '<input type="text" data-quickadd="waiting" placeholder="Waiting action\u2026">' +
-            '<button type="button" class="qa-hook" data-action="waiting-quickadd-hook" title="Hook to a condition">&#129693;</button>' +
-            '<button type="button" data-action="generate-action" data-gen-kind="waiting" title="Open full editor">&#9998;</button>' +
-          '</div>';
+          // ⚑ The two quick-add rows that used to sit here are GONE (user).
+          // Two reasons, and the second is a bug rather than taste:
+          //   · they no longer fit beside the New event / New note buttons the
+          //     linked panel now carries — three different shapes of "add"
+          //     stacked on one page;
+          //   · they rendered OUTSIDE the panel, so they were still on screen
+          //     after switching to the Notes side, offering to add an action to
+          //     a list that was not showing.
+          // Their creation paths move into the panel's Actions side as buttons
+          // (see projectLinkedPanelHtml), which is where the things they create
+          // actually appear.
           if (!linkedCount) fields += '<div class="screen-project-flag">No linked actions yet \u2014 every active project should have at least one next step.</div>';
         }
         if (s.taskId) fields += makeKindBtnHtml("future", "Make Future / Someday", "", draft.convertTo === "future", !!draft.willComplete);
@@ -4152,8 +4095,6 @@
         }
         return;
       }
-      const quickAddInput = e.target.closest && e.target.closest("[data-quickadd]");
-      if (quickAddInput){ e.preventDefault(); screenQuickAdd(quickAddInput.getAttribute("data-quickadd"), quickAddInput.value); }
     });
 
     document.addEventListener("click", function(e){
@@ -4583,29 +4524,17 @@
       const generateActionBtn = e.target.closest('[data-action="generate-action"]');
       if (generateActionBtn){
         const genKind = generateActionBtn.getAttribute("data-gen-kind");
-        // Carry over anything already typed in that row's quick-add box.
-        const row = generateActionBtn.closest(".quick-add-row");
-        const typed = row ? (row.querySelector("[data-quickadd]") || {}).value : "";
-        screenGenerateAction(genKind, typed);
+        // No title to carry over any more: the quick-add rows these used to sit
+        // in are gone, so this always opens an empty drafting page.
+        screenGenerateAction(genKind, "");
         return;
       }
 
-      const quickAddBtn = e.target.closest('[data-action="quick-add-submit"]');
-      if (quickAddBtn){
-        const row = quickAddBtn.closest(".quick-add-row");
-        const input = row ? row.querySelector("[data-quickadd]") : null;
-        if (input){ screenQuickAdd(quickAddBtn.getAttribute("data-gen-kind"), input.value); }
-        return;
-      }
-      // §12.1b: Waiting quick-add HOOK — opens the condition picker with the
-      // typed title; picking a target creates the staged Waiting action.
-      const qaHookBtn = e.target.closest('[data-action="waiting-quickadd-hook"]');
-      if (qaHookBtn){
-        const row = qaHookBtn.closest(".quick-add-row");
-        const input = row ? row.querySelector("[data-quickadd]") : null;
-        openWaitingHookPicker(input ? input.value : "");
-        return;
-      }
+      // (The quick-add submit and the Waiting hook-tap handlers lived here.
+      // Both drove the project page's quick-add rows, which are gone — creation
+      // is a button that opens the drafting page now. Deleted rather than left
+      // dormant: a handler with no markup to fire it is an invitation to
+      // re-add the markup.)
 
       const linkedTabBtn = e.target.closest('[data-action="project-linked-tab"]');
       if (linkedTabBtn){

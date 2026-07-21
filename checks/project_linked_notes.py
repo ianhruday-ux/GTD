@@ -248,8 +248,12 @@ with serve(DIST) as url, sync_playwright() as p:
     # is not a next step. So stage an action too, or the save is blocked and the
     # note never lands. (An earlier draft of this check missed that and read as
     # a staging bug.)
-    pg.fill('.quick-add-row [data-quickadd="next"]', "ZZ first step")
-    pg.keyboard.press("Enter"); pg.wait_for_timeout(400)
+    # ⚠ Via the + New action BUTTON: the quick-add rows this used to type into
+    # were removed, so creation always goes through the drafting page now.
+    pg.locator('[data-action="generate-action"][data-gen-kind="next"]').first.click()
+    pg.wait_for_timeout(600)
+    pg.fill('[data-field="title"]', "ZZ first step")
+    pg.click('[data-action="screen-save"]'); pg.wait_for_timeout(700)
     pg.locator('[data-action="project-linked-tab"][data-tab="notes"]').first.click()
     pg.wait_for_timeout(350)
     pg.locator('[data-action="new-linked-note"]').first.click(); pg.wait_for_timeout(600)

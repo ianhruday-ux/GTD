@@ -1541,3 +1541,14 @@ body.has-frame .tray-drawer::after{
   font-size:12.5px; color:var(--red); margin-bottom:6px;
   border-left:2px solid var(--red); padding-left:8px;
 }
+
+/* The project page's creation buttons, replacing the two quick-add rows (user).
+   Stacked full-width so they read as one group of "add to this project"
+   choices rather than as three unrelated controls. */
+.project-add-row{ display:flex; flex-direction:column; gap:6px; margin-top:8px; }
+.project-add-row .project-add-note{ margin-top:0; }
+/* §4.3's "a new project needs an action" block outlines the group now — the
+   quick-add row it used to mark is gone. */
+.project-add-row.field-invalid{
+  border:1px dashed var(--red); border-radius:9px; padding:6px;
+}
