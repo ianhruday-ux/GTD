@@ -20,10 +20,11 @@
 // (this file + its boot() call) if the convention is ever retired.
 // =========================================================
 function injectChunkMap(){
-  const FLAG = "gtd_chunk_map_v6";
+  const FLAG = "gtd_chunk_map_v7";
   if (Storage.get(FLAG)) return;
   Storage.set(FLAG, "1");
-  ["gtd_chunk_map_v1", "gtd_chunk_map_v2", "gtd_chunk_map_v3", "gtd_chunk_map_v4", "gtd_chunk_map_v5"].forEach(Storage.remove);  // retire superseded flags
+  ["gtd_chunk_map_v1", "gtd_chunk_map_v2", "gtd_chunk_map_v3", "gtd_chunk_map_v4",
+   "gtd_chunk_map_v5", "gtd_chunk_map_v6"].forEach(Storage.remove);  // retire superseded flags
 
   // Replace, don't accumulate (8.2, mirroring 8.1): sweep any previous
   // chunk-map group (tagged via devContext, not a title match, since the
@@ -71,7 +72,7 @@ function injectChunkMap(){
     { title: "✓ Chinese translation", notes: "DONE. src/i18n.js holds the string table (English + Simplified Chinese) and the ⋯ → Language switch, which re-labels the whole app live and persists the choice. Built on the same en / zh-Hans pattern the habit bubbles already used. ⚑ A friend who reads Chinese should still check the info-button prose — the machine did the words, not a native speaker." },
     { title: "✓ In-lane tutorial", notes: "DONE. Six numbered steps seeded across the lanes (make a next action, a hooked waiting action, a context, a project, fix a stalled project in Review, build a habit), cleared through completion as you go. The cards are wired to each other to demo the dependency — ② is hooked to ① and linked to project ④ — and the text toggles with the language. Two cards persist and are deleted by hand: the ◇ stalled sample (step ⑤ needs it) and the ⑥ habit (habits can't self-complete)." },
     { title: "✓ Someday has no deadlines", notes: "DONE. Future projects don't take a deadline by definition, so the field is gone from their pages and a Current → Someday conversion drops any deadline silently — no warning about losing something the destination can't hold." },
-    { title: "Fix up the desktop layout", notes: "TO DO, and the next real job — needs the author's eyes on a wide screen. Everything this sprint was designed and tested on a phone, and the desktop view has drifted." },
+    { title: "✓ Fix up the desktop layout", notes: "DONE. On a window 1000px or wider the app now shows THREE lanes at once, keeping the same pairings as the phone's tabs: Next↔Waiting on the left, Projects↔Someday in the middle, Notes↔Habits on the right, each with a toggle carrying both lists' counts. The floating + is replaced by real buttons under each column's header; drafting pages become centred cards with a Done button bottom-right and Delete bottom-left; the calendar opens as a wide popup; Language and Background move out of the ⚙ menu into the header; OELA sits in the middle; and the gold border wraps the whole page. Narrower than 1000px you get the phone app exactly as before — with one change on both layouts: the header's intray button is gone, replaced by a white arrow handle on the left edge of the screen. Also new on both: closing a page you have edited asks before throwing the changes away." },
     { title: "✓ Events on the project page", notes: "DONE. A project shows its linked events and can create them — including on the creation page, where the event is held as a draft and only becomes real when the project is saved. ‘Add an event’ in the daily review came with it." },
     { title: "✓ Linked notes on the project page", notes: "DONE. The link runs both ways now. A current project's Linked panel has an Actions side and a Notes side you toggle between, and a Someday project has a Linked notes section of its own — notes only, since a Someday project holds no actions by design." },
     { title: "Re-test backups against the new fields", notes: "TO DO. Export and import have not been exercised since deadlines gained a start date and a push counter, repeats gained a missed-day marker, and the backgrounds changed names. Backups are the one thing that has to survive real use." },

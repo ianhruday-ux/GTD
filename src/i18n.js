@@ -211,48 +211,48 @@ const STRINGS = {
     "zh-Hans": "① 创建你的第一个下一步行动"
   },
   "tutorial.t1.notes": {
-    en: "Tap the round + at the bottom right and choose “New action”. A next action is the one physical thing you'd do next — not the whole project. When you've made one, tick this card's circle to complete it: that's how you clear each tutorial step.",
-    "zh-Hans": "点右下角的圆形 + 按钮，选择「新建行动」。下一步行动是你接下来会做的那一个具体动作——不是整个项目。做好之后，点这张卡片的圆圈把它标记为完成：教程的每一步都是这样清除的。"
+    en: "Use the lane’s create button — the round + on a phone, “+ New action” under the column header on a wide screen. A next action is the one physical thing you'd do next — not the whole project. When you've made one, tick this card's circle to complete it: that's how you clear each tutorial step.",
+    "zh-Hans": "用列表的创建按钮——手机上是右下角的圆形 +，宽屏上是列标题下的「+ 新建行动」。下一步行动是你接下来会做的那一个具体动作——不是整个项目。做好之后，点这张卡片的圆圈把它标记为完成：教程的每一步都是这样清除的。"
   },
   "tutorial.t2.title": {
     en: "② Add a waiting action and hook it to a next action",
     "zh-Hans": "② 添加一个等待项，并把它挂到下一步行动上"
   },
   "tutorial.t2.notes": {
-    en: "This card IS a waiting action — it's hooked to step ① and linked to the project in step ④. Complete ① and watch this jump up into Next Actions on its own. To make your own: on the Waiting tab, + → “New action”, then tap the 🪝 to choose what it's waiting on.",
-    "zh-Hans": "这张卡片本身就是一个等待项——它挂在第①步上，并链接到第④步的项目。完成第①步，看它自己跳进「下一步行动」列表。要创建你自己的：在「等待」标签页，+ →「新建行动」，然后点 🪝 选择它在等待什么。"
+    en: "This card IS a waiting action — it's hooked to step ① and linked to the project in step ④. Complete ① and watch this jump up into Next Actions on its own. To make your own: open Waiting On, create a new action there, then tap the 🪝 to choose what it's waiting on.",
+    "zh-Hans": "这张卡片本身就是一个等待项——它挂在第①步上，并链接到第④步的项目。完成第①步，看它自己跳进「下一步行动」列表。要创建你自己的：打开「等待中」，在那里新建一个行动，然后点 🪝 选择它在等待什么。"
   },
   "tutorial.t3.title": {
     en: "③ Make a context",
     "zh-Hans": "③ 创建一个情境"
   },
   "tutorial.t3.notes": {
-    en: "A context groups actions by where or how you'll do them — “at computer”, “errands”. On an action tab, tap + → “New context”, name it, then file actions under it. Tick this card once you've made one.",
-    "zh-Hans": "情境按你做事的地点或方式给行动分组——「在电脑前」「外出办事」。在某个行动标签页，点 + →「新建情境」，起个名字，然后把行动归到它下面。创建好后点这张卡片。"
+    en: "A context groups actions by where or how you'll do them — “at computer”, “errands”. In Next Actions or Waiting On, choose “New context”, name it, then file actions under it. Tick this card once you've made one.",
+    "zh-Hans": "情境按你做事的地点或方式给行动分组——「在电脑前」「外出办事」。在「下一步行动」或「等待中」选择「新建情境」，起个名字，然后把行动归到它下面。创建好后点这张卡片。"
   },
   "tutorial.t4.title": {
     en: "④ Start a project",
     "zh-Hans": "④ 开始一个项目"
   },
   "tutorial.t4.notes": {
-    en: "A project is anything that takes more than one action. On the Projects tab, tap + → “New project”. Every project needs at least one next step, so add an action or link an existing one. (This card already has step ②'s waiting action linked to it.)",
-    "zh-Hans": "项目是指任何需要一个以上行动才能完成的事。在「项目」标签页，点 + →「新建项目」。每个项目都需要至少一个下一步，所以加一个行动或链接一个已有的。（这张卡片已经把第②步的等待项链接进来了。）"
+    en: "A project is anything that takes more than one action. In Current Projects, choose “New project”. Every project needs at least one next step, so add an action or link an existing one. (This card already has step ②'s waiting action linked to it.)",
+    "zh-Hans": "项目是指任何需要一个以上行动才能完成的事。在「当前项目」选择「新建项目」。每个项目都需要至少一个下一步，所以加一个行动或链接一个已有的。（这张卡片已经把第②步的等待项链接进来了。）"
   },
   "tutorial.t5.title": {
     en: "⑤ Fix a stalled project in Review",
     "zh-Hans": "⑤ 在回顾中修复一个停滞的项目"
   },
   "tutorial.t5.notes": {
-    en: "Open the 📥 intray, then 🔍 Review. The sample project with no next step (below in Projects) will come up — give it a way forward by adding a next action right there in the review. Tick this card once you have.",
-    "zh-Hans": "打开 📥 收件箱，再点 🔍 回顾。那个没有下一步的示例项目（在下面的「项目」里）会出现——就在回顾里给它加一个下一步行动，让它继续走下去。做完后点这张卡片。"
+    en: "Open the intray with the white arrow on the left edge of the screen, then 🔍 Review. The sample project with no next step (below in Projects) will come up — give it a way forward by adding a next action right there in the review. Tick this card once you have.",
+    "zh-Hans": "用屏幕左边缘的白色箭头打开收件箱，再点 🔍 回顾。那个没有下一步的示例项目（在下面的「项目」里）会出现——就在回顾里给它加一个下一步行动，让它继续走下去。做完后点这张卡片。"
   },
   "tutorial.t6.title": {
     en: "⑥ Build a habit",
     "zh-Hans": "⑥ 养成一个习惯"
   },
   "tutorial.t6.notes": {
-    en: "A habit is a routine triggered by a cue. On the Habits tab, tap + and give it a cue like “after I pour my coffee”. Check it off each day; the little runner on the card keeps your streak. This card can't be completed (habits reset daily instead) — delete it with the 🗑 on its page once you've made your own.",
-    "zh-Hans": "习惯是由提示触发的例行行为。在「习惯」标签页，点 + 并给它一个提示，比如「倒完咖啡之后」。每天把它勾掉；卡片上的小人会记录你的连续天数。这张卡片无法被「完成」（习惯每天会重置）——创建好你自己的之后，在它的页面上用 🗑 删除它。"
+    en: "A habit is a routine triggered by a cue. In Habits, create a new habit and give it a cue like “after I pour my coffee”. Check it off each day; the little runner on the card keeps your streak. This card can't be completed (habits reset daily instead) — delete it with the 🗑 on its page once you've made your own.",
+    "zh-Hans": "习惯是由提示触发的例行行为。在「习惯」新建一个习惯，并给它一个提示，比如「倒完咖啡之后」。每天把它勾掉；卡片上的小人会记录你的连续天数。这张卡片无法被「完成」（习惯每天会重置）——创建好你自己的之后，在它的页面上用 🗑 删除它。"
   },
   "tutorial.tp.title": {
     en: "◇ A sample project with no next step",
