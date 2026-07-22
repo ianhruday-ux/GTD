@@ -39,21 +39,25 @@ def check(cond, msg):
 # This round's groups. ⚠ Update BOTH of these whenever injectQAChecklist is
 # rewritten — the sweep test works by clearing the CURRENT flag to force a
 # re-injection, so a stale flag name here makes the whole file pass vacuously.
-EXPECTED = ["The seven things you reported", "The full event creation page",
-            "Worth a second look after these fixes"]
+EXPECTED = ["The desktop layout (do these on a computer)",
+            "The intray handle (phone AND computer)",
+            "Make sure nothing else moved"]
 RETIRED = ["Chunk 7", "Chunk 8", "Per-occurrence", "Recheck chunk 6b",
            "Settings & appearance", "Calendar & review fixes", "Progress bars", "Pickers",
-           # the round this one replaces — the QA-findings round swept all ten
            "The new time picker", "The new date picker", "Deadlines that get pushed",
            "List view", "The daily review and the intray", "Repeating events and habits",
            "How the app talks", "Desks and decoration",
-           "Adding to a list or a context", "Lane colours"]
-CURRENT_FLAG = "gtd_qa_checklist_postsprint_v7"
+           "Adding to a list or a context", "Lane colours",
+           # the round this one replaces — the desktop round swept all three
+           "The seven things you reported", "The full event creation page",
+           "Worth a second look after these fixes"]
+CURRENT_FLAG = "gtd_qa_checklist_desktop_v1"
 SUPERSEDED_FLAGS = ["gtd_qa_checklist_chunk7_v1", "gtd_qa_checklist_override_v1",
                     "gtd_qa_checklist_override_v2", "gtd_qa_checklist_chunk8_v1",
                     "gtd_qa_checklist_postsprint_v1", "gtd_qa_checklist_postsprint_v2",
                     "gtd_qa_checklist_postsprint_v3", "gtd_qa_checklist_postsprint_v4",
-                    "gtd_qa_checklist_postsprint_v5", "gtd_qa_checklist_postsprint_v6"]
+                    "gtd_qa_checklist_postsprint_v5", "gtd_qa_checklist_postsprint_v6",
+                    "gtd_qa_checklist_postsprint_v7"]
 
 with serve(DIST) as url, sync_playwright() as p:
     b = p.chromium.launch()
