@@ -29,14 +29,27 @@
 </head>
 <body>
 
+<!-- The header's LEFT cluster is desktop-only and built by JS
+     (renderHeaderWidgets): Language and Background dropdowns, then the Calendar
+     button, which is MOVED here rather than duplicated. On the phone this div
+     is empty and the header is exactly what it always was — minus the 📥, which
+     retires on both layouts in favour of the tray handle on the left screen
+     edge (#tray-handle, below). -->
 <header>
+  <div class="header-left" id="header-left"></div>
   <div class="brand"><span class="mark">OELA</span></div>
   <div class="header-right">
-    <button class="header-icon" type="button" title="Intray" data-action="open-tray">&#128229;</button>
     <button class="header-icon" type="button" title="Calendar" data-action="open-calendar">&#128197;</button>
     <button class="header-icon" type="button" title="More" data-action="open-overflow">&#8943;</button>
   </div>
 </header>
+
+<!-- The intray handle: a slim tab on the LEFT SCREEN EDGE, on both layouts.
+     It keeps data-action="open-tray" — the action name is the contract, not the
+     button's position. Tap only: the left edge belongs to the browser's
+     back-swipe gesture, so this must never be a drag target. It hides while the
+     drawer is open (the drawer's own arrow closes it). -->
+<button id="tray-handle" type="button" data-action="open-tray" title="Intray" aria-label="Intray">&#8250;</button>
 
 <!-- Compact letter+icon panels, no horizontal scroll (user round). Related
      lanes share one panel, split into two independently-tappable halves --

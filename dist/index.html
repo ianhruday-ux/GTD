@@ -1137,7 +1137,7 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 .tray-backdrop.open{ opacity:1; pointer-events:auto; } /* only intercepts taps while open — the fading-out copy lets taps through */
 .tray-scroll{ display:flex; flex-direction:column; }
 .tray-drawer{
-  position:fixed; top:0; left:0; bottom:0; z-index:211; width:min(360px, 86vw);
+  position:fixed; top:0; left:0; bottom:0; z-index:211; width:var(--tray-w);
   background:var(--desk) var(--wood); background-size:var(--wood-size) var(--wood-size); background-repeat:repeat;
   box-shadow:6px 0 24px rgba(0,0,0,0.5); display:flex; flex-direction:column; overflow-y:auto;
   padding:calc(env(safe-area-inset-top) + 14px) 16px calc(env(safe-area-inset-bottom) + 16px) calc(env(safe-area-inset-left) + 16px);
@@ -1685,18 +1685,283 @@ body.has-frame .tray-drawer::after{
   display:block; font-size:10.5px; color:var(--text-soft); font-weight:400;
   margin-top:2px; line-height:1.35; white-space:normal;
 }
+
+/* ============================================================================
+   THE INTRAY HANDLE  (both layouts — the one sanctioned phone change this round)
+   ----------------------------------------------------------------------------
+   The header's 📥 is gone. In its place a slim white tab on the LEFT SCREEN
+   EDGE, which is where the drawer actually comes from — the button now points
+   at the thing it opens instead of sitting three inches away from it.
+
+   ⚑ TAP ONLY. The left edge belongs to the browser's back-swipe gesture, so this
+   must never become a drag/pull target. The existing swipe-open from the left
+   third still works; the handle is an affordance on top of it, not a
+   replacement. It is deliberately narrow (22px) so it barely occludes cards, and
+   sits in the upper third where lanes are emptiest.
+
+   z-index 150: over lane content and the header, UNDER the tray backdrop (210)
+   and any drafting page (200). It rides OVER the gold band rather than being
+   inset from it — an object on the edge of the desk, which reads correctly.
+============================================================================ */
+#tray-handle{
+  position:fixed; left:0; top:34%; z-index:150;
+  width:22px; min-height:58px; padding:12px 0;
+  border:none; border-radius:0 9px 9px 0;
+  background:rgba(244,240,232,0.93); color:#1a1408;
+  font-size:16px; font-weight:700; line-height:1;
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:2px 0 12px rgba(0,0,0,0.5);
+  transition:opacity .14s ease, background .14s ease;
+}
+#tray-handle:hover{ background:#fff; }
+/* Hidden while the drawer is open, and back only AFTER the .28s slide-out — the
+   class is dropped on the same 300ms timer the drawer's teardown uses, so it
+   never pops in over a moving drawer. */
+body.tray-open #tray-handle{ opacity:0; pointer-events:none; }
+/* A drafting page owns the whole screen; the handle would float over its scrim. */
+body.screen-open #tray-handle{ display:none; }
+
+/* The other half of the same control: an arrow on the drawer's own edge that
+   puts it away. position:fixed inside the drawer (whose transform makes it the
+   containing block) so it rides the slide and ignores the drawer's scrolling. */
+.tray-edge-handle{
+  position:fixed; right:0; top:34%; z-index:2;
+  width:22px; min-height:58px; padding:12px 0;
+  border:none; border-radius:9px 0 0 9px;
+  background:rgba(244,240,232,0.93); color:#1a1408;
+  font-size:16px; font-weight:700; line-height:1;
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:-2px 0 12px rgba(0,0,0,0.45);
+}
+.tray-edge-handle:hover{ background:#fff; }
+
+/* One variable for the drawer's width, so the desktop widening (author note 1)
+   is a single number and the jade inlay keeps working at either size. */
+:root{ --tray-w: min(360px, 86vw); }
+
+/* ============================================================================
+   THE DRAFTING CARD WRAPPER  (mobile: invisible; desktop: the card)
+   `.screen-card` is rendered in both modes on purpose — see renderScreen.
+============================================================================ */
+/* The desktop column head and per-lane create row are rendered into every lane
+   in both modes and HIDDEN on the phone — the mobile markup is untouched, just
+   not shown (trap T8: hide per mode, don't delete). */
+.lane-colhead, .lane-create-row{ display:none; }
+
+.screen-card{ display:flex; flex-direction:column; flex:1 1 auto; min-height:0; width:100%; }
+/* The desktop footer (Done / Delete). Not rendered at all on the phone, which
+   keeps the back arrow and the bin in the header — so exactly one element ever
+   carries data-action="screen-save". */
+.screen-footer{ display:none; }
+/* The "what happens on Done" group. `display:contents` on the phone means the
+   Complete pill keeps its floating position and the convert button keeps its
+   place in the flow: the grouping is desktop-visible only. */
+.screen-outcome-group{ display:contents; }
+
+/* ============================================================================
+   ▲ DESKTOP LAYOUT  (>=1000px)
+   ----------------------------------------------------------------------------
+   ⚠ THIS NUMBER IS MIRRORED IN ONE PLACE IN JS: DESKTOP_MIN_PX in app.js. They
+   must never drift — a half-desktop state (three columns, still showing the FAB)
+   is what two sources of truth look like.
+
+   Below it, the phone app exactly as it shipped. A half-snapped laptop window
+   gets the mobile layout; that is intended.
+============================================================================ */
+@media (min-width:1000px){
+  /* --- the tab bar retires; its spacer keeps reserving the fixed header --- */
+  .tabbar{ display:none; }
+  .tabbar-spacer{ height:calc(var(--header-h) + 22px); }
+  /* --- the floating + retires; every column has its own real buttons --- */
+  #fab-create, .fab-menu{ display:none !important; }
+
+  /* --- header: dropdowns left, OELA centered, gear right (author notes 8/9) --- */
+  .header-left{ display:flex; align-items:center; gap:8px; }
+  header .brand{ position:absolute; left:50%; transform:translateX(-50%); }
+  .header-drop{ position:relative; }
+  .header-drop-btn{
+    display:inline-flex; align-items:center; gap:7px;
+    border:1px solid rgba(237,231,218,0.16); background:rgba(237,231,218,0.05);
+    color:var(--text-primary); border-radius:9px; padding:7px 11px; font-size:13px;
+  }
+  .header-drop-btn:hover{ background:rgba(237,231,218,0.10); }
+  .hdr-drop-icon{ font-size:13px; line-height:1; }
+  .hdr-drop-value{ max-width:132px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .hdr-drop-caret{ color:var(--text-soft); font-size:10px; }
+  /* Reuses .settings-menu's chrome, but anchored to its own button rather than
+     to the header's right edge. */
+  .header-drop-menu{
+    position:absolute; top:calc(100% + 7px); left:0; right:auto;
+    min-width:210px; max-width:280px;
+  }
+  .header-drop-menu[hidden]{ display:none; }
+
+  /* --- three columns (ruling 2) ---------------------------------------------
+     No explicit grid-column anywhere: every pair is contiguous in ALL_LANES and
+     the pairs are in column order, so auto-placement puts the three visible
+     lanes in the right cells on its own.
+     ⚠ ONE scrolling document (trap T16) — the columns grow downward and the page
+     scrolls as a whole. Per-column scrollbars fight both the frame and
+     lockBodyScroll. */
+  .lanes{
+    max-width:1460px;
+    display:grid; grid-template-columns:repeat(3, minmax(0,1fr));
+    gap:14px 26px; align-items:start;
+  }
+  .lane{ min-width:0; }
+
+  /* --- one layer of headers (author note 4 / trap T8) ---
+     The column toggle IS the lane header on desktop, so the in-lane floating
+     label is hidden rather than stacked under it. */
+  .lane-label{ display:none; }
+  .lane-colhead{ display:flex; align-items:center; gap:8px; margin:2px 0 12px 0; }
+  .col-tabs{ display:flex; gap:6px; flex:1 1 auto; min-width:0; }
+  .col-tab{
+    flex:0 1 auto; min-width:0;
+    display:inline-flex; align-items:center; gap:8px;
+    border:1px solid rgba(237,231,218,0.18); background:transparent; color:var(--text-soft);
+    font-family:var(--font-display); font-weight:700; font-size:14.5px; letter-spacing:0.01em;
+    padding:9px 13px; border-radius:9px; white-space:nowrap;
+  }
+  .col-tab:hover{ background:rgba(237,231,218,0.06); color:var(--text-primary); }
+  .col-tab .col-tab-name{ overflow:hidden; text-overflow:ellipsis; }
+  .col-tab.active{
+    background:var(--lane-accent); border-color:transparent; color:var(--dark-on-accent);
+    box-shadow:0 3px 10px rgba(0,0,0,0.35);
+  }
+  .col-count{
+    font-family:var(--font-mono); font-weight:600; font-size:11px;
+    background:rgba(237,231,218,0.10); padding:2px 7px; border-radius:10px;
+  }
+  .col-tab.active .col-count{ background:rgba(0,0,0,0.2); }
+  .col-tab.active:hover{ background:var(--lane-accent); color:var(--dark-on-accent); }
+  /* The info button sits outside the lit pill now, so it needs its own outline.
+     It still toggles the same .lane-info panel via the same handler. */
+  .col-info{
+    flex:0 0 auto; background:transparent; color:var(--text-soft);
+    border:1px solid rgba(237,231,218,0.22);
+  }
+  .col-info:hover{ background:rgba(237,231,218,0.08); color:var(--text-primary); }
+
+  /* --- per-lane create buttons (author note 5 / trap T4) --- */
+  .lane-create-row{ display:flex; flex-wrap:wrap; gap:6px; margin:0 0 12px 0; }
+  .lane-create-btn{ border-color:rgba(237,231,218,0.26); }
+  .lane-create-btn:hover{ border-color:var(--lane-accent); color:var(--text-primary); }
+  .lane-tools-row{ margin:0 0 10px 0; }
+
+  /* --- drafting pages become centered cards (ruling 4) ---
+     Same overlay node as the phone: the overlay becomes the SCRIM and the card
+     is the inner wrapper. The entrance differs in CSS alone — slide on mobile,
+     fade-and-settle here. */
+  .screen-overlay{
+    background:rgba(8,6,5,0.62);
+    display:flex; align-items:center; justify-content:center;
+    padding:34px 20px;
+    transform:none; opacity:0; transition:opacity .16s ease;
+  }
+  .screen-overlay.open{ transform:none; opacity:1; }
+  .screen-card{
+    flex:0 1 auto; width:min(700px, 100%); max-height:100%;
+    background:var(--desk) var(--wood);
+    background-size:var(--wood-size) var(--wood-size); background-repeat:repeat;
+    border:1px solid rgba(237,231,218,0.14); border-radius:14px;
+    box-shadow:0 26px 64px rgba(0,0,0,0.62);
+    overflow:hidden;
+    transform:scale(0.985); transition:transform .16s ease;
+  }
+  .screen-overlay.open .screen-card{ transform:scale(1); }
+  /* Project pages carry the staged-actions machinery and need the room. */
+  .screen-overlay[data-kind="current"] .screen-card,
+  .screen-overlay[data-kind="future"] .screen-card{ width:min(880px, 100%); }
+  /* ⚑ The calendar is visually a popup and structurally the SAME screen (ruling
+     6). Widening the card is only half of it: the month grid is sized against
+     .screen-body's 640px column, so that column has to widen for this screen
+     only (trap T11). */
+  .screen-overlay[data-kind="calendar"] .screen-card{ width:min(900px, 100%); }
+  .screen-body{
+    max-width:none; padding:18px 26px 22px 26px;
+  }
+  .screen-header{ padding:12px 20px 12px 26px; }
+  .screen-footer{
+    display:flex; align-items:center; justify-content:space-between; gap:16px;
+    flex:0 0 auto; padding:14px 26px calc(14px + env(safe-area-inset-bottom)) 26px;
+    border-top:1px solid rgba(237,231,218,0.12);
+  }
+  .screen-footer-done{
+    border:none; background:var(--brass); color:var(--dark-on-accent);
+    font-weight:700; font-size:14px; padding:11px 32px; border-radius:9px;
+    box-shadow:0 3px 12px rgba(0,0,0,0.4);
+  }
+  .screen-footer-done:hover{ filter:brightness(1.08); }
+  /* Maximum distance from Done, and danger-styled so the two never read alike. */
+  .screen-footer-delete{
+    border:1px solid rgba(194,74,61,0.5); background:transparent; color:var(--red);
+    font-size:13px; font-weight:600; padding:10px 16px; border-radius:9px;
+  }
+  .screen-footer-delete:hover{ background:rgba(194,74,61,0.14); }
+  .screen-chrome-spacer{ display:inline-block; width:22px; }
+
+  /* --- Complete + Convert as ONE group (ruling 4 / trap T10) ---
+     They are the same kind of control — a declaration about what the item
+     becomes on save — and their mutual exclusion is only legible when they sit
+     next to each other. The pill stops floating and joins the flow. */
+  .screen-outcome-group{
+    display:flex; flex-wrap:wrap; align-items:center; gap:10px;
+    border:1px solid rgba(237,231,218,0.14); border-radius:10px;
+    padding:12px 14px; margin-top:2px;
+  }
+  .screen-outcome-group .screen-complete-pill{
+    position:static; right:auto; bottom:auto; box-shadow:none; flex:0 0 auto;
+  }
+  .screen-outcome-group .screen-make-kind-btn{ align-self:auto; flex:0 1 auto; }
+
+  /* --- the intray, wider (author note 1) --- */
+  :root{ --tray-w: min(440px, 86vw); }
+
+  /* --- the gold-leaf frame wraps the WHOLE PAGE (author note 10 / trap T14) ---
+     Every other surface has --frame-inset:0, so all of this collapses to nothing
+     unless the lacquer desk is on. */
+  body.has-frame header{ top:var(--frame-inset); left:var(--frame-inset); right:var(--frame-inset); }
+  body.has-frame .tabbar-spacer{ height:calc(var(--header-h) + 22px + var(--frame-inset)); }
+  body.has-frame main{
+    padding-left:calc(20px + var(--frame-inset));
+    padding-right:calc(20px + var(--frame-inset));
+    padding-bottom:calc(40px + var(--frame-inset));
+  }
+  /* The band is on the viewport now, not on main's box — so the lanes must NOT
+     also pad themselves in by the same amount. */
+  body.has-frame .lanes{ padding:0; }
+}
+
+/* The frame's desktop geometry: pinned to the viewport, over the header, under
+   the tray handle and any drafting page. Set by drawDeskFrame, not by a media
+   query, because the JS also has to change what it measures. */
+#desk-frame.frame-fixed{ position:fixed; top:0; left:0; z-index:140; }
 </style>
 </head>
 <body>
 
+<!-- The header's LEFT cluster is desktop-only and built by JS
+     (renderHeaderWidgets): Language and Background dropdowns, then the Calendar
+     button, which is MOVED here rather than duplicated. On the phone this div
+     is empty and the header is exactly what it always was — minus the 📥, which
+     retires on both layouts in favour of the tray handle on the left screen
+     edge (#tray-handle, below). -->
 <header>
+  <div class="header-left" id="header-left"></div>
   <div class="brand"><span class="mark">OELA</span></div>
   <div class="header-right">
-    <button class="header-icon" type="button" title="Intray" data-action="open-tray">&#128229;</button>
     <button class="header-icon" type="button" title="Calendar" data-action="open-calendar">&#128197;</button>
     <button class="header-icon" type="button" title="More" data-action="open-overflow">&#8943;</button>
   </div>
 </header>
+
+<!-- The intray handle: a slim tab on the LEFT SCREEN EDGE, on both layouts.
+     It keeps data-action="open-tray" — the action name is the contract, not the
+     button's position. Tap only: the left edge belongs to the browser's
+     back-swipe gesture, so this must never be a drag target. It hides while the
+     drawer is open (the drawer's own arrow closes it). -->
+<button id="tray-handle" type="button" data-action="open-tray" title="Intray" aria-label="Intray">&#8250;</button>
 
 <!-- Compact letter+icon panels, no horizontal scroll (user round). Related
      lanes share one panel, split into two independently-tappable halves --
@@ -1780,7 +2045,7 @@ body.has-frame .tray-drawer::after{
 (function(){
 "use strict";
 
-const BUILD_STAMP = "21 Jul 19:29";  // replaced by build.py
+const BUILD_STAMP = "21 Jul 21:25";  // replaced by build.py
 
 // =========================================================
 // STORAGE ADAPTER (spec.md §3, known issue 4)
@@ -2020,6 +2285,29 @@ const STRINGS = {
   "chrome.delete":   { en: "Delete",           "zh-Hans": "删除" },
   "chrome.info":     { en: "Information",      "zh-Hans": "说明" },
 
+  // ---- desktop round: the card footer, the discard gate, the tray handle ----
+  // "Done" is the desktop footer's filled button. It is the SAME action as the
+  // phone's ← (screen-save): save and close. The word changes, the contract
+  // does not.
+  "chrome.done":     { en: "Done",             "zh-Hans": "完成" },
+  "chrome.doneTitle":{ en: "Save and close",   "zh-Hans": "保存并关闭" },
+  // The discard gate (desktop ruling 5, applied on both layouts): ✕/Escape asks
+  // only when the draft actually differs from what is saved. Register matched to
+  // the project page's existing warning — "Discard changes" / "Keep editing".
+  "discard.message": {
+    en: "Discard your changes? Nothing on this page has been saved yet.",
+    "zh-Hans": "放弃你的更改？此页面上的内容尚未保存。"
+  },
+  "discard.yes":     { en: "Discard changes",  "zh-Hans": "放弃更改" },
+  "discard.no":      { en: "Keep editing",     "zh-Hans": "继续编辑" },
+  "tray.handle":     { en: "Intray",           "zh-Hans": "收集箱" },
+  "tray.handleOpen": { en: "Open the intray",  "zh-Hans": "打开收集箱" },
+  "tray.handleClose":{ en: "Close the intray", "zh-Hans": "关闭收集箱" },
+  // ⚑ Was NEW_ITEM_LABEL.habit, an English-only const outside this table (trap
+  // T12). It becomes visible button text on the desktop Habits column, so it
+  // moves in here properly. Habits has no multi-option menu — one button.
+  "fab.newHabit":    { en: "New habit",        "zh-Hans": "新建习惯" },
+
   // ---- the in-lane tutorial (seedTutorial in app.js) ----
   // Each seeded tutorial card carries a `tutorialKey`; restampTutorialCards()
   // re-reads these on a language change. Titles say what to DO; notes describe
@@ -2126,6 +2414,10 @@ function applyLocale(){
   if (typeof restampTutorialCards === "function") restampTutorialCards();
   if (typeof renderShell === "function") renderShell();
   if (typeof renderTabLabels === "function") renderTabLabels();
+  // Desktop round: the header's Language/Background dropdowns carry their own
+  // labels in their own language, and setLocale knows nothing about them
+  // otherwise (trap T12).
+  if (typeof renderHeaderWidgets === "function") renderHeaderWidgets();
   if (typeof renderLane === "function" && typeof ALL_LANES !== "undefined"){
     ALL_LANES.forEach(renderLane);
   }
@@ -3279,16 +3571,34 @@ function drawFretRun(ctx, len, band, seed){
   }
   ctx.stroke();
 }
+// ▲ DESKTOP (author note 10 / trap T14): the frame has TWO geometries, and they
+// must not be merged.
+//
+//   · MOBILE (unchanged): the canvas lives inside #main and is sized to #main's
+//     own box, so the border wraps the lanes and GROWS with them as content is
+//     added. A ResizeObserver on #main is what keeps it honest.
+//   · DESKTOP (new): the frame goes around the WHOLE PAGE, header included, so
+//     it is sized to the VIEWPORT and pinned there. #main's observer cannot see
+//     a window-height change that doesn't reflow main, so the desktop path
+//     listens to the window as well.
+//
+// One function, parameterised by host box — not two copies of the meander.
+function frameHostBox(){
+  const desktop = document.body && document.body.classList.contains("desktop");
+  if (desktop) return { W: window.innerWidth, H: window.innerHeight, fixed: true };
+  const host = document.getElementById("main");
+  if (!host) return null;
+  return { W: host.offsetWidth, H: host.offsetHeight, fixed: false };
+}
 function drawDeskFrame(){
   const cv = document.getElementById("desk-frame");
-  const host = document.getElementById("main");
-  if (!cv || !host) return;
+  const box = frameHostBox();
+  if (!cv || !box) return;
   const cfg = SURFACES[currentSurfaceId()];
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  // main's OWN box, not the viewport: the border wraps the lanes and grows with
-  // them. offsetHeight rather than a viewport height is the whole change.
-  const W = host.offsetWidth, H = host.offsetHeight;
+  const W = box.W, H = box.H;
   if (!W || !H) return;
+  cv.classList.toggle("frame-fixed", !!box.fixed);
   cv.width = Math.round(W * dpr);
   cv.height = Math.round(H * dpr);
   cv.style.width = W + "px";
@@ -3333,11 +3643,10 @@ function drawDeskFrame(){
 // chatter costs nothing.
 let lastFrameW = -1, lastFrameH = -1;
 function refreshDeskFrame(){
-  const host = document.getElementById("main");
-  if (!host) return;
-  const W = host.offsetWidth, H = host.offsetHeight;
-  if (W === lastFrameW && H === lastFrameH) return;
-  lastFrameW = W; lastFrameH = H;
+  const box = frameHostBox();
+  if (!box) return;
+  if (box.W === lastFrameW && box.H === lastFrameH) return;
+  lastFrameW = box.W; lastFrameH = box.H;
   drawDeskFrame();
 }
 // Bypasses the size guard — for when the SURFACE changed rather than the box.
@@ -3349,9 +3658,10 @@ function initDeskFrame(){
   const host = document.getElementById("main");
   if (host && window.ResizeObserver){
     new ResizeObserver(refreshDeskFrame).observe(host);
-  } else {
-    window.addEventListener("resize", refreshDeskFrame);
   }
+  // ALWAYS, not as a fallback: the desktop frame is sized to the window, and a
+  // window that gets shorter without reflowing #main never touches the observer.
+  window.addEventListener("resize", refreshDeskFrame);
   forceDeskFrame();
 }
 function applySurface(id){
@@ -4780,6 +5090,29 @@ function injectChunkMap(){
   // ALL_LANES is what tab/lane rendering and visibility iterate (chunk 6).
   const KINDS = ["next", "waiting", "current", "future", "habit"];
   const ALL_LANES = ["next", "waiting", "current", "future", "habit", "notes"];
+  // =========================================================
+  // DESKTOP LAYOUT (desktop-redesign-plan.md, rulings 1–2)
+  //
+  // ⚠ ONE SOURCE OF TRUTH for "am I desktop?" (trap T1). This number is
+  // mirrored in exactly one place in styles.css — `@media (min-width:1000px)`.
+  // Nothing in JS may read window.innerWidth to decide layout; everything asks
+  // state.desktop, which only applyLayoutMode() writes.
+  //
+  // The three columns keep the phone's tab pairings, so both layouts are one
+  // mental model: do (Next/Waiting) · plan (Projects/Someday) · support
+  // (Notes/Habits). ⚠ ORDER MATTERS TWICE: it is the column order left→right,
+  // and — because every pair is contiguous in ALL_LANES and the pairs are in
+  // the same sequence — CSS grid auto-placement puts the three visible lanes in
+  // their own columns with no explicit grid-column anywhere.
+  // =========================================================
+  const DESKTOP_MIN_PX = 1000;
+  const COLUMN_PAIRS = [["next", "waiting"], ["current", "future"], ["notes", "habit"]];
+  function columnIndexOfKind(k){
+    for (let i = 0; i < COLUMN_PAIRS.length; i++){ if (COLUMN_PAIRS[i].indexOf(k) !== -1) return i; }
+    return -1;
+  }
+  function laneCount(k){ return k === "notes" ? (state.notes || []).length : (state.tasks[k] || []).length; }
+  function visibleLanes(){ return state.desktop ? state.columns.slice() : [state.activeKind]; }
   const PROJECT_KINDS = ["current", "future"];
   const MOVE_MAP = { waiting: "next", future: "current" };
   const NEW_ITEM_LABEL = {
@@ -4799,6 +5132,12 @@ function injectChunkMap(){
     // promoted Waiting item land in the identically-named context for free.
     contexts: [],
     activeKind: "next",
+    // Desktop round. `desktop` is written ONLY by applyLayoutMode(); `columns`
+    // holds the active lane of each of the three columns, in COLUMN_PAIRS
+    // order. Session-only, like activeKind — a fresh desktop load shows
+    // Next / Projects / Notes (the first-named of each pair).
+    desktop: false,
+    columns: ["next", "current", "notes"],
     collapsed: {},
     habitDone: {},
     habitDoneOrder: [],
@@ -6539,7 +6878,7 @@ function injectChunkMap(){
   function renderLane(kind){
     const laneEl = qs('.lane[data-kind="' + kind + '"]');
     if (!laneEl) return;
-    if (kind === "notes"){ renderNotesLane(laneEl); return; } // chunk 6: notes aren't tasks
+    if (kind === "notes"){ renderNotesLane(laneEl); updateColumnHeads(); return; } // chunk 6: notes aren't tasks
     if (kind === "habit"){
       updateHabitBadge();
     }
@@ -6601,10 +6940,56 @@ function injectChunkMap(){
     // there. Tapping anywhere on it opens the calendar.
     const widget = kind === "waiting" ? waitingWidgetHtml() : "";
     rootEl.innerHTML = widget + activeHtml + completedHtml;
+    updateColumnHeads(); // the desktop head shows BOTH lanes' counts, including this one's
+  }
+  // ▲ DESKTOP (ruling 9 / trap T8): "one layer of headers" means MERGING, not
+  // adding. Each lane already renders a `.lane-label`; stacking a column header
+  // above it would print every column's name twice. So the column head carries
+  // the full lane names, both counts and the ⓘ, and CSS hides `.lane-label` on
+  // desktop — the mobile markup is untouched, just not shown.
+  //
+  // It lives INSIDE the lane rather than in a separate bar across the top: the
+  // ⓘ then still targets its own lane's `.lane-info` panel (same handler, same
+  // data-kind), and the per-lane create row sits with the lane it creates into.
+  // Because the three visible lanes are top-aligned grid items, the three heads
+  // still read as one layer.
+  function laneColHeadHtml(k){
+    const pair = COLUMN_PAIRS[columnIndexOfKind(k)] || [k];
+    return (
+      '<div class="lane-colhead">' +
+        '<div class="col-tabs">' +
+          pair.map(function(pk){
+            return '<button type="button" class="col-tab' + (pk === k ? " active" : "") + '" data-action="col-lane" data-kind="' + pk + '">' +
+              '<span class="col-tab-name">' + escapeHtml(LIST_TITLES[pk]) + '</span>' +
+              '<span class="col-count">0</span>' +
+            '</button>';
+          }).join("") +
+        '</div>' +
+        '<button class="info-btn col-info" data-action="toggle-info" data-kind="' + k + '" type="button" title="' + escapeHtml(t("chrome.info")) + '">i</button>' +
+      '</div>'
+    );
+  }
+  // ▲ DESKTOP (ruling 10 / trap T4): the floating + makes no sense when three
+  // lanes are live at once — "the active lane" is ambiguous. Each column gets
+  // its own lane's options as real buttons, carrying an EXPLICIT data-kind, so
+  // nothing here routes through state.activeKind the way the FAB menu does.
+  // Labels come from FAB_MENU_LABELS (already translated). Habits has no FAB
+  // menu at all, so it gets the one button it has always had a tooltip for.
+  function laneCreateRowHtml(k){
+    const labels = k === "habit" ? [t("fab.newHabit")] : (FAB_MENU_LABELS[k] || []);
+    if (!labels.length) return "";
+    return '<div class="lane-create-row">' + labels.map(function(label, idx){
+      // Only the tertiary slot is not a create (Notes → Tags); everything else
+      // gets the "+" the author asked for by name.
+      const text = idx === 2 ? label : "+ " + label;
+      return '<button type="button" class="btn btn-ghost btn-small lane-create-btn" data-action="lane-new" ' +
+        'data-kind="' + k + '" data-idx="' + idx + '">' + escapeHtml(text) + '</button>';
+    }).join("") + '</div>';
   }
   function laneShellHtml(k){
     return (
       '<div class="lane" data-kind="' + k + '">' +
+        laneColHeadHtml(k) +
         '<div class="lane-label">' +
           '<span class="lane-label-title">' + escapeHtml(LIST_TITLES[k]) + '</span>' +
           '<span class="lane-label-right">' +
@@ -6619,6 +7004,7 @@ function injectChunkMap(){
         (k === "habit"
           ? '<div class="lane-tools-row"><button class="btn btn-ghost btn-small tidy-btn" data-action="tidy-habits" type="button" title="Suggest an order from your hooks (you can still rearrange freely afterward)">&#8645; Tidy order</button></div>'
           : "") +
+        laneCreateRowHtml(k) +
         '<div class="inline-slot" data-kind="' + k + '"></div>' +
         '<div class="cards-root" data-dropzone-parent=""></div>' +
       '</div>'
@@ -6626,8 +7012,26 @@ function injectChunkMap(){
   }
   function renderShell(){ qs("#lanes").innerHTML = ALL_LANES.map(laneShellHtml).join(""); }
 
+  // Both counts on every column head — the hidden half's count IS the reason to
+  // toggle (trap T5). Cheap enough to redo wholesale on any lane render.
+  function updateColumnHeads(){
+    qsa(".col-tab").forEach(function(b){
+      const bk = b.getAttribute("data-kind");
+      const lane = b.closest(".lane");
+      const laneKind = lane ? lane.getAttribute("data-kind") : bk;
+      b.classList.toggle("active", bk === laneKind);
+      const c = b.querySelector(".col-count");
+      if (c) c.textContent = laneCount(bk);
+    });
+  }
   function updateLaneVisibility(){
-    qsa(".lane").forEach(function(el){ el.classList.toggle("active-lane", el.getAttribute("data-kind") === state.activeKind); });
+    // On desktop the left column's lane IS the "active kind" for everything
+    // that still asks (the FAB path, which the phone owns) — keep it in sync
+    // rather than leaving a stale value behind a mode flip.
+    if (state.desktop) state.activeKind = state.columns[0];
+    const vis = visibleLanes();
+    qsa(".lane").forEach(function(el){ el.classList.toggle("active-lane", vis.indexOf(el.getAttribute("data-kind")) !== -1); });
+    updateColumnHeads();
     // The floating + creates for whichever lane is active — retint it and
     // repoint its data-kind whenever the tab changes (overnight notes:
     // Google-Tasks-style FAB replaces the per-lane create button).
@@ -6653,6 +7057,102 @@ function injectChunkMap(){
       });
       menu.hidden = true;
     }
+  }
+
+  // =========================================================
+  // LAYOUT MODE (desktop redesign, trap T1)
+  //
+  // The single place that decides which layout is running. One matchMedia
+  // listener; everything else reads state.desktop or keys off the matching
+  // media query in styles.css. A live resize across the boundary re-renders
+  // rather than stranding anything: an open page, an open tray, an open
+  // settings menu and an open FAB menu all survive the flip.
+  // =========================================================
+  let layoutModeApplied = null;
+  // Held as a NODE reference, not re-queried: on desktop the Calendar button is
+  // MOVED into the header's left cluster (author note 8) rather than duplicated
+  // there — a second element carrying data-action="open-calendar" would be a
+  // second thing to keep in sync and would break any check that clicks the
+  // action by selector.
+  let calendarBtnEl = null;
+  function applyLayoutMode(){
+    const desk = window.matchMedia("(min-width:" + DESKTOP_MIN_PX + "px)").matches;
+    if (layoutModeApplied === desk) return;
+    layoutModeApplied = desk;
+    state.desktop = desk;
+    document.body.classList.toggle("desktop", desk);
+    if (desk){
+      // Carry the phone's current lane into its own column, so crossing the
+      // boundary keeps you looking at what you were looking at.
+      const i = columnIndexOfKind(state.activeKind);
+      if (i !== -1) state.columns[i] = state.activeKind;
+    } else {
+      // Going the other way, the phone shows the left column's lane and the tab
+      // strip has to agree with it.
+      state.activeKind = state.columns[0];
+      qsa("#lane-switcher button[data-kind]").forEach(function(b){
+        b.classList.toggle("active", b.getAttribute("data-kind") === state.activeKind);
+      });
+    }
+    const fabMenu = qs("#fab-menu"); if (fabMenu) fabMenu.hidden = true;
+    closeHeaderDrops();
+    // The ⋯ becomes a gear on desktop (author note 8); the phone keeps ⋯.
+    const gear = qs('[data-action="open-overflow"]');
+    if (gear){ gear.innerHTML = desk ? "&#9881;" : "&#8943;"; }
+    renderHeaderWidgets();
+    // The settings menu's contents differ per mode (Language/Background move
+    // out of it on desktop), and it is positioned against chrome that just
+    // changed — rebuild it rather than leaving a menu from the other layout.
+    if (qs(".settings-menu")) closeDialog();
+    // Notes may only now be on screen, and its cards are derived from live
+    // project state (trap T5).
+    renderLane("notes");
+    updateLaneVisibility();
+    if (state.screen) renderScreen();   // card ⇄ full-screen is a re-render, not a reopen
+    if (typeof forceDeskFrame === "function") forceDeskFrame(); // the frame changes host box
+  }
+  // ▲ DESKTOP HEADER (author note 8, trap T17). The header has never held state
+  // before, so everything stateful about it lives here: the two dropdowns are
+  // built on demand, only one is ever open, and they re-render on a language
+  // change (applyLocale calls this). Mobile gets an EMPTY left cluster and its
+  // markup stays byte-identical to what shipped.
+  function renderHeaderWidgets(){
+    const host = qs("#header-left");
+    if (!host) return;
+    if (!calendarBtnEl) calendarBtnEl = qs('[data-action="open-calendar"]');
+    if (!state.desktop){
+      host.innerHTML = "";
+      // Put the calendar button back where the phone header has always had it:
+      // to the left of ⋯, in .header-right.
+      const right = qs(".header-right"), gear = qs('[data-action="open-overflow"]');
+      if (calendarBtnEl && right && gear && calendarBtnEl.parentNode !== right) right.insertBefore(calendarBtnEl, gear);
+      return;
+    }
+    const surf = SURFACES[currentSurfaceId()] || SURFACES[DEFAULT_SURFACE];
+    host.innerHTML =
+      headerDropHtml("lang", "🌐", t("settings.language"), localeLabel(currentLocale())) +
+      headerDropHtml("bg", "🎨", t("settings.background"), surf.label);
+    if (calendarBtnEl) host.appendChild(calendarBtnEl); // moved, never cloned
+  }
+  function headerDropHtml(id, icon, label, value){
+    return (
+      '<div class="header-drop" data-drop="' + id + '">' +
+        '<button type="button" class="header-drop-btn" data-action="hdr-drop" data-drop="' + id + '" title="' + escapeHtml(label) + '">' +
+          '<span class="hdr-drop-icon" aria-hidden="true">' + icon + '</span>' +
+          '<span class="hdr-drop-value">' + escapeHtml(value) + '</span>' +
+          '<span class="hdr-drop-caret" aria-hidden="true">&#9662;</span>' +
+        '</button>' +
+        '<div class="header-drop-menu settings-menu" hidden></div>' +
+      '</div>'
+    );
+  }
+  // Returns whether it actually closed something — the Escape handler needs to
+  // know, so a stray Escape with a dropdown open never reaches the open page
+  // (trap T17).
+  function closeHeaderDrops(){
+    let closed = false;
+    qsa(".header-drop-menu").forEach(function(m){ if (!m.hidden){ m.hidden = true; closed = true; } });
+    return closed;
   }
 
   // =========================================================
@@ -7076,6 +7576,61 @@ function injectChunkMap(){
   // The ✕ / Back / Escape gate on a project page (§12.1): warn before
   // discarding a non-empty staged set (state-compare, not a dirty flag). Every
   // other page — and a non-dirty project — just closes.
+  // =========================================================
+  // THE DISCARD GATE (desktop ruling 5, trap T6)
+  //
+  // ✕ / Escape asks "Discard your changes?" — but ONLY when the draft actually
+  // differs from what is saved. An untouched page closes instantly. This is a
+  // SOFTENING ON TOP OF draft isolation, not a change to it: ✕ still never
+  // commits anything, and Save still commits everything.
+  //
+  // ⚑ WHY A SNAPSHOT AND NOT A DIRTY FLAG. Flags rot: every new control is a new
+  // place to remember to set one, and the day someone forgets, the confirm goes
+  // quiet on exactly the page that needed it. This compares the draft against a
+  // fingerprint of itself taken the moment the page first rendered — the same
+  // state-compare discipline projectDraftDirty already uses, but shape-agnostic,
+  // so notes, events, tags, habits and plain tasks are all covered by one path
+  // and a page type invented later is covered for free.
+  //
+  // The excluded keys are TRANSIENT VIEW STATE, not content: which sub-picker is
+  // open, which row it was opened from, a consumed animation result, per-row
+  // validation marks, and the project page's staged set (which projectDraftDirty
+  // reads on its own). Including them would fire the confirm for opening a
+  // picker and closing it again.
+  const DRAFT_TRANSIENT_KEYS = {
+    hookPicker: 1, hookPickerRow: 1, conditionPicker: 1, projectPicker: 1,
+    pendingResult: 1, rowErrors: 1, staged: 1, manage: 1, invalid: 1
+  };
+  function draftFingerprint(s){
+    if (!s || !s.draft) return "";
+    if (s.noteView && typeof syncNoteBodyDraft === "function"){
+      // The note body lives in a contenteditable and only reaches the draft when
+      // something flushes it. Flush before measuring, or every unsaved keystroke
+      // in the body is invisible to the gate.
+      try { syncNoteBodyDraft(); } catch (e){}
+    }
+    const d = s.draft;
+    const keys = Object.keys(d).filter(function(k){ return !DRAFT_TRANSIENT_KEYS[k]; }).sort();
+    return JSON.stringify(keys.map(function(k){
+      const v = d[k];
+      // null / undefined / "" are the same absence as far as a user is
+      // concerned; a title differing only by trailing space is not an edit.
+      if (v == null) return [k, ""];
+      if (typeof v === "string") return [k, v.trim()];
+      return [k, v];
+    }));
+  }
+  function capturePristine(s){ if (s && !s.pristineDraft) s.pristineDraft = draftFingerprint(s); }
+  function screenDirty(s){
+    if (!s) return false;
+    // No draft, nothing to discard: the completed page is read-only, the review
+    // commits as it goes, the calendar is a view.
+    if (s.completedView || s.reviewView || s.calendarView) return false;
+    // An ARMED Complete or Convert counts as dirty — it is exactly the kind of
+    // staged intention this confirm exists to protect (trap T6b).
+    if (s.draft && (s.draft.willComplete || s.draft.convertTo)) return true;
+    return !!s.pristineDraft && draftFingerprint(s) !== s.pristineDraft;
+  }
   function attemptCancelScreen(){
     const s = state.screen;
     if (s && !s.staging && isProjectKind(s.kind) && projectDraftDirty(s)){
@@ -7086,6 +7641,16 @@ function injectChunkMap(){
           { label: "Keep editing", action: function(){} }
         ]
       );
+      return;
+    }
+    // ⚑ Only reached when the project page's own warning did NOT fire — the two
+    // must never stack (trap T6a). That warning IS this confirm for projects;
+    // it just says more, because a project page can be holding staged children.
+    if (screenDirty(s)){
+      openConfirmDialog(t("discard.message"), [
+        { label: t("discard.yes"), style: "danger", action: function(){ closeScreen(); } },
+        { label: t("discard.no"), action: function(){} }
+      ]);
       return;
     }
     closeScreen();
@@ -8353,14 +8918,44 @@ function injectChunkMap(){
     // Event pages read "Appointment" once a time is set (§4.14 — the time is
     // the only thing that distinguishes the two; they are not separate types).
     const badge = s.eventView ? (s.draft && s.draft.time ? "Appointment" : "Event") : KIND_BADGE_LABEL[s.kind];
+    // ▲ DESKTOP (ruling 4): ← and 🗑 move OUT of the header and into the card's
+    // footer as "Done" and "Delete". They are not rendered in both places —
+    // exactly one element carries data-action="screen-save" in either mode, so
+    // the action stays an unambiguous selector. ✕ keeps its top-right corner in
+    // both layouts.
+    const desk = state.desktop;
     return (
       '<div class="screen-header">' +
-        '<button type="button" class="screen-chrome-btn" data-action="screen-save" title="Save and go back">&#8592;</button>' +
+        (desk
+          ? '<span class="screen-chrome-spacer" aria-hidden="true"></span>'
+          : '<button type="button" class="screen-chrome-btn" data-action="screen-save" title="' + escapeHtml(t("chrome.saveBack")) + '">&#8592;</button>') +
         '<span class="screen-kind-badge">' + escapeHtml(badge) + '</span>' +
         '<div class="screen-header-right">' +
-          (showDelete ? '<button type="button" class="screen-chrome-btn danger" data-action="screen-delete" title="Delete">&#128465;</button>' : '') +
-          '<button type="button" class="screen-chrome-btn" data-action="screen-cancel" title="Cancel">&#10005;</button>' +
+          (!desk && showDelete ? '<button type="button" class="screen-chrome-btn danger" data-action="screen-delete" title="' + escapeHtml(t("chrome.delete")) + '">&#128465;</button>' : '') +
+          '<button type="button" class="screen-chrome-btn" data-action="screen-cancel" title="' + escapeHtml(t("chrome.cancel")) + '">&#10005;</button>' +
         '</div>' +
+      '</div>'
+    );
+  }
+  // ▲ DESKTOP FOOTER (ruling 4). Done bottom-RIGHT, filled and prominent;
+  // Delete bottom-LEFT, danger-styled and behind the same confirm it always
+  // had — maximum distance between the two. Nothing about commit semantics
+  // changes: Done IS screen-save.
+  //
+  // Deliberately NOT here: Complete and Convert. A big "✓ Complete" beside
+  // "Done" reads as two rival finish buttons. The footer answers "am I finished
+  // drafting?"; the body's outcome group answers "what is this item becoming?"
+  function screenFooterHtml(s, variant){
+    if (!state.desktop) return "";
+    const deleteAction = variant === "completed" ? "completed-delete" : "screen-delete";
+    const canDelete = !!s.taskId;
+    return (
+      '<div class="screen-footer">' +
+        (canDelete
+          ? '<button type="button" class="btn screen-footer-delete" data-action="' + deleteAction + '">&#128465; ' + escapeHtml(t("chrome.delete")) + '</button>'
+          : '<span class="screen-footer-spacer" aria-hidden="true"></span>') +
+        '<button type="button" class="btn btn-brass screen-footer-done" data-action="screen-save" title="' + escapeHtml(t("chrome.doneTitle")) + '">' +
+          escapeHtml(t("chrome.done")) + '</button>' +
       '</div>'
     );
   }
@@ -8395,12 +8990,18 @@ function injectChunkMap(){
   // Completed-item page chrome (§12.2 step 5): ← (back, no save) and 🗑, and
   // deliberately NO ✕ — with nothing editable, ← and ✕ would be one gesture.
   function completedHeaderHtml(s){
+    // Same fork as screenHeaderHtml: on desktop both controls are in the card's
+    // footer, so the header keeps only the badge.
+    const desk = state.desktop;
     return (
       '<div class="screen-header">' +
-        '<button type="button" class="screen-chrome-btn" data-action="screen-save" title="Back">&#8592;</button>' +
+        (desk
+          ? '<span class="screen-chrome-spacer" aria-hidden="true"></span>'
+          : '<button type="button" class="screen-chrome-btn" data-action="screen-save" title="' + escapeHtml(t("chrome.back")) + '">&#8592;</button>') +
         '<span class="screen-kind-badge">' + escapeHtml(KIND_BADGE_LABEL[s.kind]) + '</span>' +
         '<div class="screen-header-right">' +
-          '<button type="button" class="screen-chrome-btn danger" data-action="completed-delete" title="Delete">&#128465;</button>' +
+          (desk ? '<span class="screen-chrome-spacer" aria-hidden="true"></span>'
+                : '<button type="button" class="screen-chrome-btn danger" data-action="completed-delete" title="' + escapeHtml(t("chrome.delete")) + '">&#128465;</button>') +
         '</div>' +
       '</div>'
     );
@@ -8481,6 +9082,16 @@ function injectChunkMap(){
     // the quick-add row.)
 
     let fields = '<input type="text" class="screen-field-title' + (s.invalidField === "title" ? " field-invalid" : "") + '" data-field="title" placeholder="' + escapeHtml(TITLE_PLACEHOLDER[kind]) + '" value="' + escapeHtml(draft.title) + '">';
+    // ▲ DESKTOP (ruling 4 / trap T10): the convert buttons are collected here
+    // instead of being emitted where they are computed, so they can be rendered
+    // in ONE bordered group with the Complete pill at the foot of the page —
+    // "what happens on Done". Their mutual exclusion (arming one greys the
+    // others) is only legible when they are adjacent. Membership is per page:
+    // the group renders what the page HAS, never an empty slot.
+    // ⚑ This changes the phone too, by exactly one thing: the convert button now
+    // sits below the "Advanced" row instead of above it. One DOM, one order —
+    // forking the markup by mode is what trap T7 rules out.
+    let convertHtml = "";
 
     if (kind === "next"){
       fields += '<textarea class="screen-field-desc" data-field="notesClean" placeholder="Description (optional)\u2026">' + escapeHtml(draft.notesClean) + '</textarea>';
@@ -8492,7 +9103,7 @@ function injectChunkMap(){
         // whenever a deadline is set -- converting would have to silently drop
         // the date. Complete-armed also disables it (existing mutual exclusion).
         const dated = !!(draft.deadline && draft.deadline.date);
-        fields += makeKindBtnHtml("waiting", "Make Waiting Action", "right", draft.convertTo === "waiting",
+        convertHtml += makeKindBtnHtml("waiting", "Make Waiting Action", "right", draft.convertTo === "waiting",
           !!draft.willComplete || dated,
           dated ? "A waiting action can’t hold a date — clear the deadline first" : null);
       }
@@ -8506,7 +9117,7 @@ function injectChunkMap(){
       fields += linkRowHtml(draft, linkLocked);
       fields += contextRowHtml(draft);
       fields += waitingForRowHtml(draft, s.invalidField === "waitingFor");
-      if (s.taskId) fields += makeKindBtnHtml("next", "Make Next Action", "left", draft.convertTo === "next", !!draft.willComplete);
+      if (s.taskId) convertHtml += makeKindBtnHtml("next", "Make Next Action", "left", draft.convertTo === "next", !!draft.willComplete);
       fields += advancedRowHtml(draft);
     } else if (isProjectKind(kind)){
       fields += '<textarea class="screen-field-desc" data-field="notesClean" placeholder="Description (optional)\u2026">' + escapeHtml(draft.notesClean) + '</textarea>';
@@ -8540,7 +9151,7 @@ function injectChunkMap(){
           const showFlag = s.taskId ? !hasWay : (s.invalidField === "projectActions");
           if (showFlag) fields += '<div class="screen-project-flag">No linked actions yet \u2014 every active project should have at least one next step.</div>';
         }
-        if (s.taskId) fields += makeKindBtnHtml("future", "Make Future / Someday", "", draft.convertTo === "future", !!draft.willComplete);
+        if (s.taskId) convertHtml += makeKindBtnHtml("future", "Make Future / Someday", "", draft.convertTo === "future", !!draft.willComplete);
       } else {
         // ⚑ Future projects get LINKED NOTES (user: "it should be possible to
         // link notes to the future projects page"). Notes only, and no segmented
@@ -8566,7 +9177,7 @@ function injectChunkMap(){
             (fTotal ? ' <span class="seg-count">' + fTotal + '</span>' : "") + '</div>' +
             linkedNotesListHtml(s, fpid);
         }
-        if (s.taskId) fields += makeKindBtnHtml("current", "Make Current Project", "", draft.convertTo === "current", !!draft.willComplete);
+        if (s.taskId) convertHtml += makeKindBtnHtml("current", "Make Current Project", "", draft.convertTo === "current", !!draft.willComplete);
       }
     } else if (kind === "habit"){
       fields += '<textarea class="screen-field-desc" data-field="notesClean" placeholder="Who will I be if I build this habit?">' + escapeHtml(draft.notesClean) + '</textarea>';
@@ -8579,6 +9190,7 @@ function injectChunkMap(){
       }
     }
 
+    let completeHtml = "";
     if ((kind === "next" || kind === "waiting" || isProjectKind(kind)) && s.taskId){
       // STRICT UNIFORMITY (user ruling): Complete here is draft-only too.
       // It no longer archives-and-closes on tap; it ARMS the completion,
@@ -8592,7 +9204,7 @@ function injectChunkMap(){
       // carries the matching guard.
       const armed = !!draft.willComplete;
       const blocked = !armed && !!draft.convertTo;
-      fields += '<button type="button" class="btn screen-complete-pill' + (armed ? " done" : "") + (blocked ? " paused" : "") +
+      completeHtml += '<button type="button" class="btn screen-complete-pill' + (armed ? " done" : "") + (blocked ? " paused" : "") +
         '" data-action="screen-complete" title="' +
         (armed ? "Completes when you save \u2014 tap to undo" : blocked ? "Disarm the convert to complete" : "Complete on save") + '">' +
         (armed ? "\u2713 Completing on save" : "Complete") + '</button>';
@@ -8611,9 +9223,14 @@ function injectChunkMap(){
       // the pause transition, so a complete-after-pending-unpause draft
       // records the day correctly at save.
       const pausedNow = !!draft.paused;
-      fields += '<button type="button" class="btn screen-complete-pill' + (doneToday ? " done" : "") + (pausedNow ? " paused" : "") +
+      completeHtml += '<button type="button" class="btn screen-complete-pill' + (doneToday ? " done" : "") + (pausedNow ? " paused" : "") +
         '" data-action="screen-complete" title="' + (pausedNow ? "Paused \u2014 unpause to complete" : "") + '">' +
         (pausedNow ? "\u23F8 Paused" : (doneToday ? "\u2713 Completed today" : "Complete")) + '</button>';
+    }
+    // The outcome group. Complete first, converts beside/below it, in one
+    // bordered section — or nothing at all when the page has neither half.
+    if (completeHtml || convertHtml){
+      fields += '<div class="screen-outcome-group">' + completeHtml + convertHtml + '</div>';
     }
     return '<div class="screen-body">' + fields + '</div>';
   }
@@ -8728,13 +9345,16 @@ function injectChunkMap(){
     lockBodyScroll(!!s);
     if (!s){ root.innerHTML = ""; return; }
     const key = (s.completedView ? "completed:" : s.reviewView ? "review:" : s.calendarView ? "calendar:" : "") + s.kind + ":" + (s.taskId || "new");
+    // The desktop footer is appended to the two page shapes that have something
+    // to commit or delete. The review and the calendar have neither — the
+    // review closes with its own ✕, the calendar with its ←.
     const inner = s.completedView
-      ? completedHeaderHtml(s) + completedBodyHtml(s)
+      ? completedHeaderHtml(s) + completedBodyHtml(s) + screenFooterHtml(s, "completed")
       : s.reviewView
         ? reviewHeaderHtml() + reviewBodyHtml(s)
         : s.calendarView
           ? calendarHeaderHtml(s) + calendarBodyHtml(s)
-          : screenHeaderHtml(s) + screenBodyHtml(s);
+          : screenHeaderHtml(s) + screenBodyHtml(s) + screenFooterHtml(s, "edit");
     const existing = root.querySelector(".screen-overlay");
     if (existing && existing.getAttribute("data-screen-key") === key){
       // Same item re-rendering (hook added, day chip toggled, Complete
@@ -8743,17 +9363,25 @@ function injectChunkMap(){
       // in every time you add a hook") and the scroll position survives.
       const oldBody = existing.querySelector(".screen-body");
       const scrollTop = oldBody ? oldBody.scrollTop : 0;
-      existing.innerHTML = inner;
+      const card = existing.querySelector(".screen-card") || existing;
+      card.innerHTML = inner;
       const newBody = existing.querySelector(".screen-body");
       if (newBody) newBody.scrollTop = scrollTop;
       autoGrowAll();
       if (s.calendarView) bindCalendarSwipe();
       mountHabitRunner(s);
+      capturePristine(s);
       return;
     }
     // Fresh open, or navigation to a different item (child screens,
     // returning from one): full rebuild with the slide-in.
-    root.innerHTML = '<div class="screen-overlay" data-kind="' + s.kind + '" data-screen-key="' + key + '" style="--lane-accent:var(' + accentVarForKind(s.kind) + ')">' + inner + '</div>';
+    // ⚑ `.screen-card` exists in BOTH modes (trap T7). On the phone it is a
+    // transparent full-height wrapper and changes nothing; on desktop it is the
+    // centered card and the overlay around it becomes the scrim. One DOM, two
+    // stylesheets' worth of rules — a per-mode DOM would fork the in-place
+    // re-render path and the habit runner mount, which is a bug farm.
+    root.innerHTML = '<div class="screen-overlay" data-kind="' + s.kind + '" data-screen-key="' + key + '" style="--lane-accent:var(' + accentVarForKind(s.kind) + ')">' +
+      '<div class="screen-card">' + inner + '</div></div>';
     requestAnimationFrame(function(){
       const overlay = qs(".screen-overlay");
       if (overlay) overlay.classList.add("open");
@@ -8763,6 +9391,7 @@ function injectChunkMap(){
     autoGrowAll();
     if (s.calendarView) bindCalendarSwipe();
     mountHabitRunner(s);
+    capturePristine(s);
   }
   function autoGrowAll(){
     qsa(".screen-field-desc").forEach(function(ta){
@@ -9070,6 +9699,22 @@ function injectChunkMap(){
         setTimeout(function(){ if (slot.isConnected && !slot.contains(document.activeElement)) clear(); }, 150);
       });
     }
+    // The three creation routes, by EXPLICIT kind. Both entry points — the
+    // phone's FAB menu and the desktop's per-column buttons — go through here,
+    // so "New action" means the same thing whichever control started it.
+    function createPrimary(kind){
+      if (kind === "habit"){ openScreen("habit", null); return; }   // habits have one option, not a menu
+      if (kind === "notes"){ openNoteScreen(null); return; }        // primary = New note
+      openScreen(kind, null);
+    }
+    function createSecondary(kind){
+      if (kind === "habit") return;                                 // no second option
+      if (kind === "notes"){ openNoteScreen(null, { checklist: true }); return; }
+      openInlineNameRow(kind);                                      // new context / new list
+    }
+    function createTertiary(kind){
+      if (kind === "notes") openTagsScreen();                       // Tags → the Tags page (§4.9b)
+    }
     document.addEventListener("keydown", function(e){
       if (e.key === "Escape"){
         const fabMenuEl = qs("#fab-menu");
@@ -9103,6 +9748,52 @@ function injectChunkMap(){
       // actions; returns false for the generic screen-save/cancel/delete so
       // those still handle the event page below.
       if (eventsHandleClick(e)) return;
+
+      // ▲ DESKTOP: any click outside a header dropdown puts it away. Runs
+      // before the action handlers and does NOT return — clicking the gear with
+      // the Language menu open should close the menu AND open the gear menu.
+      if (!e.target.closest(".header-drop")) closeHeaderDrops();
+
+      // ▲ DESKTOP (ruling 2): a column's toggle. Same pairings as the phone's
+      // tab pairs, so the two layouts stay one mental model.
+      const colTab = e.target.closest('[data-action="col-lane"]');
+      if (colTab){
+        const ck = colTab.getAttribute("data-kind");
+        const ci = columnIndexOfKind(ck);
+        if (ci !== -1) state.columns[ci] = ck;
+        // Notes cards are DERIVED from live project state, so they are rendered
+        // on the way in rather than left stale (trap T5) — the same thing the
+        // phone's tab handler does.
+        if (ck === "notes") renderLane("notes");
+        updateLaneVisibility();
+        return;
+      }
+      // ▲ DESKTOP (author note 8 / trap T17): the header's Language and
+      // Background dropdowns. They REUSE the settings panels' markup and call
+      // setLocale / setSurface — one implementation of each, two entry points.
+      const hdrDropBtn = e.target.closest('[data-action="hdr-drop"]');
+      if (hdrDropBtn){
+        const wrap = hdrDropBtn.closest(".header-drop");
+        const menu = wrap && wrap.querySelector(".header-drop-menu");
+        if (!menu) return;
+        const wasOpen = !menu.hidden;
+        closeHeaderDrops();                 // only one open at a time
+        if (!wasOpen){
+          menu.innerHTML = hdrDropBtn.getAttribute("data-drop") === "lang"
+            ? settingsLanguageHtml(true) : settingsBackgroundsHtml(true);
+          menu.hidden = false;
+        }
+        return;
+      }
+      const hdrPick = e.target.closest('.header-drop-menu [data-action]');
+      if (hdrPick){
+        const act = hdrPick.getAttribute("data-action");
+        // Applying re-renders the header widgets (which is what closes the
+        // menu): the button's own label is the value you just picked, so the
+        // menu has said everything it has to say.
+        if (act === "settings-pick-lang"){ setLocale(hdrPick.getAttribute("data-lang")); renderHeaderWidgets(); return; }
+        if (act === "settings-pick-bg"){ setSurface(hdrPick.getAttribute("data-bg")); renderHeaderWidgets(); return; }
+      }
 
       // CHUNK 6 (§4.8a / §4.10): the intray drawer and the settings surface.
       if (e.target.closest('[data-action="open-tray"]')){ openTray(); return; }
@@ -9246,12 +9937,24 @@ function injectChunkMap(){
         if (menu) menu.hidden = !menu.hidden;
         return;
       }
+      // ▲ DESKTOP (trap T4): the per-column create buttons. They carry an
+      // EXPLICIT data-kind and land in the same three functions the FAB menu
+      // calls — the FAB path keeps reading state.activeKind, because on the
+      // phone exactly one lane is live and that is the right answer there.
+      const laneNewBtn = e.target.closest('[data-action="lane-new"]');
+      if (laneNewBtn){
+        const lk = laneNewBtn.getAttribute("data-kind");
+        const idx = Number(laneNewBtn.getAttribute("data-idx") || 0);
+        if (idx === 0) createPrimary(lk);
+        else if (idx === 1) createSecondary(lk);
+        else createTertiary(lk);
+        return;
+      }
       const fabPrimary = e.target.closest('[data-action="new-primary"]');
       if (fabPrimary){
         const menu = qs("#fab-menu");
         if (menu) menu.hidden = true;
-        if (state.activeKind === "notes"){ openNoteScreen(null); return; } // primary = New note (bottom, nearest thumb)
-        openScreen(state.activeKind, null);
+        createPrimary(state.activeKind);
         return;
       }
       // The + beside a list's or a context's count (user). Both open the normal
@@ -9277,15 +9980,14 @@ function injectChunkMap(){
       if (fabSecondary){
         const menu = qs("#fab-menu");
         if (menu) menu.hidden = true;
-        if (state.activeKind === "notes"){ openNoteScreen(null, { checklist: true }); return; } // secondary = New checklist (above)
-        openInlineNameRow(state.activeKind);
+        createSecondary(state.activeKind);
         return;
       }
       const fabTertiary = e.target.closest('[data-action="new-tertiary"]');
       if (fabTertiary){
         const menu = qs("#fab-menu");
         if (menu) menu.hidden = true;
-        if (state.activeKind === "notes"){ openTagsScreen(); return; } // Tags → the Tags page (§4.9b)
+        createTertiary(state.activeKind);
         return;
       }
       const moveBtn = e.target.closest('[data-action="move"]');
@@ -9727,6 +10429,10 @@ function injectChunkMap(){
     document.addEventListener("keydown", function(e){
       if (e.key !== "Escape") return;
       // §4.6 Back/Escape resolution order: dialog → drawer → page → exit.
+      // ▲ DESKTOP (trap T17): a header dropdown slots in FRONT of all of it. An
+      // Escape aimed at a stray open menu must never travel through to the
+      // half-edited page behind it.
+      if (closeHeaderDrops()) return;
       if (qs(".choice-dialog-backdrop")){ closeDialog(); return; }
       if (state.trayOpen){ closeTray(); return; }
       if (state.screen){ attemptCancelScreen(); } // §12.1: project ✕-warning on every exit route
@@ -10542,6 +11248,10 @@ function injectChunkMap(){
           '<button type="button" data-action="tray-add" title="Add">+</button>' +
         '</div>' +
         list +
+        // The handle's other half: an arrow on the drawer's own edge that puts
+        // it away. Same shape and colour as #tray-handle, pointing the other
+        // way, so the pair reads as one control with two states.
+        '<button type="button" class="tray-edge-handle" data-action="close-tray" title="' + escapeHtml(t("tray.handleClose")) + '" aria-label="' + escapeHtml(t("tray.handleClose")) + '">&#8249;</button>' +
       '</div>';
     // Force the -100% start state to commit BEFORE adding .open, or the
     // browser collapses both into one paint and the drawer snaps open with no
@@ -10553,9 +11263,15 @@ function injectChunkMap(){
     if (drawer){ void drawer.offsetWidth; drawer.classList.add("open"); }
     if (backdrop) backdrop.classList.add("open");
   }
+  // The left-edge handle hides while the drawer is open and comes back only
+  // AFTER the slide-out finishes (trap T15b) — otherwise it pops in on top of a
+  // drawer that is still moving. One class, driven from the same 300ms timer
+  // the drawer's own teardown already uses.
+  function syncTrayHandle(){ document.body.classList.toggle("tray-open", !!state.trayOpen); }
   function openTray(){
     state.trayOpen = true;
     state.trayReveal = false; // captures start sealed every time the drawer opens (user follow-up)
+    syncTrayHandle();
     renderTray();
     const input = qs("#tray-input"); if (input) input.focus();
   }
@@ -10563,10 +11279,10 @@ function injectChunkMap(){
     state.trayOpen = false;
     const r = qs("#tray-root");
     const drawer = qs(".tray-drawer"), backdrop = qs(".tray-backdrop");
-    if (!drawer){ if (r) r.innerHTML = ""; return; }
+    if (!drawer){ if (r) r.innerHTML = ""; syncTrayHandle(); return; }
     drawer.classList.remove("open");            // slide out
     if (backdrop) backdrop.classList.remove("open");
-    setTimeout(function(){ if (r && !state.trayOpen) r.innerHTML = ""; }, 300); // clears after the .28s slide-out
+    setTimeout(function(){ if (r && !state.trayOpen) r.innerHTML = ""; syncTrayHandle(); }, 300); // clears after the .28s slide-out
   }
   // Finger-follow swipe on the intray drawer — the same drag-and-snap mechanic
   // as the calendar month swipe (user: "works great, no browser issues"). Two
@@ -10626,7 +11342,7 @@ function injectChunkMap(){
         else { dd.drawer.classList.add("open"); if (dd.backdrop) dd.backdrop.classList.add("open"); clearInline(); } // snap back open
       } else {
         if (dx > threshold){                                               // commit open
-          state.trayOpen = true; state.trayReveal = false;
+          state.trayOpen = true; state.trayReveal = false; syncTrayHandle();
           dd.drawer.classList.add("open"); if (dd.backdrop) dd.backdrop.classList.add("open"); clearInline();
           const inp = qs("#tray-input"); if (inp) setTimeout(function(){ inp.focus(); }, 60);
         } else { dd.drawer.classList.remove("open"); teardown(); }          // cancel open
@@ -11224,14 +11940,18 @@ function injectChunkMap(){
       '<button type="button" class="settings-item" data-action="import-data">' +
         '<span>&#11015;</span><span class="si-label">Import a backup</span></button>' +
       '<div class="settings-sep"></div>' +
-      '<button type="button" class="settings-item" data-action="settings-backgrounds">' +
-        '<span>&#127912;</span><span class="si-label">Background</span>' +
-        '<span class="si-value">' + escapeHtml(surf.label) + '</span><span class="si-caret">&#8250;</span></button>' +
-      // ⚑ BUILT (Chinese round): no longer a disabled "not built yet" row. Opens a
-      // sub-panel like Background; the current language shows in its own script.
-      '<button type="button" class="settings-item" data-action="settings-language">' +
-        '<span>&#127760;</span><span class="si-label">' + escapeHtml(t("settings.language")) + '</span>' +
-        '<span class="si-value">' + escapeHtml(localeLabel(currentLocale())) + '</span><span class="si-caret">&#8250;</span></button>' +
+      // ▲ DESKTOP (author note 8): Background and Language become header
+      // dropdowns and LEAVE this menu — one place per thing. The phone keeps
+      // them here, where they have always been.
+      (state.desktop ? "" :
+        '<button type="button" class="settings-item" data-action="settings-backgrounds">' +
+          '<span>&#127912;</span><span class="si-label">' + escapeHtml(t("settings.background")) + '</span>' +
+          '<span class="si-value">' + escapeHtml(surf.label) + '</span><span class="si-caret">&#8250;</span></button>' +
+        // ⚑ BUILT (Chinese round): no longer a disabled "not built yet" row. Opens a
+        // sub-panel like Background; the current language shows in its own script.
+        '<button type="button" class="settings-item" data-action="settings-language">' +
+          '<span>&#127760;</span><span class="si-label">' + escapeHtml(t("settings.language")) + '</span>' +
+          '<span class="si-value">' + escapeHtml(localeLabel(currentLocale())) + '</span><span class="si-caret">&#8250;</span></button>') +
       // ⚑ Where the dev tools live now. A row rather than a permanent bar: they
       // are scaffolding for building the app, and having them across the top of
       // every screen was the clutter the user wanted gone.
@@ -11268,11 +11988,14 @@ function injectChunkMap(){
     });
     return out;
   }
-  function settingsBackgroundsHtml(){
+  // `noBack`: the header dropdown shows the same rows without the "‹ Background"
+  // return row — a dropdown has nowhere to go back TO (trap T17: reuse the
+  // presentation, never reimplement the picking).
+  function settingsBackgroundsHtml(noBack){
     const cur = currentSurfaceId();
-    let out =
+    let out = noBack ? "" :
       '<button type="button" class="settings-item settings-back" data-action="settings-root">' +
-        '<span>&#8249;</span><span class="si-label">Background</span></button>' +
+        '<span>&#8249;</span><span class="si-label">' + escapeHtml(t("settings.background")) + '</span></button>' +
       '<div class="settings-sep"></div>';
     Object.keys(SURFACES).forEach(function(id){
       out +=
@@ -11287,9 +12010,9 @@ function injectChunkMap(){
   // Each row shows its language in its OWN script (native name), the way a real
   // language switcher does — a menu that lists "简体中文" as "Chinese" is one you
   // cannot use once you are already in the language you cannot read.
-  function settingsLanguageHtml(){
+  function settingsLanguageHtml(noBack){
     const cur = currentLocale();
-    let out =
+    let out = noBack ? "" :
       '<button type="button" class="settings-item settings-back" data-action="settings-root">' +
         '<span>&#8249;</span><span class="si-label">' + escapeHtml(t("settings.language")) + '</span></button>' +
       '<div class="settings-sep"></div>';
@@ -11980,6 +12703,15 @@ function injectChunkMap(){
     applyChalkDust();              // §P6: the habit runner's board
     renderShell();
     renderTabLabels();
+    // ⚠ BEFORE the first lane render: applyLayoutMode decides which lanes are
+    // visible and what the header holds. One listener, both directions — a
+    // window dragged across 1000px re-renders rather than stranding an open
+    // page, tray or menu (trap T1).
+    applyLayoutMode();
+    const deskMQ = window.matchMedia("(min-width:" + DESKTOP_MIN_PX + "px)");
+    if (deskMQ.addEventListener) deskMQ.addEventListener("change", applyLayoutMode);
+    else if (deskMQ.addListener) deskMQ.addListener(applyLayoutMode);   // older Safari
+    else window.addEventListener("resize", applyLayoutMode);
     bindEvents();
     bindDrawerSwipe(); // finger-follow open/close on the intray drawer, same mechanic as the calendar month swipe
     initLocalData();

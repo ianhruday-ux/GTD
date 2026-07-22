@@ -177,6 +177,29 @@ const STRINGS = {
   "chrome.delete":   { en: "Delete",           "zh-Hans": "删除" },
   "chrome.info":     { en: "Information",      "zh-Hans": "说明" },
 
+  // ---- desktop round: the card footer, the discard gate, the tray handle ----
+  // "Done" is the desktop footer's filled button. It is the SAME action as the
+  // phone's ← (screen-save): save and close. The word changes, the contract
+  // does not.
+  "chrome.done":     { en: "Done",             "zh-Hans": "完成" },
+  "chrome.doneTitle":{ en: "Save and close",   "zh-Hans": "保存并关闭" },
+  // The discard gate (desktop ruling 5, applied on both layouts): ✕/Escape asks
+  // only when the draft actually differs from what is saved. Register matched to
+  // the project page's existing warning — "Discard changes" / "Keep editing".
+  "discard.message": {
+    en: "Discard your changes? Nothing on this page has been saved yet.",
+    "zh-Hans": "放弃你的更改？此页面上的内容尚未保存。"
+  },
+  "discard.yes":     { en: "Discard changes",  "zh-Hans": "放弃更改" },
+  "discard.no":      { en: "Keep editing",     "zh-Hans": "继续编辑" },
+  "tray.handle":     { en: "Intray",           "zh-Hans": "收集箱" },
+  "tray.handleOpen": { en: "Open the intray",  "zh-Hans": "打开收集箱" },
+  "tray.handleClose":{ en: "Close the intray", "zh-Hans": "关闭收集箱" },
+  // ⚑ Was NEW_ITEM_LABEL.habit, an English-only const outside this table (trap
+  // T12). It becomes visible button text on the desktop Habits column, so it
+  // moves in here properly. Habits has no multi-option menu — one button.
+  "fab.newHabit":    { en: "New habit",        "zh-Hans": "新建习惯" },
+
   // ---- the in-lane tutorial (seedTutorial in app.js) ----
   // Each seeded tutorial card carries a `tutorialKey`; restampTutorialCards()
   // re-reads these on a language change. Titles say what to DO; notes describe
@@ -283,6 +306,10 @@ function applyLocale(){
   if (typeof restampTutorialCards === "function") restampTutorialCards();
   if (typeof renderShell === "function") renderShell();
   if (typeof renderTabLabels === "function") renderTabLabels();
+  // Desktop round: the header's Language/Background dropdowns carry their own
+  // labels in their own language, and setLocale knows nothing about them
+  // otherwise (trap T12).
+  if (typeof renderHeaderWidgets === "function") renderHeaderWidgets();
   if (typeof renderLane === "function" && typeof ALL_LANES !== "undefined"){
     ALL_LANES.forEach(renderLane);
   }

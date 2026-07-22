@@ -416,16 +416,34 @@ function drawFretRun(ctx, len, band, seed){
   }
   ctx.stroke();
 }
+// ▲ DESKTOP (author note 10 / trap T14): the frame has TWO geometries, and they
+// must not be merged.
+//
+//   · MOBILE (unchanged): the canvas lives inside #main and is sized to #main's
+//     own box, so the border wraps the lanes and GROWS with them as content is
+//     added. A ResizeObserver on #main is what keeps it honest.
+//   · DESKTOP (new): the frame goes around the WHOLE PAGE, header included, so
+//     it is sized to the VIEWPORT and pinned there. #main's observer cannot see
+//     a window-height change that doesn't reflow main, so the desktop path
+//     listens to the window as well.
+//
+// One function, parameterised by host box — not two copies of the meander.
+function frameHostBox(){
+  const desktop = document.body && document.body.classList.contains("desktop");
+  if (desktop) return { W: window.innerWidth, H: window.innerHeight, fixed: true };
+  const host = document.getElementById("main");
+  if (!host) return null;
+  return { W: host.offsetWidth, H: host.offsetHeight, fixed: false };
+}
 function drawDeskFrame(){
   const cv = document.getElementById("desk-frame");
-  const host = document.getElementById("main");
-  if (!cv || !host) return;
+  const box = frameHostBox();
+  if (!cv || !box) return;
   const cfg = SURFACES[currentSurfaceId()];
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  // main's OWN box, not the viewport: the border wraps the lanes and grows with
-  // them. offsetHeight rather than a viewport height is the whole change.
-  const W = host.offsetWidth, H = host.offsetHeight;
+  const W = box.W, H = box.H;
   if (!W || !H) return;
+  cv.classList.toggle("frame-fixed", !!box.fixed);
   cv.width = Math.round(W * dpr);
   cv.height = Math.round(H * dpr);
   cv.style.width = W + "px";
@@ -470,11 +488,10 @@ function drawDeskFrame(){
 // chatter costs nothing.
 let lastFrameW = -1, lastFrameH = -1;
 function refreshDeskFrame(){
-  const host = document.getElementById("main");
-  if (!host) return;
-  const W = host.offsetWidth, H = host.offsetHeight;
-  if (W === lastFrameW && H === lastFrameH) return;
-  lastFrameW = W; lastFrameH = H;
+  const box = frameHostBox();
+  if (!box) return;
+  if (box.W === lastFrameW && box.H === lastFrameH) return;
+  lastFrameW = box.W; lastFrameH = box.H;
   drawDeskFrame();
 }
 // Bypasses the size guard — for when the SURFACE changed rather than the box.
@@ -486,9 +503,10 @@ function initDeskFrame(){
   const host = document.getElementById("main");
   if (host && window.ResizeObserver){
     new ResizeObserver(refreshDeskFrame).observe(host);
-  } else {
-    window.addEventListener("resize", refreshDeskFrame);
   }
+  // ALWAYS, not as a fallback: the desktop frame is sized to the window, and a
+  // window that gets shorter without reflowing #main never touches the observer.
+  window.addEventListener("resize", refreshDeskFrame);
   forceDeskFrame();
 }
 function applySurface(id){

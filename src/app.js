@@ -65,6 +65,29 @@
   // ALL_LANES is what tab/lane rendering and visibility iterate (chunk 6).
   const KINDS = ["next", "waiting", "current", "future", "habit"];
   const ALL_LANES = ["next", "waiting", "current", "future", "habit", "notes"];
+  // =========================================================
+  // DESKTOP LAYOUT (desktop-redesign-plan.md, rulings 1–2)
+  //
+  // ⚠ ONE SOURCE OF TRUTH for "am I desktop?" (trap T1). This number is
+  // mirrored in exactly one place in styles.css — `@media (min-width:1000px)`.
+  // Nothing in JS may read window.innerWidth to decide layout; everything asks
+  // state.desktop, which only applyLayoutMode() writes.
+  //
+  // The three columns keep the phone's tab pairings, so both layouts are one
+  // mental model: do (Next/Waiting) · plan (Projects/Someday) · support
+  // (Notes/Habits). ⚠ ORDER MATTERS TWICE: it is the column order left→right,
+  // and — because every pair is contiguous in ALL_LANES and the pairs are in
+  // the same sequence — CSS grid auto-placement puts the three visible lanes in
+  // their own columns with no explicit grid-column anywhere.
+  // =========================================================
+  const DESKTOP_MIN_PX = 1000;
+  const COLUMN_PAIRS = [["next", "waiting"], ["current", "future"], ["notes", "habit"]];
+  function columnIndexOfKind(k){
+    for (let i = 0; i < COLUMN_PAIRS.length; i++){ if (COLUMN_PAIRS[i].indexOf(k) !== -1) return i; }
+    return -1;
+  }
+  function laneCount(k){ return k === "notes" ? (state.notes || []).length : (state.tasks[k] || []).length; }
+  function visibleLanes(){ return state.desktop ? state.columns.slice() : [state.activeKind]; }
   const PROJECT_KINDS = ["current", "future"];
   const MOVE_MAP = { waiting: "next", future: "current" };
   const NEW_ITEM_LABEL = {
@@ -84,6 +107,12 @@
     // promoted Waiting item land in the identically-named context for free.
     contexts: [],
     activeKind: "next",
+    // Desktop round. `desktop` is written ONLY by applyLayoutMode(); `columns`
+    // holds the active lane of each of the three columns, in COLUMN_PAIRS
+    // order. Session-only, like activeKind — a fresh desktop load shows
+    // Next / Projects / Notes (the first-named of each pair).
+    desktop: false,
+    columns: ["next", "current", "notes"],
     collapsed: {},
     habitDone: {},
     habitDoneOrder: [],
@@ -1824,7 +1853,7 @@
   function renderLane(kind){
     const laneEl = qs('.lane[data-kind="' + kind + '"]');
     if (!laneEl) return;
-    if (kind === "notes"){ renderNotesLane(laneEl); return; } // chunk 6: notes aren't tasks
+    if (kind === "notes"){ renderNotesLane(laneEl); updateColumnHeads(); return; } // chunk 6: notes aren't tasks
     if (kind === "habit"){
       updateHabitBadge();
     }
@@ -1886,10 +1915,56 @@
     // there. Tapping anywhere on it opens the calendar.
     const widget = kind === "waiting" ? waitingWidgetHtml() : "";
     rootEl.innerHTML = widget + activeHtml + completedHtml;
+    updateColumnHeads(); // the desktop head shows BOTH lanes' counts, including this one's
+  }
+  // ▲ DESKTOP (ruling 9 / trap T8): "one layer of headers" means MERGING, not
+  // adding. Each lane already renders a `.lane-label`; stacking a column header
+  // above it would print every column's name twice. So the column head carries
+  // the full lane names, both counts and the ⓘ, and CSS hides `.lane-label` on
+  // desktop — the mobile markup is untouched, just not shown.
+  //
+  // It lives INSIDE the lane rather than in a separate bar across the top: the
+  // ⓘ then still targets its own lane's `.lane-info` panel (same handler, same
+  // data-kind), and the per-lane create row sits with the lane it creates into.
+  // Because the three visible lanes are top-aligned grid items, the three heads
+  // still read as one layer.
+  function laneColHeadHtml(k){
+    const pair = COLUMN_PAIRS[columnIndexOfKind(k)] || [k];
+    return (
+      '<div class="lane-colhead">' +
+        '<div class="col-tabs">' +
+          pair.map(function(pk){
+            return '<button type="button" class="col-tab' + (pk === k ? " active" : "") + '" data-action="col-lane" data-kind="' + pk + '">' +
+              '<span class="col-tab-name">' + escapeHtml(LIST_TITLES[pk]) + '</span>' +
+              '<span class="col-count">0</span>' +
+            '</button>';
+          }).join("") +
+        '</div>' +
+        '<button class="info-btn col-info" data-action="toggle-info" data-kind="' + k + '" type="button" title="' + escapeHtml(t("chrome.info")) + '">i</button>' +
+      '</div>'
+    );
+  }
+  // ▲ DESKTOP (ruling 10 / trap T4): the floating + makes no sense when three
+  // lanes are live at once — "the active lane" is ambiguous. Each column gets
+  // its own lane's options as real buttons, carrying an EXPLICIT data-kind, so
+  // nothing here routes through state.activeKind the way the FAB menu does.
+  // Labels come from FAB_MENU_LABELS (already translated). Habits has no FAB
+  // menu at all, so it gets the one button it has always had a tooltip for.
+  function laneCreateRowHtml(k){
+    const labels = k === "habit" ? [t("fab.newHabit")] : (FAB_MENU_LABELS[k] || []);
+    if (!labels.length) return "";
+    return '<div class="lane-create-row">' + labels.map(function(label, idx){
+      // Only the tertiary slot is not a create (Notes → Tags); everything else
+      // gets the "+" the author asked for by name.
+      const text = idx === 2 ? label : "+ " + label;
+      return '<button type="button" class="btn btn-ghost btn-small lane-create-btn" data-action="lane-new" ' +
+        'data-kind="' + k + '" data-idx="' + idx + '">' + escapeHtml(text) + '</button>';
+    }).join("") + '</div>';
   }
   function laneShellHtml(k){
     return (
       '<div class="lane" data-kind="' + k + '">' +
+        laneColHeadHtml(k) +
         '<div class="lane-label">' +
           '<span class="lane-label-title">' + escapeHtml(LIST_TITLES[k]) + '</span>' +
           '<span class="lane-label-right">' +
@@ -1904,6 +1979,7 @@
         (k === "habit"
           ? '<div class="lane-tools-row"><button class="btn btn-ghost btn-small tidy-btn" data-action="tidy-habits" type="button" title="Suggest an order from your hooks (you can still rearrange freely afterward)">&#8645; Tidy order</button></div>'
           : "") +
+        laneCreateRowHtml(k) +
         '<div class="inline-slot" data-kind="' + k + '"></div>' +
         '<div class="cards-root" data-dropzone-parent=""></div>' +
       '</div>'
@@ -1911,8 +1987,26 @@
   }
   function renderShell(){ qs("#lanes").innerHTML = ALL_LANES.map(laneShellHtml).join(""); }
 
+  // Both counts on every column head — the hidden half's count IS the reason to
+  // toggle (trap T5). Cheap enough to redo wholesale on any lane render.
+  function updateColumnHeads(){
+    qsa(".col-tab").forEach(function(b){
+      const bk = b.getAttribute("data-kind");
+      const lane = b.closest(".lane");
+      const laneKind = lane ? lane.getAttribute("data-kind") : bk;
+      b.classList.toggle("active", bk === laneKind);
+      const c = b.querySelector(".col-count");
+      if (c) c.textContent = laneCount(bk);
+    });
+  }
   function updateLaneVisibility(){
-    qsa(".lane").forEach(function(el){ el.classList.toggle("active-lane", el.getAttribute("data-kind") === state.activeKind); });
+    // On desktop the left column's lane IS the "active kind" for everything
+    // that still asks (the FAB path, which the phone owns) — keep it in sync
+    // rather than leaving a stale value behind a mode flip.
+    if (state.desktop) state.activeKind = state.columns[0];
+    const vis = visibleLanes();
+    qsa(".lane").forEach(function(el){ el.classList.toggle("active-lane", vis.indexOf(el.getAttribute("data-kind")) !== -1); });
+    updateColumnHeads();
     // The floating + creates for whichever lane is active — retint it and
     // repoint its data-kind whenever the tab changes (overnight notes:
     // Google-Tasks-style FAB replaces the per-lane create button).
@@ -1938,6 +2032,102 @@
       });
       menu.hidden = true;
     }
+  }
+
+  // =========================================================
+  // LAYOUT MODE (desktop redesign, trap T1)
+  //
+  // The single place that decides which layout is running. One matchMedia
+  // listener; everything else reads state.desktop or keys off the matching
+  // media query in styles.css. A live resize across the boundary re-renders
+  // rather than stranding anything: an open page, an open tray, an open
+  // settings menu and an open FAB menu all survive the flip.
+  // =========================================================
+  let layoutModeApplied = null;
+  // Held as a NODE reference, not re-queried: on desktop the Calendar button is
+  // MOVED into the header's left cluster (author note 8) rather than duplicated
+  // there — a second element carrying data-action="open-calendar" would be a
+  // second thing to keep in sync and would break any check that clicks the
+  // action by selector.
+  let calendarBtnEl = null;
+  function applyLayoutMode(){
+    const desk = window.matchMedia("(min-width:" + DESKTOP_MIN_PX + "px)").matches;
+    if (layoutModeApplied === desk) return;
+    layoutModeApplied = desk;
+    state.desktop = desk;
+    document.body.classList.toggle("desktop", desk);
+    if (desk){
+      // Carry the phone's current lane into its own column, so crossing the
+      // boundary keeps you looking at what you were looking at.
+      const i = columnIndexOfKind(state.activeKind);
+      if (i !== -1) state.columns[i] = state.activeKind;
+    } else {
+      // Going the other way, the phone shows the left column's lane and the tab
+      // strip has to agree with it.
+      state.activeKind = state.columns[0];
+      qsa("#lane-switcher button[data-kind]").forEach(function(b){
+        b.classList.toggle("active", b.getAttribute("data-kind") === state.activeKind);
+      });
+    }
+    const fabMenu = qs("#fab-menu"); if (fabMenu) fabMenu.hidden = true;
+    closeHeaderDrops();
+    // The ⋯ becomes a gear on desktop (author note 8); the phone keeps ⋯.
+    const gear = qs('[data-action="open-overflow"]');
+    if (gear){ gear.innerHTML = desk ? "&#9881;" : "&#8943;"; }
+    renderHeaderWidgets();
+    // The settings menu's contents differ per mode (Language/Background move
+    // out of it on desktop), and it is positioned against chrome that just
+    // changed — rebuild it rather than leaving a menu from the other layout.
+    if (qs(".settings-menu")) closeDialog();
+    // Notes may only now be on screen, and its cards are derived from live
+    // project state (trap T5).
+    renderLane("notes");
+    updateLaneVisibility();
+    if (state.screen) renderScreen();   // card ⇄ full-screen is a re-render, not a reopen
+    if (typeof forceDeskFrame === "function") forceDeskFrame(); // the frame changes host box
+  }
+  // ▲ DESKTOP HEADER (author note 8, trap T17). The header has never held state
+  // before, so everything stateful about it lives here: the two dropdowns are
+  // built on demand, only one is ever open, and they re-render on a language
+  // change (applyLocale calls this). Mobile gets an EMPTY left cluster and its
+  // markup stays byte-identical to what shipped.
+  function renderHeaderWidgets(){
+    const host = qs("#header-left");
+    if (!host) return;
+    if (!calendarBtnEl) calendarBtnEl = qs('[data-action="open-calendar"]');
+    if (!state.desktop){
+      host.innerHTML = "";
+      // Put the calendar button back where the phone header has always had it:
+      // to the left of ⋯, in .header-right.
+      const right = qs(".header-right"), gear = qs('[data-action="open-overflow"]');
+      if (calendarBtnEl && right && gear && calendarBtnEl.parentNode !== right) right.insertBefore(calendarBtnEl, gear);
+      return;
+    }
+    const surf = SURFACES[currentSurfaceId()] || SURFACES[DEFAULT_SURFACE];
+    host.innerHTML =
+      headerDropHtml("lang", "🌐", t("settings.language"), localeLabel(currentLocale())) +
+      headerDropHtml("bg", "🎨", t("settings.background"), surf.label);
+    if (calendarBtnEl) host.appendChild(calendarBtnEl); // moved, never cloned
+  }
+  function headerDropHtml(id, icon, label, value){
+    return (
+      '<div class="header-drop" data-drop="' + id + '">' +
+        '<button type="button" class="header-drop-btn" data-action="hdr-drop" data-drop="' + id + '" title="' + escapeHtml(label) + '">' +
+          '<span class="hdr-drop-icon" aria-hidden="true">' + icon + '</span>' +
+          '<span class="hdr-drop-value">' + escapeHtml(value) + '</span>' +
+          '<span class="hdr-drop-caret" aria-hidden="true">&#9662;</span>' +
+        '</button>' +
+        '<div class="header-drop-menu settings-menu" hidden></div>' +
+      '</div>'
+    );
+  }
+  // Returns whether it actually closed something — the Escape handler needs to
+  // know, so a stray Escape with a dropdown open never reaches the open page
+  // (trap T17).
+  function closeHeaderDrops(){
+    let closed = false;
+    qsa(".header-drop-menu").forEach(function(m){ if (!m.hidden){ m.hidden = true; closed = true; } });
+    return closed;
   }
 
   // =========================================================
@@ -2361,6 +2551,61 @@
   // The ✕ / Back / Escape gate on a project page (§12.1): warn before
   // discarding a non-empty staged set (state-compare, not a dirty flag). Every
   // other page — and a non-dirty project — just closes.
+  // =========================================================
+  // THE DISCARD GATE (desktop ruling 5, trap T6)
+  //
+  // ✕ / Escape asks "Discard your changes?" — but ONLY when the draft actually
+  // differs from what is saved. An untouched page closes instantly. This is a
+  // SOFTENING ON TOP OF draft isolation, not a change to it: ✕ still never
+  // commits anything, and Save still commits everything.
+  //
+  // ⚑ WHY A SNAPSHOT AND NOT A DIRTY FLAG. Flags rot: every new control is a new
+  // place to remember to set one, and the day someone forgets, the confirm goes
+  // quiet on exactly the page that needed it. This compares the draft against a
+  // fingerprint of itself taken the moment the page first rendered — the same
+  // state-compare discipline projectDraftDirty already uses, but shape-agnostic,
+  // so notes, events, tags, habits and plain tasks are all covered by one path
+  // and a page type invented later is covered for free.
+  //
+  // The excluded keys are TRANSIENT VIEW STATE, not content: which sub-picker is
+  // open, which row it was opened from, a consumed animation result, per-row
+  // validation marks, and the project page's staged set (which projectDraftDirty
+  // reads on its own). Including them would fire the confirm for opening a
+  // picker and closing it again.
+  const DRAFT_TRANSIENT_KEYS = {
+    hookPicker: 1, hookPickerRow: 1, conditionPicker: 1, projectPicker: 1,
+    pendingResult: 1, rowErrors: 1, staged: 1, manage: 1, invalid: 1
+  };
+  function draftFingerprint(s){
+    if (!s || !s.draft) return "";
+    if (s.noteView && typeof syncNoteBodyDraft === "function"){
+      // The note body lives in a contenteditable and only reaches the draft when
+      // something flushes it. Flush before measuring, or every unsaved keystroke
+      // in the body is invisible to the gate.
+      try { syncNoteBodyDraft(); } catch (e){}
+    }
+    const d = s.draft;
+    const keys = Object.keys(d).filter(function(k){ return !DRAFT_TRANSIENT_KEYS[k]; }).sort();
+    return JSON.stringify(keys.map(function(k){
+      const v = d[k];
+      // null / undefined / "" are the same absence as far as a user is
+      // concerned; a title differing only by trailing space is not an edit.
+      if (v == null) return [k, ""];
+      if (typeof v === "string") return [k, v.trim()];
+      return [k, v];
+    }));
+  }
+  function capturePristine(s){ if (s && !s.pristineDraft) s.pristineDraft = draftFingerprint(s); }
+  function screenDirty(s){
+    if (!s) return false;
+    // No draft, nothing to discard: the completed page is read-only, the review
+    // commits as it goes, the calendar is a view.
+    if (s.completedView || s.reviewView || s.calendarView) return false;
+    // An ARMED Complete or Convert counts as dirty — it is exactly the kind of
+    // staged intention this confirm exists to protect (trap T6b).
+    if (s.draft && (s.draft.willComplete || s.draft.convertTo)) return true;
+    return !!s.pristineDraft && draftFingerprint(s) !== s.pristineDraft;
+  }
   function attemptCancelScreen(){
     const s = state.screen;
     if (s && !s.staging && isProjectKind(s.kind) && projectDraftDirty(s)){
@@ -2371,6 +2616,16 @@
           { label: "Keep editing", action: function(){} }
         ]
       );
+      return;
+    }
+    // ⚑ Only reached when the project page's own warning did NOT fire — the two
+    // must never stack (trap T6a). That warning IS this confirm for projects;
+    // it just says more, because a project page can be holding staged children.
+    if (screenDirty(s)){
+      openConfirmDialog(t("discard.message"), [
+        { label: t("discard.yes"), style: "danger", action: function(){ closeScreen(); } },
+        { label: t("discard.no"), action: function(){} }
+      ]);
       return;
     }
     closeScreen();
@@ -3638,14 +3893,44 @@
     // Event pages read "Appointment" once a time is set (§4.14 — the time is
     // the only thing that distinguishes the two; they are not separate types).
     const badge = s.eventView ? (s.draft && s.draft.time ? "Appointment" : "Event") : KIND_BADGE_LABEL[s.kind];
+    // ▲ DESKTOP (ruling 4): ← and 🗑 move OUT of the header and into the card's
+    // footer as "Done" and "Delete". They are not rendered in both places —
+    // exactly one element carries data-action="screen-save" in either mode, so
+    // the action stays an unambiguous selector. ✕ keeps its top-right corner in
+    // both layouts.
+    const desk = state.desktop;
     return (
       '<div class="screen-header">' +
-        '<button type="button" class="screen-chrome-btn" data-action="screen-save" title="Save and go back">&#8592;</button>' +
+        (desk
+          ? '<span class="screen-chrome-spacer" aria-hidden="true"></span>'
+          : '<button type="button" class="screen-chrome-btn" data-action="screen-save" title="' + escapeHtml(t("chrome.saveBack")) + '">&#8592;</button>') +
         '<span class="screen-kind-badge">' + escapeHtml(badge) + '</span>' +
         '<div class="screen-header-right">' +
-          (showDelete ? '<button type="button" class="screen-chrome-btn danger" data-action="screen-delete" title="Delete">&#128465;</button>' : '') +
-          '<button type="button" class="screen-chrome-btn" data-action="screen-cancel" title="Cancel">&#10005;</button>' +
+          (!desk && showDelete ? '<button type="button" class="screen-chrome-btn danger" data-action="screen-delete" title="' + escapeHtml(t("chrome.delete")) + '">&#128465;</button>' : '') +
+          '<button type="button" class="screen-chrome-btn" data-action="screen-cancel" title="' + escapeHtml(t("chrome.cancel")) + '">&#10005;</button>' +
         '</div>' +
+      '</div>'
+    );
+  }
+  // ▲ DESKTOP FOOTER (ruling 4). Done bottom-RIGHT, filled and prominent;
+  // Delete bottom-LEFT, danger-styled and behind the same confirm it always
+  // had — maximum distance between the two. Nothing about commit semantics
+  // changes: Done IS screen-save.
+  //
+  // Deliberately NOT here: Complete and Convert. A big "✓ Complete" beside
+  // "Done" reads as two rival finish buttons. The footer answers "am I finished
+  // drafting?"; the body's outcome group answers "what is this item becoming?"
+  function screenFooterHtml(s, variant){
+    if (!state.desktop) return "";
+    const deleteAction = variant === "completed" ? "completed-delete" : "screen-delete";
+    const canDelete = !!s.taskId;
+    return (
+      '<div class="screen-footer">' +
+        (canDelete
+          ? '<button type="button" class="btn screen-footer-delete" data-action="' + deleteAction + '">&#128465; ' + escapeHtml(t("chrome.delete")) + '</button>'
+          : '<span class="screen-footer-spacer" aria-hidden="true"></span>') +
+        '<button type="button" class="btn btn-brass screen-footer-done" data-action="screen-save" title="' + escapeHtml(t("chrome.doneTitle")) + '">' +
+          escapeHtml(t("chrome.done")) + '</button>' +
       '</div>'
     );
   }
@@ -3680,12 +3965,18 @@
   // Completed-item page chrome (§12.2 step 5): ← (back, no save) and 🗑, and
   // deliberately NO ✕ — with nothing editable, ← and ✕ would be one gesture.
   function completedHeaderHtml(s){
+    // Same fork as screenHeaderHtml: on desktop both controls are in the card's
+    // footer, so the header keeps only the badge.
+    const desk = state.desktop;
     return (
       '<div class="screen-header">' +
-        '<button type="button" class="screen-chrome-btn" data-action="screen-save" title="Back">&#8592;</button>' +
+        (desk
+          ? '<span class="screen-chrome-spacer" aria-hidden="true"></span>'
+          : '<button type="button" class="screen-chrome-btn" data-action="screen-save" title="' + escapeHtml(t("chrome.back")) + '">&#8592;</button>') +
         '<span class="screen-kind-badge">' + escapeHtml(KIND_BADGE_LABEL[s.kind]) + '</span>' +
         '<div class="screen-header-right">' +
-          '<button type="button" class="screen-chrome-btn danger" data-action="completed-delete" title="Delete">&#128465;</button>' +
+          (desk ? '<span class="screen-chrome-spacer" aria-hidden="true"></span>'
+                : '<button type="button" class="screen-chrome-btn danger" data-action="completed-delete" title="' + escapeHtml(t("chrome.delete")) + '">&#128465;</button>') +
         '</div>' +
       '</div>'
     );
@@ -3766,6 +4057,16 @@
     // the quick-add row.)
 
     let fields = '<input type="text" class="screen-field-title' + (s.invalidField === "title" ? " field-invalid" : "") + '" data-field="title" placeholder="' + escapeHtml(TITLE_PLACEHOLDER[kind]) + '" value="' + escapeHtml(draft.title) + '">';
+    // ▲ DESKTOP (ruling 4 / trap T10): the convert buttons are collected here
+    // instead of being emitted where they are computed, so they can be rendered
+    // in ONE bordered group with the Complete pill at the foot of the page —
+    // "what happens on Done". Their mutual exclusion (arming one greys the
+    // others) is only legible when they are adjacent. Membership is per page:
+    // the group renders what the page HAS, never an empty slot.
+    // ⚑ This changes the phone too, by exactly one thing: the convert button now
+    // sits below the "Advanced" row instead of above it. One DOM, one order —
+    // forking the markup by mode is what trap T7 rules out.
+    let convertHtml = "";
 
     if (kind === "next"){
       fields += '<textarea class="screen-field-desc" data-field="notesClean" placeholder="Description (optional)\u2026">' + escapeHtml(draft.notesClean) + '</textarea>';
@@ -3777,7 +4078,7 @@
         // whenever a deadline is set -- converting would have to silently drop
         // the date. Complete-armed also disables it (existing mutual exclusion).
         const dated = !!(draft.deadline && draft.deadline.date);
-        fields += makeKindBtnHtml("waiting", "Make Waiting Action", "right", draft.convertTo === "waiting",
+        convertHtml += makeKindBtnHtml("waiting", "Make Waiting Action", "right", draft.convertTo === "waiting",
           !!draft.willComplete || dated,
           dated ? "A waiting action can’t hold a date — clear the deadline first" : null);
       }
@@ -3791,7 +4092,7 @@
       fields += linkRowHtml(draft, linkLocked);
       fields += contextRowHtml(draft);
       fields += waitingForRowHtml(draft, s.invalidField === "waitingFor");
-      if (s.taskId) fields += makeKindBtnHtml("next", "Make Next Action", "left", draft.convertTo === "next", !!draft.willComplete);
+      if (s.taskId) convertHtml += makeKindBtnHtml("next", "Make Next Action", "left", draft.convertTo === "next", !!draft.willComplete);
       fields += advancedRowHtml(draft);
     } else if (isProjectKind(kind)){
       fields += '<textarea class="screen-field-desc" data-field="notesClean" placeholder="Description (optional)\u2026">' + escapeHtml(draft.notesClean) + '</textarea>';
@@ -3825,7 +4126,7 @@
           const showFlag = s.taskId ? !hasWay : (s.invalidField === "projectActions");
           if (showFlag) fields += '<div class="screen-project-flag">No linked actions yet \u2014 every active project should have at least one next step.</div>';
         }
-        if (s.taskId) fields += makeKindBtnHtml("future", "Make Future / Someday", "", draft.convertTo === "future", !!draft.willComplete);
+        if (s.taskId) convertHtml += makeKindBtnHtml("future", "Make Future / Someday", "", draft.convertTo === "future", !!draft.willComplete);
       } else {
         // ⚑ Future projects get LINKED NOTES (user: "it should be possible to
         // link notes to the future projects page"). Notes only, and no segmented
@@ -3851,7 +4152,7 @@
             (fTotal ? ' <span class="seg-count">' + fTotal + '</span>' : "") + '</div>' +
             linkedNotesListHtml(s, fpid);
         }
-        if (s.taskId) fields += makeKindBtnHtml("current", "Make Current Project", "", draft.convertTo === "current", !!draft.willComplete);
+        if (s.taskId) convertHtml += makeKindBtnHtml("current", "Make Current Project", "", draft.convertTo === "current", !!draft.willComplete);
       }
     } else if (kind === "habit"){
       fields += '<textarea class="screen-field-desc" data-field="notesClean" placeholder="Who will I be if I build this habit?">' + escapeHtml(draft.notesClean) + '</textarea>';
@@ -3864,6 +4165,7 @@
       }
     }
 
+    let completeHtml = "";
     if ((kind === "next" || kind === "waiting" || isProjectKind(kind)) && s.taskId){
       // STRICT UNIFORMITY (user ruling): Complete here is draft-only too.
       // It no longer archives-and-closes on tap; it ARMS the completion,
@@ -3877,7 +4179,7 @@
       // carries the matching guard.
       const armed = !!draft.willComplete;
       const blocked = !armed && !!draft.convertTo;
-      fields += '<button type="button" class="btn screen-complete-pill' + (armed ? " done" : "") + (blocked ? " paused" : "") +
+      completeHtml += '<button type="button" class="btn screen-complete-pill' + (armed ? " done" : "") + (blocked ? " paused" : "") +
         '" data-action="screen-complete" title="' +
         (armed ? "Completes when you save \u2014 tap to undo" : blocked ? "Disarm the convert to complete" : "Complete on save") + '">' +
         (armed ? "\u2713 Completing on save" : "Complete") + '</button>';
@@ -3896,9 +4198,14 @@
       // the pause transition, so a complete-after-pending-unpause draft
       // records the day correctly at save.
       const pausedNow = !!draft.paused;
-      fields += '<button type="button" class="btn screen-complete-pill' + (doneToday ? " done" : "") + (pausedNow ? " paused" : "") +
+      completeHtml += '<button type="button" class="btn screen-complete-pill' + (doneToday ? " done" : "") + (pausedNow ? " paused" : "") +
         '" data-action="screen-complete" title="' + (pausedNow ? "Paused \u2014 unpause to complete" : "") + '">' +
         (pausedNow ? "\u23F8 Paused" : (doneToday ? "\u2713 Completed today" : "Complete")) + '</button>';
+    }
+    // The outcome group. Complete first, converts beside/below it, in one
+    // bordered section — or nothing at all when the page has neither half.
+    if (completeHtml || convertHtml){
+      fields += '<div class="screen-outcome-group">' + completeHtml + convertHtml + '</div>';
     }
     return '<div class="screen-body">' + fields + '</div>';
   }
@@ -4013,13 +4320,16 @@
     lockBodyScroll(!!s);
     if (!s){ root.innerHTML = ""; return; }
     const key = (s.completedView ? "completed:" : s.reviewView ? "review:" : s.calendarView ? "calendar:" : "") + s.kind + ":" + (s.taskId || "new");
+    // The desktop footer is appended to the two page shapes that have something
+    // to commit or delete. The review and the calendar have neither — the
+    // review closes with its own ✕, the calendar with its ←.
     const inner = s.completedView
-      ? completedHeaderHtml(s) + completedBodyHtml(s)
+      ? completedHeaderHtml(s) + completedBodyHtml(s) + screenFooterHtml(s, "completed")
       : s.reviewView
         ? reviewHeaderHtml() + reviewBodyHtml(s)
         : s.calendarView
           ? calendarHeaderHtml(s) + calendarBodyHtml(s)
-          : screenHeaderHtml(s) + screenBodyHtml(s);
+          : screenHeaderHtml(s) + screenBodyHtml(s) + screenFooterHtml(s, "edit");
     const existing = root.querySelector(".screen-overlay");
     if (existing && existing.getAttribute("data-screen-key") === key){
       // Same item re-rendering (hook added, day chip toggled, Complete
@@ -4028,17 +4338,25 @@
       // in every time you add a hook") and the scroll position survives.
       const oldBody = existing.querySelector(".screen-body");
       const scrollTop = oldBody ? oldBody.scrollTop : 0;
-      existing.innerHTML = inner;
+      const card = existing.querySelector(".screen-card") || existing;
+      card.innerHTML = inner;
       const newBody = existing.querySelector(".screen-body");
       if (newBody) newBody.scrollTop = scrollTop;
       autoGrowAll();
       if (s.calendarView) bindCalendarSwipe();
       mountHabitRunner(s);
+      capturePristine(s);
       return;
     }
     // Fresh open, or navigation to a different item (child screens,
     // returning from one): full rebuild with the slide-in.
-    root.innerHTML = '<div class="screen-overlay" data-kind="' + s.kind + '" data-screen-key="' + key + '" style="--lane-accent:var(' + accentVarForKind(s.kind) + ')">' + inner + '</div>';
+    // ⚑ `.screen-card` exists in BOTH modes (trap T7). On the phone it is a
+    // transparent full-height wrapper and changes nothing; on desktop it is the
+    // centered card and the overlay around it becomes the scrim. One DOM, two
+    // stylesheets' worth of rules — a per-mode DOM would fork the in-place
+    // re-render path and the habit runner mount, which is a bug farm.
+    root.innerHTML = '<div class="screen-overlay" data-kind="' + s.kind + '" data-screen-key="' + key + '" style="--lane-accent:var(' + accentVarForKind(s.kind) + ')">' +
+      '<div class="screen-card">' + inner + '</div></div>';
     requestAnimationFrame(function(){
       const overlay = qs(".screen-overlay");
       if (overlay) overlay.classList.add("open");
@@ -4048,6 +4366,7 @@
     autoGrowAll();
     if (s.calendarView) bindCalendarSwipe();
     mountHabitRunner(s);
+    capturePristine(s);
   }
   function autoGrowAll(){
     qsa(".screen-field-desc").forEach(function(ta){
@@ -4355,6 +4674,22 @@
         setTimeout(function(){ if (slot.isConnected && !slot.contains(document.activeElement)) clear(); }, 150);
       });
     }
+    // The three creation routes, by EXPLICIT kind. Both entry points — the
+    // phone's FAB menu and the desktop's per-column buttons — go through here,
+    // so "New action" means the same thing whichever control started it.
+    function createPrimary(kind){
+      if (kind === "habit"){ openScreen("habit", null); return; }   // habits have one option, not a menu
+      if (kind === "notes"){ openNoteScreen(null); return; }        // primary = New note
+      openScreen(kind, null);
+    }
+    function createSecondary(kind){
+      if (kind === "habit") return;                                 // no second option
+      if (kind === "notes"){ openNoteScreen(null, { checklist: true }); return; }
+      openInlineNameRow(kind);                                      // new context / new list
+    }
+    function createTertiary(kind){
+      if (kind === "notes") openTagsScreen();                       // Tags → the Tags page (§4.9b)
+    }
     document.addEventListener("keydown", function(e){
       if (e.key === "Escape"){
         const fabMenuEl = qs("#fab-menu");
@@ -4388,6 +4723,52 @@
       // actions; returns false for the generic screen-save/cancel/delete so
       // those still handle the event page below.
       if (eventsHandleClick(e)) return;
+
+      // ▲ DESKTOP: any click outside a header dropdown puts it away. Runs
+      // before the action handlers and does NOT return — clicking the gear with
+      // the Language menu open should close the menu AND open the gear menu.
+      if (!e.target.closest(".header-drop")) closeHeaderDrops();
+
+      // ▲ DESKTOP (ruling 2): a column's toggle. Same pairings as the phone's
+      // tab pairs, so the two layouts stay one mental model.
+      const colTab = e.target.closest('[data-action="col-lane"]');
+      if (colTab){
+        const ck = colTab.getAttribute("data-kind");
+        const ci = columnIndexOfKind(ck);
+        if (ci !== -1) state.columns[ci] = ck;
+        // Notes cards are DERIVED from live project state, so they are rendered
+        // on the way in rather than left stale (trap T5) — the same thing the
+        // phone's tab handler does.
+        if (ck === "notes") renderLane("notes");
+        updateLaneVisibility();
+        return;
+      }
+      // ▲ DESKTOP (author note 8 / trap T17): the header's Language and
+      // Background dropdowns. They REUSE the settings panels' markup and call
+      // setLocale / setSurface — one implementation of each, two entry points.
+      const hdrDropBtn = e.target.closest('[data-action="hdr-drop"]');
+      if (hdrDropBtn){
+        const wrap = hdrDropBtn.closest(".header-drop");
+        const menu = wrap && wrap.querySelector(".header-drop-menu");
+        if (!menu) return;
+        const wasOpen = !menu.hidden;
+        closeHeaderDrops();                 // only one open at a time
+        if (!wasOpen){
+          menu.innerHTML = hdrDropBtn.getAttribute("data-drop") === "lang"
+            ? settingsLanguageHtml(true) : settingsBackgroundsHtml(true);
+          menu.hidden = false;
+        }
+        return;
+      }
+      const hdrPick = e.target.closest('.header-drop-menu [data-action]');
+      if (hdrPick){
+        const act = hdrPick.getAttribute("data-action");
+        // Applying re-renders the header widgets (which is what closes the
+        // menu): the button's own label is the value you just picked, so the
+        // menu has said everything it has to say.
+        if (act === "settings-pick-lang"){ setLocale(hdrPick.getAttribute("data-lang")); renderHeaderWidgets(); return; }
+        if (act === "settings-pick-bg"){ setSurface(hdrPick.getAttribute("data-bg")); renderHeaderWidgets(); return; }
+      }
 
       // CHUNK 6 (§4.8a / §4.10): the intray drawer and the settings surface.
       if (e.target.closest('[data-action="open-tray"]')){ openTray(); return; }
@@ -4531,12 +4912,24 @@
         if (menu) menu.hidden = !menu.hidden;
         return;
       }
+      // ▲ DESKTOP (trap T4): the per-column create buttons. They carry an
+      // EXPLICIT data-kind and land in the same three functions the FAB menu
+      // calls — the FAB path keeps reading state.activeKind, because on the
+      // phone exactly one lane is live and that is the right answer there.
+      const laneNewBtn = e.target.closest('[data-action="lane-new"]');
+      if (laneNewBtn){
+        const lk = laneNewBtn.getAttribute("data-kind");
+        const idx = Number(laneNewBtn.getAttribute("data-idx") || 0);
+        if (idx === 0) createPrimary(lk);
+        else if (idx === 1) createSecondary(lk);
+        else createTertiary(lk);
+        return;
+      }
       const fabPrimary = e.target.closest('[data-action="new-primary"]');
       if (fabPrimary){
         const menu = qs("#fab-menu");
         if (menu) menu.hidden = true;
-        if (state.activeKind === "notes"){ openNoteScreen(null); return; } // primary = New note (bottom, nearest thumb)
-        openScreen(state.activeKind, null);
+        createPrimary(state.activeKind);
         return;
       }
       // The + beside a list's or a context's count (user). Both open the normal
@@ -4562,15 +4955,14 @@
       if (fabSecondary){
         const menu = qs("#fab-menu");
         if (menu) menu.hidden = true;
-        if (state.activeKind === "notes"){ openNoteScreen(null, { checklist: true }); return; } // secondary = New checklist (above)
-        openInlineNameRow(state.activeKind);
+        createSecondary(state.activeKind);
         return;
       }
       const fabTertiary = e.target.closest('[data-action="new-tertiary"]');
       if (fabTertiary){
         const menu = qs("#fab-menu");
         if (menu) menu.hidden = true;
-        if (state.activeKind === "notes"){ openTagsScreen(); return; } // Tags → the Tags page (§4.9b)
+        createTertiary(state.activeKind);
         return;
       }
       const moveBtn = e.target.closest('[data-action="move"]');
@@ -5012,6 +5404,10 @@
     document.addEventListener("keydown", function(e){
       if (e.key !== "Escape") return;
       // §4.6 Back/Escape resolution order: dialog → drawer → page → exit.
+      // ▲ DESKTOP (trap T17): a header dropdown slots in FRONT of all of it. An
+      // Escape aimed at a stray open menu must never travel through to the
+      // half-edited page behind it.
+      if (closeHeaderDrops()) return;
       if (qs(".choice-dialog-backdrop")){ closeDialog(); return; }
       if (state.trayOpen){ closeTray(); return; }
       if (state.screen){ attemptCancelScreen(); } // §12.1: project ✕-warning on every exit route
@@ -5827,6 +6223,10 @@
           '<button type="button" data-action="tray-add" title="Add">+</button>' +
         '</div>' +
         list +
+        // The handle's other half: an arrow on the drawer's own edge that puts
+        // it away. Same shape and colour as #tray-handle, pointing the other
+        // way, so the pair reads as one control with two states.
+        '<button type="button" class="tray-edge-handle" data-action="close-tray" title="' + escapeHtml(t("tray.handleClose")) + '" aria-label="' + escapeHtml(t("tray.handleClose")) + '">&#8249;</button>' +
       '</div>';
     // Force the -100% start state to commit BEFORE adding .open, or the
     // browser collapses both into one paint and the drawer snaps open with no
@@ -5838,9 +6238,15 @@
     if (drawer){ void drawer.offsetWidth; drawer.classList.add("open"); }
     if (backdrop) backdrop.classList.add("open");
   }
+  // The left-edge handle hides while the drawer is open and comes back only
+  // AFTER the slide-out finishes (trap T15b) — otherwise it pops in on top of a
+  // drawer that is still moving. One class, driven from the same 300ms timer
+  // the drawer's own teardown already uses.
+  function syncTrayHandle(){ document.body.classList.toggle("tray-open", !!state.trayOpen); }
   function openTray(){
     state.trayOpen = true;
     state.trayReveal = false; // captures start sealed every time the drawer opens (user follow-up)
+    syncTrayHandle();
     renderTray();
     const input = qs("#tray-input"); if (input) input.focus();
   }
@@ -5848,10 +6254,10 @@
     state.trayOpen = false;
     const r = qs("#tray-root");
     const drawer = qs(".tray-drawer"), backdrop = qs(".tray-backdrop");
-    if (!drawer){ if (r) r.innerHTML = ""; return; }
+    if (!drawer){ if (r) r.innerHTML = ""; syncTrayHandle(); return; }
     drawer.classList.remove("open");            // slide out
     if (backdrop) backdrop.classList.remove("open");
-    setTimeout(function(){ if (r && !state.trayOpen) r.innerHTML = ""; }, 300); // clears after the .28s slide-out
+    setTimeout(function(){ if (r && !state.trayOpen) r.innerHTML = ""; syncTrayHandle(); }, 300); // clears after the .28s slide-out
   }
   // Finger-follow swipe on the intray drawer — the same drag-and-snap mechanic
   // as the calendar month swipe (user: "works great, no browser issues"). Two
@@ -5911,7 +6317,7 @@
         else { dd.drawer.classList.add("open"); if (dd.backdrop) dd.backdrop.classList.add("open"); clearInline(); } // snap back open
       } else {
         if (dx > threshold){                                               // commit open
-          state.trayOpen = true; state.trayReveal = false;
+          state.trayOpen = true; state.trayReveal = false; syncTrayHandle();
           dd.drawer.classList.add("open"); if (dd.backdrop) dd.backdrop.classList.add("open"); clearInline();
           const inp = qs("#tray-input"); if (inp) setTimeout(function(){ inp.focus(); }, 60);
         } else { dd.drawer.classList.remove("open"); teardown(); }          // cancel open
@@ -6509,14 +6915,18 @@
       '<button type="button" class="settings-item" data-action="import-data">' +
         '<span>&#11015;</span><span class="si-label">Import a backup</span></button>' +
       '<div class="settings-sep"></div>' +
-      '<button type="button" class="settings-item" data-action="settings-backgrounds">' +
-        '<span>&#127912;</span><span class="si-label">Background</span>' +
-        '<span class="si-value">' + escapeHtml(surf.label) + '</span><span class="si-caret">&#8250;</span></button>' +
-      // ⚑ BUILT (Chinese round): no longer a disabled "not built yet" row. Opens a
-      // sub-panel like Background; the current language shows in its own script.
-      '<button type="button" class="settings-item" data-action="settings-language">' +
-        '<span>&#127760;</span><span class="si-label">' + escapeHtml(t("settings.language")) + '</span>' +
-        '<span class="si-value">' + escapeHtml(localeLabel(currentLocale())) + '</span><span class="si-caret">&#8250;</span></button>' +
+      // ▲ DESKTOP (author note 8): Background and Language become header
+      // dropdowns and LEAVE this menu — one place per thing. The phone keeps
+      // them here, where they have always been.
+      (state.desktop ? "" :
+        '<button type="button" class="settings-item" data-action="settings-backgrounds">' +
+          '<span>&#127912;</span><span class="si-label">' + escapeHtml(t("settings.background")) + '</span>' +
+          '<span class="si-value">' + escapeHtml(surf.label) + '</span><span class="si-caret">&#8250;</span></button>' +
+        // ⚑ BUILT (Chinese round): no longer a disabled "not built yet" row. Opens a
+        // sub-panel like Background; the current language shows in its own script.
+        '<button type="button" class="settings-item" data-action="settings-language">' +
+          '<span>&#127760;</span><span class="si-label">' + escapeHtml(t("settings.language")) + '</span>' +
+          '<span class="si-value">' + escapeHtml(localeLabel(currentLocale())) + '</span><span class="si-caret">&#8250;</span></button>') +
       // ⚑ Where the dev tools live now. A row rather than a permanent bar: they
       // are scaffolding for building the app, and having them across the top of
       // every screen was the clutter the user wanted gone.
@@ -6553,11 +6963,14 @@
     });
     return out;
   }
-  function settingsBackgroundsHtml(){
+  // `noBack`: the header dropdown shows the same rows without the "‹ Background"
+  // return row — a dropdown has nowhere to go back TO (trap T17: reuse the
+  // presentation, never reimplement the picking).
+  function settingsBackgroundsHtml(noBack){
     const cur = currentSurfaceId();
-    let out =
+    let out = noBack ? "" :
       '<button type="button" class="settings-item settings-back" data-action="settings-root">' +
-        '<span>&#8249;</span><span class="si-label">Background</span></button>' +
+        '<span>&#8249;</span><span class="si-label">' + escapeHtml(t("settings.background")) + '</span></button>' +
       '<div class="settings-sep"></div>';
     Object.keys(SURFACES).forEach(function(id){
       out +=
@@ -6572,9 +6985,9 @@
   // Each row shows its language in its OWN script (native name), the way a real
   // language switcher does — a menu that lists "简体中文" as "Chinese" is one you
   // cannot use once you are already in the language you cannot read.
-  function settingsLanguageHtml(){
+  function settingsLanguageHtml(noBack){
     const cur = currentLocale();
-    let out =
+    let out = noBack ? "" :
       '<button type="button" class="settings-item settings-back" data-action="settings-root">' +
         '<span>&#8249;</span><span class="si-label">' + escapeHtml(t("settings.language")) + '</span></button>' +
       '<div class="settings-sep"></div>';
@@ -7265,6 +7678,15 @@
     applyChalkDust();              // §P6: the habit runner's board
     renderShell();
     renderTabLabels();
+    // ⚠ BEFORE the first lane render: applyLayoutMode decides which lanes are
+    // visible and what the header holds. One listener, both directions — a
+    // window dragged across 1000px re-renders rather than stranding an open
+    // page, tray or menu (trap T1).
+    applyLayoutMode();
+    const deskMQ = window.matchMedia("(min-width:" + DESKTOP_MIN_PX + "px)");
+    if (deskMQ.addEventListener) deskMQ.addEventListener("change", applyLayoutMode);
+    else if (deskMQ.addListener) deskMQ.addListener(applyLayoutMode);   // older Safari
+    else window.addEventListener("resize", applyLayoutMode);
     bindEvents();
     bindDrawerSwipe(); // finger-follow open/close on the intray drawer, same mechanic as the calendar month swipe
     initLocalData();

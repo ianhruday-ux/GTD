@@ -1111,7 +1111,7 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 .tray-backdrop.open{ opacity:1; pointer-events:auto; } /* only intercepts taps while open — the fading-out copy lets taps through */
 .tray-scroll{ display:flex; flex-direction:column; }
 .tray-drawer{
-  position:fixed; top:0; left:0; bottom:0; z-index:211; width:min(360px, 86vw);
+  position:fixed; top:0; left:0; bottom:0; z-index:211; width:var(--tray-w);
   background:var(--desk) var(--wood); background-size:var(--wood-size) var(--wood-size); background-repeat:repeat;
   box-shadow:6px 0 24px rgba(0,0,0,0.5); display:flex; flex-direction:column; overflow-y:auto;
   padding:calc(env(safe-area-inset-top) + 14px) 16px calc(env(safe-area-inset-bottom) + 16px) calc(env(safe-area-inset-left) + 16px);
@@ -1659,3 +1659,255 @@ body.has-frame .tray-drawer::after{
   display:block; font-size:10.5px; color:var(--text-soft); font-weight:400;
   margin-top:2px; line-height:1.35; white-space:normal;
 }
+
+/* ============================================================================
+   THE INTRAY HANDLE  (both layouts — the one sanctioned phone change this round)
+   ----------------------------------------------------------------------------
+   The header's 📥 is gone. In its place a slim white tab on the LEFT SCREEN
+   EDGE, which is where the drawer actually comes from — the button now points
+   at the thing it opens instead of sitting three inches away from it.
+
+   ⚑ TAP ONLY. The left edge belongs to the browser's back-swipe gesture, so this
+   must never become a drag/pull target. The existing swipe-open from the left
+   third still works; the handle is an affordance on top of it, not a
+   replacement. It is deliberately narrow (22px) so it barely occludes cards, and
+   sits in the upper third where lanes are emptiest.
+
+   z-index 150: over lane content and the header, UNDER the tray backdrop (210)
+   and any drafting page (200). It rides OVER the gold band rather than being
+   inset from it — an object on the edge of the desk, which reads correctly.
+============================================================================ */
+#tray-handle{
+  position:fixed; left:0; top:34%; z-index:150;
+  width:22px; min-height:58px; padding:12px 0;
+  border:none; border-radius:0 9px 9px 0;
+  background:rgba(244,240,232,0.93); color:#1a1408;
+  font-size:16px; font-weight:700; line-height:1;
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:2px 0 12px rgba(0,0,0,0.5);
+  transition:opacity .14s ease, background .14s ease;
+}
+#tray-handle:hover{ background:#fff; }
+/* Hidden while the drawer is open, and back only AFTER the .28s slide-out — the
+   class is dropped on the same 300ms timer the drawer's teardown uses, so it
+   never pops in over a moving drawer. */
+body.tray-open #tray-handle{ opacity:0; pointer-events:none; }
+/* A drafting page owns the whole screen; the handle would float over its scrim. */
+body.screen-open #tray-handle{ display:none; }
+
+/* The other half of the same control: an arrow on the drawer's own edge that
+   puts it away. position:fixed inside the drawer (whose transform makes it the
+   containing block) so it rides the slide and ignores the drawer's scrolling. */
+.tray-edge-handle{
+  position:fixed; right:0; top:34%; z-index:2;
+  width:22px; min-height:58px; padding:12px 0;
+  border:none; border-radius:9px 0 0 9px;
+  background:rgba(244,240,232,0.93); color:#1a1408;
+  font-size:16px; font-weight:700; line-height:1;
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:-2px 0 12px rgba(0,0,0,0.45);
+}
+.tray-edge-handle:hover{ background:#fff; }
+
+/* One variable for the drawer's width, so the desktop widening (author note 1)
+   is a single number and the jade inlay keeps working at either size. */
+:root{ --tray-w: min(360px, 86vw); }
+
+/* ============================================================================
+   THE DRAFTING CARD WRAPPER  (mobile: invisible; desktop: the card)
+   `.screen-card` is rendered in both modes on purpose — see renderScreen.
+============================================================================ */
+/* The desktop column head and per-lane create row are rendered into every lane
+   in both modes and HIDDEN on the phone — the mobile markup is untouched, just
+   not shown (trap T8: hide per mode, don't delete). */
+.lane-colhead, .lane-create-row{ display:none; }
+
+.screen-card{ display:flex; flex-direction:column; flex:1 1 auto; min-height:0; width:100%; }
+/* The desktop footer (Done / Delete). Not rendered at all on the phone, which
+   keeps the back arrow and the bin in the header — so exactly one element ever
+   carries data-action="screen-save". */
+.screen-footer{ display:none; }
+/* The "what happens on Done" group. `display:contents` on the phone means the
+   Complete pill keeps its floating position and the convert button keeps its
+   place in the flow: the grouping is desktop-visible only. */
+.screen-outcome-group{ display:contents; }
+
+/* ============================================================================
+   ▲ DESKTOP LAYOUT  (>=1000px)
+   ----------------------------------------------------------------------------
+   ⚠ THIS NUMBER IS MIRRORED IN ONE PLACE IN JS: DESKTOP_MIN_PX in app.js. They
+   must never drift — a half-desktop state (three columns, still showing the FAB)
+   is what two sources of truth look like.
+
+   Below it, the phone app exactly as it shipped. A half-snapped laptop window
+   gets the mobile layout; that is intended.
+============================================================================ */
+@media (min-width:1000px){
+  /* --- the tab bar retires; its spacer keeps reserving the fixed header --- */
+  .tabbar{ display:none; }
+  .tabbar-spacer{ height:calc(var(--header-h) + 22px); }
+  /* --- the floating + retires; every column has its own real buttons --- */
+  #fab-create, .fab-menu{ display:none !important; }
+
+  /* --- header: dropdowns left, OELA centered, gear right (author notes 8/9) --- */
+  .header-left{ display:flex; align-items:center; gap:8px; }
+  header .brand{ position:absolute; left:50%; transform:translateX(-50%); }
+  .header-drop{ position:relative; }
+  .header-drop-btn{
+    display:inline-flex; align-items:center; gap:7px;
+    border:1px solid rgba(237,231,218,0.16); background:rgba(237,231,218,0.05);
+    color:var(--text-primary); border-radius:9px; padding:7px 11px; font-size:13px;
+  }
+  .header-drop-btn:hover{ background:rgba(237,231,218,0.10); }
+  .hdr-drop-icon{ font-size:13px; line-height:1; }
+  .hdr-drop-value{ max-width:132px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .hdr-drop-caret{ color:var(--text-soft); font-size:10px; }
+  /* Reuses .settings-menu's chrome, but anchored to its own button rather than
+     to the header's right edge. */
+  .header-drop-menu{
+    position:absolute; top:calc(100% + 7px); left:0; right:auto;
+    min-width:210px; max-width:280px;
+  }
+  .header-drop-menu[hidden]{ display:none; }
+
+  /* --- three columns (ruling 2) ---------------------------------------------
+     No explicit grid-column anywhere: every pair is contiguous in ALL_LANES and
+     the pairs are in column order, so auto-placement puts the three visible
+     lanes in the right cells on its own.
+     ⚠ ONE scrolling document (trap T16) — the columns grow downward and the page
+     scrolls as a whole. Per-column scrollbars fight both the frame and
+     lockBodyScroll. */
+  .lanes{
+    max-width:1460px;
+    display:grid; grid-template-columns:repeat(3, minmax(0,1fr));
+    gap:14px 26px; align-items:start;
+  }
+  .lane{ min-width:0; }
+
+  /* --- one layer of headers (author note 4 / trap T8) ---
+     The column toggle IS the lane header on desktop, so the in-lane floating
+     label is hidden rather than stacked under it. */
+  .lane-label{ display:none; }
+  .lane-colhead{ display:flex; align-items:center; gap:8px; margin:2px 0 12px 0; }
+  .col-tabs{ display:flex; gap:6px; flex:1 1 auto; min-width:0; }
+  .col-tab{
+    flex:0 1 auto; min-width:0;
+    display:inline-flex; align-items:center; gap:8px;
+    border:1px solid rgba(237,231,218,0.18); background:transparent; color:var(--text-soft);
+    font-family:var(--font-display); font-weight:700; font-size:14.5px; letter-spacing:0.01em;
+    padding:9px 13px; border-radius:9px; white-space:nowrap;
+  }
+  .col-tab:hover{ background:rgba(237,231,218,0.06); color:var(--text-primary); }
+  .col-tab .col-tab-name{ overflow:hidden; text-overflow:ellipsis; }
+  .col-tab.active{
+    background:var(--lane-accent); border-color:transparent; color:var(--dark-on-accent);
+    box-shadow:0 3px 10px rgba(0,0,0,0.35);
+  }
+  .col-count{
+    font-family:var(--font-mono); font-weight:600; font-size:11px;
+    background:rgba(237,231,218,0.10); padding:2px 7px; border-radius:10px;
+  }
+  .col-tab.active .col-count{ background:rgba(0,0,0,0.2); }
+  .col-tab.active:hover{ background:var(--lane-accent); color:var(--dark-on-accent); }
+  /* The info button sits outside the lit pill now, so it needs its own outline.
+     It still toggles the same .lane-info panel via the same handler. */
+  .col-info{
+    flex:0 0 auto; background:transparent; color:var(--text-soft);
+    border:1px solid rgba(237,231,218,0.22);
+  }
+  .col-info:hover{ background:rgba(237,231,218,0.08); color:var(--text-primary); }
+
+  /* --- per-lane create buttons (author note 5 / trap T4) --- */
+  .lane-create-row{ display:flex; flex-wrap:wrap; gap:6px; margin:0 0 12px 0; }
+  .lane-create-btn{ border-color:rgba(237,231,218,0.26); }
+  .lane-create-btn:hover{ border-color:var(--lane-accent); color:var(--text-primary); }
+  .lane-tools-row{ margin:0 0 10px 0; }
+
+  /* --- drafting pages become centered cards (ruling 4) ---
+     Same overlay node as the phone: the overlay becomes the SCRIM and the card
+     is the inner wrapper. The entrance differs in CSS alone — slide on mobile,
+     fade-and-settle here. */
+  .screen-overlay{
+    background:rgba(8,6,5,0.62);
+    display:flex; align-items:center; justify-content:center;
+    padding:34px 20px;
+    transform:none; opacity:0; transition:opacity .16s ease;
+  }
+  .screen-overlay.open{ transform:none; opacity:1; }
+  .screen-card{
+    flex:0 1 auto; width:min(700px, 100%); max-height:100%;
+    background:var(--desk) var(--wood);
+    background-size:var(--wood-size) var(--wood-size); background-repeat:repeat;
+    border:1px solid rgba(237,231,218,0.14); border-radius:14px;
+    box-shadow:0 26px 64px rgba(0,0,0,0.62);
+    overflow:hidden;
+    transform:scale(0.985); transition:transform .16s ease;
+  }
+  .screen-overlay.open .screen-card{ transform:scale(1); }
+  /* Project pages carry the staged-actions machinery and need the room. */
+  .screen-overlay[data-kind="current"] .screen-card,
+  .screen-overlay[data-kind="future"] .screen-card{ width:min(880px, 100%); }
+  /* ⚑ The calendar is visually a popup and structurally the SAME screen (ruling
+     6). Widening the card is only half of it: the month grid is sized against
+     .screen-body's 640px column, so that column has to widen for this screen
+     only (trap T11). */
+  .screen-overlay[data-kind="calendar"] .screen-card{ width:min(900px, 100%); }
+  .screen-body{
+    max-width:none; padding:18px 26px 22px 26px;
+  }
+  .screen-header{ padding:12px 20px 12px 26px; }
+  .screen-footer{
+    display:flex; align-items:center; justify-content:space-between; gap:16px;
+    flex:0 0 auto; padding:14px 26px calc(14px + env(safe-area-inset-bottom)) 26px;
+    border-top:1px solid rgba(237,231,218,0.12);
+  }
+  .screen-footer-done{
+    border:none; background:var(--brass); color:var(--dark-on-accent);
+    font-weight:700; font-size:14px; padding:11px 32px; border-radius:9px;
+    box-shadow:0 3px 12px rgba(0,0,0,0.4);
+  }
+  .screen-footer-done:hover{ filter:brightness(1.08); }
+  /* Maximum distance from Done, and danger-styled so the two never read alike. */
+  .screen-footer-delete{
+    border:1px solid rgba(194,74,61,0.5); background:transparent; color:var(--red);
+    font-size:13px; font-weight:600; padding:10px 16px; border-radius:9px;
+  }
+  .screen-footer-delete:hover{ background:rgba(194,74,61,0.14); }
+  .screen-chrome-spacer{ display:inline-block; width:22px; }
+
+  /* --- Complete + Convert as ONE group (ruling 4 / trap T10) ---
+     They are the same kind of control — a declaration about what the item
+     becomes on save — and their mutual exclusion is only legible when they sit
+     next to each other. The pill stops floating and joins the flow. */
+  .screen-outcome-group{
+    display:flex; flex-wrap:wrap; align-items:center; gap:10px;
+    border:1px solid rgba(237,231,218,0.14); border-radius:10px;
+    padding:12px 14px; margin-top:2px;
+  }
+  .screen-outcome-group .screen-complete-pill{
+    position:static; right:auto; bottom:auto; box-shadow:none; flex:0 0 auto;
+  }
+  .screen-outcome-group .screen-make-kind-btn{ align-self:auto; flex:0 1 auto; }
+
+  /* --- the intray, wider (author note 1) --- */
+  :root{ --tray-w: min(440px, 86vw); }
+
+  /* --- the gold-leaf frame wraps the WHOLE PAGE (author note 10 / trap T14) ---
+     Every other surface has --frame-inset:0, so all of this collapses to nothing
+     unless the lacquer desk is on. */
+  body.has-frame header{ top:var(--frame-inset); left:var(--frame-inset); right:var(--frame-inset); }
+  body.has-frame .tabbar-spacer{ height:calc(var(--header-h) + 22px + var(--frame-inset)); }
+  body.has-frame main{
+    padding-left:calc(20px + var(--frame-inset));
+    padding-right:calc(20px + var(--frame-inset));
+    padding-bottom:calc(40px + var(--frame-inset));
+  }
+  /* The band is on the viewport now, not on main's box — so the lanes must NOT
+     also pad themselves in by the same amount. */
+  body.has-frame .lanes{ padding:0; }
+}
+
+/* The frame's desktop geometry: pinned to the viewport, over the header, under
+   the tray handle and any drafting page. Set by drawDeskFrame, not by a media
+   query, because the JS also has to change what it measures. */
+#desk-frame.frame-fixed{ position:fixed; top:0; left:0; z-index:140; }
