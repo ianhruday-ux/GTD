@@ -445,6 +445,11 @@
       { id: genId(), title: "Website relaunch", notesClean: "", linkedProjectId: null, isGroup: false, parent: null },
       { id: genId(), title: "Kitchen remodel", notesClean: "", linkedProjectId: null, isGroup: false, parent: null }
     ];
+    // ⚑ Give "Website relaunch" a linked action so it is NOT stalled. Without this
+    // it has no way forward and surfaces in Review alongside the tutorial's
+    // dedicated stalled sample (seedTutorial's ◇ card) — two stalled projects
+    // competing for step ⑤, which muddies the lesson. One intended example only.
+    state.tasks.next[1].linkedProjectId = state.tasks.current[0].id;
 
     const emailNextId = state.tasks.next[0].id;
     state.tasks.waiting = [
@@ -486,8 +491,82 @@
     seededRuns[reviewProjId] = Object.assign(defaultHabitRun(), { schedule: [5] });
     Storage.setJSON("gtd_habit_runs", seededRuns);
 
+    seedTutorial(); // the in-lane onboarding — default data, cleared by completion
     KINDS.forEach(saveTasksLocal);
     seedEvents(); // chunk 7 (§4.13): sample events/appointments in their own store
+  }
+  // =========================================================
+  // THE IN-LANE TUTORIAL (user). Seeded default data — one numbered card per
+  // step, living in the lane the step is about, cleared through completion as you
+  // work. Modelled on the QA checklist's "cards in the lanes" idea, but this is
+  // REAL user-facing content: not gated behind the QA switch, and it re-seeds
+  // with the rest of the samples on Reset (initLocalData → seedData).
+  //
+  // TWO deliberate persist-exceptions, removed by 🗑 rather than completion:
+  //   · the ◇ stalled sample project (tp) — step ⑤ needs a stalled project to
+  //     fix, and fixing it un-stalls it rather than deleting it (user OK'd this);
+  //   · the ⑥ habit (t6) — habits toggle done-for-today, they never archive, so
+  //     no habit card CAN self-complete. Flagged: keeping the habit lesson in the
+  //     Habits lane was judged worth a second manual-delete card.
+  //
+  // LANGUAGE: each card carries a stable `tutorialKey`. A language switch re-reads
+  // the text from i18n (restampTutorialCards) but never touches the IDs, so the
+  // ② → ① hook and the ② → ④ link — which are by id — survive translation. This
+  // is the id-stable alternative to the "swap cards for their siblings" idea; it
+  // avoids rewriting every cross-reference.
+  const TUTORIAL_KEYS = ["t1", "t2", "t3", "t4", "t5", "t6", "tp"];
+  function tutTitle(key){ return t("tutorial." + key + ".title"); }
+  function tutNotes(key){ return t("tutorial." + key + ".notes"); }
+  function seedTutorial(){
+    const id = {}; TUTORIAL_KEYS.forEach(function(k){ id[k] = genId(); });
+    function card(key, extra){
+      return Object.assign({
+        id: id[key], title: tutTitle(key), notesClean: tutNotes(key),
+        linkedProjectId: null, isGroup: false, parent: null, tutorialKey: key
+      }, extra || {});
+    }
+    // ① ③ ⑤ ⑥ are next actions (they complete-archive, clearing the step).
+    // ⑥ lives here rather than in Habits BECAUSE a habit cannot self-complete;
+    // its text sends the reader to the Habits tab. tp/t6 exceptions stay put.
+    state.tasks.next.unshift(card("t1", { contextId: null }));
+    state.tasks.next.push(card("t3", { contextId: null }), card("t5", { contextId: null }), card("t6", { contextId: null }));
+    // ④ a healthy project (② links to it, below); ◇ the stalled sample.
+    state.tasks.current.unshift(card("t4"), card("tp"));
+    // ② a waiting action: hooked to ① (conditionId) AND linked to project ④.
+    state.tasks.waiting.unshift(card("t2", {
+      whenText: null, conditionId: id.t1, conditionKind: "next", conditionLabel: tutTitle("t1"),
+      linkedProjectId: id.t4
+    }));
+  }
+  // Re-read every tutorial card's text for the current language (called from
+  // applyLocale). IDs and cross-references are untouched; only title/notes/the
+  // frozen conditionLabel change. Active lanes AND the Completed archive, so a
+  // step you already ticked isn't left half-translated in the archive.
+  function restampTutorialCards(){
+    const touched = {};
+    function stamp(list, kindKey){
+      (list || []).forEach(function(tk){
+        if (!tk || !tk.tutorialKey) return;
+        tk.title = tutTitle(tk.tutorialKey);
+        tk.notesClean = tutNotes(tk.tutorialKey);
+        // ② carries a frozen label for ①; re-derive it in the new language.
+        if (tk.conditionKind === "next" && tk.conditionId){
+          tk.conditionLabel = tutTitle("t1"); // the only tutorial condition target
+        }
+        touched[kindKey] = true;
+      });
+    }
+    ["next", "waiting", "current", "future", "habit"].forEach(function(k){ stamp(state.tasks[k], k); });
+    ["next", "waiting", "current", "future"].forEach(function(k){
+      stamp((state.completed || {})[k], k);
+    });
+    Object.keys(touched).forEach(function(k){ saveTasksLocal(k); });
+    // completed archive persistence, if any tutorial card lives there
+    ["next", "waiting", "current", "future"].forEach(function(k){
+      if ((state.completed || {})[k] && state.completed[k].some(function(x){ return x.tutorialKey; })) {
+        saveCompletedLocal(k);
+      }
+    });
   }
   function initLocalData(){
     let anyMissing = false;

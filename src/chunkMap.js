@@ -20,10 +20,10 @@
 // (this file + its boot() call) if the convention is ever retired.
 // =========================================================
 function injectChunkMap(){
-  const FLAG = "gtd_chunk_map_v5";
+  const FLAG = "gtd_chunk_map_v6";
   if (Storage.get(FLAG)) return;
   Storage.set(FLAG, "1");
-  ["gtd_chunk_map_v1", "gtd_chunk_map_v2", "gtd_chunk_map_v3", "gtd_chunk_map_v4"].forEach(Storage.remove);  // retire superseded flags
+  ["gtd_chunk_map_v1", "gtd_chunk_map_v2", "gtd_chunk_map_v3", "gtd_chunk_map_v4", "gtd_chunk_map_v5"].forEach(Storage.remove);  // retire superseded flags
 
   // Replace, don't accumulate (8.2, mirroring 8.1): sweep any previous
   // chunk-map group (tagged via devContext, not a title match, since the
@@ -68,8 +68,10 @@ function injectChunkMap(){
     { title: "✓ Post-sprint — Your checklist findings", notes: "DONE. Six of the seven you reported: ticking a past-due repeat now clears it from the review; the QA clock buttons reach you inside the calendar and every other full-screen page; a revealed intray card opens its item; the review's quick-add boxes take typing again (they were opening the date picker) and gained a Full page button; a project's creation page can add an event, as a proper draft; and naming a new list or context no longer drags the screen to the bottom. The seventh — a delete dialog when leaving a repeating event — I could not reproduce; there is a question waiting for you in the QA checklist." },
 
     { title: "✓ Polish the writing", notes: "DONE. Ruled that the only text needing a review pass was the information-button copy; INFO-TEXT.txt was marked up and is now wired into the app. COPY.txt — the generated dump of all 236 strings — is OBSOLETE and was never filled in; the app's inline wording stands as written. This row used to say everything waited on it, which is what made the translation look blocked when it was not."},
-    { title: "Chinese translation", notes: "IN PROGRESS. No longer blocked — the writing is final (see the row above). Simplified Chinese, matching the habit thought-bubbles, which already carry both languages and are the pattern the rest follows. Needs a string table and a working Language switch as well as the words themselves." },
-    { title: "Fix up the desktop layout", notes: "TO DO. Everything this sprint was designed and tested on a phone, and the desktop view has drifted — wide screens especially." },
+    { title: "✓ Chinese translation", notes: "DONE. src/i18n.js holds the string table (English + Simplified Chinese) and the ⋯ → Language switch, which re-labels the whole app live and persists the choice. Built on the same en / zh-Hans pattern the habit bubbles already used. ⚑ A friend who reads Chinese should still check the info-button prose — the machine did the words, not a native speaker." },
+    { title: "✓ In-lane tutorial", notes: "DONE. Six numbered steps seeded across the lanes (make a next action, a hooked waiting action, a context, a project, fix a stalled project in Review, build a habit), cleared through completion as you go. The cards are wired to each other to demo the dependency — ② is hooked to ① and linked to project ④ — and the text toggles with the language. Two cards persist and are deleted by hand: the ◇ stalled sample (step ⑤ needs it) and the ⑥ habit (habits can't self-complete)." },
+    { title: "✓ Someday has no deadlines", notes: "DONE. Future projects don't take a deadline by definition, so the field is gone from their pages and a Current → Someday conversion drops any deadline silently — no warning about losing something the destination can't hold." },
+    { title: "Fix up the desktop layout", notes: "TO DO, and the next real job — needs the author's eyes on a wide screen. Everything this sprint was designed and tested on a phone, and the desktop view has drifted." },
     { title: "✓ Events on the project page", notes: "DONE. A project shows its linked events and can create them — including on the creation page, where the event is held as a draft and only becomes real when the project is saved. ‘Add an event’ in the daily review came with it." },
     { title: "✓ Linked notes on the project page", notes: "DONE. The link runs both ways now. A current project's Linked panel has an Actions side and a Notes side you toggle between, and a Someday project has a Linked notes section of its own — notes only, since a Someday project holds no actions by design." },
     { title: "Re-test backups against the new fields", notes: "TO DO. Export and import have not been exercised since deadlines gained a start date and a push counter, repeats gained a missed-day marker, and the backgrounds changed names. Backups are the one thing that has to survive real use." },

@@ -1780,7 +1780,7 @@ body.has-frame .tray-drawer::after{
 (function(){
 "use strict";
 
-const BUILD_STAMP = "21 Jul 17:26";  // replaced by build.py
+const BUILD_STAMP = "21 Jul 19:29";  // replaced by build.py
 
 // =========================================================
 // STORAGE ADAPTER (spec.md §3, known issue 4)
@@ -2018,7 +2018,70 @@ const STRINGS = {
   "chrome.back":     { en: "Back",             "zh-Hans": "返回" },
   "chrome.cancel":   { en: "Cancel",           "zh-Hans": "取消" },
   "chrome.delete":   { en: "Delete",           "zh-Hans": "删除" },
-  "chrome.info":     { en: "Information",      "zh-Hans": "说明" }
+  "chrome.info":     { en: "Information",      "zh-Hans": "说明" },
+
+  // ---- the in-lane tutorial (seedTutorial in app.js) ----
+  // Each seeded tutorial card carries a `tutorialKey`; restampTutorialCards()
+  // re-reads these on a language change. Titles say what to DO; notes describe
+  // the interface. ⚠ The card IDs and their cross-references (the ② → ① hook, the
+  // ② → ④ project link) are NOT touched by a language switch — only this text is —
+  // which is why the dependency wiring survives translation.
+  "tutorial.t1.title": {
+    en: "① Create your first next action",
+    "zh-Hans": "① 创建你的第一个下一步行动"
+  },
+  "tutorial.t1.notes": {
+    en: "Tap the round + at the bottom right and choose “New action”. A next action is the one physical thing you'd do next — not the whole project. When you've made one, tick this card's circle to complete it: that's how you clear each tutorial step.",
+    "zh-Hans": "点右下角的圆形 + 按钮，选择「新建行动」。下一步行动是你接下来会做的那一个具体动作——不是整个项目。做好之后，点这张卡片的圆圈把它标记为完成：教程的每一步都是这样清除的。"
+  },
+  "tutorial.t2.title": {
+    en: "② Add a waiting action and hook it to a next action",
+    "zh-Hans": "② 添加一个等待项，并把它挂到下一步行动上"
+  },
+  "tutorial.t2.notes": {
+    en: "This card IS a waiting action — it's hooked to step ① and linked to the project in step ④. Complete ① and watch this jump up into Next Actions on its own. To make your own: on the Waiting tab, + → “New action”, then tap the 🪝 to choose what it's waiting on.",
+    "zh-Hans": "这张卡片本身就是一个等待项——它挂在第①步上，并链接到第④步的项目。完成第①步，看它自己跳进「下一步行动」列表。要创建你自己的：在「等待」标签页，+ →「新建行动」，然后点 🪝 选择它在等待什么。"
+  },
+  "tutorial.t3.title": {
+    en: "③ Make a context",
+    "zh-Hans": "③ 创建一个情境"
+  },
+  "tutorial.t3.notes": {
+    en: "A context groups actions by where or how you'll do them — “at computer”, “errands”. On an action tab, tap + → “New context”, name it, then file actions under it. Tick this card once you've made one.",
+    "zh-Hans": "情境按你做事的地点或方式给行动分组——「在电脑前」「外出办事」。在某个行动标签页，点 + →「新建情境」，起个名字，然后把行动归到它下面。创建好后点这张卡片。"
+  },
+  "tutorial.t4.title": {
+    en: "④ Start a project",
+    "zh-Hans": "④ 开始一个项目"
+  },
+  "tutorial.t4.notes": {
+    en: "A project is anything that takes more than one action. On the Projects tab, tap + → “New project”. Every project needs at least one next step, so add an action or link an existing one. (This card already has step ②'s waiting action linked to it.)",
+    "zh-Hans": "项目是指任何需要一个以上行动才能完成的事。在「项目」标签页，点 + →「新建项目」。每个项目都需要至少一个下一步，所以加一个行动或链接一个已有的。（这张卡片已经把第②步的等待项链接进来了。）"
+  },
+  "tutorial.t5.title": {
+    en: "⑤ Fix a stalled project in Review",
+    "zh-Hans": "⑤ 在回顾中修复一个停滞的项目"
+  },
+  "tutorial.t5.notes": {
+    en: "Open the 📥 intray, then 🔍 Review. The sample project with no next step (below in Projects) will come up — give it a way forward by adding a next action right there in the review. Tick this card once you have.",
+    "zh-Hans": "打开 📥 收件箱，再点 🔍 回顾。那个没有下一步的示例项目（在下面的「项目」里）会出现——就在回顾里给它加一个下一步行动，让它继续走下去。做完后点这张卡片。"
+  },
+  "tutorial.t6.title": {
+    en: "⑥ Build a habit",
+    "zh-Hans": "⑥ 养成一个习惯"
+  },
+  "tutorial.t6.notes": {
+    en: "A habit is a routine triggered by a cue. On the Habits tab, tap + and give it a cue like “after I pour my coffee”. Check it off each day; the little runner on the card keeps your streak. This card can't be completed (habits reset daily instead) — delete it with the 🗑 on its page once you've made your own.",
+    "zh-Hans": "习惯是由提示触发的例行行为。在「习惯」标签页，点 + 并给它一个提示，比如「倒完咖啡之后」。每天把它勾掉；卡片上的小人会记录你的连续天数。这张卡片无法被「完成」（习惯每天会重置）——创建好你自己的之后，在它的页面上用 🗑 删除它。"
+  },
+  "tutorial.tp.title": {
+    en: "◇ A sample project with no next step",
+    "zh-Hans": "◇ 一个没有下一步的示例项目"
+  },
+  "tutorial.tp.notes": {
+    en: "Leave this one be — it's the stalled project for step ⑤. It has no next action, so it shows a ⚠ and turns up in Review. When you're done exploring, delete it with the 🗑 on its page.",
+    "zh-Hans": "先别动它——它是留给第⑤步的停滞项目。它没有下一步行动，所以显示 ⚠ 并出现在回顾里。等你探索完，在它的页面上用 🗑 删除它。"
+  }
 };
 
 // ⚑ Dev aid, deliberately loud. A missing key used to be the silent failure that
@@ -2058,6 +2121,9 @@ function setLocale(id){
 // language read during boot, before those are defined.
 function applyLocale(){
   if (typeof rebuildStringTables === "function") rebuildStringTables();
+  // Tutorial cards carry their own translatable text (seedTutorial) — re-stamp
+  // it BEFORE the lanes re-render below, or they'd repaint in the old language.
+  if (typeof restampTutorialCards === "function") restampTutorialCards();
   if (typeof renderShell === "function") renderShell();
   if (typeof renderTabLabels === "function") renderTabLabels();
   if (typeof renderLane === "function" && typeof ALL_LANES !== "undefined"){
@@ -4573,10 +4639,10 @@ function initTimePickerFields(){
 // (this file + its boot() call) if the convention is ever retired.
 // =========================================================
 function injectChunkMap(){
-  const FLAG = "gtd_chunk_map_v5";
+  const FLAG = "gtd_chunk_map_v6";
   if (Storage.get(FLAG)) return;
   Storage.set(FLAG, "1");
-  ["gtd_chunk_map_v1", "gtd_chunk_map_v2", "gtd_chunk_map_v3", "gtd_chunk_map_v4"].forEach(Storage.remove);  // retire superseded flags
+  ["gtd_chunk_map_v1", "gtd_chunk_map_v2", "gtd_chunk_map_v3", "gtd_chunk_map_v4", "gtd_chunk_map_v5"].forEach(Storage.remove);  // retire superseded flags
 
   // Replace, don't accumulate (8.2, mirroring 8.1): sweep any previous
   // chunk-map group (tagged via devContext, not a title match, since the
@@ -4621,8 +4687,10 @@ function injectChunkMap(){
     { title: "✓ Post-sprint — Your checklist findings", notes: "DONE. Six of the seven you reported: ticking a past-due repeat now clears it from the review; the QA clock buttons reach you inside the calendar and every other full-screen page; a revealed intray card opens its item; the review's quick-add boxes take typing again (they were opening the date picker) and gained a Full page button; a project's creation page can add an event, as a proper draft; and naming a new list or context no longer drags the screen to the bottom. The seventh — a delete dialog when leaving a repeating event — I could not reproduce; there is a question waiting for you in the QA checklist." },
 
     { title: "✓ Polish the writing", notes: "DONE. Ruled that the only text needing a review pass was the information-button copy; INFO-TEXT.txt was marked up and is now wired into the app. COPY.txt — the generated dump of all 236 strings — is OBSOLETE and was never filled in; the app's inline wording stands as written. This row used to say everything waited on it, which is what made the translation look blocked when it was not."},
-    { title: "Chinese translation", notes: "IN PROGRESS. No longer blocked — the writing is final (see the row above). Simplified Chinese, matching the habit thought-bubbles, which already carry both languages and are the pattern the rest follows. Needs a string table and a working Language switch as well as the words themselves." },
-    { title: "Fix up the desktop layout", notes: "TO DO. Everything this sprint was designed and tested on a phone, and the desktop view has drifted — wide screens especially." },
+    { title: "✓ Chinese translation", notes: "DONE. src/i18n.js holds the string table (English + Simplified Chinese) and the ⋯ → Language switch, which re-labels the whole app live and persists the choice. Built on the same en / zh-Hans pattern the habit bubbles already used. ⚑ A friend who reads Chinese should still check the info-button prose — the machine did the words, not a native speaker." },
+    { title: "✓ In-lane tutorial", notes: "DONE. Six numbered steps seeded across the lanes (make a next action, a hooked waiting action, a context, a project, fix a stalled project in Review, build a habit), cleared through completion as you go. The cards are wired to each other to demo the dependency — ② is hooked to ① and linked to project ④ — and the text toggles with the language. Two cards persist and are deleted by hand: the ◇ stalled sample (step ⑤ needs it) and the ⑥ habit (habits can't self-complete)." },
+    { title: "✓ Someday has no deadlines", notes: "DONE. Future projects don't take a deadline by definition, so the field is gone from their pages and a Current → Someday conversion drops any deadline silently — no warning about losing something the destination can't hold." },
+    { title: "Fix up the desktop layout", notes: "TO DO, and the next real job — needs the author's eyes on a wide screen. Everything this sprint was designed and tested on a phone, and the desktop view has drifted." },
     { title: "✓ Events on the project page", notes: "DONE. A project shows its linked events and can create them — including on the creation page, where the event is held as a draft and only becomes real when the project is saved. ‘Add an event’ in the daily review came with it." },
     { title: "✓ Linked notes on the project page", notes: "DONE. The link runs both ways now. A current project's Linked panel has an Actions side and a Notes side you toggle between, and a Someday project has a Linked notes section of its own — notes only, since a Someday project holds no actions by design." },
     { title: "Re-test backups against the new fields", notes: "TO DO. Export and import have not been exercised since deadlines gained a start date and a push counter, repeats gained a missed-day marker, and the backgrounds changed names. Backups are the one thing that has to survive real use." },
@@ -5092,6 +5160,11 @@ function injectChunkMap(){
       { id: genId(), title: "Website relaunch", notesClean: "", linkedProjectId: null, isGroup: false, parent: null },
       { id: genId(), title: "Kitchen remodel", notesClean: "", linkedProjectId: null, isGroup: false, parent: null }
     ];
+    // ⚑ Give "Website relaunch" a linked action so it is NOT stalled. Without this
+    // it has no way forward and surfaces in Review alongside the tutorial's
+    // dedicated stalled sample (seedTutorial's ◇ card) — two stalled projects
+    // competing for step ⑤, which muddies the lesson. One intended example only.
+    state.tasks.next[1].linkedProjectId = state.tasks.current[0].id;
 
     const emailNextId = state.tasks.next[0].id;
     state.tasks.waiting = [
@@ -5133,8 +5206,82 @@ function injectChunkMap(){
     seededRuns[reviewProjId] = Object.assign(defaultHabitRun(), { schedule: [5] });
     Storage.setJSON("gtd_habit_runs", seededRuns);
 
+    seedTutorial(); // the in-lane onboarding — default data, cleared by completion
     KINDS.forEach(saveTasksLocal);
     seedEvents(); // chunk 7 (§4.13): sample events/appointments in their own store
+  }
+  // =========================================================
+  // THE IN-LANE TUTORIAL (user). Seeded default data — one numbered card per
+  // step, living in the lane the step is about, cleared through completion as you
+  // work. Modelled on the QA checklist's "cards in the lanes" idea, but this is
+  // REAL user-facing content: not gated behind the QA switch, and it re-seeds
+  // with the rest of the samples on Reset (initLocalData → seedData).
+  //
+  // TWO deliberate persist-exceptions, removed by 🗑 rather than completion:
+  //   · the ◇ stalled sample project (tp) — step ⑤ needs a stalled project to
+  //     fix, and fixing it un-stalls it rather than deleting it (user OK'd this);
+  //   · the ⑥ habit (t6) — habits toggle done-for-today, they never archive, so
+  //     no habit card CAN self-complete. Flagged: keeping the habit lesson in the
+  //     Habits lane was judged worth a second manual-delete card.
+  //
+  // LANGUAGE: each card carries a stable `tutorialKey`. A language switch re-reads
+  // the text from i18n (restampTutorialCards) but never touches the IDs, so the
+  // ② → ① hook and the ② → ④ link — which are by id — survive translation. This
+  // is the id-stable alternative to the "swap cards for their siblings" idea; it
+  // avoids rewriting every cross-reference.
+  const TUTORIAL_KEYS = ["t1", "t2", "t3", "t4", "t5", "t6", "tp"];
+  function tutTitle(key){ return t("tutorial." + key + ".title"); }
+  function tutNotes(key){ return t("tutorial." + key + ".notes"); }
+  function seedTutorial(){
+    const id = {}; TUTORIAL_KEYS.forEach(function(k){ id[k] = genId(); });
+    function card(key, extra){
+      return Object.assign({
+        id: id[key], title: tutTitle(key), notesClean: tutNotes(key),
+        linkedProjectId: null, isGroup: false, parent: null, tutorialKey: key
+      }, extra || {});
+    }
+    // ① ③ ⑤ ⑥ are next actions (they complete-archive, clearing the step).
+    // ⑥ lives here rather than in Habits BECAUSE a habit cannot self-complete;
+    // its text sends the reader to the Habits tab. tp/t6 exceptions stay put.
+    state.tasks.next.unshift(card("t1", { contextId: null }));
+    state.tasks.next.push(card("t3", { contextId: null }), card("t5", { contextId: null }), card("t6", { contextId: null }));
+    // ④ a healthy project (② links to it, below); ◇ the stalled sample.
+    state.tasks.current.unshift(card("t4"), card("tp"));
+    // ② a waiting action: hooked to ① (conditionId) AND linked to project ④.
+    state.tasks.waiting.unshift(card("t2", {
+      whenText: null, conditionId: id.t1, conditionKind: "next", conditionLabel: tutTitle("t1"),
+      linkedProjectId: id.t4
+    }));
+  }
+  // Re-read every tutorial card's text for the current language (called from
+  // applyLocale). IDs and cross-references are untouched; only title/notes/the
+  // frozen conditionLabel change. Active lanes AND the Completed archive, so a
+  // step you already ticked isn't left half-translated in the archive.
+  function restampTutorialCards(){
+    const touched = {};
+    function stamp(list, kindKey){
+      (list || []).forEach(function(tk){
+        if (!tk || !tk.tutorialKey) return;
+        tk.title = tutTitle(tk.tutorialKey);
+        tk.notesClean = tutNotes(tk.tutorialKey);
+        // ② carries a frozen label for ①; re-derive it in the new language.
+        if (tk.conditionKind === "next" && tk.conditionId){
+          tk.conditionLabel = tutTitle("t1"); // the only tutorial condition target
+        }
+        touched[kindKey] = true;
+      });
+    }
+    ["next", "waiting", "current", "future", "habit"].forEach(function(k){ stamp(state.tasks[k], k); });
+    ["next", "waiting", "current", "future"].forEach(function(k){
+      stamp((state.completed || {})[k], k);
+    });
+    Object.keys(touched).forEach(function(k){ saveTasksLocal(k); });
+    // completed archive persistence, if any tutorial card lives there
+    ["next", "waiting", "current", "future"].forEach(function(k){
+      if ((state.completed || {})[k] && state.completed[k].some(function(x){ return x.tutorialKey; })) {
+        saveCompletedLocal(k);
+      }
+    });
   }
   function initLocalData(){
     let anyMissing = false;
