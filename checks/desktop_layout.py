@@ -232,6 +232,22 @@ def main():
         check(pg.evaluate("() => getComputedStyle(document.querySelector('#tray-handle')).opacity") == "1",
               "the handle comes back after the slide-out finishes")
 
+        print("\n-- the handle does not interfere with a drafting page (desktop) --")
+        pg.click('.lane[data-kind="next"] .lane-create-btn[data-idx="0"]'); pg.wait_for_timeout(500)
+        check(pg.evaluate("() => getComputedStyle(document.querySelector('#tray-handle')).display") == "none",
+              "the handle is fully display:none while the card is open, not just faded")
+        # geometry: at its 50% midpoint the handle would sit squarely over a
+        # ~700px centered card if it were visible at all — confirm the card's
+        # own left edge does not collide with where the (hidden) handle lives.
+        geom = pg.evaluate("""() => { const c = document.querySelector('.screen-card');
+          const r = c ? c.getBoundingClientRect() : null;
+          return r ? { cardLeft: Math.round(r.left), handleRight: 22 } : null; }""")
+        check(geom and geom["cardLeft"] > geom["handleRight"],
+              "even measured, the card's left edge clears the handle's 22px column: %s" % geom)
+        pg.click('[data-action="screen-cancel"]'); pg.wait_for_timeout(400)
+        check(pg.evaluate("() => getComputedStyle(document.querySelector('#tray-handle')).display") != "none",
+              "and it returns once the page closes")
+
         print("\n-- live resize across the boundary (trap T1) --")
         pg.set_viewport_size(PHONE); pg.wait_for_timeout(500)
         check(not pg.evaluate("() => document.body.classList.contains('desktop')"), "crossing down leaves desktop mode")
@@ -273,6 +289,11 @@ def main():
         check(pg2.evaluate("""() => { const f = document.querySelector('.screen-footer');
               return !f || getComputedStyle(f).display === 'none'; }"""),
               "no desktop footer on the phone")
+        check(pg2.evaluate("() => getComputedStyle(document.querySelector('#tray-handle')).display") == "none",
+              "and the handle is display:none behind the full-screen slide-in page")
+        pg2.click('[data-action="screen-cancel"]'); pg2.wait_for_timeout(400)
+        check(pg2.evaluate("() => getComputedStyle(document.querySelector('#tray-handle')).display") != "none",
+              "returning once more when the page closes")
         ctx2.close()
         br.close()
 

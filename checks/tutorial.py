@@ -1,25 +1,45 @@
-"""The in-lane tutorial (user request).
+"""The in-lane tutorial (user request; chained in a later round).
 
-Six numbered steps seeded as default data, one per lane the step is about, cleared
-through completion as you work — modelled on the QA checklist's "cards in the
-lanes" shape, but REAL user-facing content (not gated behind the QA switch, and it
-re-seeds on Reset with the other samples).
+Six numbered steps seeded as default data, cleared through completion as you
+work — modelled on the QA checklist's "cards in the lanes" shape, but REAL
+user-facing content (not gated behind the QA switch, and it re-seeds on Reset
+with the other samples).
+
+▲ CHAIN ROUND: ②–⑥ used to be five independent cards (only ② actually hooked
+to anything); now they are a real chain. Each is a waiting action hooked to
+the step before it, seeded directly into Waiting On, and promotes into Next
+Actions on its own as the previous step is ticked — the mechanic ② always
+demonstrated, run four more times. The healthy demo project ② links to is no
+longer step ④ itself (a project can't be a chain link — conditions only ever
+target a next or waiting item); it is its own unnumbered card, `tr`, the same
+way the stalled sample `tp` already worked.
 
 WHAT THIS GUARDS:
-  · the cards seed into the right lanes with the numbered titles;
-  · the dependency wiring — ② hooked to ① (conditionId), ② linked to project ④
-    (linkedProjectId) — is real, so ① auto-promotes ② when completed;
-  · exactly ONE stalled project reaches Review (the ◇ sample), not two — the
-    generic "Website relaunch" sample was healed so it doesn't compete;
-  · a LANGUAGE switch re-stamps every card's text (title, notes, and ②'s frozen
-    condition label) WITHOUT changing any id, so the hook and the link survive
-    translation — the whole reason the id-stable approach was chosen;
+  · ① seeds into Next Actions with no condition; ②–⑥ all seed into WAITING ON,
+    each hooked to the step before it; tr and tp seed into Current Projects;
+  · the FULL CHAIN fires live: completing each step promotes exactly the next
+    one from Waiting into Next Actions, in order, all the way to ⑥;
+  · a step mid-chain — waiting on a target that has ALREADY promoted from
+    Waiting to Next but not yet been completed — does NOT render as orphaned.
+    This is the bug the chain would expose: the app used to pick a fixed pool
+    (next XOR waiting) by the target's conditionKind, which goes stale the
+    moment a live target changes lanes. Both leafCardHtml's cue pill and
+    isWaitingOrphaned now check both live pools;
+  · exactly ONE stalled project reaches Review (tp), not tr — tr counts as
+    having a way forward because ②'s waiting action links to it, in EITHER of
+    its lanes (Waiting or, once promoted, Next);
+  · a language switch re-stamps every card's text AND every chain link's
+    frozen condition label, without changing any id, so the whole chain still
+    resolves after translation;
   · completing a step archives it (clears it), and the two persist-exceptions
-    (◇ sample project, ⑥ habit) are not next actions that could be ticked away.
+    (tp, ⑥ habit) are not next actions that could be ticked away.
 """
 import os, sys, functools, http.server, socket, socketserver, threading, contextlib
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 from playwright.sync_api import sync_playwright
+
+try: sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except Exception: pass
 
 DIST = os.path.join(REPO, "dist")
 
@@ -63,67 +83,113 @@ with serve(DIST) as url, sync_playwright() as p:
                 return tk
         return None
 
+    def find_tut(key):
+        """A chain link's lane changes as it promotes — search wherever it lives."""
+        for kind in ("next", "waiting", "current"):
+            t = tut(kind, key)
+            if t is not None:
+                return kind, t
+        return None, None
+
     def kill_tray():
         pg.evaluate("() => { const r = document.querySelector('#tray-root'); if (r) r.innerHTML = ''; }")
 
     # ---------- the cards seed into the right lanes ----------
     check(tut("next", "t1") is not None, "① seeds into Next Actions")
-    check(tut("waiting", "t2") is not None, "② seeds into Waiting")
-    check(tut("next", "t3") is not None, "③ seeds into Next Actions")
-    check(tut("current", "t4") is not None, "④ seeds into Current Projects")
-    check(tut("next", "t5") is not None, "⑤ seeds into Next Actions")
-    check(tut("next", "t6") is not None, "⑥ (habit instruction) seeds into Next Actions")
+    for key in ["t2", "t3", "t4", "t5", "t6"]:
+        check(tut("waiting", key) is not None, f"{key} seeds into Waiting On (the chain)")
+    check(tut("current", "tr") is not None, "the healthy reference project (tr) seeds into Current Projects")
     check(tut("current", "tp") is not None, "◇ stalled sample seeds into Current Projects")
     check("①" in (tut("next", "t1") or {}).get("title", ""),
           "the title is numbered — it says what to do")
 
-    # ---------- the dependency wiring is real ----------
-    t1, t2, t4 = tut("next", "t1"), tut("waiting", "t2"), tut("current", "t4")
+    # ---------- the chain wiring is real, link by link ----------
+    t1 = tut("next", "t1")
+    t2, t3, t4, t5, t6 = (tut("waiting", k) for k in ["t2", "t3", "t4", "t5", "t6"])
+    tr = tut("current", "tr")
     check(t2["conditionId"] == t1["id"] and t2["conditionKind"] == "next",
           "② is hooked to ① (conditionId → ①)")
     check(t2["conditionLabel"] == t1["title"], "and its frozen label reads ①'s title")
-    check(t2["linkedProjectId"] == t4["id"], "② is linked to project ④")
+    check(t2["linkedProjectId"] == tr["id"], "② is linked to the reference project")
+    check(t3["conditionId"] == t2["id"] and t3["conditionKind"] == "waiting", "③ is hooked to ②")
+    check(t4["conditionId"] == t3["id"], "④ is hooked to ③")
+    check(t5["conditionId"] == t4["id"], "⑤ is hooked to ④")
+    check(t6["conditionId"] == t5["id"], "⑥ is hooked to ⑤ — the last link")
 
     # ---------- exactly one stalled project reaches Review ----------
     kill_tray()
     pg.evaluate("() => document.querySelector('[data-action=\"open-tray\"]').click()"); pg.wait_for_timeout(350)
     badge = pg.evaluate("() => { const b = document.querySelector('.tray-review-count'); return b ? b.textContent.trim() : '0'; }")
-    check(badge == "1", f"the review badge is 1 — only the ◇ sample is stalled ({badge})")
+    check(badge == "1", f"the review badge is 1 — only tp is stalled, tr is not ({badge})")
     pg.evaluate("() => document.querySelector('[data-action=\"open-review\"]').click()"); pg.wait_for_timeout(600)
     first = pg.evaluate("() => { const e = document.querySelector('.review-card-title'); return e ? e.textContent.trim() : null; }")
-    check(first and "sample project" in first, f"and it is the ◇ sample that comes up ({first})")
+    check(first and "sample project" in first, f"and it is tp, the stalled sample ({first})")
     pg.evaluate("() => { const c = document.querySelector('[data-action=\"review-close\"]'); if (c) c.click(); }")
     pg.wait_for_timeout(300); kill_tray()
 
-    # ---------- ① auto-promotes ② when completed (the hook, live) ----------
-    # Tick ①'s checkbox in the lane; ② should jump from Waiting into Next Actions.
+    # ---------- the chain fires live, and never shows a false orphan ----------
     pg.evaluate("() => { const t = [...document.querySelectorAll('.tab')].find(x => x.getAttribute('data-kind') === 'next'); if (t) t.click(); }")
     pg.wait_for_timeout(300)
-    ok = pg.evaluate("""() => {
-      const row = [...document.querySelectorAll('.card')].find(c => c.textContent.includes('Create your first next action'));
-      if (!row) return 'no ① row';
-      const cb = row.querySelector('.checkbox, [data-action="complete"], input[type=checkbox]');
-      if (!cb) return 'no checkbox';
-      cb.click(); return 'ok';
-    }""")
-    pg.wait_for_timeout(700)
+
+    def tick_by_title(kind, title_substr):
+        pg.evaluate("""(k) => { const t = [...document.querySelectorAll('.tab')].find(x => x.getAttribute('data-kind') === k); if (t) t.click(); }""", kind)
+        pg.wait_for_timeout(250)
+        ok = pg.evaluate("""(needle) => {
+          const row = [...document.querySelectorAll('.card')].find(c => c.textContent.includes(needle));
+          if (!row) return 'no row for: ' + needle;
+          const cb = row.querySelector('.check, [data-action="complete"], input[type=checkbox]');
+          if (!cb) return 'no checkbox for: ' + needle;
+          cb.click(); return 'ok';
+        }""", title_substr)
+        pg.wait_for_timeout(700)
+        return ok
+
+    ok = tick_by_title("next", "Create your first next action")
     check(ok == "ok", f"① has a completion checkbox and it ticks ({ok})")
     check(tut("next", "t1") is None, "① left the active Next Actions lane (archived)")
-    check(tut("next", "t2") is not None,
-          "② auto-promoted from Waiting into Next Actions — the hook fired live")
-    check(tut("waiting", "t2") is None, "and is no longer in Waiting")
+    kind2, live2 = find_tut("t2")
+    check(kind2 == "next", "② auto-promoted from Waiting into Next Actions — the hook fired live")
+
+    # The bug this round fixed: ③ is still hooked to ②, and ② has just moved
+    # lanes (waiting → next) WITHOUT being completed yet. ③'s cue pill must
+    # still read as a live hook, not an orphan.
+    orphaned = pg.evaluate("""(id) => {
+      const btn = document.querySelector('.link-pill[data-kind="waiting"][data-id="' + id + '"]');
+      return btn ? btn.classList.contains('cue-orphaned') : 'no pill found';
+    }""", t3["id"])
+    check(orphaned is False,
+          f"③'s cue pill reads live, not orphaned, while ② sits promoted-but-uncompleted ({orphaned})")
+
+    ok = tick_by_title("next", "Add a waiting action")
+    check(ok == "ok", f"② ticks from Next Actions ({ok})")
+    kind3, _ = find_tut("t3")
+    check(kind3 == "next", "③ promoted in turn")
+
+    ok = tick_by_title("next", "Make a context")
+    check(ok == "ok", f"③ ticks ({ok})")
+    kind4, _ = find_tut("t4")
+    check(kind4 == "next", "④ promoted in turn")
+
+    ok = tick_by_title("next", "Start a project")
+    check(ok == "ok", f"④ ticks ({ok})")
+    kind5, _ = find_tut("t5")
+    check(kind5 == "next", "⑤ promoted in turn")
+
+    ok = tick_by_title("next", "Fix a stalled project")
+    check(ok == "ok", f"⑤ ticks ({ok})")
+    kind6, _ = find_tut("t6")
+    check(kind6 == "next", "⑥ promoted in turn — the whole chain fired, link by link")
 
     # ---------- language switch re-stamps text but not ids ----------
-    # ⚠ Reset to FRESH seed first: ① was completed above and completion persists
-    # across a reload, so a plain reload would NOT bring it back. Clear the gtd_
-    # keys and reload to re-seed the tutorial in its untouched state.
+    # ⚠ Reset to FRESH seed first: the chain above was ticked all the way
+    # through, and that persists across a reload.
     pg.evaluate("""() => { Object.keys(localStorage)
       .filter(k => k.indexOf('gtd_') === 0)
       .forEach(k => localStorage.removeItem(k)); }""")
     pg.reload(); pg.wait_for_timeout(1200)
     kill_tray()
     id_before = {k: (tut("next", k) or tut("waiting", k) or tut("current", k) or {}).get("id")
-                 for k in ["t1", "t2", "t4", "tp"]}
+                 for k in ["t1", "t2", "t3", "t4", "t5", "t6", "tr", "tp"]}
     pg.evaluate("() => document.querySelector('[data-action=\"open-overflow\"]').click()"); pg.wait_for_timeout(300)
     pg.evaluate("() => document.querySelector('[data-action=\"settings-language\"]').click()"); pg.wait_for_timeout(250)
     pg.evaluate("() => document.querySelector('[data-action=\"settings-pick-lang\"][data-lang=\"zh-Hans\"]').click()"); pg.wait_for_timeout(500)
@@ -134,16 +200,22 @@ with serve(DIST) as url, sync_playwright() as p:
     z2 = tut("waiting", "t2")
     check(z2 and z2["conditionLabel"] == z1["title"],
           "and ②'s frozen condition label follows into Chinese")
+    z3 = tut("waiting", "t3")
+    check(z3 and z3["conditionLabel"] == z2["title"],
+          "so does ③'s — pointing at ②, not ①")
     id_after = {k: (tut("next", k) or tut("waiting", k) or tut("current", k) or {}).get("id")
-                for k in ["t1", "t2", "t4", "tp"]}
+                for k in ["t1", "t2", "t3", "t4", "t5", "t6", "tr", "tp"]}
     check(id_before == id_after, f"no card id changed across the switch ({id_before} vs {id_after})")
-    check(z2 and z2["conditionId"] == z1["id"] and z2["linkedProjectId"] == tut("current", "t4")["id"],
+    check(z2 and z2["conditionId"] == z1["id"] and z2["linkedProjectId"] == tut("current", "tr")["id"],
           "so ②'s hook and project link still resolve after translation")
 
-    # ---------- the two persist-exceptions are NOT tick-away next actions ----------
+    # ---------- the persist-exceptions are NOT tick-away next actions ----------
     tp = tut("current", "tp")
     check(tp is not None and tp.get("tutorialKey") == "tp",
-          "the ◇ sample project persists (removed by 🗑, per the ruling)")
+          "the ◇ stalled sample persists (removed by 🗑, per the ruling)")
+    trz = tut("current", "tr")
+    check(trz is not None and trz.get("tutorialKey") == "tr",
+          "the reference project persists the same way")
 
     # put it back to English so later check files see the default
     pg.evaluate("() => document.querySelector('[data-action=\"open-overflow\"]').click()"); pg.wait_for_timeout(250)
@@ -154,6 +226,6 @@ with serve(DIST) as url, sync_playwright() as p:
     b.close()
 
 for line in notes + fails:
-    print(line.encode("ascii", "replace").decode())
+    print(line)
 print("\n%d passed, %d failed" % (len(notes), len(fails)))
 sys.exit(1 if fails else 0)

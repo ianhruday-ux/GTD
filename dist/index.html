@@ -1689,31 +1689,55 @@ body.has-frame .tray-drawer::after{
 /* ============================================================================
    THE INTRAY HANDLE  (both layouts — the one sanctioned phone change this round)
    ----------------------------------------------------------------------------
-   The header's 📥 is gone. In its place a slim white tab on the LEFT SCREEN
-   EDGE, which is where the drawer actually comes from — the button now points
-   at the thing it opens instead of sitting three inches away from it.
+   The header's 📥 is gone. In its place a mark on the LEFT SCREEN EDGE, which
+   is where the drawer actually comes from — the control now points at the
+   thing it opens instead of sitting three inches away from it.
 
    ⚑ TAP ONLY. The left edge belongs to the browser's back-swipe gesture, so this
    must never become a drag/pull target. The existing swipe-open from the left
    third still works; the handle is an affordance on top of it, not a
-   replacement. It is deliberately narrow (22px) so it barely occludes cards, and
-   sits in the upper third where lanes are emptiest.
+   replacement.
+
+   ⚑ REVISION (user: "it works, but it's visually distracting"). The first
+   build was a solid white tab — noticeable, but it read as a UI chrome block
+   sitting on top of the lanes rather than a discreet edge mark. Three changes,
+   same contract (data-action="open-tray" unchanged — see T2 in the redesign
+   plan): (1) no more background block — the button's hit area is invisible,
+   only the mark itself draws; (2) the mark is now two nested chevrons, drawn
+   as thin lines (border strokes, not a font glyph) rather than a single bold
+   arrow character, echoing the calendar's own ‹ › line-drawn nav arrows
+   instead of standing out as its own idiom; (3) it sits at the vertical
+   MIDPOINT of the screen (was 34%, an upper-third guess) — dead center reads
+   as "the edge has a handle," not "there's a button near the top."
+
+   Hit area stays a real 44px-tall target even though nothing paints across
+   most of it — the chevrons are small on purpose, the tap target is not.
 
    z-index 150: over lane content and the header, UNDER the tray backdrop (210)
    and any drafting page (200). It rides OVER the gold band rather than being
-   inset from it — an object on the edge of the desk, which reads correctly.
+   inset from it — a mark on the edge of the desk, which reads correctly. It is
+   fully display:none — not just faint — the instant a drafting page opens
+   (below), so "not distracting" is guaranteed there by construction, not by
+   contrast alone.
 ============================================================================ */
 #tray-handle{
-  position:fixed; left:0; top:34%; z-index:150;
-  width:22px; min-height:58px; padding:12px 0;
-  border:none; border-radius:0 9px 9px 0;
-  background:rgba(244,240,232,0.93); color:#1a1408;
-  font-size:16px; font-weight:700; line-height:1;
-  display:flex; align-items:center; justify-content:center;
-  box-shadow:2px 0 12px rgba(0,0,0,0.5);
-  transition:opacity .14s ease, background .14s ease;
+  position:fixed; left:0; top:50%; transform:translateY(-50%); z-index:150;
+  width:22px; height:44px; padding:0;
+  border:none; background:transparent;
+  display:flex; align-items:center; justify-content:center; gap:2px;
+  color:rgba(237,231,218,0.5);
+  transition:opacity .14s ease, color .14s ease;
 }
-#tray-handle:hover{ background:#fff; }
+#tray-handle:hover{ color:rgba(237,231,218,0.92); }
+/* Two nested line-drawn chevrons (». Each is a corner of a square, rotated 45°
+   so two adjoining border edges form a ">" stroke — the same construction as
+   the calendar's own line arrows, not a font character. The pair sits close
+   enough to read as one "expand this way" mark, not two separate arrows. */
+.tray-handle-chevron{
+  width:7px; height:7px; flex:0 0 auto;
+  border-top:2px solid currentColor; border-right:2px solid currentColor;
+  transform:rotate(45deg);
+}
 /* Hidden while the drawer is open, and back only AFTER the .28s slide-out — the
    class is dropped on the same 300ms timer the drawer's teardown uses, so it
    never pops in over a moving drawer. */
@@ -1721,19 +1745,23 @@ body.tray-open #tray-handle{ opacity:0; pointer-events:none; }
 /* A drafting page owns the whole screen; the handle would float over its scrim. */
 body.screen-open #tray-handle{ display:none; }
 
-/* The other half of the same control: an arrow on the drawer's own edge that
-   puts it away. position:fixed inside the drawer (whose transform makes it the
-   containing block) so it rides the slide and ignores the drawer's scrolling. */
+/* The other half of the same control: a mark on the drawer's own edge that
+   puts it away. Same revision as #tray-handle — transparent hit area, nested
+   line chevrons (pointing the closing direction), same vertical midpoint, so
+   the pair still reads as one control with two states. position:fixed inside
+   the drawer (whose transform makes it the containing block) so it rides the
+   slide and ignores the drawer's scrolling. */
 .tray-edge-handle{
-  position:fixed; right:0; top:34%; z-index:2;
-  width:22px; min-height:58px; padding:12px 0;
-  border:none; border-radius:9px 0 0 9px;
-  background:rgba(244,240,232,0.93); color:#1a1408;
-  font-size:16px; font-weight:700; line-height:1;
-  display:flex; align-items:center; justify-content:center;
-  box-shadow:-2px 0 12px rgba(0,0,0,0.45);
+  position:fixed; right:0; top:50%; transform:translateY(-50%); z-index:2;
+  width:22px; height:44px; padding:0;
+  border:none; background:transparent;
+  display:flex; align-items:center; justify-content:center; gap:2px;
+  color:rgba(237,231,218,0.5);
+  transition:color .14s ease;
 }
-.tray-edge-handle:hover{ background:#fff; }
+.tray-edge-handle:hover{ color:rgba(237,231,218,0.92); }
+/* Points the opposite way: the left+bottom edges rotated -135° draw a "‹" stroke. */
+.tray-edge-handle .tray-handle-chevron{ transform:rotate(-135deg); }
 
 /* One variable for the drawer's width, so the desktop widening (author note 1)
    is a single number and the jade inlay keeps working at either size. */
@@ -1956,12 +1984,16 @@ body.screen-open #tray-handle{ display:none; }
   </div>
 </header>
 
-<!-- The intray handle: a slim tab on the LEFT SCREEN EDGE, on both layouts.
-     It keeps data-action="open-tray" — the action name is the contract, not the
+<!-- The intray handle: a mark on the LEFT SCREEN EDGE, on both layouts. It
+     keeps data-action="open-tray" — the action name is the contract, not the
      button's position. Tap only: the left edge belongs to the browser's
      back-swipe gesture, so this must never be a drag target. It hides while the
-     drawer is open (the drawer's own arrow closes it). -->
-<button id="tray-handle" type="button" data-action="open-tray" title="Intray" aria-label="Intray">&#8250;</button>
+     drawer is open (the drawer's own arrow closes it). The two spans are line-
+     drawn chevrons (styles.css), not a font glyph — see the revision note there. -->
+<button id="tray-handle" type="button" data-action="open-tray" title="Intray" aria-label="Intray">
+  <span class="tray-handle-chevron" aria-hidden="true"></span>
+  <span class="tray-handle-chevron" aria-hidden="true"></span>
+</button>
 
 <!-- Compact letter+icon panels, no horizontal scroll (user round). Related
      lanes share one panel, split into two independently-tappable halves --
@@ -2045,7 +2077,7 @@ body.screen-open #tray-handle{ display:none; }
 (function(){
 "use strict";
 
-const BUILD_STAMP = "21 Jul 21:31";  // replaced by build.py
+const BUILD_STAMP = "21 Jul 22:14";  // replaced by build.py
 
 // =========================================================
 // STORAGE ADAPTER (spec.md §3, known issue 4)
@@ -2311,9 +2343,15 @@ const STRINGS = {
   // ---- the in-lane tutorial (seedTutorial in app.js) ----
   // Each seeded tutorial card carries a `tutorialKey`; restampTutorialCards()
   // re-reads these on a language change. Titles say what to DO; notes describe
-  // the interface. ⚠ The card IDs and their cross-references (the ② → ① hook, the
-  // ② → ④ project link) are NOT touched by a language switch — only this text is —
-  // which is why the dependency wiring survives translation.
+  // the interface. ⚠ The card IDs and their cross-references (the ①→②→③→④→⑤→⑥
+  // chain, the ② → tr project link) are NOT touched by a language switch — only
+  // this text is — which is why the dependency wiring survives translation.
+  //
+  // ▲ CHAIN ROUND (user): ②–⑥ are now a real chain of waiting actions, each
+  // hooked to the one before it, promoting into Next Actions on its own as you
+  // tick through — see seedTutorial in app.js. `tr` (below, after tp) is the
+  // healthy demo project ② links to; it used to double as step ④'s own card,
+  // but a project can't be a chain link, so it is now unnumbered like tp.
   "tutorial.t1.title": {
     en: "① Create your first next action",
     "zh-Hans": "① 创建你的第一个下一步行动"
@@ -2327,40 +2365,40 @@ const STRINGS = {
     "zh-Hans": "② 添加一个等待项，并把它挂到下一步行动上"
   },
   "tutorial.t2.notes": {
-    en: "This card IS a waiting action — it's hooked to step ① and linked to the project in step ④. Complete ① and watch this jump up into Next Actions on its own. To make your own: open Waiting On, create a new action there, then tap the 🪝 to choose what it's waiting on.",
-    "zh-Hans": "这张卡片本身就是一个等待项——它挂在第①步上，并链接到第④步的项目。完成第①步，看它自己跳进「下一步行动」列表。要创建你自己的：打开「等待中」，在那里新建一个行动，然后点 🪝 选择它在等待什么。"
+    en: "This card IS a waiting action — it's hooked to step ①, and linked to the sample project below in Current Projects. Complete ① and watch this jump up into Next Actions on its own. Steps ③ through ⑥ work the same way, each one hooked to the step before it, so ticking one always reveals the next. To make your own hook: open Waiting On, create a new action there, then tap the 🪝 to choose what it's waiting on.",
+    "zh-Hans": "这张卡片本身就是一个等待项——它挂在第①步上，并链接到下面「当前项目」里的示例项目。完成第①步，看它自己跳进「下一步行动」列表。第③步到第⑥步也是这样，每一步都挂在前一步上——所以勾掉一步，总会带出下一步。要创建你自己的挂钩：打开「等待中」，在那里新建一个行动，然后点 🪝 选择它在等待什么。"
   },
   "tutorial.t3.title": {
     en: "③ Make a context",
     "zh-Hans": "③ 创建一个情境"
   },
   "tutorial.t3.notes": {
-    en: "A context groups actions by where or how you'll do them — “at computer”, “errands”. In Next Actions or Waiting On, choose “New context”, name it, then file actions under it. Tick this card once you've made one.",
-    "zh-Hans": "情境按你做事的地点或方式给行动分组——「在电脑前」「外出办事」。在「下一步行动」或「等待中」选择「新建情境」，起个名字，然后把行动归到它下面。创建好后点这张卡片。"
+    en: "This one waits on ② the same way ② waits on ① — complete ② and it jumps up here on its own. A context groups actions by where or how you'll do them — “at computer”, “errands”. In Next Actions or Waiting On, choose “New context”, name it, then file actions under it. Tick this card once you've made one.",
+    "zh-Hans": "这一步挂在第②步上，就像第②步挂在第①步上一样——完成第②步，它会自己跳到这里。情境按你做事的地点或方式给行动分组——「在电脑前」「外出办事」。在「下一步行动」或「等待中」选择「新建情境」，起个名字，然后把行动归到它下面。创建好后点这张卡片。"
   },
   "tutorial.t4.title": {
     en: "④ Start a project",
     "zh-Hans": "④ 开始一个项目"
   },
   "tutorial.t4.notes": {
-    en: "A project is anything that takes more than one action. In Current Projects, choose “New project”. Every project needs at least one next step, so add an action or link an existing one. (This card already has step ②'s waiting action linked to it.)",
-    "zh-Hans": "项目是指任何需要一个以上行动才能完成的事。在「当前项目」选择「新建项目」。每个项目都需要至少一个下一步，所以加一个行动或链接一个已有的。（这张卡片已经把第②步的等待项链接进来了。）"
+    en: "Waits on ③. A project is anything that takes more than one action. In Current Projects, choose “New project” — or look at the one already sitting there, linked to step ②'s waiting action, to see what a healthy one looks like. Every project needs at least one next step. Tick this card once you've made one, or once you understand why the sample already counts.",
+    "zh-Hans": "挂在第③步上。项目是指任何需要一个以上行动才能完成的事。在「当前项目」选择「新建项目」——或者看看那里已经有的那个，它链接着第②步的等待项，可以看看健康的项目是什么样子。每个项目都需要至少一个下一步。创建好你自己的项目后点这张卡片，或者在你明白示例项目为什么已经算数之后点它。"
   },
   "tutorial.t5.title": {
     en: "⑤ Fix a stalled project in Review",
     "zh-Hans": "⑤ 在回顾中修复一个停滞的项目"
   },
   "tutorial.t5.notes": {
-    en: "Open the intray with the white arrow on the left edge of the screen, then 🔍 Review. The sample project with no next step (below in Projects) will come up — give it a way forward by adding a next action right there in the review. Tick this card once you have.",
-    "zh-Hans": "用屏幕左边缘的白色箭头打开收件箱，再点 🔍 回顾。那个没有下一步的示例项目（在下面的「项目」里）会出现——就在回顾里给它加一个下一步行动，让它继续走下去。做完后点这张卡片。"
+    en: "Waits on ④. Open the intray with the white arrow on the left edge of the screen, then 🔍 Review. The sample project with no next step (below in Current Projects) will come up — give it a way forward by adding a next action right there in the review. Tick this card once you have.",
+    "zh-Hans": "挂在第④步上。用屏幕左边缘的白色箭头打开收件箱，再点 🔍 回顾。那个没有下一步的示例项目（在下面的「当前项目」里）会出现——就在回顾里给它加一个下一步行动，让它继续走下去。做完后点这张卡片。"
   },
   "tutorial.t6.title": {
     en: "⑥ Build a habit",
     "zh-Hans": "⑥ 养成一个习惯"
   },
   "tutorial.t6.notes": {
-    en: "A habit is a routine triggered by a cue. In Habits, create a new habit and give it a cue like “after I pour my coffee”. Check it off each day; the little runner on the card keeps your streak. This card can't be completed (habits reset daily instead) — delete it with the 🗑 on its page once you've made your own.",
-    "zh-Hans": "习惯是由提示触发的例行行为。在「习惯」新建一个习惯，并给它一个提示，比如「倒完咖啡之后」。每天把它勾掉；卡片上的小人会记录你的连续天数。这张卡片无法被「完成」（习惯每天会重置）——创建好你自己的之后，在它的页面上用 🗑 删除它。"
+    en: "Waits on ⑤ — the last link in the chain. A habit is a routine triggered by a cue. In Habits, create a new habit and give it a cue like “after I pour my coffee”. Check it off each day; the little runner on the card keeps your streak. This card can't be completed the same way (habits reset daily instead) — delete it with the 🗑 on its page once you've made your own.",
+    "zh-Hans": "挂在第⑤步上——这是这条链的最后一环。习惯是由提示触发的例行行为。在「习惯」新建一个习惯，并给它一个提示，比如「倒完咖啡之后」。每天把它勾掉；卡片上的小人会记录你的连续天数。这张卡片无法用同样的方式「完成」（习惯每天会重置）——创建好你自己的之后，在它的页面上用 🗑 删除它。"
   },
   "tutorial.tp.title": {
     en: "◇ A sample project with no next step",
@@ -2369,6 +2407,14 @@ const STRINGS = {
   "tutorial.tp.notes": {
     en: "Leave this one be — it's the stalled project for step ⑤. It has no next action, so it shows a ⚠ and turns up in Review. When you're done exploring, delete it with the 🗑 on its page.",
     "zh-Hans": "先别动它——它是留给第⑤步的停滞项目。它没有下一步行动，所以显示 ⚠ 并出现在回顾里。等你探索完，在它的页面上用 🗑 删除它。"
+  },
+  "tutorial.tr.title": {
+    en: "◆ A project already linked to step ②",
+    "zh-Hans": "◆ 一个已经链接到第②步的项目"
+  },
+  "tutorial.tr.notes": {
+    en: "A project is anything that takes more than one action to complete. This one already has a next step — step ②'s waiting action is linked to it, which is what keeps it out of Review's stalled list. Every real project needs one like it. Delete this one with the 🗑 on its page once you've made your own.",
+    "zh-Hans": "项目是指任何需要一个以上行动才能完成的事。这个项目已经有一个下一步——第②步的等待项链接着它，这也是它不会出现在回顾停滞列表里的原因。每个真正的项目都需要一个这样的步骤。创建好你自己的项目后，在这个示例的页面上用 🗑 删除它。"
   }
 };
 
@@ -4949,11 +4995,11 @@ function initTimePickerFields(){
 // (this file + its boot() call) if the convention is ever retired.
 // =========================================================
 function injectChunkMap(){
-  const FLAG = "gtd_chunk_map_v7";
+  const FLAG = "gtd_chunk_map_v8";
   if (Storage.get(FLAG)) return;
   Storage.set(FLAG, "1");
   ["gtd_chunk_map_v1", "gtd_chunk_map_v2", "gtd_chunk_map_v3", "gtd_chunk_map_v4",
-   "gtd_chunk_map_v5", "gtd_chunk_map_v6"].forEach(Storage.remove);  // retire superseded flags
+   "gtd_chunk_map_v5", "gtd_chunk_map_v6", "gtd_chunk_map_v7"].forEach(Storage.remove);  // retire superseded flags
 
   // Replace, don't accumulate (8.2, mirroring 8.1): sweep any previous
   // chunk-map group (tagged via devContext, not a title match, since the
@@ -5001,7 +5047,9 @@ function injectChunkMap(){
     { title: "✓ Chinese translation", notes: "DONE. src/i18n.js holds the string table (English + Simplified Chinese) and the ⋯ → Language switch, which re-labels the whole app live and persists the choice. Built on the same en / zh-Hans pattern the habit bubbles already used. ⚑ A friend who reads Chinese should still check the info-button prose — the machine did the words, not a native speaker." },
     { title: "✓ In-lane tutorial", notes: "DONE. Six numbered steps seeded across the lanes (make a next action, a hooked waiting action, a context, a project, fix a stalled project in Review, build a habit), cleared through completion as you go. The cards are wired to each other to demo the dependency — ② is hooked to ① and linked to project ④ — and the text toggles with the language. Two cards persist and are deleted by hand: the ◇ stalled sample (step ⑤ needs it) and the ⑥ habit (habits can't self-complete)." },
     { title: "✓ Someday has no deadlines", notes: "DONE. Future projects don't take a deadline by definition, so the field is gone from their pages and a Current → Someday conversion drops any deadline silently — no warning about losing something the destination can't hold." },
-    { title: "✓ Fix up the desktop layout", notes: "DONE. On a window 1000px or wider the app now shows THREE lanes at once, keeping the same pairings as the phone's tabs: Next↔Waiting on the left, Projects↔Someday in the middle, Notes↔Habits on the right, each with a toggle carrying both lists' counts. The floating + is replaced by real buttons under each column's header; drafting pages become centred cards with a Done button bottom-right and Delete bottom-left; the calendar opens as a wide popup; Language and Background move out of the ⚙ menu into the header; OELA sits in the middle; and the gold border wraps the whole page. Narrower than 1000px you get the phone app exactly as before — with one change on both layouts: the header's intray button is gone, replaced by a white arrow handle on the left edge of the screen. Also new on both: closing a page you have edited asks before throwing the changes away." },
+    { title: "✓ Fix up the desktop layout", notes: "DONE. On a window 1000px or wider the app now shows THREE lanes at once, keeping the same pairings as the phone's tabs: Next↔Waiting on the left, Projects↔Someday in the middle, Notes↔Habits on the right, each with a toggle carrying both lists' counts. The floating + is replaced by real buttons under each column's header; drafting pages become centred cards with a Done button bottom-right and Delete bottom-left; the calendar opens as a wide popup; Language and Background move out of the ⚙ menu into the header; OELA sits in the middle; and the gold border wraps the whole page. Narrower than 1000px you get the phone app exactly as before — with one change on both layouts: the header's intray button is gone, replaced by an edge handle on the left of the screen. Also new on both: closing a page you have edited asks before throwing the changes away." },
+    { title: "✓ Intray handle, redrawn", notes: "DONE. The edge handle was flagged as visually distracting — it started as a solid white tab. It is now two small nested arrow-lines with no background block behind them, sitting at the exact vertical middle of the screen instead of a third of the way down. Fully invisible (display:none, not just faded) the instant a drafting page opens, on both layouts." },
+    { title: "✓ The tutorial is now a chain", notes: "DONE. Steps ②–⑥ used to be five separate cards (only ② was actually hooked to anything); they are now a real chain of waiting actions, each hooked to the one before it, seeded together into Waiting On and promoting into Next Actions one at a time as you tick through — the same mechanic ② always demonstrated, now run five times instead of once. Building it surfaced and fixed a real bug in the hook engine: a waiting action's condition pill could show as broken ('cue-orphaned') for as long as its target sat promoted-but-not-yet-completed, because the lookup picked one storage pool by a value that goes stale the moment the target changes lanes. The healthy demo project ② links to is no longer step ④ itself (a project can't be a chain link) — it is its own unnumbered card, ◆, the same way the stalled sample ◇ already worked." },
     { title: "✓ Events on the project page", notes: "DONE. A project shows its linked events and can create them — including on the creation page, where the event is held as a draft and only becomes real when the project is saved. ‘Add an event’ in the daily review came with it." },
     { title: "✓ Linked notes on the project page", notes: "DONE. The link runs both ways now. A current project's Linked panel has an Actions side and a Notes side you toggle between, and a Someday project has a Linked notes section of its own — notes only, since a Someday project holds no actions by design." },
     { title: "Re-test backups against the new fields", notes: "TO DO. Export and import have not been exercised since deadlines gained a start date and a push counter, repeats gained a missed-day marker, and the backgrounds changed names. Backups are the one thing that has to survive real use." },
@@ -5566,10 +5614,25 @@ function injectChunkMap(){
   //
   // LANGUAGE: each card carries a stable `tutorialKey`. A language switch re-reads
   // the text from i18n (restampTutorialCards) but never touches the IDs, so the
-  // ② → ① hook and the ② → ④ link — which are by id — survive translation. This
-  // is the id-stable alternative to the "swap cards for their siblings" idea; it
-  // avoids rewriting every cross-reference.
-  const TUTORIAL_KEYS = ["t1", "t2", "t3", "t4", "t5", "t6", "tp"];
+  // ①→②→③→④→⑤→⑥ chain and the ② → tr link — which are by id — survive
+  // translation. This is the id-stable alternative to the "swap cards for their
+  // siblings" idea; it avoids rewriting every cross-reference.
+  //
+  // ▲ CHAIN ROUND (user): ②–⑥ used to be five independent cards, only ②
+  // actually hooked to anything. Now they are a real chain — each one waits on
+  // the step before it and starts life in WAITING ON, promoting into Next
+  // Actions automatically as the previous step is ticked, the same mechanic ②
+  // always used, run four more times. `tr` is new: the healthy demo project
+  // that ② links to used to double as "step ④" itself; a project can't be a
+  // chain link (waiting conditions only ever target a next or waiting item —
+  // getValidConditionTargets), so it is now its own unnumbered reference
+  // object, mirroring how `tp` (the stalled sample) already works.
+  const TUTORIAL_KEYS = ["t1", "t2", "t3", "t4", "t5", "t6", "tp", "tr"];
+  // Maps a chain link to the step that unlocks it — used only to re-derive the
+  // frozen conditionLabel after a language switch (below). ② is hooked to ①,
+  // a plain next action whose kind never changes; ③–⑥ are each hooked to the
+  // waiting card directly before them.
+  const TUTORIAL_CHAIN_PARENT = { t2: "t1", t3: "t2", t4: "t3", t5: "t4", t6: "t5" };
   function tutTitle(key){ return t("tutorial." + key + ".title"); }
   function tutNotes(key){ return t("tutorial." + key + ".notes"); }
   function seedTutorial(){
@@ -5580,18 +5643,23 @@ function injectChunkMap(){
         linkedProjectId: null, isGroup: false, parent: null, tutorialKey: key
       }, extra || {});
     }
-    // ① ③ ⑤ ⑥ are next actions (they complete-archive, clearing the step).
-    // ⑥ lives here rather than in Habits BECAUSE a habit cannot self-complete;
-    // its text sends the reader to the Habits tab. tp/t6 exceptions stay put.
+    // ① is the seed: a plain next action, no condition, present from the start.
     state.tasks.next.unshift(card("t1", { contextId: null }));
-    state.tasks.next.push(card("t3", { contextId: null }), card("t5", { contextId: null }), card("t6", { contextId: null }));
-    // ④ a healthy project (② links to it, below); ◇ the stalled sample.
-    state.tasks.current.unshift(card("t4"), card("tp"));
-    // ② a waiting action: hooked to ① (conditionId) AND linked to project ④.
-    state.tasks.waiting.unshift(card("t2", {
-      whenText: null, conditionId: id.t1, conditionKind: "next", conditionLabel: tutTitle("t1"),
-      linkedProjectId: id.t4
-    }));
+    // ②–⑥: the chain. Each is hooked (conditionId) to the step before it and
+    // seeded directly into Waiting On, in order, so they read top to bottom as
+    // ②③④⑤⑥. Completing a step promotes the next one into Next Actions on its
+    // own — ticking through the tutorial IS working the hook mechanic.
+    state.tasks.waiting.unshift(
+      card("t2", { whenText: null, conditionId: id.t1, conditionKind: "next", conditionLabel: tutTitle("t1"), linkedProjectId: id.tr }),
+      card("t3", { whenText: null, conditionId: id.t2, conditionKind: "waiting", conditionLabel: tutTitle("t2") }),
+      card("t4", { whenText: null, conditionId: id.t3, conditionKind: "waiting", conditionLabel: tutTitle("t3") }),
+      card("t5", { whenText: null, conditionId: id.t4, conditionKind: "waiting", conditionLabel: tutTitle("t4") }),
+      card("t6", { whenText: null, conditionId: id.t5, conditionKind: "waiting", conditionLabel: tutTitle("t5") })
+    );
+    // tr: the healthy reference project ②'s waiting action links to — real
+    // projects need a next step like this one to stay off Review's stalled
+    // list. tp: the stalled sample ⑤ exists to demonstrate fixing.
+    state.tasks.current.unshift(card("tr"), card("tp"));
   }
   // Re-read every tutorial card's text for the current language (called from
   // applyLocale). IDs and cross-references are untouched; only title/notes/the
@@ -5604,9 +5672,12 @@ function injectChunkMap(){
         if (!tk || !tk.tutorialKey) return;
         tk.title = tutTitle(tk.tutorialKey);
         tk.notesClean = tutNotes(tk.tutorialKey);
-        // ② carries a frozen label for ①; re-derive it in the new language.
-        if (tk.conditionKind === "next" && tk.conditionId){
-          tk.conditionLabel = tutTitle("t1"); // the only tutorial condition target
+        // A still-hooked chain link carries a frozen label for the step
+        // before it; re-derive it in the new language. Naturally a no-op once
+        // a link has promoted — changeKind clears its own conditionId then.
+        const parentKey = TUTORIAL_CHAIN_PARENT[tk.tutorialKey];
+        if (parentKey && tk.conditionId){
+          tk.conditionLabel = tutTitle(parentKey);
         }
         touched[kindKey] = true;
       });
@@ -6701,7 +6772,17 @@ function injectChunkMap(){
     // per 4.2), falling back to the free-text or date option.
     if (kind === "waiting"){
       if (task.conditionId){
-        const liveTarget = (task.conditionKind === "next" ? state.tasks.next : state.tasks.waiting)
+        // ⚑ FIX: check BOTH live pools, not just the one named by
+        // conditionKind. conditionKind records the target's kind at the
+        // moment the hook was made — but a waiting target can PROMOTE to
+        // next (that is the entire point of a hook) while remaining live,
+        // and neither moveItem nor changeKind update a dependent's stored
+        // conditionKind when that happens. Picking one pool by a value that
+        // can go stale mid-flight showed a perfectly live chain link as
+        // "cue-orphaned" for as long as its target sat promoted-but-not-yet-
+        // completed. A condition can only ever target a next or waiting item
+        // (getValidConditionTargets), so search both.
+        const liveTarget = state.tasks.next.concat(state.tasks.waiting)
           .find(function(t){ return t.id === task.conditionId && !t.isGroup; });
         // chunk 8 (§10): a condition may point at a NOT-YET-LIVE event. Its
         // task ID isn't in a lane yet, but it is not an orphan — resolve it
@@ -11025,7 +11106,7 @@ function injectChunkMap(){
     // chunk 8 (the user has finished walking all three). §8.1's replace-don't-
     // accumulate discipline is restored: this is the ONLY injector again, and
     // the two additive ones are deleted rather than left dormant.
-    const FLAG = "gtd_qa_checklist_desktop_v1";
+    const FLAG = "gtd_qa_checklist_desktop_v2";
     if (Storage.get(FLAG)) return;
     Storage.set(FLAG, "1");
     // Retire the superseded flags so they can't resurrect their injectors, and
@@ -11035,7 +11116,7 @@ function injectChunkMap(){
      "gtd_qa_checklist_postsprint_v1", "gtd_qa_checklist_postsprint_v2",
      "gtd_qa_checklist_postsprint_v3", "gtd_qa_checklist_postsprint_v4",
      "gtd_qa_checklist_postsprint_v5", "gtd_qa_checklist_postsprint_v6",
-     "gtd_qa_checklist_postsprint_v7"].forEach(Storage.remove);
+     "gtd_qa_checklist_postsprint_v7", "gtd_qa_checklist_desktop_v1"].forEach(Storage.remove);
 
     // Replace, don't accumulate (8.1) — and actually mean it this time.
     // Earlier rounds bumped the flag but left the previous rounds' groups
@@ -11076,17 +11157,25 @@ function injectChunkMap(){
       { title: '9. All four backgrounds, both window widths', notes: '⚙ → Background, and look at each of the four. Only the black lacquer one has the gold border. On a wide window that border should go around the WHOLE page, header included, and follow the window when you resize it. On the other three there should be no border and no leftover empty margin where one used to be. Then narrow the window and check the lacquer border is back to wrapping just the lists and growing as you scroll.' }
     ]);
 
-    addGroupWithItems('✅ QA — The intray handle (phone AND computer)', [
-      { title: '10. The white arrow on the left edge opens the intray', notes: 'The 📥 button in the header is gone on both layouts. In its place is a slim white arrow tab on the left edge of the screen. Tap it: the drawer should slide in. While the drawer is open the tab should disappear, and an arrow on the drawer’s own edge should put it away. When it slides shut, the tab should reappear only after the drawer has finished moving — not on top of it.' },
-      { title: '11. On the phone, the handle must not fight the browser', notes: 'This is the one that needs your actual phone. TAP the handle — that should work. Now try to SWIPE from it: the browser’s back gesture lives on that edge, so the handle is deliberately tap-only. The old swipe-in from the left third of the screen should still open the drawer as before. Also tell me whether the tab sits somewhere annoying: it is at about a third of the way down, which should be above most cards, but your phone is the real verdict.' },
-      { title: '12. The intray is wider on a computer', notes: 'Open the drawer on a wide window — it should be noticeably wider than on the phone, with room for longer captured lines. On the black lacquer background, the green jade strip down its inner edge should still be there and still look like stone rather than a flat green line.' }
+    addGroupWithItems('✅ QA — The intray handle (redrawn — phone AND computer)', [
+      { title: '10. A small edge mark opens the intray, not a white block', notes: 'The handle changed since you last looked: it used to be a solid white tab; it is now a small pair of nested arrow-lines ( » ) with nothing solid behind them, sitting at the exact vertical MIDDLE of the screen (it used to be a third of the way down). Tap it: the drawer should slide in. While the drawer is open the mark should disappear, and a matching mark on the drawer’s own edge (pointing the other way, ‹‹ ) should put it away. When it slides shut, the mark should reappear only after the drawer has finished moving — not on top of it.' },
+      { title: '11. Is it noticeable enough now, or too little?', notes: 'This is the judgement call I want your eyes on. The old white tab was flagged as visually distracting; this version has no background block, just the two thin arrow-lines, dimmed until you hover or tap near them. Tell me if it now reads as too subtle to notice on first use, especially on the phone.' },
+      { title: '12. On the phone, it still must not fight the browser', notes: 'This is the one that needs your actual phone. TAP the mark — that should work. Now try to SWIPE from it: the browser’s back gesture lives on that edge, so it is deliberately tap-only. The old swipe-in from the left third of the screen should still open the drawer as before.' },
+      { title: '13. It never sits on top of a drafting page', notes: 'Open anything to edit — a next action, a note, a project. The edge mark should vanish completely the instant the page opens (not just fade), on both the phone and a wide window, and come back the moment you close the page. If you ever see the mark or its hit-area overlapping a card’s buttons, tell me exactly where.' },
+      { title: '14. The intray is wider on a computer', notes: 'Open the drawer on a wide window — it should be noticeably wider than on the phone, with room for longer captured lines. On the black lacquer background, the green jade strip down its inner edge should still be there and still look like stone rather than a flat green line.' }
+    ]);
+
+    addGroupWithItems('✅ QA — The tutorial is now a chain (②–⑥ in Waiting On)', [
+      { title: '15. Steps ②–⑥ start together in Waiting On', notes: 'Reset the app to defaults (or read this on a fresh install) and open Waiting On. You should see FIVE tutorial cards there at once — ②③④⑤⑥ — not just ② the way it used to be. Next Actions should show only ① and your other samples; Current Projects should show a project marked ◆ (linked to step ②) and one marked ◇ (the stalled one for step ⑤).' },
+      { title: '16. Completing one reveals the next, all the way through', notes: 'Tick ① in Next Actions. ② should jump up into Next Actions on its own — same as before. Now tick ②: ③ should jump up next. Keep going through ④, ⑤, ⑥ — each tick should bring the next one up out of Waiting On by itself, without you ever creating or hooking anything by hand. If any step just sits in Waiting On and never appears in Next Actions, that is the bug to report, and say which step.' },
+      { title: '17. No step ever looks broken while it is waiting its turn', notes: 'While a step sits in Waiting On waiting for its turn (for example, look at ④ right after you have ticked ② but before ticking ③), its little "After …" pill should read normally, in the ordinary colour. It must NOT turn red / show as broken — that would be the exact bug I found and fixed while building this. If you see red "After a deleted item" wording on a step that has NOT been deleted, tell me which step and what you had just done.' },
+      { title: '18. The reference project (◆) never shows up as stalled', notes: 'Open 🔍 Review from the intray. Only the ◇ sample (step ⑤’s stalled project) should turn up needing a next step — the ◆ project should NOT appear, because step ②’s waiting action already counts as its way forward, wherever step ② currently sits in the chain.' },
+      { title: '19. Both languages, and nothing left half-translated', notes: 'Switch to 中文 with the chain still mid-way (tick ① and ② first, so ③ is sitting in Waiting On). All five visible steps’ text, and the little "挂在…上" wait-for pill, should be in Chinese, not English. Switch back to English the same way.' }
     ]);
 
     addGroupWithItems('✅ QA — Make sure nothing else moved', [
-      { title: '13. The phone app is unchanged apart from the handle', notes: 'On your phone, walk through the things you use most: the tab bar, the floating +, creating an action, a project with staged actions, the daily review, a habit. Everything should look and behave exactly as it did before this round. The ONLY intended change is the intray handle and the new "discard your changes?" question. Anything else that looks different is a bug — tell me what and where.' },
-      { title: '14. The tutorial cards no longer say "tap the +"', notes: 'The six numbered tutorial steps used to give phone-only instructions. Read them on a wide window and check none of them tells you to use a control you cannot see. Step ⑤ used to say "open the 📥 intray" — it should now point at the arrow on the left edge. Tell me if any wording still reads wrong on either size; I changed these, and they are your words originally.' },
-      { title: '15. Nothing saves that should not', notes: 'The important one, on a wide window. Open a project page, add an action to it, change the notes, arm Complete — then press ✕ and Discard. Nothing should have happened: no new action, no changed notes, nothing completed. Now do the same and press Done: everything should have happened. Repeat on a habit page (change the cue, the days, and the pause switch) and on a note.' },
-      { title: '16. Both languages, wide and narrow', notes: 'Switch to 中文 and look at the desktop layout: the column names, the create buttons, Done, Delete, and the discard question should all be in Chinese, with nothing showing an English word or a raw code like "chrome.done". Switch back to English the same way.' }
+      { title: '20. The phone app is unchanged apart from the handle and the tutorial', notes: 'On your phone, walk through the things you use most: the tab bar, the floating +, creating an action, a project with staged actions, the daily review, a habit. Everything should look and behave exactly as it did before these two rounds. The intended changes are: the intray handle, the "discard your changes?" question, and the tutorial now being a chain. Anything else that looks different is a bug — tell me what and where.' },
+      { title: '21. Nothing saves that should not', notes: 'On a wide window: open a project page, add an action to it, change the notes, arm Complete — then press ✕ and Discard. Nothing should have happened: no new action, no changed notes, nothing completed. Now do the same and press Done: everything should have happened. Repeat on a habit page (change the cue, the days, and the pause switch) and on a note.' }
     ]);
     saveTasksLocal("next");
   }
@@ -11252,7 +11341,9 @@ function injectChunkMap(){
         // The handle's other half: an arrow on the drawer's own edge that puts
         // it away. Same shape and colour as #tray-handle, pointing the other
         // way, so the pair reads as one control with two states.
-        '<button type="button" class="tray-edge-handle" data-action="close-tray" title="' + escapeHtml(t("tray.handleClose")) + '" aria-label="' + escapeHtml(t("tray.handleClose")) + '">&#8249;</button>' +
+        '<button type="button" class="tray-edge-handle" data-action="close-tray" title="' + escapeHtml(t("tray.handleClose")) + '" aria-label="' + escapeHtml(t("tray.handleClose")) + '">' +
+          '<span class="tray-handle-chevron" aria-hidden="true"></span><span class="tray-handle-chevron" aria-hidden="true"></span>' +
+        '</button>' +
       '</div>';
     // Force the -100% start state to commit BEFORE adding .open, or the
     // browser collapses both into one paint and the drawer snaps open with no
@@ -11398,8 +11489,11 @@ function injectChunkMap(){
   // =========================================================
   function isWaitingOrphaned(task){
     if (!task || !task.conditionId) return false;
-    const pool = task.conditionKind === "next" ? state.tasks.next : state.tasks.waiting;
-    if (pool.some(function(t){ return t.id === task.conditionId && !t.isGroup; })) return false;
+    // Same fix as the cueBlock lookup in leafCardHtml: search both live
+    // pools, not the one named by the (possibly stale) conditionKind.
+    const live = state.tasks.next.concat(state.tasks.waiting)
+      .some(function(t){ return t.id === task.conditionId && !t.isGroup; });
+    if (live) return false;
     // chunk 8 (§10 / §4.15b): a condition on a not-yet-live event is NOT an
     // orphan — resolve it against gtd_events. A PAUSED series won't fire, so a
     // dependent on it IS shown orphaned, but reversibly (this is derived, not a

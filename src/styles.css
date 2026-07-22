@@ -1663,31 +1663,55 @@ body.has-frame .tray-drawer::after{
 /* ============================================================================
    THE INTRAY HANDLE  (both layouts — the one sanctioned phone change this round)
    ----------------------------------------------------------------------------
-   The header's 📥 is gone. In its place a slim white tab on the LEFT SCREEN
-   EDGE, which is where the drawer actually comes from — the button now points
-   at the thing it opens instead of sitting three inches away from it.
+   The header's 📥 is gone. In its place a mark on the LEFT SCREEN EDGE, which
+   is where the drawer actually comes from — the control now points at the
+   thing it opens instead of sitting three inches away from it.
 
    ⚑ TAP ONLY. The left edge belongs to the browser's back-swipe gesture, so this
    must never become a drag/pull target. The existing swipe-open from the left
    third still works; the handle is an affordance on top of it, not a
-   replacement. It is deliberately narrow (22px) so it barely occludes cards, and
-   sits in the upper third where lanes are emptiest.
+   replacement.
+
+   ⚑ REVISION (user: "it works, but it's visually distracting"). The first
+   build was a solid white tab — noticeable, but it read as a UI chrome block
+   sitting on top of the lanes rather than a discreet edge mark. Three changes,
+   same contract (data-action="open-tray" unchanged — see T2 in the redesign
+   plan): (1) no more background block — the button's hit area is invisible,
+   only the mark itself draws; (2) the mark is now two nested chevrons, drawn
+   as thin lines (border strokes, not a font glyph) rather than a single bold
+   arrow character, echoing the calendar's own ‹ › line-drawn nav arrows
+   instead of standing out as its own idiom; (3) it sits at the vertical
+   MIDPOINT of the screen (was 34%, an upper-third guess) — dead center reads
+   as "the edge has a handle," not "there's a button near the top."
+
+   Hit area stays a real 44px-tall target even though nothing paints across
+   most of it — the chevrons are small on purpose, the tap target is not.
 
    z-index 150: over lane content and the header, UNDER the tray backdrop (210)
    and any drafting page (200). It rides OVER the gold band rather than being
-   inset from it — an object on the edge of the desk, which reads correctly.
+   inset from it — a mark on the edge of the desk, which reads correctly. It is
+   fully display:none — not just faint — the instant a drafting page opens
+   (below), so "not distracting" is guaranteed there by construction, not by
+   contrast alone.
 ============================================================================ */
 #tray-handle{
-  position:fixed; left:0; top:34%; z-index:150;
-  width:22px; min-height:58px; padding:12px 0;
-  border:none; border-radius:0 9px 9px 0;
-  background:rgba(244,240,232,0.93); color:#1a1408;
-  font-size:16px; font-weight:700; line-height:1;
-  display:flex; align-items:center; justify-content:center;
-  box-shadow:2px 0 12px rgba(0,0,0,0.5);
-  transition:opacity .14s ease, background .14s ease;
+  position:fixed; left:0; top:50%; transform:translateY(-50%); z-index:150;
+  width:22px; height:44px; padding:0;
+  border:none; background:transparent;
+  display:flex; align-items:center; justify-content:center; gap:2px;
+  color:rgba(237,231,218,0.5);
+  transition:opacity .14s ease, color .14s ease;
 }
-#tray-handle:hover{ background:#fff; }
+#tray-handle:hover{ color:rgba(237,231,218,0.92); }
+/* Two nested line-drawn chevrons (». Each is a corner of a square, rotated 45°
+   so two adjoining border edges form a ">" stroke — the same construction as
+   the calendar's own line arrows, not a font character. The pair sits close
+   enough to read as one "expand this way" mark, not two separate arrows. */
+.tray-handle-chevron{
+  width:7px; height:7px; flex:0 0 auto;
+  border-top:2px solid currentColor; border-right:2px solid currentColor;
+  transform:rotate(45deg);
+}
 /* Hidden while the drawer is open, and back only AFTER the .28s slide-out — the
    class is dropped on the same 300ms timer the drawer's teardown uses, so it
    never pops in over a moving drawer. */
@@ -1695,19 +1719,23 @@ body.tray-open #tray-handle{ opacity:0; pointer-events:none; }
 /* A drafting page owns the whole screen; the handle would float over its scrim. */
 body.screen-open #tray-handle{ display:none; }
 
-/* The other half of the same control: an arrow on the drawer's own edge that
-   puts it away. position:fixed inside the drawer (whose transform makes it the
-   containing block) so it rides the slide and ignores the drawer's scrolling. */
+/* The other half of the same control: a mark on the drawer's own edge that
+   puts it away. Same revision as #tray-handle — transparent hit area, nested
+   line chevrons (pointing the closing direction), same vertical midpoint, so
+   the pair still reads as one control with two states. position:fixed inside
+   the drawer (whose transform makes it the containing block) so it rides the
+   slide and ignores the drawer's scrolling. */
 .tray-edge-handle{
-  position:fixed; right:0; top:34%; z-index:2;
-  width:22px; min-height:58px; padding:12px 0;
-  border:none; border-radius:9px 0 0 9px;
-  background:rgba(244,240,232,0.93); color:#1a1408;
-  font-size:16px; font-weight:700; line-height:1;
-  display:flex; align-items:center; justify-content:center;
-  box-shadow:-2px 0 12px rgba(0,0,0,0.45);
+  position:fixed; right:0; top:50%; transform:translateY(-50%); z-index:2;
+  width:22px; height:44px; padding:0;
+  border:none; background:transparent;
+  display:flex; align-items:center; justify-content:center; gap:2px;
+  color:rgba(237,231,218,0.5);
+  transition:color .14s ease;
 }
-.tray-edge-handle:hover{ background:#fff; }
+.tray-edge-handle:hover{ color:rgba(237,231,218,0.92); }
+/* Points the opposite way: the left+bottom edges rotated -135° draw a "‹" stroke. */
+.tray-edge-handle .tray-handle-chevron{ transform:rotate(-135deg); }
 
 /* One variable for the drawer's width, so the desktop widening (author note 1)
    is a single number and the jade inlay keeps working at either size. */

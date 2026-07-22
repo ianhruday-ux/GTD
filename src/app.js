@@ -540,10 +540,25 @@
   //
   // LANGUAGE: each card carries a stable `tutorialKey`. A language switch re-reads
   // the text from i18n (restampTutorialCards) but never touches the IDs, so the
-  // ② → ① hook and the ② → ④ link — which are by id — survive translation. This
-  // is the id-stable alternative to the "swap cards for their siblings" idea; it
-  // avoids rewriting every cross-reference.
-  const TUTORIAL_KEYS = ["t1", "t2", "t3", "t4", "t5", "t6", "tp"];
+  // ①→②→③→④→⑤→⑥ chain and the ② → tr link — which are by id — survive
+  // translation. This is the id-stable alternative to the "swap cards for their
+  // siblings" idea; it avoids rewriting every cross-reference.
+  //
+  // ▲ CHAIN ROUND (user): ②–⑥ used to be five independent cards, only ②
+  // actually hooked to anything. Now they are a real chain — each one waits on
+  // the step before it and starts life in WAITING ON, promoting into Next
+  // Actions automatically as the previous step is ticked, the same mechanic ②
+  // always used, run four more times. `tr` is new: the healthy demo project
+  // that ② links to used to double as "step ④" itself; a project can't be a
+  // chain link (waiting conditions only ever target a next or waiting item —
+  // getValidConditionTargets), so it is now its own unnumbered reference
+  // object, mirroring how `tp` (the stalled sample) already works.
+  const TUTORIAL_KEYS = ["t1", "t2", "t3", "t4", "t5", "t6", "tp", "tr"];
+  // Maps a chain link to the step that unlocks it — used only to re-derive the
+  // frozen conditionLabel after a language switch (below). ② is hooked to ①,
+  // a plain next action whose kind never changes; ③–⑥ are each hooked to the
+  // waiting card directly before them.
+  const TUTORIAL_CHAIN_PARENT = { t2: "t1", t3: "t2", t4: "t3", t5: "t4", t6: "t5" };
   function tutTitle(key){ return t("tutorial." + key + ".title"); }
   function tutNotes(key){ return t("tutorial." + key + ".notes"); }
   function seedTutorial(){
@@ -554,18 +569,23 @@
         linkedProjectId: null, isGroup: false, parent: null, tutorialKey: key
       }, extra || {});
     }
-    // ① ③ ⑤ ⑥ are next actions (they complete-archive, clearing the step).
-    // ⑥ lives here rather than in Habits BECAUSE a habit cannot self-complete;
-    // its text sends the reader to the Habits tab. tp/t6 exceptions stay put.
+    // ① is the seed: a plain next action, no condition, present from the start.
     state.tasks.next.unshift(card("t1", { contextId: null }));
-    state.tasks.next.push(card("t3", { contextId: null }), card("t5", { contextId: null }), card("t6", { contextId: null }));
-    // ④ a healthy project (② links to it, below); ◇ the stalled sample.
-    state.tasks.current.unshift(card("t4"), card("tp"));
-    // ② a waiting action: hooked to ① (conditionId) AND linked to project ④.
-    state.tasks.waiting.unshift(card("t2", {
-      whenText: null, conditionId: id.t1, conditionKind: "next", conditionLabel: tutTitle("t1"),
-      linkedProjectId: id.t4
-    }));
+    // ②–⑥: the chain. Each is hooked (conditionId) to the step before it and
+    // seeded directly into Waiting On, in order, so they read top to bottom as
+    // ②③④⑤⑥. Completing a step promotes the next one into Next Actions on its
+    // own — ticking through the tutorial IS working the hook mechanic.
+    state.tasks.waiting.unshift(
+      card("t2", { whenText: null, conditionId: id.t1, conditionKind: "next", conditionLabel: tutTitle("t1"), linkedProjectId: id.tr }),
+      card("t3", { whenText: null, conditionId: id.t2, conditionKind: "waiting", conditionLabel: tutTitle("t2") }),
+      card("t4", { whenText: null, conditionId: id.t3, conditionKind: "waiting", conditionLabel: tutTitle("t3") }),
+      card("t5", { whenText: null, conditionId: id.t4, conditionKind: "waiting", conditionLabel: tutTitle("t4") }),
+      card("t6", { whenText: null, conditionId: id.t5, conditionKind: "waiting", conditionLabel: tutTitle("t5") })
+    );
+    // tr: the healthy reference project ②'s waiting action links to — real
+    // projects need a next step like this one to stay off Review's stalled
+    // list. tp: the stalled sample ⑤ exists to demonstrate fixing.
+    state.tasks.current.unshift(card("tr"), card("tp"));
   }
   // Re-read every tutorial card's text for the current language (called from
   // applyLocale). IDs and cross-references are untouched; only title/notes/the
@@ -578,9 +598,12 @@
         if (!tk || !tk.tutorialKey) return;
         tk.title = tutTitle(tk.tutorialKey);
         tk.notesClean = tutNotes(tk.tutorialKey);
-        // ② carries a frozen label for ①; re-derive it in the new language.
-        if (tk.conditionKind === "next" && tk.conditionId){
-          tk.conditionLabel = tutTitle("t1"); // the only tutorial condition target
+        // A still-hooked chain link carries a frozen label for the step
+        // before it; re-derive it in the new language. Naturally a no-op once
+        // a link has promoted — changeKind clears its own conditionId then.
+        const parentKey = TUTORIAL_CHAIN_PARENT[tk.tutorialKey];
+        if (parentKey && tk.conditionId){
+          tk.conditionLabel = tutTitle(parentKey);
         }
         touched[kindKey] = true;
       });
@@ -1675,7 +1698,17 @@
     // per 4.2), falling back to the free-text or date option.
     if (kind === "waiting"){
       if (task.conditionId){
-        const liveTarget = (task.conditionKind === "next" ? state.tasks.next : state.tasks.waiting)
+        // ⚑ FIX: check BOTH live pools, not just the one named by
+        // conditionKind. conditionKind records the target's kind at the
+        // moment the hook was made — but a waiting target can PROMOTE to
+        // next (that is the entire point of a hook) while remaining live,
+        // and neither moveItem nor changeKind update a dependent's stored
+        // conditionKind when that happens. Picking one pool by a value that
+        // can go stale mid-flight showed a perfectly live chain link as
+        // "cue-orphaned" for as long as its target sat promoted-but-not-yet-
+        // completed. A condition can only ever target a next or waiting item
+        // (getValidConditionTargets), so search both.
+        const liveTarget = state.tasks.next.concat(state.tasks.waiting)
           .find(function(t){ return t.id === task.conditionId && !t.isGroup; });
         // chunk 8 (§10): a condition may point at a NOT-YET-LIVE event. Its
         // task ID isn't in a lane yet, but it is not an orphan — resolve it
@@ -5999,7 +6032,7 @@
     // chunk 8 (the user has finished walking all three). §8.1's replace-don't-
     // accumulate discipline is restored: this is the ONLY injector again, and
     // the two additive ones are deleted rather than left dormant.
-    const FLAG = "gtd_qa_checklist_desktop_v1";
+    const FLAG = "gtd_qa_checklist_desktop_v2";
     if (Storage.get(FLAG)) return;
     Storage.set(FLAG, "1");
     // Retire the superseded flags so they can't resurrect their injectors, and
@@ -6009,7 +6042,7 @@
      "gtd_qa_checklist_postsprint_v1", "gtd_qa_checklist_postsprint_v2",
      "gtd_qa_checklist_postsprint_v3", "gtd_qa_checklist_postsprint_v4",
      "gtd_qa_checklist_postsprint_v5", "gtd_qa_checklist_postsprint_v6",
-     "gtd_qa_checklist_postsprint_v7"].forEach(Storage.remove);
+     "gtd_qa_checklist_postsprint_v7", "gtd_qa_checklist_desktop_v1"].forEach(Storage.remove);
 
     // Replace, don't accumulate (8.1) — and actually mean it this time.
     // Earlier rounds bumped the flag but left the previous rounds' groups
@@ -6050,17 +6083,25 @@
       { title: '9. All four backgrounds, both window widths', notes: '⚙ → Background, and look at each of the four. Only the black lacquer one has the gold border. On a wide window that border should go around the WHOLE page, header included, and follow the window when you resize it. On the other three there should be no border and no leftover empty margin where one used to be. Then narrow the window and check the lacquer border is back to wrapping just the lists and growing as you scroll.' }
     ]);
 
-    addGroupWithItems('✅ QA — The intray handle (phone AND computer)', [
-      { title: '10. The white arrow on the left edge opens the intray', notes: 'The 📥 button in the header is gone on both layouts. In its place is a slim white arrow tab on the left edge of the screen. Tap it: the drawer should slide in. While the drawer is open the tab should disappear, and an arrow on the drawer’s own edge should put it away. When it slides shut, the tab should reappear only after the drawer has finished moving — not on top of it.' },
-      { title: '11. On the phone, the handle must not fight the browser', notes: 'This is the one that needs your actual phone. TAP the handle — that should work. Now try to SWIPE from it: the browser’s back gesture lives on that edge, so the handle is deliberately tap-only. The old swipe-in from the left third of the screen should still open the drawer as before. Also tell me whether the tab sits somewhere annoying: it is at about a third of the way down, which should be above most cards, but your phone is the real verdict.' },
-      { title: '12. The intray is wider on a computer', notes: 'Open the drawer on a wide window — it should be noticeably wider than on the phone, with room for longer captured lines. On the black lacquer background, the green jade strip down its inner edge should still be there and still look like stone rather than a flat green line.' }
+    addGroupWithItems('✅ QA — The intray handle (redrawn — phone AND computer)', [
+      { title: '10. A small edge mark opens the intray, not a white block', notes: 'The handle changed since you last looked: it used to be a solid white tab; it is now a small pair of nested arrow-lines ( » ) with nothing solid behind them, sitting at the exact vertical MIDDLE of the screen (it used to be a third of the way down). Tap it: the drawer should slide in. While the drawer is open the mark should disappear, and a matching mark on the drawer’s own edge (pointing the other way, ‹‹ ) should put it away. When it slides shut, the mark should reappear only after the drawer has finished moving — not on top of it.' },
+      { title: '11. Is it noticeable enough now, or too little?', notes: 'This is the judgement call I want your eyes on. The old white tab was flagged as visually distracting; this version has no background block, just the two thin arrow-lines, dimmed until you hover or tap near them. Tell me if it now reads as too subtle to notice on first use, especially on the phone.' },
+      { title: '12. On the phone, it still must not fight the browser', notes: 'This is the one that needs your actual phone. TAP the mark — that should work. Now try to SWIPE from it: the browser’s back gesture lives on that edge, so it is deliberately tap-only. The old swipe-in from the left third of the screen should still open the drawer as before.' },
+      { title: '13. It never sits on top of a drafting page', notes: 'Open anything to edit — a next action, a note, a project. The edge mark should vanish completely the instant the page opens (not just fade), on both the phone and a wide window, and come back the moment you close the page. If you ever see the mark or its hit-area overlapping a card’s buttons, tell me exactly where.' },
+      { title: '14. The intray is wider on a computer', notes: 'Open the drawer on a wide window — it should be noticeably wider than on the phone, with room for longer captured lines. On the black lacquer background, the green jade strip down its inner edge should still be there and still look like stone rather than a flat green line.' }
+    ]);
+
+    addGroupWithItems('✅ QA — The tutorial is now a chain (②–⑥ in Waiting On)', [
+      { title: '15. Steps ②–⑥ start together in Waiting On', notes: 'Reset the app to defaults (or read this on a fresh install) and open Waiting On. You should see FIVE tutorial cards there at once — ②③④⑤⑥ — not just ② the way it used to be. Next Actions should show only ① and your other samples; Current Projects should show a project marked ◆ (linked to step ②) and one marked ◇ (the stalled one for step ⑤).' },
+      { title: '16. Completing one reveals the next, all the way through', notes: 'Tick ① in Next Actions. ② should jump up into Next Actions on its own — same as before. Now tick ②: ③ should jump up next. Keep going through ④, ⑤, ⑥ — each tick should bring the next one up out of Waiting On by itself, without you ever creating or hooking anything by hand. If any step just sits in Waiting On and never appears in Next Actions, that is the bug to report, and say which step.' },
+      { title: '17. No step ever looks broken while it is waiting its turn', notes: 'While a step sits in Waiting On waiting for its turn (for example, look at ④ right after you have ticked ② but before ticking ③), its little "After …" pill should read normally, in the ordinary colour. It must NOT turn red / show as broken — that would be the exact bug I found and fixed while building this. If you see red "After a deleted item" wording on a step that has NOT been deleted, tell me which step and what you had just done.' },
+      { title: '18. The reference project (◆) never shows up as stalled', notes: 'Open 🔍 Review from the intray. Only the ◇ sample (step ⑤’s stalled project) should turn up needing a next step — the ◆ project should NOT appear, because step ②’s waiting action already counts as its way forward, wherever step ② currently sits in the chain.' },
+      { title: '19. Both languages, and nothing left half-translated', notes: 'Switch to 中文 with the chain still mid-way (tick ① and ② first, so ③ is sitting in Waiting On). All five visible steps’ text, and the little "挂在…上" wait-for pill, should be in Chinese, not English. Switch back to English the same way.' }
     ]);
 
     addGroupWithItems('✅ QA — Make sure nothing else moved', [
-      { title: '13. The phone app is unchanged apart from the handle', notes: 'On your phone, walk through the things you use most: the tab bar, the floating +, creating an action, a project with staged actions, the daily review, a habit. Everything should look and behave exactly as it did before this round. The ONLY intended change is the intray handle and the new "discard your changes?" question. Anything else that looks different is a bug — tell me what and where.' },
-      { title: '14. The tutorial cards no longer say "tap the +"', notes: 'The six numbered tutorial steps used to give phone-only instructions. Read them on a wide window and check none of them tells you to use a control you cannot see. Step ⑤ used to say "open the 📥 intray" — it should now point at the arrow on the left edge. Tell me if any wording still reads wrong on either size; I changed these, and they are your words originally.' },
-      { title: '15. Nothing saves that should not', notes: 'The important one, on a wide window. Open a project page, add an action to it, change the notes, arm Complete — then press ✕ and Discard. Nothing should have happened: no new action, no changed notes, nothing completed. Now do the same and press Done: everything should have happened. Repeat on a habit page (change the cue, the days, and the pause switch) and on a note.' },
-      { title: '16. Both languages, wide and narrow', notes: 'Switch to 中文 and look at the desktop layout: the column names, the create buttons, Done, Delete, and the discard question should all be in Chinese, with nothing showing an English word or a raw code like "chrome.done". Switch back to English the same way.' }
+      { title: '20. The phone app is unchanged apart from the handle and the tutorial', notes: 'On your phone, walk through the things you use most: the tab bar, the floating +, creating an action, a project with staged actions, the daily review, a habit. Everything should look and behave exactly as it did before these two rounds. The intended changes are: the intray handle, the "discard your changes?" question, and the tutorial now being a chain. Anything else that looks different is a bug — tell me what and where.' },
+      { title: '21. Nothing saves that should not', notes: 'On a wide window: open a project page, add an action to it, change the notes, arm Complete — then press ✕ and Discard. Nothing should have happened: no new action, no changed notes, nothing completed. Now do the same and press Done: everything should have happened. Repeat on a habit page (change the cue, the days, and the pause switch) and on a note.' }
     ]);
     saveTasksLocal("next");
   }
@@ -6226,7 +6267,9 @@
         // The handle's other half: an arrow on the drawer's own edge that puts
         // it away. Same shape and colour as #tray-handle, pointing the other
         // way, so the pair reads as one control with two states.
-        '<button type="button" class="tray-edge-handle" data-action="close-tray" title="' + escapeHtml(t("tray.handleClose")) + '" aria-label="' + escapeHtml(t("tray.handleClose")) + '">&#8249;</button>' +
+        '<button type="button" class="tray-edge-handle" data-action="close-tray" title="' + escapeHtml(t("tray.handleClose")) + '" aria-label="' + escapeHtml(t("tray.handleClose")) + '">' +
+          '<span class="tray-handle-chevron" aria-hidden="true"></span><span class="tray-handle-chevron" aria-hidden="true"></span>' +
+        '</button>' +
       '</div>';
     // Force the -100% start state to commit BEFORE adding .open, or the
     // browser collapses both into one paint and the drawer snaps open with no
@@ -6372,8 +6415,11 @@
   // =========================================================
   function isWaitingOrphaned(task){
     if (!task || !task.conditionId) return false;
-    const pool = task.conditionKind === "next" ? state.tasks.next : state.tasks.waiting;
-    if (pool.some(function(t){ return t.id === task.conditionId && !t.isGroup; })) return false;
+    // Same fix as the cueBlock lookup in leafCardHtml: search both live
+    // pools, not the one named by the (possibly stale) conditionKind.
+    const live = state.tasks.next.concat(state.tasks.waiting)
+      .some(function(t){ return t.id === task.conditionId && !t.isGroup; });
+    if (live) return false;
     // chunk 8 (§10 / §4.15b): a condition on a not-yet-live event is NOT an
     // orphan — resolve it against gtd_events. A PAUSED series won't fire, so a
     // dependent on it IS shown orphaned, but reversibly (this is derived, not a
