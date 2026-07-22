@@ -221,6 +221,15 @@ def main():
         check(pg.evaluate("""() => { const h = document.querySelector('#tray-handle');
               return !!h && getComputedStyle(h).display !== 'none' && h.dataset.action === 'open-tray'; }"""),
               "the left-edge handle is present and keeps data-action=open-tray (trap T2)")
+        # The "less distracting" redraw was meant for the phone ONLY — the
+        # author's own clarification after the first pass shipped it to both.
+        # On desktop the handle must still be the ORIGINAL solid tab: a real
+        # background, the single glyph, NOT the transparent chevrons.
+        style = pg.evaluate("""() => { const h = document.querySelector('#tray-handle'); const cs = getComputedStyle(h);
+          return { bg: cs.backgroundColor, glyphShown: getComputedStyle(document.querySelector('#tray-handle .tray-handle-glyph')).display !== 'none',
+                   chevronShown: getComputedStyle(document.querySelector('#tray-handle .tray-handle-chevron')).display !== 'none' }; }""")
+        check(style["bg"] != "rgba(0, 0, 0, 0)" and style["glyphShown"] and not style["chevronShown"],
+              "desktop keeps the original solid block + single glyph, unrevised: %s" % style)
         pg.click('#tray-handle'); pg.wait_for_timeout(500)
         check(pg.evaluate("() => !!document.querySelector('.tray-drawer.open')"), "it opens the drawer")
         check(pg.evaluate("() => getComputedStyle(document.querySelector('#tray-handle')).opacity") == "0",
@@ -282,6 +291,13 @@ def main():
         pg2.click('#tray-handle'); pg2.wait_for_timeout(500)
         check(pg2.evaluate("() => !!document.querySelector('.tray-drawer.open')"), "the handle opens the drawer here too")
         close_tray(pg2)
+        # The phone IS meant to get the redraw: transparent block, chevrons not
+        # the glyph. If desktop's revert also reverted the phone, this fails.
+        style2 = pg2.evaluate("""() => { const h = document.querySelector('#tray-handle'); const cs = getComputedStyle(h);
+          return { bg: cs.backgroundColor, glyphShown: getComputedStyle(document.querySelector('#tray-handle .tray-handle-glyph')).display !== 'none',
+                   chevronShown: getComputedStyle(document.querySelector('#tray-handle .tray-handle-chevron')).display !== 'none' }; }""")
+        check(style2["bg"] == "rgba(0, 0, 0, 0)" and not style2["glyphShown"] and style2["chevronShown"],
+              "the phone keeps the redraw — transparent block, chevrons: %s" % style2)
         pg2.click('#fab-create'); pg2.wait_for_timeout(200)
         pg2.click('[data-action="new-primary"]'); pg2.wait_for_timeout(500)
         check(pg2.evaluate("() => document.querySelectorAll('[data-action=\"screen-save\"]').length") == 1,

@@ -1687,7 +1687,7 @@ body.has-frame .tray-drawer::after{
 }
 
 /* ============================================================================
-   THE INTRAY HANDLE  (both layouts — the one sanctioned phone change this round)
+   THE INTRAY HANDLE  (the one sanctioned phone change this round)
    ----------------------------------------------------------------------------
    The header's 📥 is gone. In its place a mark on the LEFT SCREEN EDGE, which
    is where the drawer actually comes from — the control now points at the
@@ -1698,46 +1698,39 @@ body.has-frame .tray-drawer::after{
    third still works; the handle is an affordance on top of it, not a
    replacement.
 
-   ⚑ REVISION (user: "it works, but it's visually distracting"). The first
-   build was a solid white tab — noticeable, but it read as a UI chrome block
-   sitting on top of the lanes rather than a discreet edge mark. Three changes,
-   same contract (data-action="open-tray" unchanged — see T2 in the redesign
-   plan): (1) no more background block — the button's hit area is invisible,
-   only the mark itself draws; (2) the mark is now two nested chevrons, drawn
-   as thin lines (border strokes, not a font glyph) rather than a single bold
-   arrow character, echoing the calendar's own ‹ › line-drawn nav arrows
-   instead of standing out as its own idiom; (3) it sits at the vertical
-   MIDPOINT of the screen (was 34%, an upper-third guess) — dead center reads
-   as "the edge has a handle," not "there's a button near the top."
+   ⚑ REVISION, PHONE ONLY (user: "it works, but it's visually distracting" —
+   later clarified as phone-only; the desktop block was fine as first shipped).
+   Below is the ORIGINAL solid-tab design, still the desktop default. The
+   revised, less-block-y design lives in the ≥1000px-max media query further
+   down and is overridden BACK to this look inside the desktop breakpoint.
+   ⚠ Two markup nodes ride together in the button now — `.tray-handle-glyph`
+   (the original single arrow character) and two `.tray-handle-chevron` spans
+   (the phone's line-drawn double chevron) — and each breakpoint shows exactly
+   one of the two, never both, never neither.
 
-   Hit area stays a real 44px-tall target even though nothing paints across
-   most of it — the chevrons are small on purpose, the tap target is not.
+   Hit area stays a real ≥44px-tall target on the phone even though little
+   paints across most of it on the newer look — the chevrons are small on
+   purpose, the tap target is not.
 
    z-index 150: over lane content and the header, UNDER the tray backdrop (210)
    and any drafting page (200). It rides OVER the gold band rather than being
-   inset from it — a mark on the edge of the desk, which reads correctly. It is
-   fully display:none — not just faint — the instant a drafting page opens
-   (below), so "not distracting" is guaranteed there by construction, not by
-   contrast alone.
+   inset from it — an object on the edge of the desk, which reads correctly.
+   It is fully display:none — not just faint — the instant a drafting page
+   opens (below), on EITHER layout.
 ============================================================================ */
 #tray-handle{
-  position:fixed; left:0; top:50%; transform:translateY(-50%); z-index:150;
-  width:22px; height:44px; padding:0;
-  border:none; background:transparent;
-  display:flex; align-items:center; justify-content:center; gap:2px;
-  color:rgba(237,231,218,0.5);
-  transition:opacity .14s ease, color .14s ease;
+  position:fixed; left:0; top:34%; z-index:150;
+  width:22px; min-height:58px; padding:12px 0;
+  border:none; border-radius:0 9px 9px 0;
+  background:rgba(244,240,232,0.93); color:#1a1408;
+  font-size:16px; font-weight:700; line-height:1;
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:2px 0 12px rgba(0,0,0,0.5);
+  transition:opacity .14s ease, background .14s ease;
 }
-#tray-handle:hover{ color:rgba(237,231,218,0.92); }
-/* Two nested line-drawn chevrons (». Each is a corner of a square, rotated 45°
-   so two adjoining border edges form a ">" stroke — the same construction as
-   the calendar's own line arrows, not a font character. The pair sits close
-   enough to read as one "expand this way" mark, not two separate arrows. */
-.tray-handle-chevron{
-  width:7px; height:7px; flex:0 0 auto;
-  border-top:2px solid currentColor; border-right:2px solid currentColor;
-  transform:rotate(45deg);
-}
+#tray-handle:hover{ background:#fff; }
+/* The phone-only chevrons are hidden by default (desktop shows the glyph). */
+.tray-handle-chevron{ display:none; }
 /* Hidden while the drawer is open, and back only AFTER the .28s slide-out — the
    class is dropped on the same 300ms timer the drawer's teardown uses, so it
    never pops in over a moving drawer. */
@@ -1745,23 +1738,51 @@ body.tray-open #tray-handle{ opacity:0; pointer-events:none; }
 /* A drafting page owns the whole screen; the handle would float over its scrim. */
 body.screen-open #tray-handle{ display:none; }
 
-/* The other half of the same control: a mark on the drawer's own edge that
-   puts it away. Same revision as #tray-handle — transparent hit area, nested
-   line chevrons (pointing the closing direction), same vertical midpoint, so
-   the pair still reads as one control with two states. position:fixed inside
-   the drawer (whose transform makes it the containing block) so it rides the
-   slide and ignores the drawer's scrolling. */
+/* The other half of the same control: an arrow on the drawer's own edge that
+   puts it away. position:fixed inside the drawer (whose transform makes it the
+   containing block) so it rides the slide and ignores the drawer's scrolling. */
 .tray-edge-handle{
-  position:fixed; right:0; top:50%; transform:translateY(-50%); z-index:2;
-  width:22px; height:44px; padding:0;
-  border:none; background:transparent;
-  display:flex; align-items:center; justify-content:center; gap:2px;
-  color:rgba(237,231,218,0.5);
-  transition:color .14s ease;
+  position:fixed; right:0; top:34%; z-index:2;
+  width:22px; min-height:58px; padding:12px 0;
+  border:none; border-radius:9px 0 0 9px;
+  background:rgba(244,240,232,0.93); color:#1a1408;
+  font-size:16px; font-weight:700; line-height:1;
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:-2px 0 12px rgba(0,0,0,0.45);
 }
-.tray-edge-handle:hover{ color:rgba(237,231,218,0.92); }
-/* Points the opposite way: the left+bottom edges rotated -135° draw a "‹" stroke. */
-.tray-edge-handle .tray-handle-chevron{ transform:rotate(-135deg); }
+.tray-edge-handle:hover{ background:#fff; }
+
+/* ▲ PHONE-ONLY REVISION (user: "it works, but it's visually distracting" —
+   the desktop block was intentionally left alone; only the phone was ever
+   meant to change). Below 1000px — the same number as DESKTOP_MIN_PX in
+   app.js, mirrored here as max-width so the two thresholds can never land on
+   different sides of the same pixel — both handles swap from a solid tab to a
+   quieter mark: no background block (only the mark itself draws), the single
+   bold glyph becomes two nested line-drawn chevrons (the same construction as
+   the calendar's own ‹ › nav arrows — border corners rotated 45°, not a font
+   character), and the vertical position moves from an upper-third guess to
+   the screen's dead center. */
+@media (max-width:999.98px){
+  #tray-handle, .tray-edge-handle{
+    top:50%; transform:translateY(-50%);
+    min-height:0; height:44px; padding:0; border-radius:0;
+    background:transparent; box-shadow:none;
+    gap:2px; color:rgba(237,231,218,0.5);
+  }
+  #tray-handle:hover, .tray-edge-handle:hover{ background:transparent; color:rgba(237,231,218,0.92); }
+  .tray-handle-glyph{ display:none; }
+  /* Two nested line-drawn chevrons. Each is a corner of a square, rotated 45°
+     so two adjoining border edges form a ">" stroke. The pair sits close
+     enough to read as one "expand this way" mark, not two separate arrows. */
+  .tray-handle-chevron{
+    display:block; width:7px; height:7px; flex:0 0 auto;
+    border-top:2px solid currentColor; border-right:2px solid currentColor;
+    transform:rotate(45deg);
+  }
+  /* The drawer's own arrow points the opposite way: the same corner rotated
+     -135° (225°) flips the stroke's tip from "›" to "‹". */
+  .tray-edge-handle .tray-handle-chevron{ transform:rotate(-135deg); }
+}
 
 /* One variable for the drawer's width, so the desktop widening (author note 1)
    is a single number and the jade inlay keeps working at either size. */
@@ -1988,9 +2009,14 @@ body.screen-open #tray-handle{ display:none; }
      keeps data-action="open-tray" — the action name is the contract, not the
      button's position. Tap only: the left edge belongs to the browser's
      back-swipe gesture, so this must never be a drag target. It hides while the
-     drawer is open (the drawer's own arrow closes it). The two spans are line-
-     drawn chevrons (styles.css), not a font glyph — see the revision note there. -->
+     drawer is open (the drawer's own arrow closes it).
+     ⚑ Carries BOTH looks at once and lets styles.css pick one per breakpoint:
+     `.tray-handle-glyph` is the original single-arrow character (desktop,
+     unchanged since it was never the part flagged as distracting); the two
+     `.tray-handle-chevron` spans are the phone-only line-drawn double chevron.
+     Exactly one shows at a time — see the revision note in styles.css. -->
 <button id="tray-handle" type="button" data-action="open-tray" title="Intray" aria-label="Intray">
+  <span class="tray-handle-glyph" aria-hidden="true">&#8250;</span>
   <span class="tray-handle-chevron" aria-hidden="true"></span>
   <span class="tray-handle-chevron" aria-hidden="true"></span>
 </button>
@@ -2077,7 +2103,7 @@ body.screen-open #tray-handle{ display:none; }
 (function(){
 "use strict";
 
-const BUILD_STAMP = "21 Jul 22:14";  // replaced by build.py
+const BUILD_STAMP = "21 Jul 22:27";  // replaced by build.py
 
 // =========================================================
 // STORAGE ADAPTER (spec.md §3, known issue 4)
@@ -11157,25 +11183,26 @@ function injectChunkMap(){
       { title: '9. All four backgrounds, both window widths', notes: '⚙ → Background, and look at each of the four. Only the black lacquer one has the gold border. On a wide window that border should go around the WHOLE page, header included, and follow the window when you resize it. On the other three there should be no border and no leftover empty margin where one used to be. Then narrow the window and check the lacquer border is back to wrapping just the lists and growing as you scroll.' }
     ]);
 
-    addGroupWithItems('✅ QA — The intray handle (redrawn — phone AND computer)', [
-      { title: '10. A small edge mark opens the intray, not a white block', notes: 'The handle changed since you last looked: it used to be a solid white tab; it is now a small pair of nested arrow-lines ( » ) with nothing solid behind them, sitting at the exact vertical MIDDLE of the screen (it used to be a third of the way down). Tap it: the drawer should slide in. While the drawer is open the mark should disappear, and a matching mark on the drawer’s own edge (pointing the other way, ‹‹ ) should put it away. When it slides shut, the mark should reappear only after the drawer has finished moving — not on top of it.' },
-      { title: '11. Is it noticeable enough now, or too little?', notes: 'This is the judgement call I want your eyes on. The old white tab was flagged as visually distracting; this version has no background block, just the two thin arrow-lines, dimmed until you hover or tap near them. Tell me if it now reads as too subtle to notice on first use, especially on the phone.' },
-      { title: '12. On the phone, it still must not fight the browser', notes: 'This is the one that needs your actual phone. TAP the mark — that should work. Now try to SWIPE from it: the browser’s back gesture lives on that edge, so it is deliberately tap-only. The old swipe-in from the left third of the screen should still open the drawer as before.' },
-      { title: '13. It never sits on top of a drafting page', notes: 'Open anything to edit — a next action, a note, a project. The edge mark should vanish completely the instant the page opens (not just fade), on both the phone and a wide window, and come back the moment you close the page. If you ever see the mark or its hit-area overlapping a card’s buttons, tell me exactly where.' },
-      { title: '14. The intray is wider on a computer', notes: 'Open the drawer on a wide window — it should be noticeably wider than on the phone, with room for longer captured lines. On the black lacquer background, the green jade strip down its inner edge should still be there and still look like stone rather than a flat green line.' }
+    addGroupWithItems('✅ QA — The intray handle (redrawn — PHONE ONLY)', [
+      { title: '10. On the phone, a small edge mark opens the intray, not a white block', notes: 'The revised look is PHONE ONLY — the computer keeps the original solid white tab, deliberately, per your last note. On the phone: it used to be a solid white tab; it is now a small pair of nested arrow-lines ( » ) with nothing solid behind them, sitting at the exact vertical MIDDLE of the screen (it used to be a third of the way down). Tap it: the drawer should slide in. While the drawer is open the mark should disappear, and a matching mark on the drawer’s own edge (pointing the other way, ‹‹ ) should put it away.' },
+      { title: '11. Is the phone version noticeable enough, or too little?', notes: 'This is the judgement call I want your eyes on. The old white tab was flagged as distracting; this version has no background block, just the two thin arrow-lines, dimmed until you tap near them. Tell me if it now reads as too subtle to notice on first use.' },
+      { title: '12. Confirm the computer really did not change', notes: 'Widen the window past a laptop size and look at the same edge. It should be the ORIGINAL solid white tab with a single arrow, at the upper-third position, unchanged from before I touched it. If it looks like the phone version (no background, two thin lines, dead-center), that is the bug this round exists to fix — tell me right away.' },
+      { title: '13. On the phone, it still must not fight the browser', notes: 'TAP the mark — that should work. Now try to SWIPE from it: the browser’s back gesture lives on that edge, so it is deliberately tap-only. The old swipe-in from the left third of the screen should still open the drawer as before.' },
+      { title: '14. It never sits on top of a drafting page, on either size', notes: 'Open anything to edit — a next action, a note, a project. The handle should vanish completely the instant the page opens (not just fade), on both the phone and a wide window, and come back the moment you close the page.' },
+      { title: '15. The intray is wider on a computer', notes: 'Open the drawer on a wide window — it should be noticeably wider than on the phone, with room for longer captured lines. On the black lacquer background, the green jade strip down its inner edge should still be there and still look like stone rather than a flat green line.' }
     ]);
 
     addGroupWithItems('✅ QA — The tutorial is now a chain (②–⑥ in Waiting On)', [
-      { title: '15. Steps ②–⑥ start together in Waiting On', notes: 'Reset the app to defaults (or read this on a fresh install) and open Waiting On. You should see FIVE tutorial cards there at once — ②③④⑤⑥ — not just ② the way it used to be. Next Actions should show only ① and your other samples; Current Projects should show a project marked ◆ (linked to step ②) and one marked ◇ (the stalled one for step ⑤).' },
-      { title: '16. Completing one reveals the next, all the way through', notes: 'Tick ① in Next Actions. ② should jump up into Next Actions on its own — same as before. Now tick ②: ③ should jump up next. Keep going through ④, ⑤, ⑥ — each tick should bring the next one up out of Waiting On by itself, without you ever creating or hooking anything by hand. If any step just sits in Waiting On and never appears in Next Actions, that is the bug to report, and say which step.' },
-      { title: '17. No step ever looks broken while it is waiting its turn', notes: 'While a step sits in Waiting On waiting for its turn (for example, look at ④ right after you have ticked ② but before ticking ③), its little "After …" pill should read normally, in the ordinary colour. It must NOT turn red / show as broken — that would be the exact bug I found and fixed while building this. If you see red "After a deleted item" wording on a step that has NOT been deleted, tell me which step and what you had just done.' },
-      { title: '18. The reference project (◆) never shows up as stalled', notes: 'Open 🔍 Review from the intray. Only the ◇ sample (step ⑤’s stalled project) should turn up needing a next step — the ◆ project should NOT appear, because step ②’s waiting action already counts as its way forward, wherever step ② currently sits in the chain.' },
-      { title: '19. Both languages, and nothing left half-translated', notes: 'Switch to 中文 with the chain still mid-way (tick ① and ② first, so ③ is sitting in Waiting On). All five visible steps’ text, and the little "挂在…上" wait-for pill, should be in Chinese, not English. Switch back to English the same way.' }
+      { title: '16. Steps ②–⑥ start together in Waiting On', notes: 'Reset the app to defaults (or read this on a fresh install) and open Waiting On. You should see FIVE tutorial cards there at once — ②③④⑤⑥ — not just ② the way it used to be. Next Actions should show only ① and your other samples; Current Projects should show a project marked ◆ (linked to step ②) and one marked ◇ (the stalled one for step ⑤).' },
+      { title: '17. Completing one reveals the next, all the way through', notes: 'Tick ① in Next Actions. ② should jump up into Next Actions on its own — same as before. Now tick ②: ③ should jump up next. Keep going through ④, ⑤, ⑥ — each tick should bring the next one up out of Waiting On by itself, without you ever creating or hooking anything by hand. If any step just sits in Waiting On and never appears in Next Actions, that is the bug to report, and say which step.' },
+      { title: '18. No step ever looks broken while it is waiting its turn', notes: 'While a step sits in Waiting On waiting for its turn (for example, look at ④ right after you have ticked ② but before ticking ③), its little "After …" pill should read normally, in the ordinary colour. It must NOT turn red / show as broken — that would be the exact bug I found and fixed while building this. If you see red "After a deleted item" wording on a step that has NOT been deleted, tell me which step and what you had just done.' },
+      { title: '19. The reference project (◆) never shows up as stalled', notes: 'Open 🔍 Review from the intray. Only the ◇ sample (step ⑤’s stalled project) should turn up needing a next step — the ◆ project should NOT appear, because step ②’s waiting action already counts as its way forward, wherever step ② currently sits in the chain.' },
+      { title: '20. Both languages, and nothing left half-translated', notes: 'Switch to 中文 with the chain still mid-way (tick ① and ② first, so ③ is sitting in Waiting On). All five visible steps’ text, and the little "挂在…上" wait-for pill, should be in Chinese, not English. Switch back to English the same way.' }
     ]);
 
     addGroupWithItems('✅ QA — Make sure nothing else moved', [
-      { title: '20. The phone app is unchanged apart from the handle and the tutorial', notes: 'On your phone, walk through the things you use most: the tab bar, the floating +, creating an action, a project with staged actions, the daily review, a habit. Everything should look and behave exactly as it did before these two rounds. The intended changes are: the intray handle, the "discard your changes?" question, and the tutorial now being a chain. Anything else that looks different is a bug — tell me what and where.' },
-      { title: '21. Nothing saves that should not', notes: 'On a wide window: open a project page, add an action to it, change the notes, arm Complete — then press ✕ and Discard. Nothing should have happened: no new action, no changed notes, nothing completed. Now do the same and press Done: everything should have happened. Repeat on a habit page (change the cue, the days, and the pause switch) and on a note.' }
+      { title: '21. The phone app is unchanged apart from the handle and the tutorial', notes: 'On your phone, walk through the things you use most: the tab bar, the floating +, creating an action, a project with staged actions, the daily review, a habit. Everything should look and behave exactly as it did before these two rounds. The intended changes are: the intray handle, the "discard your changes?" question, and the tutorial now being a chain. Anything else that looks different is a bug — tell me what and where.' },
+      { title: '22. Nothing saves that should not', notes: 'On a wide window: open a project page, add an action to it, change the notes, arm Complete — then press ✕ and Discard. Nothing should have happened: no new action, no changed notes, nothing completed. Now do the same and press Done: everything should have happened. Repeat on a habit page (change the cue, the days, and the pause switch) and on a note.' }
     ]);
     saveTasksLocal("next");
   }
@@ -11340,8 +11367,11 @@ function injectChunkMap(){
         list +
         // The handle's other half: an arrow on the drawer's own edge that puts
         // it away. Same shape and colour as #tray-handle, pointing the other
-        // way, so the pair reads as one control with two states.
+        // way, so the pair reads as one control with two states. Carries both
+        // looks (glyph + chevrons) the same way #tray-handle does — see the
+        // revision note in styles.css.
         '<button type="button" class="tray-edge-handle" data-action="close-tray" title="' + escapeHtml(t("tray.handleClose")) + '" aria-label="' + escapeHtml(t("tray.handleClose")) + '">' +
+          '<span class="tray-handle-glyph" aria-hidden="true">&#8249;</span>' +
           '<span class="tray-handle-chevron" aria-hidden="true"></span><span class="tray-handle-chevron" aria-hidden="true"></span>' +
         '</button>' +
       '</div>';

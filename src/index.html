@@ -48,9 +48,14 @@
      keeps data-action="open-tray" — the action name is the contract, not the
      button's position. Tap only: the left edge belongs to the browser's
      back-swipe gesture, so this must never be a drag target. It hides while the
-     drawer is open (the drawer's own arrow closes it). The two spans are line-
-     drawn chevrons (styles.css), not a font glyph — see the revision note there. -->
+     drawer is open (the drawer's own arrow closes it).
+     ⚑ Carries BOTH looks at once and lets styles.css pick one per breakpoint:
+     `.tray-handle-glyph` is the original single-arrow character (desktop,
+     unchanged since it was never the part flagged as distracting); the two
+     `.tray-handle-chevron` spans are the phone-only line-drawn double chevron.
+     Exactly one shows at a time — see the revision note in styles.css. -->
 <button id="tray-handle" type="button" data-action="open-tray" title="Intray" aria-label="Intray">
+  <span class="tray-handle-glyph" aria-hidden="true">&#8250;</span>
   <span class="tray-handle-chevron" aria-hidden="true"></span>
   <span class="tray-handle-chevron" aria-hidden="true"></span>
 </button>

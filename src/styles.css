@@ -1661,7 +1661,7 @@ body.has-frame .tray-drawer::after{
 }
 
 /* ============================================================================
-   THE INTRAY HANDLE  (both layouts — the one sanctioned phone change this round)
+   THE INTRAY HANDLE  (the one sanctioned phone change this round)
    ----------------------------------------------------------------------------
    The header's 📥 is gone. In its place a mark on the LEFT SCREEN EDGE, which
    is where the drawer actually comes from — the control now points at the
@@ -1672,46 +1672,39 @@ body.has-frame .tray-drawer::after{
    third still works; the handle is an affordance on top of it, not a
    replacement.
 
-   ⚑ REVISION (user: "it works, but it's visually distracting"). The first
-   build was a solid white tab — noticeable, but it read as a UI chrome block
-   sitting on top of the lanes rather than a discreet edge mark. Three changes,
-   same contract (data-action="open-tray" unchanged — see T2 in the redesign
-   plan): (1) no more background block — the button's hit area is invisible,
-   only the mark itself draws; (2) the mark is now two nested chevrons, drawn
-   as thin lines (border strokes, not a font glyph) rather than a single bold
-   arrow character, echoing the calendar's own ‹ › line-drawn nav arrows
-   instead of standing out as its own idiom; (3) it sits at the vertical
-   MIDPOINT of the screen (was 34%, an upper-third guess) — dead center reads
-   as "the edge has a handle," not "there's a button near the top."
+   ⚑ REVISION, PHONE ONLY (user: "it works, but it's visually distracting" —
+   later clarified as phone-only; the desktop block was fine as first shipped).
+   Below is the ORIGINAL solid-tab design, still the desktop default. The
+   revised, less-block-y design lives in the ≥1000px-max media query further
+   down and is overridden BACK to this look inside the desktop breakpoint.
+   ⚠ Two markup nodes ride together in the button now — `.tray-handle-glyph`
+   (the original single arrow character) and two `.tray-handle-chevron` spans
+   (the phone's line-drawn double chevron) — and each breakpoint shows exactly
+   one of the two, never both, never neither.
 
-   Hit area stays a real 44px-tall target even though nothing paints across
-   most of it — the chevrons are small on purpose, the tap target is not.
+   Hit area stays a real ≥44px-tall target on the phone even though little
+   paints across most of it on the newer look — the chevrons are small on
+   purpose, the tap target is not.
 
    z-index 150: over lane content and the header, UNDER the tray backdrop (210)
    and any drafting page (200). It rides OVER the gold band rather than being
-   inset from it — a mark on the edge of the desk, which reads correctly. It is
-   fully display:none — not just faint — the instant a drafting page opens
-   (below), so "not distracting" is guaranteed there by construction, not by
-   contrast alone.
+   inset from it — an object on the edge of the desk, which reads correctly.
+   It is fully display:none — not just faint — the instant a drafting page
+   opens (below), on EITHER layout.
 ============================================================================ */
 #tray-handle{
-  position:fixed; left:0; top:50%; transform:translateY(-50%); z-index:150;
-  width:22px; height:44px; padding:0;
-  border:none; background:transparent;
-  display:flex; align-items:center; justify-content:center; gap:2px;
-  color:rgba(237,231,218,0.5);
-  transition:opacity .14s ease, color .14s ease;
+  position:fixed; left:0; top:34%; z-index:150;
+  width:22px; min-height:58px; padding:12px 0;
+  border:none; border-radius:0 9px 9px 0;
+  background:rgba(244,240,232,0.93); color:#1a1408;
+  font-size:16px; font-weight:700; line-height:1;
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:2px 0 12px rgba(0,0,0,0.5);
+  transition:opacity .14s ease, background .14s ease;
 }
-#tray-handle:hover{ color:rgba(237,231,218,0.92); }
-/* Two nested line-drawn chevrons (». Each is a corner of a square, rotated 45°
-   so two adjoining border edges form a ">" stroke — the same construction as
-   the calendar's own line arrows, not a font character. The pair sits close
-   enough to read as one "expand this way" mark, not two separate arrows. */
-.tray-handle-chevron{
-  width:7px; height:7px; flex:0 0 auto;
-  border-top:2px solid currentColor; border-right:2px solid currentColor;
-  transform:rotate(45deg);
-}
+#tray-handle:hover{ background:#fff; }
+/* The phone-only chevrons are hidden by default (desktop shows the glyph). */
+.tray-handle-chevron{ display:none; }
 /* Hidden while the drawer is open, and back only AFTER the .28s slide-out — the
    class is dropped on the same 300ms timer the drawer's teardown uses, so it
    never pops in over a moving drawer. */
@@ -1719,23 +1712,51 @@ body.tray-open #tray-handle{ opacity:0; pointer-events:none; }
 /* A drafting page owns the whole screen; the handle would float over its scrim. */
 body.screen-open #tray-handle{ display:none; }
 
-/* The other half of the same control: a mark on the drawer's own edge that
-   puts it away. Same revision as #tray-handle — transparent hit area, nested
-   line chevrons (pointing the closing direction), same vertical midpoint, so
-   the pair still reads as one control with two states. position:fixed inside
-   the drawer (whose transform makes it the containing block) so it rides the
-   slide and ignores the drawer's scrolling. */
+/* The other half of the same control: an arrow on the drawer's own edge that
+   puts it away. position:fixed inside the drawer (whose transform makes it the
+   containing block) so it rides the slide and ignores the drawer's scrolling. */
 .tray-edge-handle{
-  position:fixed; right:0; top:50%; transform:translateY(-50%); z-index:2;
-  width:22px; height:44px; padding:0;
-  border:none; background:transparent;
-  display:flex; align-items:center; justify-content:center; gap:2px;
-  color:rgba(237,231,218,0.5);
-  transition:color .14s ease;
+  position:fixed; right:0; top:34%; z-index:2;
+  width:22px; min-height:58px; padding:12px 0;
+  border:none; border-radius:9px 0 0 9px;
+  background:rgba(244,240,232,0.93); color:#1a1408;
+  font-size:16px; font-weight:700; line-height:1;
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:-2px 0 12px rgba(0,0,0,0.45);
 }
-.tray-edge-handle:hover{ color:rgba(237,231,218,0.92); }
-/* Points the opposite way: the left+bottom edges rotated -135° draw a "‹" stroke. */
-.tray-edge-handle .tray-handle-chevron{ transform:rotate(-135deg); }
+.tray-edge-handle:hover{ background:#fff; }
+
+/* ▲ PHONE-ONLY REVISION (user: "it works, but it's visually distracting" —
+   the desktop block was intentionally left alone; only the phone was ever
+   meant to change). Below 1000px — the same number as DESKTOP_MIN_PX in
+   app.js, mirrored here as max-width so the two thresholds can never land on
+   different sides of the same pixel — both handles swap from a solid tab to a
+   quieter mark: no background block (only the mark itself draws), the single
+   bold glyph becomes two nested line-drawn chevrons (the same construction as
+   the calendar's own ‹ › nav arrows — border corners rotated 45°, not a font
+   character), and the vertical position moves from an upper-third guess to
+   the screen's dead center. */
+@media (max-width:999.98px){
+  #tray-handle, .tray-edge-handle{
+    top:50%; transform:translateY(-50%);
+    min-height:0; height:44px; padding:0; border-radius:0;
+    background:transparent; box-shadow:none;
+    gap:2px; color:rgba(237,231,218,0.5);
+  }
+  #tray-handle:hover, .tray-edge-handle:hover{ background:transparent; color:rgba(237,231,218,0.92); }
+  .tray-handle-glyph{ display:none; }
+  /* Two nested line-drawn chevrons. Each is a corner of a square, rotated 45°
+     so two adjoining border edges form a ">" stroke. The pair sits close
+     enough to read as one "expand this way" mark, not two separate arrows. */
+  .tray-handle-chevron{
+    display:block; width:7px; height:7px; flex:0 0 auto;
+    border-top:2px solid currentColor; border-right:2px solid currentColor;
+    transform:rotate(45deg);
+  }
+  /* The drawer's own arrow points the opposite way: the same corner rotated
+     -135° (225°) flips the stroke's tip from "›" to "‹". */
+  .tray-edge-handle .tray-handle-chevron{ transform:rotate(-135deg); }
+}
 
 /* One variable for the drawer's width, so the desktop widening (author note 1)
    is a single number and the jade inlay keeps working at either size. */

@@ -40,7 +40,7 @@ def check(cond, msg):
 # rewritten — the sweep test works by clearing the CURRENT flag to force a
 # re-injection, so a stale flag name here makes the whole file pass vacuously.
 EXPECTED = ["The desktop layout (do these on a computer)",
-            "The intray handle (redrawn — phone AND computer)",
+            "The intray handle (redrawn — PHONE ONLY)",
             "The tutorial is now a chain (②–⑥ in Waiting On)",
             "Make sure nothing else moved"]
 RETIRED = ["Chunk 7", "Chunk 8", "Per-occurrence", "Recheck chunk 6b",
@@ -52,7 +52,10 @@ RETIRED = ["Chunk 7", "Chunk 8", "Per-occurrence", "Recheck chunk 6b",
            "The seven things you reported", "The full event creation page",
            "Worth a second look after these fixes",
            # the round this one replaces — v2 swept v1's own three groups
-           "The intray handle (phone AND computer)"]
+           "The intray handle (phone AND computer)",
+           # and this superseded v2's own wording — the handle turned out to
+           # be phone-only, not both layouts
+           "The intray handle (redrawn — phone AND computer)"]
 CURRENT_FLAG = "gtd_qa_checklist_desktop_v2"
 SUPERSEDED_FLAGS = ["gtd_qa_checklist_chunk7_v1", "gtd_qa_checklist_override_v1",
                     "gtd_qa_checklist_override_v2", "gtd_qa_checklist_chunk8_v1",
