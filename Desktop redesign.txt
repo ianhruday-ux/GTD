@@ -1,0 +1,25 @@
+Desktop redesign
+1. The intray should pull out a bit further.
+
+2. The tray should be marked on the lefthand side as expandible, there should be floating white arrow buttons that will do the job instead of the current tray button.
+
+3. The screen is wide enough that we can have three lanes. on the left, you should be able to toggle between actions and waiting actions. In the middle you should toggle between projects and future projects. On the right you should be able to toggle between notes and habits.
+
+4. The lane headers can be bigger, use the full words instead of the letters, and should only be in one layer across the top.
+
+5. The floating badge doesn't make sense for the desktop. Put the list options as separate buttons under the header for the appropriate lane. For example, notes should have "+ New Note", "+ New Checklist", and "Tags."
+
+6. The creation, drafting, and review  pages should be resized and organized for a desktop layout. For example, the complete button should probably be moved to the middle of the page. The arrow should probably be replaced with a "done" button and moved somewhere prominent, and you should do the same with the delete button. This one might require a conversation, and I'd like to get some input before committing to anything.
+
+7. The calendar should probably be a popup, but I'd like to get your input on that.
+
+8. I'd like some input on this before you go through with it. Take the languages and backgrounds options out of the settings menu and put them as their own dropdowns on the top left. Put the calendar button beside the languages and backgrounds options. Turn the settings menu button into a gear icon and leave it on the top right.
+
+9. The "OELA" label should be moved to the center.
+
+10. The goldleaf boarder should go around the whole page. Don't try to make it work in the individual lanes. That would just be visually confusing and would probably cause problems.
+
+Standing instructions
+1. Don't build anything until we've had a conversation. about it.
+
+2. Write a markdown document predicting some of the potential challenges with this build so that a future session will know what traps to look out for.
