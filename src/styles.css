@@ -258,6 +258,12 @@ body.screen-open #dev-toolbar:not([hidden]) > *{ pointer-events:auto; }
 body.screen-open #dev-toolbar:not([hidden]) ~ .it-moved-banner{
   bottom:calc(128px + env(safe-area-inset-bottom));
 }
+/* Same collision, same fix: the SW update banner is also fixed bottom-centre
+   at the same z-index, so it needs the identical lift while the dev QA bar
+   floats over an open drafting page. */
+body.screen-open #dev-toolbar:not([hidden]) ~ .sw-update-banner{
+  bottom:calc(128px + env(safe-area-inset-bottom));
+}
 
 /* ----------------------------------------------------------------------------
    BUTTONS  (= carried over =)
@@ -1603,6 +1609,25 @@ body.has-frame .tray-drawer::after{
   opacity:0; transition:opacity .28s ease, transform .28s ease; pointer-events:none; max-width:88vw; text-align:center;
 }
 .it-moved-banner.show{ opacity:1; transform:translate(-50%, 0); }
+
+/* Chunk 9: the service worker's update-ready banner. Same visual language as
+   .it-moved-banner (fixed, bottom-centre, paper-2/brass chrome) but this one
+   is interactive — pointer-events stay on, and it has no auto-dismiss, since
+   it sits there until the user acts or the tab closes. */
+.sw-update-banner{
+  position:fixed; left:50%; bottom:calc(28px + env(safe-area-inset-bottom)); transform:translateX(-50%);
+  z-index:60; background:var(--paper-2); color:var(--text-primary); border:1px solid var(--brass);
+  border-radius:20px; padding:10px 10px 10px 18px; font-size:13px; font-weight:600;
+  box-shadow:0 6px 18px rgba(0,0,0,0.5); max-width:88vw;
+  display:flex; align-items:center; gap:12px;
+}
+.sw-update-banner[hidden]{ display:none; }
+.sw-update-reload{
+  border:none; border-radius:14px; padding:7px 14px; font-size:12.5px; font-weight:700;
+  background:var(--brass); color:var(--dark-on-accent); flex:none;
+}
+.sw-update-reload:hover{ filter:brightness(1.08); }
+.sw-update-reload:active{ transform:translateY(1px); }
 
 /* ----------------------------------------------------------------------------
    REDUCED MOTION — honor the OS preference (quality floor).

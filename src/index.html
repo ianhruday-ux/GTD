@@ -128,6 +128,14 @@
 
 <footer id="footer-note">Data lives in this browser's local storage.</footer>
 
+<!-- Chunk 9: the service worker's one visible surface. Non-modal, never
+     steals an in-progress edit — the update only applies when tapped.
+     Hidden until swClient.js has an update ready to offer. -->
+<div id="sw-update-banner" class="sw-update-banner" hidden>
+  <span class="sw-update-msg"></span>
+  <button type="button" class="sw-update-reload" data-action="sw-reload"></button>
+</div>
+
 <div id="tray-root"></div>
 <div id="screen-root"></div>
 <div id="dialog-root"></div>

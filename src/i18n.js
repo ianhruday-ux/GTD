@@ -692,6 +692,10 @@ const STRINGS = {
   "seed.habit.reviewProj.title": { en: "Review my projects",          "zh-Hans": "回顾我的项目" },
   "seed.habit.reviewProj.notes": { en: "Someone who finishes what they start.", "zh-Hans": "一个能把开始的事情做完的人。" },
   "seed.habit.reviewProj.cue":  { en: "After my Friday coffee",       "zh-Hans": "周五喝完咖啡之后" },
+
+  // ---- service worker update banner (chunk 9) ----
+  "sw.updateBanner.message": { en: "New version available",          "zh-Hans": "有新版本可用" },
+  "sw.updateBanner.reload":  { en: "Reload",                         "zh-Hans": "重新加载" },
 };
 
 // ⚑ Dev aid, deliberately loud. A missing key used to be the silent failure that
@@ -739,6 +743,7 @@ function applyLocale(){
   if (typeof restampSeedDefaults === "function") restampSeedDefaults();
   if (typeof renderShell === "function") renderShell();
   if (typeof renderTabLabels === "function") renderTabLabels();
+  if (typeof renderSwUpdateBannerLabels === "function") renderSwUpdateBannerLabels();
   // Desktop round: the header's Language/Background dropdowns carry their own
   // labels in their own language, and setLocale knows nothing about them
   // otherwise (trap T12).

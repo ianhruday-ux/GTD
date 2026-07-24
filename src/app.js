@@ -6061,11 +6061,10 @@
     if (touched){ renderLane("next"); renderLane("current"); }
   }
   function injectQAChecklist(){
-    // POST-SPRINT round — replaces chunk 7, the per-occurrence follow-up AND
-    // chunk 8 (the user has finished walking all three). §8.1's replace-don't-
-    // accumulate discipline is restored: this is the ONLY injector again, and
-    // the two additive ones are deleted rather than left dormant.
-    const FLAG = "gtd_qa_checklist_desktop_v2";
+    // CHUNK 9 round — the service worker (service-worker-plan.md). §8.1's
+    // replace-don't-accumulate discipline: this is the ONLY injector, and the
+    // desktop round's groups below are swept out, not left dormant.
+    const FLAG = "gtd_qa_checklist_sw_v1";
     if (Storage.get(FLAG)) return;
     Storage.set(FLAG, "1");
     // Retire the superseded flags so they can't resurrect their injectors, and
@@ -6075,7 +6074,8 @@
      "gtd_qa_checklist_postsprint_v1", "gtd_qa_checklist_postsprint_v2",
      "gtd_qa_checklist_postsprint_v3", "gtd_qa_checklist_postsprint_v4",
      "gtd_qa_checklist_postsprint_v5", "gtd_qa_checklist_postsprint_v6",
-     "gtd_qa_checklist_postsprint_v7", "gtd_qa_checklist_desktop_v1"].forEach(Storage.remove);
+     "gtd_qa_checklist_postsprint_v7", "gtd_qa_checklist_desktop_v1",
+     "gtd_qa_checklist_desktop_v2"].forEach(Storage.remove);
 
     // Replace, don't accumulate (8.1) — and actually mean it this time.
     // Earlier rounds bumped the flag but left the previous rounds' groups
@@ -6104,38 +6104,22 @@
       });
     }
 
-    addGroupWithItems('✅ QA — The desktop layout (do these on a computer)', [
-      { title: '1. Three lanes appear when the window is wide', notes: 'Open the app on a computer and make the window nearly full-screen. You should see three columns instead of one: Next Actions on the left, Current Projects in the middle, Notes on the right — each with its name in full words along the top, not a letter. Now drag the window narrower and narrower. At about half a laptop screen it should snap back to the phone app you already know, tab bar and all. Drag it wide again and the three columns should come back. Nothing should end up half-and-half: three columns AND the floating + would be wrong.' },
-      { title: '2. Each column toggles between its two lists', notes: 'At the top of each column are two names side by side; the lit one is what you are looking at. Tap the other one. The LEFT column should swap between Next Actions and Waiting On, the MIDDLE between Current Projects and Someday, the RIGHT between Notes and Habits — and each should only change its own column. The number beside each name is how many things are in that list, including the one you are not looking at; that number is the reason to switch.' },
-      { title: '3. Every column has its own create buttons', notes: 'The floating + is gone on a wide screen. Under each column’s header are real buttons for that list: Notes should show "+ New note", "+ New checklist" and "Tags"; Next Actions "+ New action" and "+ New context"; Habits just "+ New habit". Test the one that matters: with Next Actions showing on the left, use the NOTES column’s buttons. They must make notes, not actions. Getting a new action out of the Notes column is the specific bug to watch for.' },
-      { title: '4. Creating and editing happens in a card', notes: 'Open anything to edit it. Instead of a page sliding in from the right, a card should appear in the middle with the lanes dimmed behind it. Check: "Done" is at the bottom RIGHT and is the filled, obvious button; "Delete" is at the bottom LEFT and is red; the ✕ is at the top right. Done should save and close, exactly like the old ← did. Delete should still ask before it deletes.' },
-      { title: '5. Complete and Convert sit together in one box', notes: 'Open an existing next action. Near the bottom of the card, inside a bordered box, should be the Complete button and the "Make Waiting Action" button together. Arm one and the other should go grey right beside it — that is the whole point of putting them together. Hover the greyed one and a tooltip should tell you why. Neither should do anything until you press Done.' },
-      { title: '6. Closing an edited page now asks first', notes: 'This one is on the phone too. Open something, change the title, and press ✕ (or Escape). It should ask "Discard your changes?" — choose Keep editing and your change should still be there; choose Discard and it must be gone from the list. Then open something and press ✕ WITHOUT changing anything: it should close straight away with no question. Also try starting a brand-new item and pressing ✕ before typing — no question. And with something armed to Complete but not saved: ✕ should ask.' },
-      { title: '7. The calendar opens as a wide popup', notes: 'Press the calendar button in the header. It should open as a big card in the middle with room for the whole month, not squeezed into a phone-width column. Check the ‹ › arrows change the month, the Month / Day / List tabs work, and the creation controls at the bottom still make an event. Opening an event from the calendar and pressing Done should put you back on the calendar, not out at the lanes.' },
-      { title: '8. The header: languages, backgrounds, calendar, gear', notes: 'Top left should have a Language dropdown, a Background dropdown, and the calendar button. OELA should be centred. The settings button top right should be a gear. Open the gear menu: Language and Background should NOT be in it any more — they moved. Switch language from the header dropdown and check the whole app changes, including the dropdown’s own label. Open one dropdown then the other: only one should ever be open. Press Escape with a dropdown open — it should close the dropdown and nothing else.' },
-      { title: '9. All four backgrounds, both window widths', notes: '⚙ → Background, and look at each of the four. Only the black lacquer one has the gold border. On a wide window that border should go around the WHOLE page, header included, and follow the window when you resize it. On the other three there should be no border and no leftover empty margin where one used to be. Then narrow the window and check the lacquer border is back to wrapping just the lists and growing as you scroll.' }
+    addGroupWithItems('✅ QA — Works with no internet (do this on your phone)', [
+      { title: '1. Open it once online first', notes: 'Before testing offline, open the app normally with the internet on, and let it fully load — this is the one-time "install" that lets everything below work. You only need to do this once per device.' },
+      { title: '2. Turn on airplane mode and reopen it', notes: 'Fully close the app (swipe it away, don’t just leave it in the background), turn on airplane mode, then open the app again. It should look and load exactly the same as always — no error screen, no spinner that never finishes, no blank white page.' },
+      { title: '3. It still works while offline, not just opens', notes: 'Still in airplane mode: create a next action, tick something complete, open a project. Everything should work normally. Turn airplane mode back off when you’re done.' }
     ]);
 
-    addGroupWithItems('✅ QA — The intray handle (redrawn — PHONE ONLY)', [
-      { title: '10. On the phone, a small edge mark opens the intray, not a white block', notes: 'The revised look is PHONE ONLY — the computer keeps the original solid white tab, deliberately, per your last note. On the phone: it used to be a solid white tab; it is now a small pair of nested arrow-lines ( » ) with nothing solid behind them, sitting at the exact vertical MIDDLE of the screen (it used to be a third of the way down). Tap it: the drawer should slide in. While the drawer is open the mark should disappear, and a matching mark on the drawer’s own edge (pointing the other way, ‹‹ ) should put it away.' },
-      { title: '11. Is the phone version noticeable enough, or too little?', notes: 'This is the judgement call I want your eyes on. The old white tab was flagged as distracting; this version has no background block, just the two thin arrow-lines, dimmed until you tap near them. Tell me if it now reads as too subtle to notice on first use.' },
-      { title: '12. Confirm the computer really did not change', notes: 'Widen the window past a laptop size and look at the same edge. It should be the ORIGINAL solid white tab with a single arrow, at the upper-third position, unchanged from before I touched it. If it looks like the phone version (no background, two thin lines, dead-center), that is the bug this round exists to fix — tell me right away.' },
-      { title: '13. On the phone, it still must not fight the browser', notes: 'TAP the mark — that should work. Now try to SWIPE from it: the browser’s back gesture lives on that edge, so it is deliberately tap-only. The old swipe-in from the left third of the screen should still open the drawer as before.' },
-      { title: '14. It never sits on top of a drafting page, on either size', notes: 'Open anything to edit — a next action, a note, a project. The handle should vanish completely the instant the page opens (not just fade), on both the phone and a wide window, and come back the moment you close the page.' },
-      { title: '15. The intray is wider on a computer', notes: 'Open the drawer on a wide window — it should be noticeably wider than on the phone, with room for longer captured lines. On the black lacquer background, the green jade strip down its inner edge should still be there and still look like stone rather than a flat green line.' }
+    addGroupWithItems('✅ QA — The "New version available" bar', [
+      { title: '4. Note the build number before you start', notes: 'Open ⋯ (the gear menu) and look at the small "Build …" line — write down or remember what it says, so you can tell later whether the update actually took.' },
+      { title: '5. Get a new version pushed, then just wait', notes: 'Tell me when you’re ready and keep the app open on your phone (don’t close it) while I ship a small change. After a little while a small bar should appear near the bottom of the screen saying "New version available" with a Reload button — you don’t need to do anything to make it appear, it should show up on its own.' },
+      { title: '6. Tap Reload', notes: 'Tap the Reload button on that bar. The app should reload itself (you’ll see it flash/refresh) and the bar should go away. Open ⋯ again and check the Build line — it should now be different from what you wrote down in step 4.' },
+      { title: '7. It never interrupted anything', notes: 'This one matters: the bar should NEVER pop up while you are in the middle of typing something or editing a page — only when you are just looking at your lists, or it should simply wait quietly until you close whatever you had open. If it ever appears and grabs your attention away from something you were typing, or reloads the page without you tapping Reload, tell me right away — that specifically must not happen.' }
     ]);
 
-    addGroupWithItems('✅ QA — The tutorial is now a chain (②–⑥ in Waiting On)', [
-      { title: '16. Steps ②–⑥ start together in Waiting On', notes: 'Reset the app to defaults (or read this on a fresh install) and open Waiting On. You should see FIVE tutorial cards there at once — ②③④⑤⑥ — not just ② the way it used to be. Next Actions should show only ① and your other samples; Current Projects should show a project marked ◆ (linked to step ②) and one marked ◇ (the stalled one for step ⑤).' },
-      { title: '17. Completing one reveals the next, all the way through', notes: 'Tick ① in Next Actions. ② should jump up into Next Actions on its own — same as before. Now tick ②: ③ should jump up next. Keep going through ④, ⑤, ⑥ — each tick should bring the next one up out of Waiting On by itself, without you ever creating or hooking anything by hand. If any step just sits in Waiting On and never appears in Next Actions, that is the bug to report, and say which step.' },
-      { title: '18. No step ever looks broken while it is waiting its turn', notes: 'While a step sits in Waiting On waiting for its turn (for example, look at ④ right after you have ticked ② but before ticking ③), its little "After …" pill should read normally, in the ordinary colour. It must NOT turn red / show as broken — that would be the exact bug I found and fixed while building this. If you see red "After a deleted item" wording on a step that has NOT been deleted, tell me which step and what you had just done.' },
-      { title: '19. The reference project (◆) never shows up as stalled', notes: 'Open 🔍 Review from the intray. Only the ◇ sample (step ⑤’s stalled project) should turn up needing a next step — the ◆ project should NOT appear, because step ②’s waiting action already counts as its way forward, wherever step ② currently sits in the chain.' },
-      { title: '20. Both languages, and nothing left half-translated', notes: 'Switch to 中文 with the chain still mid-way (tick ① and ② first, so ③ is sitting in Waiting On). All five visible steps’ text, and the little "挂在…上" wait-for pill, should be in Chinese, not English. Switch back to English the same way.' }
-    ]);
-
-    addGroupWithItems('✅ QA — Make sure nothing else moved', [
-      { title: '21. The phone app is unchanged apart from the handle and the tutorial', notes: 'On your phone, walk through the things you use most: the tab bar, the floating +, creating an action, a project with staged actions, the daily review, a habit. Everything should look and behave exactly as it did before these two rounds. The intended changes are: the intray handle, the "discard your changes?" question, and the tutorial now being a chain. Anything else that looks different is a bug — tell me what and where.' },
-      { title: '22. Nothing saves that should not', notes: 'On a wide window: open a project page, add an action to it, change the notes, arm Complete — then press ✕ and Discard. Nothing should have happened: no new action, no changed notes, nothing completed. Now do the same and press Done: everything should have happened. Repeat on a habit page (change the cue, the days, and the pause switch) and on a note.' }
+    addGroupWithItems('✅ QA — One quick pass per device', [
+      { title: '8. Repeat the offline check on your computer', notes: 'Same as items 2–3 above, but in whatever browser you use on your computer: fully close the tab, disconnect from the internet (or use the browser’s offline mode if you know how), reopen it, confirm it still loads and works.' },
+      { title: '9. If you try it on an iPhone: add it to the home screen first', notes: 'iPhones only save the offline copy properly once the app is added to the home screen (Share button → "Add to Home Screen"). Do that first, then repeat the offline check from the home-screen icon, not from Safari directly.' }
     ]);
     saveTasksLocal("next");
   }
@@ -7807,6 +7791,8 @@
     // yet (the calendar creation row, an event page opened later).
     initTimePickerFields();
     openTray(); // §4.8a: auto-open on launch — capture is the first job
+    renderSwUpdateBannerLabels(); // chunk 9: static markup, translated like tab labels
+    initServiceWorker(); // chunk 9: offline cache + the update-ready banner
   }
 
   document.addEventListener("DOMContentLoaded", boot);

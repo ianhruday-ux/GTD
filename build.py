@@ -19,6 +19,8 @@ The manifest and icons ship as separate files alongside dist/index.html
 else the app needs is in the one HTML file.
 """
 import datetime
+import hashlib
+import json
 import shutil
 import sys
 import time
@@ -35,9 +37,18 @@ DIST = REPO / "dist"
 # ⚠ i18n.js sits right after storage.js and must STAY early: its STRINGS/LOCALES
 # are `const`, so they are in the temporal dead zone until this file is
 # evaluated. Function declarations hoist and do not care about order; consts do.
-JS_MODULES = ["storage.js", "i18n.js", "textures.js", "surface.js", "runner.js", "pickers.js", "chunkMap.js", "app.js", "events.js"]
+JS_MODULES = ["storage.js", "i18n.js", "textures.js", "surface.js", "runner.js", "pickers.js", "chunkMap.js", "app.js", "events.js", "swClient.js"]
 
 ASSET_FILES = ["manifest.webmanifest", "icon.svg", "icon-192.png", "icon-512.png"]
+
+# Chunk 9 (service-worker-plan.md §5): the SW's precache list is DERIVED from
+# what build() actually ships, so it can't drift from ASSET_FILES by hand-
+# maintaining a second copy. "index.html" covers the app shell; the bare scope
+# root ("./") is deliberately NOT precached here — sw.js's fetch handler serves
+# the cached index.html for every navigation instead (the navigation-fallback
+# trap, plan §9.2), which covers the bare-directory-URL case without a second,
+# redundant precache fetch of the same bytes under a different cache key.
+SW_PRECACHE_FILES = ["index.html"] + ASSET_FILES
 
 
 def build_stamp():
@@ -61,6 +72,36 @@ def build_stamp():
     "is this the build I just made?" -- and it cannot be wrong.
     """
     return datetime.datetime.now().strftime("%d %b %H:%M")
+
+
+def sw_version(out_html, asset_bytes):
+    """Content hash of everything the SW precaches (service-worker-plan.md §4.2).
+
+    NOT build_stamp() — that's minute-resolution ("%d %b %H:%M"), so two builds
+    in the same minute would collide and the second would be served from the
+    first's cache. A content hash also means "no bytes changed -> same version
+    -> no needless update prompt" for free.
+    """
+    h = hashlib.sha256()
+    h.update(out_html.encode("utf-8"))
+    for b in asset_bytes:
+        h.update(b)
+    return h.hexdigest()[:12]
+
+
+def build_sw(out_html, asset_bytes):
+    template = (SRC / "sw.js").read_text(encoding="utf-8")
+    version = sw_version(out_html, asset_bytes)
+
+    if "__SW_VERSION__" not in template:
+        sys.exit("build.py: __SW_VERSION__ placeholder is missing from src/sw.js")
+    if "__SW_PRECACHE__" not in template:
+        sys.exit("build.py: __SW_PRECACHE__ placeholder is missing from src/sw.js")
+
+    script = template.replace("__SW_VERSION__", version)
+    script = script.replace("__SW_PRECACHE__", json.dumps(SW_PRECACHE_FILES))
+    (DIST / "sw.js").write_text(script, encoding="utf-8", newline="\n")
+    return version
 
 
 def build():
@@ -88,15 +129,19 @@ def build():
     DIST.mkdir(exist_ok=True)
     (DIST / "index.html").write_text(out, encoding="utf-8", newline="\n")
 
+    asset_bytes = []
     for name in ASSET_FILES:
         src_path = SRC / "assets" / name if name != "manifest.webmanifest" else SRC / name
         shutil.copyfile(src_path, DIST / name)
+        asset_bytes.append(src_path.read_bytes())
 
-    print(f"built {DIST / 'index.html'} ({len(out)} bytes)")
+    version = build_sw(out, asset_bytes)
+
+    print(f"built {DIST / 'index.html'} ({len(out)} bytes), sw {version}")
 
 
 def watch():
-    watched = [SRC / "index.html", SRC / "styles.css"] + [SRC / m for m in JS_MODULES]
+    watched = [SRC / "index.html", SRC / "styles.css", SRC / "sw.js"] + [SRC / m for m in JS_MODULES]
     build()
     mtimes = {f: f.stat().st_mtime for f in watched}
     print("watching src/ for changes (Ctrl+C to stop)...")
