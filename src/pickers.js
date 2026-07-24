@@ -165,26 +165,26 @@ function openTimePicker(value, opts, onDone){
 
   const root = document.getElementById("dialog-root");
   root.innerHTML =
-    '<div class="tp-backdrop" role="dialog" aria-modal="true" aria-label="Choose a time">' +
+    '<div class="tp-backdrop" role="dialog" aria-modal="true" aria-label="' + escapeHtml(t("picker.chooseTime")) + '">' +
       '<div class="tp-card">' +
-        '<div class="tp-title">Select time</div>' +
+        '<div class="tp-title">' + escapeHtml(t("picker.selectTime")) + '</div>' +
         '<div class="tp-readout">' +
-          '<button type="button" class="tp-unit" data-tp="hour" aria-label="Hour"></button>' +
+          '<button type="button" class="tp-unit" data-tp="hour" aria-label="' + escapeHtml(t("picker.hour")) + '"></button>' +
           '<span class="tp-colon">:</span>' +
-          '<button type="button" class="tp-unit" data-tp="minute" aria-label="Minute"></button>' +
+          '<button type="button" class="tp-unit" data-tp="minute" aria-label="' + escapeHtml(t("picker.minute")) + '"></button>' +
           '<div class="tp-ampm">' +
-            '<button type="button" data-tp="am">AM</button>' +
-            '<button type="button" data-tp="pm">PM</button>' +
+            '<button type="button" data-tp="am">' + escapeHtml(t("picker.am")) + '</button>' +
+            '<button type="button" data-tp="pm">' + escapeHtml(t("picker.pm")) + '</button>' +
           '</div>' +
         '</div>' +
         '<div class="tp-dial" data-tp="dial">' +
           '<div class="tp-hand"></div><div class="tp-knob"></div><div class="tp-hub"></div>' +
         '</div>' +
         '<div class="tp-btns">' +
-          (options.allowClear ? '<button type="button" class="tp-clear" data-tp="clear">Clear</button>' : "") +
+          (options.allowClear ? '<button type="button" class="tp-clear" data-tp="clear">' + escapeHtml(t("picker.clear")) + '</button>' : "") +
           '<span class="tp-spacer"></span>' +
-          '<button type="button" data-tp="cancel">Cancel</button>' +
-          '<button type="button" data-tp="set">Set</button>' +
+          '<button type="button" data-tp="cancel">' + escapeHtml(t("picker.cancel")) + '</button>' +
+          '<button type="button" data-tp="set">' + escapeHtml(t("picker.set")) + '</button>' +
         '</div>' +
       '</div>' +
     '</div>';
@@ -345,9 +345,10 @@ function timePickerFieldValue(el){ return el.value || ""; }
  * Value format is unchanged, "YYYY-MM-DD", so every existing reader is
  * untouched — same approach the time picker took.
  * ============================================================ */
-const DP_DOW = ["S", "M", "T", "W", "T", "F", "S"];
-const DP_MONTHS = ["January", "February", "March", "April", "May", "June", "July",
-                   "August", "September", "October", "November", "December"];
+// Functions, not consts: called at render time so a language switch is
+// picked up, same as the calendar's own monthName/dowShortList (events.js).
+function dpDowList(){ return [0, 1, 2, 3, 4, 5, 6].map(function(i){ return t("habit.dowLetter." + i); }); }
+function dpMonthName(i){ return t("cal.month." + i); }
 
 const DATE_PICKER_CSS = `
 .dp-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:2px; }
@@ -415,21 +416,21 @@ function openDatePicker(value, opts, onDone){
 
   const root = document.getElementById("dialog-root");
   root.innerHTML =
-    '<div class="tp-backdrop" role="dialog" aria-modal="true" aria-label="Choose a date">' +
+    '<div class="tp-backdrop" role="dialog" aria-modal="true" aria-label="' + escapeHtml(t("picker.chooseDate")) + '">' +
       '<div class="tp-card">' +
-        '<div class="tp-title">Select date</div>' +
+        '<div class="tp-title">' + escapeHtml(t("picker.selectDate")) + '</div>' +
         '<div class="dp-nav">' +
-          '<button type="button" data-dp="prev" aria-label="Previous month">&#8249;</button>' +
+          '<button type="button" data-dp="prev" aria-label="' + escapeHtml(t("picker.previousMonth")) + '">&#8249;</button>' +
           '<span class="dp-label"></span>' +
-          '<button type="button" data-dp="next" aria-label="Next month">&#8250;</button>' +
+          '<button type="button" data-dp="next" aria-label="' + escapeHtml(t("picker.nextMonth")) + '">&#8250;</button>' +
         '</div>' +
         '<div class="dp-grid" data-dp="grid"></div>' +
         '<div class="tp-btns">' +
-          (options.allowClear ? '<button type="button" class="tp-clear" data-dp="clear">Clear</button>' : "") +
-          '<button type="button" class="tp-clear" data-dp="today">Today</button>' +
+          (options.allowClear ? '<button type="button" class="tp-clear" data-dp="clear">' + escapeHtml(t("picker.clear")) + '</button>' : "") +
+          '<button type="button" class="tp-clear" data-dp="today">' + escapeHtml(t("picker.today")) + '</button>' +
           '<span class="tp-spacer"></span>' +
-          '<button type="button" data-dp="cancel">Cancel</button>' +
-          '<button type="button" data-dp="set">Set</button>' +
+          '<button type="button" data-dp="cancel">' + escapeHtml(t("picker.cancel")) + '</button>' +
+          '<button type="button" data-dp="set">' + escapeHtml(t("picker.set")) + '</button>' +
         '</div>' +
       '</div>' +
     '</div>';
@@ -439,8 +440,8 @@ function openDatePicker(value, opts, onDone){
   const label = root.querySelector(".dp-label");
 
   function render(){
-    label.textContent = DP_MONTHS[viewM] + " " + viewY;
-    let html = DP_DOW.map(function(d){ return '<div class="dp-dow">' + d + "</div>"; }).join("");
+    label.textContent = dpMonthName(viewM) + " " + viewY;
+    let html = dpDowList().map(function(d){ return '<div class="dp-dow">' + escapeHtml(d) + "</div>"; }).join("");
     const first = new Date(viewY, viewM, 1).getDay();
     const days = new Date(viewY, viewM + 1, 0).getDate();
     for (let i = 0; i < first; i++) html += '<button type="button" class="dp-cell" disabled></button>';

@@ -50,6 +50,12 @@ def check(cond, msg):
 PROJECT = {"id": "zz-proj", "title": "ZZ build the shed", "notesClean": "",
            "linkedProjectId": None, "isGroup": False, "parent": None,
            "whenText": None, "deadline": None, "contextId": None}
+# ⚠ Injected rather than relying on seedData()'s old "Learn woodworking" Someday
+# sample — that generic filler was removed (starter kit is now just the seeded
+# contexts/habits + the in-lane tutorial), so the Someday lane check below needs
+# its own fixture the same way the Current-lane one above already gets injected.
+FUTURE_PROJECT = {"id": "zz-future-proj", "title": "ZZ someday project", "notesClean": "",
+                   "linkedProjectId": None, "isGroup": False, "parent": None}
 # editedAt ascending, so "most recent first" is the REVERSE of this order
 NOTES = [
     {"id": "n-old", "title": "ZZ oldest note", "body": "", "editedAt": 1000,
@@ -74,12 +80,15 @@ with serve(DIST) as url, sync_playwright() as p:
     # check passes without testing anything.
     enable_qa_scaffolding(pg)
 
-    pg.evaluate("""([proj, ns]) => {
+    pg.evaluate("""([proj, futureProj, ns]) => {
       const cur = JSON.parse(localStorage.getItem('gtd_tasks_current') || '[]');
       localStorage.setItem('gtd_tasks_current',
         JSON.stringify(cur.filter(t => t.id !== proj.id).concat([proj])));
+      const fut = JSON.parse(localStorage.getItem('gtd_tasks_future') || '[]');
+      localStorage.setItem('gtd_tasks_future',
+        JSON.stringify(fut.filter(t => t.id !== futureProj.id).concat([futureProj])));
       localStorage.setItem('gtd_notes', JSON.stringify(ns));
-    }""", [PROJECT, NOTES])
+    }""", [PROJECT, FUTURE_PROJECT, NOTES])
     pg.reload(); pg.wait_for_timeout(1100)
 
     def open_project():
@@ -293,7 +302,7 @@ with serve(DIST) as url, sync_playwright() as p:
     }""")
     pg.wait_for_timeout(250)
     pg.click('.tab[data-kind="future"]'); pg.wait_for_timeout(450)
-    pg.locator('.lane.active-lane .card-title').first.click(); pg.wait_for_timeout(600)
+    pg.locator('.card-title:has-text("ZZ someday project")').first.click(); pg.wait_for_timeout(600)
     labels = pg.evaluate("""() => [...document.querySelectorAll('.screen-hook-pick-label')]
       .map(e => e.textContent.trim())""")
     check("Linked notes" in labels, f"a Someday project page has a Linked notes section ({labels})")
@@ -304,7 +313,7 @@ with serve(DIST) as url, sync_playwright() as p:
 
     pg.locator('[data-action="new-linked-note"]').first.click(); pg.wait_for_timeout(650)
     chips = pg.evaluate("() => [...document.querySelectorAll('.note-chip')].map(e => e.textContent.trim())")
-    check(any("Learn woodworking" in c for c in chips),
+    check(any("ZZ someday project" in c for c in chips),
           f"the new note arrives pre-linked to it ({chips})")
     pg.fill('[data-field="noteTitle"]', "ZZ someday note")
     pg.click('[data-action="screen-save"]'); pg.wait_for_timeout(600)
@@ -315,7 +324,7 @@ with serve(DIST) as url, sync_playwright() as p:
     saved = pg.evaluate("""() => { const n = JSON.parse(localStorage.getItem('gtd_notes') || '[]')
       .find(x => x.title === 'ZZ someday note');
       return n ? (n.projectLinks || []).map(l => l.name) : null; }""")
-    check(saved and "Learn woodworking" in saved, f"and the link persists ({saved})")
+    check(saved and "ZZ someday project" in saved, f"and the link persists ({saved})")
 
     # ---------- the notes picker splits the two lanes ----------
     pg.click('.tab[data-kind="notes"]'); pg.wait_for_timeout(450)
@@ -330,9 +339,9 @@ with serve(DIST) as url, sync_playwright() as p:
       .map(l => [...l.querySelectorAll('.screen-hook-pick-item')].map(i => i.textContent.trim()))""")
     cur_sec = sections[1] if len(sections) > 1 else []
     fut_sec = sections[2] if len(sections) > 2 else []
-    check(any("Learn woodworking" in t for t in fut_sec),
+    check(any("ZZ someday project" in t for t in fut_sec),
           f"Someday projects are in the Someday section ({fut_sec})")
-    check(not any("Learn woodworking" in t for t in cur_sec),
+    check(not any("ZZ someday project" in t for t in cur_sec),
           f"and not in the current one ({cur_sec[:4]})")
     # ⚠ The chunk map injects ~26 rows into Current Projects. They are dev
     # scaffolding (devContext), and they were burying the real projects here.

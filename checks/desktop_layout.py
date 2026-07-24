@@ -211,10 +211,19 @@ def main():
         w = pg.evaluate("""() => { const c = document.querySelector('.screen-overlay[data-kind="calendar"] .screen-card');
           return c ? Math.round(c.getBoundingClientRect().width) : 0; }""")
         check(800 < w <= 900, "the calendar card is ~900px wide: %d" % w)
-        check(pg.evaluate("""() => { const b = document.querySelector('.screen-overlay[data-kind="calendar"] .screen-body');
-              const g = document.querySelector('.cal-cells');
-              return !!g && g.getBoundingClientRect().width > 700; }"""),
-              "the month grid actually grew with it (trap T11)")
+        # ⚑ REVERSED (author QA: "the calendar is wide, but it is too tall").
+        # T11 used to assert the grid grows to fill the widened 900px card —
+        # that WAS the bug: 7 equal columns with a fixed cell aspect-ratio
+        # means growing the grid's WIDTH grows its HEIGHT right along with it,
+        # six rows stacking past 800px tall. The fix (styles.css, .cal-body
+        # --cal-cell-w) caps the grid at 660px regardless of the card's width —
+        # so the correct assertion is now the opposite of the original trap.
+        grid = pg.evaluate("""() => { const g = document.querySelector('.cal-cells');
+              return g ? { w: Math.round(g.getBoundingClientRect().width), h: Math.round(g.getBoundingClientRect().height) } : null; }""")
+        check(grid and 600 <= grid["w"] <= 700,
+              f"the month grid is capped at ~660px, NOT grown to match the wide card ({grid})")
+        check(grid and grid["h"] < 700,
+              f"...which keeps six rows from ballooning past a reasonable height ({grid})")
         pg.click('[data-action="cal-close"]'); pg.wait_for_timeout(400)
 
         print("\n-- the tray --")

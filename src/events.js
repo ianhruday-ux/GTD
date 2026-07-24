@@ -24,14 +24,17 @@
 //    ID across every roll (§4.15b, §4.14a).
 // =========================================================
 
-const RECUR_OPTIONS = [
-  { v: "none", label: "Does not repeat" },
-  { v: "daily", label: "Daily" },
-  { v: "weekly", label: "Weekly" },
-  { v: "monthly", label: "Monthly" },
-  { v: "yearly", label: "Yearly" }
-];
-const RECUR_LABEL = { none: "Does not repeat", daily: "Daily", weekly: "Weekly", monthly: "Monthly", yearly: "Yearly" };
+// ⚠ Translated (author QA: month/weekday/recurrence names were among the
+// "buttons and textboxes" that never got wired to i18n). These used to be
+// static consts evaluated once at parse time — that would have frozen
+// whichever language was active at load, wrong the moment someone switches.
+// Functions instead, called fresh on every render so a language switch is
+// picked up the same way every other translated string already is.
+const RECUR_KEY = { none: "doesNotRepeat", daily: "daily", weekly: "weekly", monthly: "monthly", yearly: "yearly" };
+function recurOptions(){
+  return ["none", "daily", "weekly", "monthly", "yearly"].map(function(v){ return { v: v, label: t("cal." + RECUR_KEY[v]) }; });
+}
+function recurLabel(v){ return t("cal." + (RECUR_KEY[v] || "repeats")); }
 const CAL_UNDO_WINDOW_MS = 10 * 60 * 1000; // §4.15c: un-complete a series occurrence within 10 minutes
 
 function loadEvents(){ return Storage.getJSON("gtd_events", null); }
@@ -498,9 +501,9 @@ function waitingWidgetHtml(){
         const when = it.time ? ds + " · " + it.time : ds;
         return '<li><span class="cal-widget-when">' + escapeHtml(when) + '</span> ' + escapeHtml(it.title) + '</li>';
       }).join("")
-    : '<li class="cal-widget-empty">Nothing in the next 7 days.</li>';
+    : '<li class="cal-widget-empty">' + escapeHtml(t("cal.nothingNext7Days")) + '</li>';
   return (
-    '<div class="cal-widget" data-action="open-calendar" title="Open the calendar">' +
+    '<div class="cal-widget" data-action="open-calendar" title="' + escapeHtml(t("cal.openCalendar")) + '">' +
       '<div class="cal-widget-icon">&#128197;</div>' +
       '<ul class="cal-widget-list">' + bullets + '</ul>' +
     '</div>'
@@ -546,7 +549,7 @@ function projectLinkedEventRowsHtml(projectId, stagedEvents){
     // committed.
     const staged = !!stagedIds[ev.id];
     let row = staged
-      ? '<span class="linked-action-item linked-action-staged" title="Saves with this project">' +
+      ? '<span class="linked-action-item linked-action-staged" title="' + escapeHtml(t("project.savesWithProject")) + '">' +
           '<span class="kind-dot kind-event" aria-hidden="true"></span>' + escapeHtml(effTitle(ev, ev.date)) +
           ' <span class="cal-agenda-kind">' + escapeHtml(when) + '</span></span>'
       : '<button type="button" class="linked-action-item" data-action="open-event" data-id="' + ev.id + '">' +
@@ -591,8 +594,8 @@ function openCalendarScreen(prefill){
   };
   renderScreen();
 }
-const DOW_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+function dowShortList(){ return [0, 1, 2, 3, 4, 5, 6].map(function(i){ return t("cal.dowShort." + i); }); }
+function monthName(i){ return t("cal.month." + i); }
 
 // Every mark that lands on a given civil day, in truncation-priority order:
 // appointments → deadlines → events → projected recurrences (§4.15). Each is
@@ -686,7 +689,7 @@ function calMonthGridHtml(y, m){
       '<span class="cal-daynum">' + day + '</span>' + calMarksHtml(ds) +
     '</button>';
   }
-  const head = DOW_SHORT.map(function(d){ return '<div class="cal-dow">' + d + '</div>'; }).join("");
+  const head = dowShortList().map(function(d){ return '<div class="cal-dow">' + escapeHtml(d) + '</div>'; }).join("");
   return '<div class="cal-grid"><div class="cal-dow-row">' + head + '</div><div class="cal-cells">' + cells + '</div></div>';
 }
 
@@ -700,35 +703,38 @@ function calDayAgendaHtml(dateStr){
     // data-date carries the CANONICAL key so an edit targets the right override.
     canonicalsForDisplayDay(ev, dateStr).forEach(function(canon){
       const done = (ev.completedOccs || []).indexOf(canon) !== -1;
-      const t = effTime(ev, canon), title = effTitle(ev, canon);
+      // ⚠ Named `evTime`, not `t` — this function calls the i18n t() function,
+      // and a local `t` here would shadow it (see completedBodyHtml in app.js
+      // for the same fix, same reasoning).
+      const evTime = effTime(ev, canon), title = effTitle(ev, canon);
       const moved = effDate(ev, canon) !== canon;
       rows.push({
-        sort: (t ? "1" + t : "0"), timed: !!t,
+        sort: (evTime ? "1" + evTime : "0"), timed: !!evTime,
         html: '<button type="button" class="cal-agenda-row' + (done ? " cal-agenda-done" : "") + '" data-action="cal-open-event" data-id="' + ev.id + '" data-date="' + canon + '">' +
-          '<span class="cal-agenda-dot ' + (t ? "cal-mark-appt" : "cal-mark-event") + '"></span>' +
-          '<span class="cal-agenda-when">' + (t ? escapeHtml(t) : "All day") + '</span>' +
+          '<span class="cal-agenda-dot ' + (evTime ? "cal-mark-appt" : "cal-mark-event") + '"></span>' +
+          '<span class="cal-agenda-when">' + (evTime ? escapeHtml(evTime) : escapeHtml(t("cal.allDay"))) + '</span>' +
           '<span class="cal-agenda-title">' + escapeHtml(title) +
-            (moved ? ' <span class="cal-agenda-kind">moved</span>' : "") +
-            (ev.tickler ? ' <span class="cal-tickler-tag">hidden</span>' : "") + '</span>' +
+            (moved ? ' <span class="cal-agenda-kind">' + escapeHtml(t("cal.moved")) + '</span>' : "") +
+            (ev.tickler ? ' <span class="cal-tickler-tag">' + escapeHtml(t("cal.hidden")) + '</span>' : "") + '</span>' +
         '</button>'
       });
     });
   });
-  function deadlineRow(t, laneKind){
-    if (!(t.deadline && t.deadline.date === dateStr) || t.isGroup || t.eventId) return;
+  function deadlineRow(task, laneKind){
+    if (!(task.deadline && task.deadline.date === dateStr) || task.isGroup || task.eventId) return;
     rows.push({
-      sort: (t.deadline.time ? "1" + t.deadline.time : "0"), timed: !!t.deadline.time,
-      html: '<button type="button" class="cal-agenda-row" data-action="cal-open-task" data-lane="' + laneKind + '" data-id="' + t.id + '">' +
+      sort: (task.deadline.time ? "1" + task.deadline.time : "0"), timed: !!task.deadline.time,
+      html: '<button type="button" class="cal-agenda-row" data-action="cal-open-task" data-lane="' + laneKind + '" data-id="' + task.id + '">' +
         '<span class="cal-agenda-dot cal-mark-dl-' + (laneKind === "current" ? "current" : "next") + '"></span>' +
-        '<span class="cal-agenda-when">' + (t.deadline.time ? escapeHtml(t.deadline.time) : "Due") + '</span>' +
-        '<span class="cal-agenda-title">' + escapeHtml(t.title) + ' <span class="cal-agenda-kind">' + (laneKind === "current" ? "project" : "action") + ' deadline</span></span>' +
+        '<span class="cal-agenda-when">' + (task.deadline.time ? escapeHtml(task.deadline.time) : escapeHtml(t("cal.due"))) + '</span>' +
+        '<span class="cal-agenda-title">' + escapeHtml(task.title) + ' <span class="cal-agenda-kind">' + escapeHtml(laneKind === "current" ? t("cal.projectDeadline") : t("cal.actionDeadline")) + '</span></span>' +
       '</button>'
     });
   }
-  state.tasks.next.forEach(function(t){ deadlineRow(t, "next"); });
-  state.tasks.current.forEach(function(t){ deadlineRow(t, "current"); });
+  state.tasks.next.forEach(function(task){ deadlineRow(task, "next"); });
+  state.tasks.current.forEach(function(task){ deadlineRow(task, "current"); });
   rows.sort(function(a, b){ return a.sort.localeCompare(b.sort); });
-  if (!rows.length) return '<div class="cal-day-empty">Nothing on this day.</div>';
+  if (!rows.length) return '<div class="cal-day-empty">' + escapeHtml(t("cal.nothingOnThisDay")) + '</div>';
   return '<div class="cal-agenda">' + rows.map(function(r){ return r.html; }).join("") + '</div>';
 }
 
@@ -766,30 +772,30 @@ function calDayAgendaHtml(dateStr){
 function calPastDueRows(){
   const rows = [];
   ["next", "current"].forEach(function(k){
-    state.tasks[k].forEach(function(t){
-      if (t.isGroup || isDevScaffold(t)) return;
-      if (t.eventId){
-        if (!pseudoPassed(t)) return;
-        const when = dateStrToDate(t.occDate).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+    state.tasks[k].forEach(function(task){
+      if (task.isGroup || isDevScaffold(task)) return;
+      if (task.eventId){
+        if (!pseudoPassed(task)) return;
+        const when = dateStrToDate(task.occDate).toLocaleDateString(undefined, { day: "numeric", month: "short" });
         rows.push({
-          date: t.occDate, sort: (t.occTime ? "1" + t.occTime : "0"),
-          html: '<button type="button" class="cal-agenda-row cal-agenda-overdue" data-action="cal-open-event" data-id="' + t.eventId + '" data-date="' + t.occDate + '">' +
-            '<span class="cal-agenda-dot ' + (t.occTime ? "cal-mark-appt" : "cal-mark-event") + '"></span>' +
-            '<span class="cal-agenda-when">' + escapeHtml(when + (t.occTime ? " " + t.occTime : "")) + '</span>' +
-            '<span class="cal-agenda-title">' + escapeHtml(t.title) + '</span>' +
+          date: task.occDate, sort: (task.occTime ? "1" + task.occTime : "0"),
+          html: '<button type="button" class="cal-agenda-row cal-agenda-overdue" data-action="cal-open-event" data-id="' + task.eventId + '" data-date="' + task.occDate + '">' +
+            '<span class="cal-agenda-dot ' + (task.occTime ? "cal-mark-appt" : "cal-mark-event") + '"></span>' +
+            '<span class="cal-agenda-when">' + escapeHtml(when + (task.occTime ? " " + task.occTime : "")) + '</span>' +
+            '<span class="cal-agenda-title">' + escapeHtml(task.title) + '</span>' +
           '</button>'
         });
         return;
       }
-      const st = deadlineBarState(t);
+      const st = deadlineBarState(task);
       if (!(st && st.passed)) return;
-      const when = dateStrToDate(t.deadline.date).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+      const when = dateStrToDate(task.deadline.date).toLocaleDateString(undefined, { day: "numeric", month: "short" });
       rows.push({
-        date: t.deadline.date, sort: (t.deadline.time ? "1" + t.deadline.time : "0"),
-        html: '<button type="button" class="cal-agenda-row cal-agenda-overdue" data-action="cal-open-task" data-lane="' + k + '" data-id="' + t.id + '">' +
+        date: task.deadline.date, sort: (task.deadline.time ? "1" + task.deadline.time : "0"),
+        html: '<button type="button" class="cal-agenda-row cal-agenda-overdue" data-action="cal-open-task" data-lane="' + k + '" data-id="' + task.id + '">' +
           '<span class="cal-agenda-dot cal-mark-dl-' + (k === "current" ? "current" : "next") + '"></span>' +
-          '<span class="cal-agenda-when">' + escapeHtml(when + (t.deadline.time ? " " + t.deadline.time : "")) + '</span>' +
-          '<span class="cal-agenda-title">' + escapeHtml(t.title) + ' <span class="cal-agenda-kind">' + (k === "current" ? "project" : "action") + ' deadline</span></span>' +
+          '<span class="cal-agenda-when">' + escapeHtml(when + (task.deadline.time ? " " + task.deadline.time : "")) + '</span>' +
+          '<span class="cal-agenda-title">' + escapeHtml(task.title) + ' <span class="cal-agenda-kind">' + escapeHtml(k === "current" ? t("cal.projectDeadline") : t("cal.actionDeadline")) + '</span></span>' +
         '</button>'
       });
     });
@@ -808,8 +814,8 @@ function calListRows(){
   // precedence computeOpenLoops uses when an item is both past-due and stalled.
   const overdueEventIds = {};
   ["next", "current"].forEach(function(k){
-    state.tasks[k].forEach(function(t){
-      if (!t.isGroup && t.eventId && pseudoPassed(t)) overdueEventIds[t.eventId] = 1;
+    state.tasks[k].forEach(function(task){
+      if (!task.isGroup && task.eventId && pseudoPassed(task)) overdueEventIds[task.eventId] = 1;
     });
   });
   (state.events || []).forEach(function(ev){
@@ -821,37 +827,38 @@ function calListRows(){
     if (!canon) return;                       // finished one-shot
     const date = effDate(ev, canon);
     if (date < today) return;
-    const t = effTime(ev, canon), title = effTitle(ev, canon);
+    // ⚠ Named `evTime`, not `t` — see the same fix in calDayAgendaHtml above.
+    const evTime = effTime(ev, canon), title = effTitle(ev, canon);
     const tags =
-      (ev.paused ? ' <span class="cal-agenda-kind">paused</span>' : "") +
-      (isRecurring(ev) && !ev.paused ? ' <span class="cal-agenda-kind">' + escapeHtml(RECUR_LABEL[ev.recurrence] || "Repeats").toLowerCase() + '</span>' : "") +
-      (ev.tickler ? ' <span class="cal-tickler-tag">hidden</span>' : "");
+      (ev.paused ? ' <span class="cal-agenda-kind">' + escapeHtml(t("cal.paused")) + '</span>' : "") +
+      (isRecurring(ev) && !ev.paused ? ' <span class="cal-agenda-kind">' + escapeHtml(recurLabel(ev.recurrence).toLowerCase()) + '</span>' : "") +
+      (ev.tickler ? ' <span class="cal-tickler-tag">' + escapeHtml(t("cal.hidden")) + '</span>' : "");
     rows.push({
-      date: date, sort: (t ? "1" + t : "0"),
+      date: date, sort: (evTime ? "1" + evTime : "0"),
       html: '<button type="button" class="cal-agenda-row" data-action="cal-open-event" data-id="' + ev.id + '" data-date="' + canon + '">' +
-        '<span class="cal-agenda-dot ' + (t ? "cal-mark-appt" : "cal-mark-event") + '"></span>' +
-        '<span class="cal-agenda-when">' + (t ? escapeHtml(t) : "All day") + '</span>' +
+        '<span class="cal-agenda-dot ' + (evTime ? "cal-mark-appt" : "cal-mark-event") + '"></span>' +
+        '<span class="cal-agenda-when">' + (evTime ? escapeHtml(evTime) : escapeHtml(t("cal.allDay"))) + '</span>' +
         '<span class="cal-agenda-title">' + escapeHtml(title) + tags + '</span>' +
       '</button>'
     });
   });
-  function deadlineRow(t, laneKind){
-    if (t.isGroup || t.eventId) return;       // pseudo-actions come from gtd_events
-    if (!(t.deadline && t.deadline.date)) return;
-    const st = deadlineBarState(t);
+  function deadlineRow(task, laneKind){
+    if (task.isGroup || task.eventId) return;       // pseudo-actions come from gtd_events
+    if (!(task.deadline && task.deadline.date)) return;
+    const st = deadlineBarState(task);
     if (st && st.passed) return;              // shown in the Past due group instead
-    if (t.deadline.date < today) return;
+    if (task.deadline.date < today) return;
     rows.push({
-      date: t.deadline.date, sort: (t.deadline.time ? "1" + t.deadline.time : "0"),
-      html: '<button type="button" class="cal-agenda-row" data-action="cal-open-task" data-lane="' + laneKind + '" data-id="' + t.id + '">' +
+      date: task.deadline.date, sort: (task.deadline.time ? "1" + task.deadline.time : "0"),
+      html: '<button type="button" class="cal-agenda-row" data-action="cal-open-task" data-lane="' + laneKind + '" data-id="' + task.id + '">' +
         '<span class="cal-agenda-dot cal-mark-dl-' + (laneKind === "current" ? "current" : "next") + '"></span>' +
-        '<span class="cal-agenda-when">' + (t.deadline.time ? escapeHtml(t.deadline.time) : "Due") + '</span>' +
-        '<span class="cal-agenda-title">' + escapeHtml(t.title) + ' <span class="cal-agenda-kind">' + (laneKind === "current" ? "project" : "action") + ' deadline</span></span>' +
+        '<span class="cal-agenda-when">' + (task.deadline.time ? escapeHtml(task.deadline.time) : escapeHtml(t("cal.due"))) + '</span>' +
+        '<span class="cal-agenda-title">' + escapeHtml(task.title) + ' <span class="cal-agenda-kind">' + escapeHtml(laneKind === "current" ? t("cal.projectDeadline") : t("cal.actionDeadline")) + '</span></span>' +
       '</button>'
     });
   }
-  state.tasks.next.forEach(function(t){ deadlineRow(t, "next"); });
-  state.tasks.current.forEach(function(t){ deadlineRow(t, "current"); });
+  state.tasks.next.forEach(function(task){ deadlineRow(task, "next"); });
+  state.tasks.current.forEach(function(task){ deadlineRow(task, "current"); });
   rows.sort(function(a, b){
     return a.date === b.date ? a.sort.localeCompare(b.sort) : a.date.localeCompare(b.date);
   });
@@ -861,19 +868,19 @@ function calListHtml(){
   const overdue = calPastDueRows();
   const rows = calListRows();
   if (!overdue.length && !rows.length){
-    return '<div class="cal-day-empty">Nothing coming up. Anything you schedule will be listed here, in the order it happens.</div>';
+    return '<div class="cal-day-empty">' + escapeHtml(t("cal.nothingComingUp")) + '</div>';
   }
   const today = todayStr();
   let html = '<div class="cal-agenda cal-list">', lastDate = null;
   if (overdue.length){
-    html += '<div class="cal-list-daylabel is-overdue">Past due</div>';
+    html += '<div class="cal-list-daylabel is-overdue">' + escapeHtml(t("cal.pastDue")) + '</div>';
     overdue.forEach(function(r){ html += r.html; });
   }
   rows.forEach(function(r){
     if (r.date !== lastDate){
       const d = dateStrToDate(r.date);
       const label = r.date === today
-        ? "Today"
+        ? t("cal.today")
         : d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
       html += '<div class="cal-list-daylabel' + (r.date === today ? " is-today" : "") + '">' + escapeHtml(label) + '</div>';
       lastDate = r.date;
@@ -891,53 +898,53 @@ function calCreateRowHtml(s){
   // the field rather than beside it (user). A bare dashed outline cannot
   // explain "after the deadline" — the reason is not guessable from the field.
   const forProject = s.calForProjectId
-    ? '<div class="cal-for-project">Adding to <b>' + escapeHtml(s.calForProjectName || "this project") + '</b>' +
+    ? '<div class="cal-for-project">' + escapeHtml(t("cal.adding")) + ' <b>' + escapeHtml(s.calForProjectName || t("cal.thisProject")) + '</b>' +
       (s.calForProjectDeadline
-        ? ' &middot; due ' + escapeHtml(dateStrToDate(s.calForProjectDeadline).toLocaleDateString(undefined, { day: "numeric", month: "short" }))
+        ? ' &middot; ' + escapeHtml(t("cal.dueAbbrev")) + ' ' + escapeHtml(dateStrToDate(s.calForProjectDeadline).toLocaleDateString(undefined, { day: "numeric", month: "short" }))
         : "") +
       '</div>'
     : "";
   const errMsg = s.calError ? '<div class="cal-error">' + escapeHtml(s.calError) + '</div>' : "";
   const seg =
     '<div class="cal-seg">' +
-      '<button type="button" class="cal-seg-btn' + (isEvent ? " active" : "") + '" data-action="cal-kind" data-kind="event">Event</button>' +
-      '<button type="button" class="cal-seg-btn' + (!isEvent ? " active" : "") + '" data-action="cal-kind" data-kind="deadline">Deadline</button>' +
+      '<button type="button" class="cal-seg-btn' + (isEvent ? " active" : "") + '" data-action="cal-kind" data-kind="event">' + escapeHtml(t("cal.event")) + '</button>' +
+      '<button type="button" class="cal-seg-btn' + (!isEvent ? " active" : "") + '" data-action="cal-kind" data-kind="deadline">' + escapeHtml(t("cal.deadline")) + '</button>' +
     '</div>';
   let controls;
   if (isEvent){
     const habitBubble = (s.calRecur === "daily" || s.calRecur === "weekly")
-      ? '<button type="button" class="cal-habit-bubble" data-action="cal-make-habit">Recurring chore? Make this a habit instead &#8594;</button>' : "";
+      ? '<button type="button" class="cal-habit-bubble" data-action="cal-make-habit">' + escapeHtml(t("cal.makeHabitInstead")) + '</button>' : "";
     controls =
       '<div class="cal-create-controls">' +
         '<div class="cal-boxed"><span class="field-icon">&#128337;</span>' +
-          '<input type="text" readonly inputmode="none" class="screen-time" data-calfield="time" placeholder="--:--" value="' + escapeHtml(s.calTime || "") + '" title="Optional">' +
+          '<input type="text" readonly inputmode="none" class="screen-time" data-calfield="time" placeholder="' + escapeHtml(t("cal.time")) + '" value="' + escapeHtml(s.calTime || "") + '" title="' + escapeHtml(t("cal.optional")) + '">' +
         '</div>' +
-        '<input type="text" class="cal-desc" data-calfield="desc" placeholder="Description (optional)…" value="' + escapeHtml(s.calDesc || "") + '">' +
+        '<input type="text" class="cal-desc" data-calfield="desc" placeholder="' + escapeHtml(t("cal.description")) + '" value="' + escapeHtml(s.calDesc || "") + '">' +
         '<div class="cal-boxed"><span class="field-icon">&#128260;</span>' +
           '<select class="screen-link-select" data-calfield="recur">' +
-            RECUR_OPTIONS.map(function(o){ return '<option value="' + o.v + '"' + (o.v === s.calRecur ? " selected" : "") + '>' + o.label + '</option>'; }).join("") +
+            recurOptions().map(function(o){ return '<option value="' + o.v + '"' + (o.v === s.calRecur ? " selected" : "") + '>' + escapeHtml(o.label) + '</option>'; }).join("") +
           '</select>' +
-          (s.calRecur !== "none" ? '<span class="cal-hint">every</span><input type="number" min="1" class="cal-interval" data-calfield="interval" value="' + (s.calInterval || 1) + '">' : "") +
+          (s.calRecur !== "none" ? '<span class="cal-hint">' + escapeHtml(t("cal.every")) + '</span><input type="number" min="1" class="cal-interval" data-calfield="interval" value="' + (s.calInterval || 1) + '">' : "") +
         '</div>' +
         habitBubble +
-        '<label class="cal-tickler-row"><input type="checkbox" data-calfield="tickler"' + (s.calTickler ? " checked" : "") + '> Hide until the day it happens</label>' +
+        '<label class="cal-tickler-row"><input type="checkbox" data-calfield="tickler"' + (s.calTickler ? " checked" : "") + '> ' + escapeHtml(t("cal.hideUntilItHappens")) + '</label>' +
         // ⚑ The way to a context and a project link (user). Events only: the
         // Deadline side of this row creates a TASK, which has its own drafting
         // page and its own route to those fields already.
         '<button type="button" class="cal-advanced-btn" data-action="cal-advanced" ' +
-          'title="Open the full page — context, project link, and everything here">' +
-          'More options &#8594;</button>' +
+          'title="' + escapeHtml(t("cal.moreOptionsTooltip")) + '">' +
+          escapeHtml(t("cal.moreOptions")) + '</button>' +
       '</div>';
   } else {
     controls =
       '<div class="cal-create-controls">' +
         '<div class="cal-boxed"><span class="field-icon">&#128337;</span>' +
-          '<input type="text" readonly inputmode="none" class="screen-time" data-calfield="time" placeholder="--:--" value="' + escapeHtml(s.calTime || "") + '" title="Optional">' +
+          '<input type="text" readonly inputmode="none" class="screen-time" data-calfield="time" placeholder="' + escapeHtml(t("cal.time")) + '" value="' + escapeHtml(s.calTime || "") + '" title="' + escapeHtml(t("cal.optional")) + '">' +
         '</div>' +
-        '<input type="text" class="cal-desc" data-calfield="desc" placeholder="Description (optional)…" value="' + escapeHtml(s.calDesc || "") + '">' +
+        '<input type="text" class="cal-desc" data-calfield="desc" placeholder="' + escapeHtml(t("cal.description")) + '" value="' + escapeHtml(s.calDesc || "") + '">' +
         '<div class="cal-seg cal-seg-small">' +
-          '<button type="button" class="cal-seg-btn' + (s.calDeadlineFor === "next" ? " active" : "") + '" data-action="cal-dlfor" data-for="next">Action</button>' +
-          '<button type="button" class="cal-seg-btn' + (s.calDeadlineFor === "current" ? " active" : "") + '" data-action="cal-dlfor" data-for="current">Project</button>' +
+          '<button type="button" class="cal-seg-btn' + (s.calDeadlineFor === "next" ? " active" : "") + '" data-action="cal-dlfor" data-for="next">' + escapeHtml(t("cal.action")) + '</button>' +
+          '<button type="button" class="cal-seg-btn' + (s.calDeadlineFor === "current" ? " active" : "") + '" data-action="cal-dlfor" data-for="current">' + escapeHtml(t("cal.project")) + '</button>' +
         '</div>' +
       '</div>';
   }
@@ -951,8 +958,8 @@ function calCreateRowHtml(s){
       errMsg +
       seg +
       '<div class="cal-create-main">' +
-        '<input type="text" class="cal-name' + (s.calInvalid ? " field-invalid" : "") + '" data-calfield="name" placeholder="' + (isEvent ? "Event on " : "Due ") + escapeHtml(selLabel) + '…" value="' + escapeHtml(s.calName || "") + '" autocomplete="off">' +
-        '<button type="button" class="cal-add-btn" data-action="cal-add">Add</button>' +
+        '<input type="text" class="cal-name' + (s.calInvalid ? " field-invalid" : "") + '" data-calfield="name" placeholder="' + escapeHtml(isEvent ? t("cal.eventOnPrefix") : t("cal.duePrefix")) + escapeHtml(selLabel) + '…" value="' + escapeHtml(s.calName || "") + '" autocomplete="off">' +
+        '<button type="button" class="cal-add-btn" data-action="cal-add">' + escapeHtml(t("cal.add")) + '</button>' +
       '</div>' +
       controls +
     '</div>'
@@ -966,11 +973,11 @@ function calendarHeaderHtml(s){
     // the app leaves by ← in that corner. The ✕ read as "discard", which is
     // wrong — there is nothing here to discard.
     '<div class="screen-header">' +
-      '<button type="button" class="screen-chrome-btn" data-action="cal-close" title="Back">&#8592;</button>' +
+      '<button type="button" class="screen-chrome-btn" data-action="cal-close" title="' + escapeHtml(t("cal.back")) + '">&#8592;</button>' +
       '<div class="cal-tabs">' +
-        '<button type="button" class="cal-tab' + (s.calTab === "month" ? " active" : "") + '" data-action="cal-tab" data-tab="month">Month</button>' +
-        '<button type="button" class="cal-tab' + (s.calTab === "day" ? " active" : "") + '" data-action="cal-tab" data-tab="day">Day</button>' +
-        '<button type="button" class="cal-tab' + (s.calTab === "list" ? " active" : "") + '" data-action="cal-tab" data-tab="list">List</button>' +
+        '<button type="button" class="cal-tab' + (s.calTab === "month" ? " active" : "") + '" data-action="cal-tab" data-tab="month">' + escapeHtml(t("cal.month")) + '</button>' +
+        '<button type="button" class="cal-tab' + (s.calTab === "day" ? " active" : "") + '" data-action="cal-tab" data-tab="day">' + escapeHtml(t("cal.day")) + '</button>' +
+        '<button type="button" class="cal-tab' + (s.calTab === "list" ? " active" : "") + '" data-action="cal-tab" data-tab="list">' + escapeHtml(t("cal.list")) + '</button>' +
       '</div>' +
       '<div class="screen-header-right">' +
         '<span class="screen-chrome-btn" style="visibility:hidden">&#8592;</span>' +
@@ -984,7 +991,7 @@ function calendarBodyHtml(s){
     const nav =
       '<div class="cal-monthnav">' +
         '<button type="button" class="cal-navbtn" data-action="cal-month" data-dir="-1">&#8249;</button>' +
-        '<span class="cal-monthlabel">' + MONTHS[s.calM] + " " + s.calY + '</span>' +
+        '<span class="cal-monthlabel">' + escapeHtml(monthName(s.calM)) + " " + s.calY + '</span>' +
         '<button type="button" class="cal-navbtn" data-action="cal-month" data-dir="1">&#8250;</button>' +
       '</div>';
     // Three-panel swipe track (prev · current · next) — translateX follows the
@@ -1002,7 +1009,7 @@ function calendarBodyHtml(s){
   } else if (s.calTab === "list"){
     // No date nav: the list is one continuous run from today, so there is
     // nothing to page through.
-    body = '<div class="cal-daynav"><span class="cal-monthlabel">Coming up</span></div>' + calListHtml();
+    body = '<div class="cal-daynav"><span class="cal-monthlabel">' + escapeHtml(t("cal.comingUp")) + '</span></div>' + calListHtml();
   } else {
     const sel = dateStrToDate(s.calSel);
     const label = sel.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
@@ -1101,17 +1108,16 @@ function eventBodyHtml(s){
   // only" vs "all occurrences" (offered at save) has a clear referent.
   if (!creating && isRecurring({ recurrence: d.recurrence })){
     const occ = dateStrToDate(s.occDate || d.date);
-    fields += '<div class="event-occ-hint">Editing the occurrence on ' +
-      escapeHtml(occ.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })) +
-      ' · you’ll choose this one or the whole series when you save</div>';
+    fields += '<div class="event-occ-hint">' + escapeHtml(t("event.occurrenceHint").replace("{date}",
+      occ.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }))) + '</div>';
   }
-  fields += '<input type="text" class="screen-field-title' + (s.invalidField === "title" ? " field-invalid" : "") + '" data-field="title" placeholder="Event title…" value="' + escapeHtml(d.title) + '">';
-  fields += '<textarea class="screen-field-desc" data-field="notesClean" placeholder="Description (optional)…">' + escapeHtml(d.notesClean) + '</textarea>';
+  fields += '<input type="text" class="screen-field-title' + (s.invalidField === "title" ? " field-invalid" : "") + '" data-field="title" placeholder="' + escapeHtml(t("event.titlePlaceholder")) + '" value="' + escapeHtml(d.title) + '">';
+  fields += '<textarea class="screen-field-desc" data-field="notesClean" placeholder="' + escapeHtml(t("field.description")) + '">' + escapeHtml(d.notesClean) + '</textarea>';
   // Date — editable, so an occurrence can be moved to another day (a recurring
   // event asks "this occurrence / all" at save; a one-off just moves).
   fields += '<div class="screen-row"><div class="screen-boxed-row"><span class="field-icon">&#128197;</span>' +
-    '<input type="text" readonly inputmode="none" class="screen-date" data-field="event-date" placeholder="Pick a date" value="' + escapeHtml(d.date || "") + '">' +
-    (isRecurring({ recurrence: d.recurrence }) ? '<span class="cal-hint">move this occurrence</span>' : "") +
+    '<input type="text" readonly inputmode="none" class="screen-date" data-field="event-date" placeholder="' + escapeHtml(t("field.pickDate")) + '" value="' + escapeHtml(d.date || "") + '">' +
+    (isRecurring({ recurrence: d.recurrence }) ? '<span class="cal-hint">' + escapeHtml(t("event.moveThisOccurrence")) + '</span>' : "") +
     '</div></div>';
   // Time
   fields += '<div class="screen-row"><div class="screen-boxed-row"><span class="field-icon">&#128337;</span>' +
@@ -1121,21 +1127,21 @@ function eventBodyHtml(s){
     // nothing to someone adding a dentist visit. The field is optional and
     // self-evident; naming the taxonomy only taught users a word they will
     // never need. The internal terms stay in the code and the spec.
-    '<input type="text" readonly inputmode="none" class="screen-time" data-field="event-time" placeholder="--:--" value="' + escapeHtml(d.time || "") + '">' +
-    (d.time ? '<button type="button" class="screen-clear-x" data-action="event-clear-time" title="Clear time">&times;</button>' : "") +
+    '<input type="text" readonly inputmode="none" class="screen-time" data-field="event-time" placeholder="' + escapeHtml(t("cal.time")) + '" value="' + escapeHtml(d.time || "") + '">' +
+    (d.time ? '<button type="button" class="screen-clear-x" data-action="event-clear-time" title="' + escapeHtml(t("field.clearTime")) + '">&times;</button>' : "") +
     '</div></div>';
   // Recurrence
   fields += '<div class="screen-row"><div class="screen-boxed-row"><span class="field-icon">&#128260;</span>' +
     '<select class="screen-link-select" data-field="event-recurrence">' +
-      RECUR_OPTIONS.map(function(o){ return '<option value="' + o.v + '"' + (o.v === d.recurrence ? " selected" : "") + '>' + o.label + '</option>'; }).join("") +
+      recurOptions().map(function(o){ return '<option value="' + o.v + '"' + (o.v === d.recurrence ? " selected" : "") + '>' + escapeHtml(o.label) + '</option>'; }).join("") +
     '</select>' +
-    (d.recurrence !== "none" ? '<span class="cal-hint">every</span><input type="number" min="1" class="cal-interval" data-field="event-interval" value="' + (d.interval || 1) + '">' : "") +
+    (d.recurrence !== "none" ? '<span class="cal-hint">' + escapeHtml(t("cal.every")) + '</span><input type="number" min="1" class="cal-interval" data-field="event-interval" value="' + (d.interval || 1) + '">' : "") +
     '</div></div>';
   // "Make this a habit instead" (§4.15b) — daily/weekly only, load-bearing.
   // Edit-only: makeHabitFromEvent needs a real event, and the calendar's quick-add
   // row already carries this same offer for something being created.
   if (!creating && (d.recurrence === "daily" || d.recurrence === "weekly")){
-    fields += '<button type="button" class="cal-habit-bubble" data-action="event-make-habit">Recurring chore? Make this a habit instead &#8594;</button>';
+    fields += '<button type="button" class="cal-habit-bubble" data-action="event-make-habit">' + escapeHtml(t("cal.makeHabitInstead")) + '</button>';
   }
   // Context + project link (§4.15a/§4.15d) — the two fields the calendar's
   // quick-add row cannot offer, and therefore the whole reason this page has an
@@ -1144,12 +1150,12 @@ function eventBodyHtml(s){
   fields += '<div class="screen-row"><div class="screen-boxed-row"><span class="field-icon">&#128279;</span>' +
     '<select class="screen-link-select" data-field="linkedProjectId">' + projectOptionsHtml(d.linkedProjectId) + '</select></div></div>';
   // Tickler toggle (user addition)
-  fields += '<label class="cal-tickler-row"><input type="checkbox" data-field="event-tickler"' + (d.tickler ? " checked" : "") + '> Hide until the day it happens</label>';
+  fields += '<label class="cal-tickler-row"><input type="checkbox" data-field="event-tickler"' + (d.tickler ? " checked" : "") + '> ' + escapeHtml(t("cal.hideUntilItHappens")) + '</label>';
   // Pause — recurring only, draft-only + armed (§4.15b, golden-rule sibling).
   // Edit-only: pausing a series that does not exist yet is incoherent.
   if (!creating && isRecurring({ recurrence: d.recurrence })){
     fields += '<button type="button" class="btn screen-pause-btn' + (d.paused ? " armed" : "") + '" data-action="event-toggle-pause">' +
-      (d.paused ? "&#9208; Paused — resume on save" : "&#9208; Pause series") + '</button>';
+      (d.paused ? "&#9208; " + escapeHtml(t("event.pausedResumeOnSave")) : "&#9208; " + escapeHtml(t("event.pauseSeries"))) + '</button>';
   }
   // Complete — draft-only, arms on save (§4.14: completes like a Next Action).
   // Edit-only (user: "remove the complete and delete buttons"): marking something
@@ -1165,7 +1171,7 @@ function eventBodyHtml(s){
   // page now speaks it too. (`armed` remains correct on .screen-pause-btn and
   // .screen-make-kind-btn, which do define it.)
   fields += '<button type="button" class="btn screen-complete-pill' + (armed ? " done" : "") + '" data-action="event-complete">' +
-    (armed ? "&#10003; Completing on save" : (doneToday ? "&#10003; Completed today — tap to reopen on save" : "Mark complete")) + '</button>';
+    (armed ? "&#10003; " + escapeHtml(t("outcome.completingOnSave")) : (doneToday ? "&#10003; " + escapeHtml(t("event.completedTodayReopen")) : escapeHtml(t("event.markComplete")))) + '</button>';
   }
   return '<div class="screen-body">' + fields + '</div>';
 }
@@ -1206,7 +1212,7 @@ function saveEventScreen(s){
       removeCapture(s.calFromCaptureId);
       s.calFromCaptureId = null;
       const cd = dateStrToDate(newEv.date);
-      showItMovedBanner("Scheduled for " + cd.toLocaleDateString(undefined, { month: "short", day: "numeric" }) + " — in your calendar");
+      showItMovedBanner(t("event.scheduledForBanner").replace("{date}", cd.toLocaleDateString(undefined, { month: "short", day: "numeric" })));
     }
     closeScreen();
     return;
@@ -1276,12 +1282,12 @@ function saveEventScreen(s){
     // also carries series-level changes, say so rather than implying they are
     // being scoped too (QA #25, ruling A).
     const prompt = seriesFieldsChanged
-      ? "Repeat, pause, context, project link and hiding always apply to the whole series — those are saved either way. Apply your other changes to…"
-      : "Apply your changes to…";
+      ? t("event.scopePromptSeriesNote")
+      : t("event.scopePromptPlain");
     openConfirmDialog(prompt, [
-      { label: "This occurrence only", style: "primary", action: commitOccurrence },
-      { label: "All occurrences", action: commitSeries },
-      { label: "Cancel", action: function(){} }
+      { label: t("event.thisOccurrenceOnly"), style: "primary", action: commitOccurrence },
+      { label: t("event.allOccurrences"), action: commitSeries },
+      { label: t("chrome.cancel"), action: function(){} }
     ]);
     return;
   }
@@ -1328,15 +1334,15 @@ function finishEventSave(s, ev){
 function confirmDeleteEvent(ev, after){
   const done = function(){ if (after) after(); };
   if (isRecurring(ev)){
-    openConfirmDialog("This event repeats. What would you like to do?", [
-      { label: "Skip this one", action: function(){ skipOccurrence(ev); done(); } },
-      { label: "Delete series", style: "danger", action: function(){ deleteEventEntirely(ev); done(); } },
-      { label: "Cancel", action: function(){} }
+    openConfirmDialog(t("event.repeatsPrompt"), [
+      { label: t("event.skipThisOne"), action: function(){ skipOccurrence(ev); done(); } },
+      { label: t("event.deleteSeries"), style: "danger", action: function(){ deleteEventEntirely(ev); done(); } },
+      { label: t("chrome.cancel"), action: function(){} }
     ]);
   } else {
-    openConfirmDialog("Delete “" + escapeHtml(ev.title) + "”?", [
-      { label: "Delete", style: "danger", action: function(){ deleteEventEntirely(ev); done(); } },
-      { label: "Cancel", action: function(){} }
+    openConfirmDialog(t("confirm.deleteTitleQuestion").replace("{title}", escapeHtml(ev.title)), [
+      { label: t("chrome.delete"), style: "danger", action: function(){ deleteEventEntirely(ev); done(); } },
+      { label: t("chrome.cancel"), action: function(){} }
     ]);
   }
 }

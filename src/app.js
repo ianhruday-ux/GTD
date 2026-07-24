@@ -459,38 +459,26 @@
   function seedData(){
     // Default seeded contexts (§4.3d): Computer, Calls, Errands. A starting
     // point, not a taxonomy. Seeded newest-last so they read in this order.
-    const computerCtx = { id: genId(), name: "Computer" };
-    state.contexts = [ computerCtx, { id: genId(), name: "Calls" }, { id: genId(), name: "Errands" } ];
+    // Starter-kit content, not disposable demo filler (unlike the generic
+    // sample tasks that used to live below) — each carries a stable seedKey
+    // so a later language switch can restamp its name (restampSeedDefaults),
+    // the same id-stable seed+restamp treatment the tutorial cards use.
+    state.contexts = [
+      { id: genId(), name: t("seed.context.computer"), seedKey: "computer" },
+      { id: genId(), name: t("seed.context.calls"),    seedKey: "calls" },
+      { id: genId(), name: t("seed.context.errands"),  seedKey: "errands" }
+    ];
     saveContexts();
 
-    // Actions carry contextId (null = ungrouped), not a group-task parent.
-    state.tasks.next = [
-      { id: genId(), title: "Email Sarah the draft agenda", notesClean: "", linkedProjectId: null, isGroup: false, parent: null, contextId: null },
-      { id: genId(), title: "Update the budget spreadsheet", notesClean: "", linkedProjectId: null, isGroup: false, parent: null, contextId: computerCtx.id },
-      { id: genId(), title: "Reply to the invoice question", notesClean: "", linkedProjectId: null, isGroup: false, parent: null, contextId: computerCtx.id }
-    ];
-
-    state.tasks.current = [
-      { id: genId(), title: "Website relaunch", notesClean: "", linkedProjectId: null, isGroup: false, parent: null },
-      { id: genId(), title: "Kitchen remodel", notesClean: "", linkedProjectId: null, isGroup: false, parent: null }
-    ];
-    // ⚑ Give "Website relaunch" a linked action so it is NOT stalled. Without this
-    // it has no way forward and surfaces in Review alongside the tutorial's
-    // dedicated stalled sample (seedTutorial's ◇ card) — two stalled projects
-    // competing for step ⑤, which muddies the lesson. One intended example only.
-    state.tasks.next[1].linkedProjectId = state.tasks.current[0].id;
-
-    const emailNextId = state.tasks.next[0].id;
-    state.tasks.waiting = [
-      { id: genId(), title: "Contractor quote from Dana", notesClean: "", linkedProjectId: state.tasks.current[1].id, isGroup: false, parent: null,
-        whenText: "She said end of the week", conditionId: null, conditionKind: null, conditionLabel: null },
-      { id: genId(), title: "Sign-off before I book the venue", notesClean: "", linkedProjectId: null, isGroup: false, parent: null,
-        whenText: null, conditionId: emailNextId, conditionKind: "next", conditionLabel: "Email Sarah the draft agenda" }
-    ];
-
-    state.tasks.future = [
-      { id: genId(), title: "Learn woodworking", notesClean: "", linkedProjectId: null, isGroup: false, parent: null }
-    ];
+    // ⚑ The generic filler sample tasks (Email Sarah, Website relaunch, Kitchen
+    // remodel, etc.) are gone — disposable demo content that duplicated the
+    // in-lane tutorial's job of showing the lanes in use, and wasn't worth a
+    // translation key. The starter kit is now just the contexts above, the
+    // three habits below, and the tutorial chain (seedTutorial).
+    state.tasks.next = [];
+    state.tasks.current = [];
+    state.tasks.waiting = [];
+    state.tasks.future = [];
 
     // §4.16: the three seeded habits ARE the GTD routine — capture daily,
     // review daily, review projects weekly — taught by practising, not reading.
@@ -499,19 +487,21 @@
     // identity prompt; "Review my projects" is Friday (weekly review = one
     // scheduled weekday). This set is only *correct* once the calendar exists
     // (the middle habit references it), which is why it ships here in chunk 7.
+    // Same starter-kit seed+restamp treatment as the contexts above: seedKey
+    // is stable, restampSeedDefaults re-derives title/notes/cue/hook-label.
     const sortTrayId = genId();
     const reviewCalId = genId();
     const reviewProjId = genId();
     state.tasks.habit = [
-      { id: sortTrayId, title: "Sort my tray", linkedProjectId: null, isGroup: false, parent: null,
-        notesClean: "Someone who doesn’t carry their to-do list around in their head.",
-        whenTexts: ["When I sit down at my desk"], hooks: [] },
-      { id: reviewCalId, title: "Review my calendar and waiting actions", linkedProjectId: null, isGroup: false, parent: null,
-        notesClean: "Someone who knows what’s coming, instead of being surprised by it.",
-        whenTexts: [], hooks: [{ id: sortTrayId, label: "Sort my tray" }] },
-      { id: reviewProjId, title: "Review my projects", linkedProjectId: null, isGroup: false, parent: null,
-        notesClean: "Someone who finishes what they start.",
-        whenTexts: ["After my Friday coffee"], hooks: [] }
+      { id: sortTrayId, seedKey: "sortTray", title: t("seed.habit.sortTray.title"), linkedProjectId: null, isGroup: false, parent: null,
+        notesClean: t("seed.habit.sortTray.notes"),
+        whenTexts: [t("seed.habit.sortTray.cue")], hooks: [] },
+      { id: reviewCalId, seedKey: "reviewCal", title: t("seed.habit.reviewCal.title"), linkedProjectId: null, isGroup: false, parent: null,
+        notesClean: t("seed.habit.reviewCal.notes"),
+        whenTexts: [], hooks: [{ id: sortTrayId, label: t("seed.habit.sortTray.title") }] },
+      { id: reviewProjId, seedKey: "reviewProj", title: t("seed.habit.reviewProj.title"), linkedProjectId: null, isGroup: false, parent: null,
+        notesClean: t("seed.habit.reviewProj.notes"),
+        whenTexts: [t("seed.habit.reviewProj.cue")], hooks: [] }
     ];
     // "Review my projects" runs Fridays only; the other two every day. Seed the
     // run schedules through storage so boot()'s loadHabitRuns() picks them up
@@ -531,34 +521,32 @@
   // REAL user-facing content: not gated behind the QA switch, and it re-seeds
   // with the rest of the samples on Reset (initLocalData → seedData).
   //
-  // TWO deliberate persist-exceptions, removed by 🗑 rather than completion:
-  //   · the ◇ stalled sample project (tp) — step ⑤ needs a stalled project to
-  //     fix, and fixing it un-stalls it rather than deleting it (user OK'd this);
-  //   · the ⑥ habit (t6) — habits toggle done-for-today, they never archive, so
-  //     no habit card CAN self-complete. Flagged: keeping the habit lesson in the
-  //     Habits lane was judged worth a second manual-delete card.
+  // ⭐ REPLACED (user, oela_app_tutorial_en_zh.txt) — 8 steps now, not 6, and
+  // EVERY chain step is linked to `tr` (not just ②): the new script's own
+  // framing for that project is "each of its linked actions is a different
+  // stage in the tutorial." tp is still the dedicated stalled sample, now
+  // fixed at step ⑦ instead of ⑤ (the new script moved that lesson later).
+  //
+  // ONE deliberate persist-exception, removed by 🗑 rather than completion:
+  //   · the ◇ stalled sample project (tp) — step ⑦ needs a stalled project to
+  //     fix, and fixing it un-stalls it rather than deleting it (user OK'd this).
+  // ⚑ The OLD copy had a second exception here — the ⑥ habit card, which never
+  // self-completed (habits reset daily; you deleted it instead), to teach that
+  // lesson by analogy. The new script doesn't ask for that on step ⑧, so it is
+  // now a normal chain link like the rest. Flagged in case that ruling was
+  // meant to survive the rewrite — see the i18n.js comment above these keys.
   //
   // LANGUAGE: each card carries a stable `tutorialKey`. A language switch re-reads
   // the text from i18n (restampTutorialCards) but never touches the IDs, so the
-  // ①→②→③→④→⑤→⑥ chain and the ② → tr link — which are by id — survive
+  // ①→…→⑧ chain and every step's `tr` link — which are by id — survive
   // translation. This is the id-stable alternative to the "swap cards for their
   // siblings" idea; it avoids rewriting every cross-reference.
-  //
-  // ▲ CHAIN ROUND (user): ②–⑥ used to be five independent cards, only ②
-  // actually hooked to anything. Now they are a real chain — each one waits on
-  // the step before it and starts life in WAITING ON, promoting into Next
-  // Actions automatically as the previous step is ticked, the same mechanic ②
-  // always used, run four more times. `tr` is new: the healthy demo project
-  // that ② links to used to double as "step ④" itself; a project can't be a
-  // chain link (waiting conditions only ever target a next or waiting item —
-  // getValidConditionTargets), so it is now its own unnumbered reference
-  // object, mirroring how `tp` (the stalled sample) already works.
-  const TUTORIAL_KEYS = ["t1", "t2", "t3", "t4", "t5", "t6", "tp", "tr"];
+  const TUTORIAL_KEYS = ["t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "tp", "tr"];
   // Maps a chain link to the step that unlocks it — used only to re-derive the
   // frozen conditionLabel after a language switch (below). ② is hooked to ①,
-  // a plain next action whose kind never changes; ③–⑥ are each hooked to the
+  // a plain next action whose kind never changes; ③–⑧ are each hooked to the
   // waiting card directly before them.
-  const TUTORIAL_CHAIN_PARENT = { t2: "t1", t3: "t2", t4: "t3", t5: "t4", t6: "t5" };
+  const TUTORIAL_CHAIN_PARENT = { t2: "t1", t3: "t2", t4: "t3", t5: "t4", t6: "t5", t7: "t6", t8: "t7" };
   function tutTitle(key){ return t("tutorial." + key + ".title"); }
   function tutNotes(key){ return t("tutorial." + key + ".notes"); }
   function seedTutorial(){
@@ -570,21 +558,25 @@
       }, extra || {});
     }
     // ① is the seed: a plain next action, no condition, present from the start.
-    state.tasks.next.unshift(card("t1", { contextId: null }));
-    // ②–⑥: the chain. Each is hooked (conditionId) to the step before it and
+    // Every chain link (①–⑧) is linked to `tr` — the new script's own framing
+    // for that project ("each of its linked actions is a different stage").
+    state.tasks.next.unshift(card("t1", { contextId: null, linkedProjectId: id.tr }));
+    // ②–⑧: the chain. Each is hooked (conditionId) to the step before it and
     // seeded directly into Waiting On, in order, so they read top to bottom as
-    // ②③④⑤⑥. Completing a step promotes the next one into Next Actions on its
-    // own — ticking through the tutorial IS working the hook mechanic.
+    // ②③④⑤⑥⑦⑧. Completing a step promotes the next one into Next Actions on
+    // its own — ticking through the tutorial IS working the hook mechanic.
     state.tasks.waiting.unshift(
       card("t2", { whenText: null, conditionId: id.t1, conditionKind: "next", conditionLabel: tutTitle("t1"), linkedProjectId: id.tr }),
-      card("t3", { whenText: null, conditionId: id.t2, conditionKind: "waiting", conditionLabel: tutTitle("t2") }),
-      card("t4", { whenText: null, conditionId: id.t3, conditionKind: "waiting", conditionLabel: tutTitle("t3") }),
-      card("t5", { whenText: null, conditionId: id.t4, conditionKind: "waiting", conditionLabel: tutTitle("t4") }),
-      card("t6", { whenText: null, conditionId: id.t5, conditionKind: "waiting", conditionLabel: tutTitle("t5") })
+      card("t3", { whenText: null, conditionId: id.t2, conditionKind: "waiting", conditionLabel: tutTitle("t2"), linkedProjectId: id.tr }),
+      card("t4", { whenText: null, conditionId: id.t3, conditionKind: "waiting", conditionLabel: tutTitle("t3"), linkedProjectId: id.tr }),
+      card("t5", { whenText: null, conditionId: id.t4, conditionKind: "waiting", conditionLabel: tutTitle("t4"), linkedProjectId: id.tr }),
+      card("t6", { whenText: null, conditionId: id.t5, conditionKind: "waiting", conditionLabel: tutTitle("t5"), linkedProjectId: id.tr }),
+      card("t7", { whenText: null, conditionId: id.t6, conditionKind: "waiting", conditionLabel: tutTitle("t6"), linkedProjectId: id.tr }),
+      card("t8", { whenText: null, conditionId: id.t7, conditionKind: "waiting", conditionLabel: tutTitle("t7"), linkedProjectId: id.tr })
     );
-    // tr: the healthy reference project ②'s waiting action links to — real
-    // projects need a next step like this one to stay off Review's stalled
-    // list. tp: the stalled sample ⑤ exists to demonstrate fixing.
+    // tr: the "Tutorial" reference project every step is linked to — real
+    // projects need a next step like this to stay off Review's stalled list.
+    // tp: the stalled sample ⑦ exists to demonstrate fixing.
     state.tasks.current.unshift(card("tr"), card("tp"));
   }
   // Re-read every tutorial card's text for the current language (called from
@@ -620,6 +612,44 @@
       }
     });
   }
+  // Re-read the starter-kit contexts and habits for the current language —
+  // the same restamp idea as restampTutorialCards, above, but keyed by
+  // seedKey instead of tutorialKey since these aren't part of the tutorial
+  // chain. Unlike the tutorial cards these are meant to stick around (habits
+  // especially — §4.16), so this DOES overwrite any hand-edit the user made
+  // to a starter-kit name, exactly as the tutorial restamp already does to
+  // its own cards; flagging it rather than re-deciding it, since the
+  // seed+restamp comment on seedData was already committed to before this.
+  function restampSeedDefaults(){
+    let ctxTouched = false;
+    (state.contexts || []).forEach(function(c){
+      if (!c || !c.seedKey) return;
+      c.name = t("seed.context." + c.seedKey);
+      ctxTouched = true;
+    });
+    if (ctxTouched) saveContexts();
+
+    let habitsTouched = false;
+    (state.tasks.habit || []).forEach(function(h){
+      if (!h || h.isGroup || !h.seedKey) return;
+      h.title = t("seed.habit." + h.seedKey + ".title");
+      h.notesClean = t("seed.habit." + h.seedKey + ".notes");
+      if (h.whenTexts && h.whenTexts.length && STRINGS["seed.habit." + h.seedKey + ".cue"]){
+        h.whenTexts[0] = t("seed.habit." + h.seedKey + ".cue");
+      }
+      habitsTouched = true;
+    });
+    // Hook labels are a frozen display copy of the target habit's title
+    // (same pattern as the tutorial's conditionLabel) — re-derive them from
+    // the just-restamped titles above, not from a seed key of their own.
+    (state.tasks.habit || []).forEach(function(h){
+      (h.hooks || []).forEach(function(hk){
+        const target = state.tasks.habit.find(function(x){ return x.id === hk.id; });
+        if (target) hk.label = target.title;
+      });
+    });
+    if (habitsTouched) saveTasksLocal("habit");
+  }
   function initLocalData(){
     let anyMissing = false;
     KINDS.forEach(function(k){
@@ -640,7 +670,11 @@
       // registry rather than re-seeding over real tasks. Old parent-based
       // context group-tasks in the action lanes simply render ungrouped now
       // (no migration — §1). Reset seeds everything fresh in the new shape.
-      state.contexts = [ { id: genId(), name: "Computer" }, { id: genId(), name: "Calls" }, { id: genId(), name: "Errands" } ];
+      state.contexts = [
+        { id: genId(), name: t("seed.context.computer"), seedKey: "computer" },
+        { id: genId(), name: t("seed.context.calls"),    seedKey: "calls" },
+        { id: genId(), name: t("seed.context.errands"),  seedKey: "errands" }
+      ];
       saveContexts();
     }
     if (anyMissing){ seedData(); }
@@ -1104,38 +1138,26 @@
     return Promise.resolve(task);
   }
 
-  // QA #23 — moving a deadline's date restarts its progress bar, and a move to
-  // a LATER date is counted (user ruling: "change the start, but mark the pushed
-  // with a counter").
+  // ⚑ REVERSED (user): QA #23 used to restart the progress bar's origin every
+  // time the date changed ("change the start, but mark the pushed with a
+  // counter"). That was wrong — the bar should NOT reset. setAt is now written
+  // ONCE, the first time a deadline is set, and carried forward untouched
+  // through every later push; the bar's fill keeps reflecting progress since
+  // that original schedule was set, against whatever the CURRENT due date is.
+  // A move to a LATER date is still counted by the push counter — that part of
+  // the old ruling stands, only the origin-reset half was the mistake.
   //
-  // The bar answers "how much of this window has gone", so when the window
-  // changes the origin has to change with it: keeping the old start made a
-  // deadline three weeks out render nearly full, which trains you to ignore the
-  // bar. The counter is what stops the reset from erasing the fact that you
-  // slipped — the bar reads honestly AND the card still says you have moved this
-  // twice.
-  //
-  // ⚑ Two judgment calls, flagged:
-  //   · The COUNTER only increments when the new date is LATER. Pulling a
-  //     deadline forward is not a deferral and should not be scored as one, but
-  //     it does restart the window, so the origin still moves.
-  //   · This lives here rather than in the review's push handler, so that
-  //     editing the date on the item's own page behaves identically. One
-  //     gesture, one rule — the alternative was a bar whose origin depended on
-  //     WHICH screen you changed the date from.
-  //
-  // setAt is the bar's origin when present; createdAt remains the fallback for
-  // a deadline that has never moved (and for pre-existing test data).
+  // This lives here rather than in the review's push handler, so that editing
+  // the date on the item's own page behaves identically. One gesture, one rule.
   function applyDeadlineChange(task, next){
     const prev = task.deadline || null;
     const nd = (next && next.date) ? next : null;
     if (!nd){ task.deadline = null; return; }
-    const dateChanged = !prev || !prev.date || prev.date !== nd.date;
     const pushedLater = !!(prev && prev.date && nd.date > prev.date);
     task.deadline = {
       date: nd.date,
       time: nd.time || null,
-      setAt: dateChanged ? nowMs() : (prev && prev.setAt) || null,
+      setAt: (prev && prev.setAt) || nowMs(),
       pushCount: ((prev && prev.pushCount) || 0) + (pushedLater ? 1 : 0)
     };
   }
@@ -1427,7 +1449,7 @@
         (many ? "they" : "it") + " can be brought back if this was a mistake.",
         [
           { label: "Complete project", style: "primary", action: doComplete },
-          { label: "Cancel", action: function(){} }
+          { label: t("chrome.cancel"), action: function(){} }
         ]
       );
     } else {
@@ -1495,7 +1517,7 @@
             deleteEvents();
             changeKind("current", "future", projectId).then(function(){ if (state.screen) closeScreen(); });
           } },
-        { label: "Cancel", action: function(){} }
+        { label: t("chrome.cancel"), action: function(){} }
       ]
     );
   }
@@ -1521,7 +1543,7 @@
   // Future projects are intentionally excluded (ruling in section 9: "a
   // project with a live action is by definition current").
   function projectOptionsHtml(selectedId){
-    let html = '<option value="">No linked project</option>';
+    let html = '<option value="">' + escapeHtml(t("field.noLinkedProject")) + '</option>';
     if (state.tasks.current.length){
       html += '<optgroup label="' + escapeHtml(LIST_TITLES.current) + '">';
       // ⚑ Dev scaffolding excluded, same reasoning as the note picker: the chunk
@@ -1577,10 +1599,10 @@
     const passedAt = deadline.time ? due : due + 24 * 3600 * 1000;
     if (now >= passedAt) return { full: true, red: true, passed: true, fillPercent: 100 };
     if (now >= due) return { full: true, red: true, passed: false, fillPercent: 100 };
-    // QA #23: the window starts when the deadline was last SET. A deadline that
-    // has been moved measures from the move, not from when the task was born —
-    // otherwise pushing a date leaves the bar nearly full and the bar stops
-    // meaning anything. deadline.setAt is written by applyDeadlineChange.
+    // The window starts when the deadline was FIRST set (§ user reversal —
+    // applyDeadlineChange no longer moves setAt on a later push, so the bar
+    // never resets; it keeps reading progress against the original schedule,
+    // just re-measured to whatever the due date currently is).
     // Missing both (pre-chunk-2 / hand-edited test data) → treat as a
     // zero-width window, the same safe fallback a same-day deadline uses
     // (§4.4d: don't divide by zero).
@@ -1715,17 +1737,17 @@
         // against gtd_events so it shows as a valid pending condition.
         const pendingEv = liveTarget ? null : findEventByTaskId(task.conditionId);
         if (liveTarget){
-          cueBlock = '<button class="link-pill" data-action="open-edit" data-kind="waiting" data-id="' + task.id + '">&#129693; After <span class="pill-target">' + escapeHtml(liveTarget.title) + '</span></button>';
+          cueBlock = '<button class="link-pill" data-action="open-edit" data-kind="waiting" data-id="' + task.id + '">&#129693; ' + escapeHtml(t("waiting.after")) + ' <span class="pill-target">' + escapeHtml(liveTarget.title) + '</span></button>';
         } else if (pendingEv && !pendingEv.paused){
           const eff = effDate(pendingEv, pendingEv.date);
           const dd = dateStrToDate(eff);
           const when = dd.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-          cueBlock = '<button class="link-pill" data-action="open-edit" data-kind="waiting" data-id="' + task.id + '">&#129693; After <span class="pill-target">' + escapeHtml(effTitle(pendingEv, pendingEv.date)) + '</span> · ' + escapeHtml(when) + '</button>';
+          cueBlock = '<button class="link-pill" data-action="open-edit" data-kind="waiting" data-id="' + task.id + '">&#129693; ' + escapeHtml(t("waiting.after")) + ' <span class="pill-target">' + escapeHtml(effTitle(pendingEv, pendingEv.date)) + '</span> · ' + escapeHtml(when) + '</button>';
         } else {
-          cueBlock = '<button class="link-pill cue-orphaned" data-action="open-edit" data-kind="waiting" data-id="' + task.id + '">&#129693; After ' + escapeHtml(task.conditionLabel || "a deleted item") + '</button>';
+          cueBlock = '<button class="link-pill cue-orphaned" data-action="open-edit" data-kind="waiting" data-id="' + task.id + '">&#129693; ' + escapeHtml(t("waiting.after")) + ' ' + escapeHtml(task.conditionLabel || t("picker.deletedItem")) + '</button>';
         }
       } else if (task.whenText){
-        cueBlock = '<button class="link-pill" data-action="open-edit" data-kind="waiting" data-id="' + task.id + '">&#128337; Waiting for <span class="pill-target">' + escapeHtml(task.whenText) + '</span></button>';
+        cueBlock = '<button class="link-pill" data-action="open-edit" data-kind="waiting" data-id="' + task.id + '">&#128337; ' + escapeHtml(t("waiting.waitingForLabel")) + ' <span class="pill-target">' + escapeHtml(task.whenText) + '</span></button>';
       }
       // (The date-pill fallback was removed in chunk 3 -- Waiting actions no
       // longer hold dates, §4.13a.)
@@ -1790,13 +1812,13 @@
     // sane meaning — no trash can. The button lives inside the header row but
     // its own handler runs first and returns, so it never toggles the section.
     const clearBtn = (kind !== "habit")
-      ? '<span class="group-actions"><button type="button" class="icon-btn" data-action="clear-completed" data-kind="' + kind + '" title="Delete all completed items">&#128465;</button></span>'
+      ? '<span class="group-actions"><button type="button" class="icon-btn" data-action="clear-completed" data-kind="' + kind + '" title="' + escapeHtml(t("lane.deleteAllCompleted")) + '">&#128465;</button></span>'
       : "";
     return (
       '<div class="completed-section">' +
         '<div class="group-header" data-action="toggle-group" data-id="__completed_open__">' +
           '<span class="chevron">' + (open ? "&#9662;" : "&#9656;") + '</span>' +
-          '<span class="group-title">Completed</span>' +
+          '<span class="group-title">' + escapeHtml(t("lane.completedSection")) + '</span>' +
           '<span class="count">' + items.length + '</span>' +
           clearBtn +
         '</div>' +
@@ -1812,8 +1834,8 @@
     const badge = (count && count > 1) ? ' <span class="completed-series-count">×' + count + '</span>' : "";
     return (
       '<div class="completed-item">' +
-        '<button type="button" class="check checked" data-action="restore" data-kind="' + kind + '" data-id="' + task.id + '" title="Restore to the active list">&#10003;</button>' +
-        '<span class="completed-item-title" data-action="open-completed" data-kind="' + kind + '" data-id="' + task.id + '" title="Tap to view">' + escapeHtml(task.title) + badge + '</span>' +
+        '<button type="button" class="check checked" data-action="restore" data-kind="' + kind + '" data-id="' + task.id + '" title="' + escapeHtml(t("outcome.restoreToActive")) + '">&#10003;</button>' +
+        '<span class="completed-item-title" data-action="open-completed" data-kind="' + kind + '" data-id="' + task.id + '" title="' + escapeHtml(t("card.tapToView")) + '">' + escapeHtml(task.title) + badge + '</span>' +
       '</div>'
     );
   }
@@ -1821,7 +1843,7 @@
     const collapsed = isCollapsed(kind, group.id);
     const moveDest = MOVE_MAP[kind];
     const moveBtn = moveDest
-      ? '<button class="icon-btn" data-action="move" data-id="' + group.id + '" data-is-group="1" title="Move to ' + escapeHtml(LIST_TITLES[moveDest]) + '">&#8592;</button>'
+      ? '<button class="icon-btn" data-action="move" data-id="' + group.id + '" data-is-group="1" title="' + escapeHtml(t("lane.moveTo").replace("{lane}", LIST_TITLES[moveDest])) + '">&#8592;</button>'
       : "";
     // Deleting a list no longer requires emptying it first (user ruling): it
     // mirrors context deletion — the items survive, landing ungrouped at the
@@ -1838,7 +1860,7 @@
       '<div class="group"' + contextAttr + ' draggable="true" data-drag-id="' + group.id + '" data-drag-parent="" data-drag-group="1">' +
         '<div class="group-header" data-action="toggle-group" data-id="' + group.id + '">' +
           '<span class="chevron">' + (collapsed ? "&#9656;" : "&#9662;") + '</span>' +
-          '<span class="group-title" title="Tap to expand/collapse \u2014 press and hold to reorder">' + escapeHtml(group.title) + '</span>' +
+          '<span class="group-title" title="' + escapeHtml(t("group.tapToExpandReorder")) + '">' + escapeHtml(group.title) + '</span>' +
           '<span class="count">' + children.length + '</span>' +
           // \u2691 Replaces the quick-add row that used to sit at the bottom of every
           // open list (user: "remove the quick add rows... they just clutter
@@ -1846,7 +1868,7 @@
           // already chosen, so a new item gets the same page \u2014 and the same
           // fields \u2014 as every other way of creating one. It also works while the
           // list is COLLAPSED, which the old row could not.
-          '<button class="group-add" data-action="add-to-list" data-kind="' + kind + '" data-id="' + group.id + '" title="Add to this list">+</button>' +
+          '<button class="group-add" data-action="add-to-list" data-kind="' + kind + '" data-id="' + group.id + '" title="' + escapeHtml(t("group.addToList")) + '">+</button>' +
           '<span class="group-actions">' + moveBtn +
             '<button class="icon-btn" data-action="delete-group" data-id="' + group.id + '" title="' + deleteTitle + '">&times;</button>' +
           '</span>' +
@@ -1870,9 +1892,9 @@
       '<div class="group" data-context-group="' + ctx.id + '">' +
         '<div class="group-header" data-action="toggle-group" data-id="' + ctx.id + '">' +
           '<span class="chevron">' + (collapsed ? "&#9656;" : "&#9662;") + '</span>' +
-          '<span class="group-title" title="Tap to expand/collapse">' + escapeHtml(ctx.name) + '</span>' +
+          '<span class="group-title" title="' + escapeHtml(t("group.tapToExpand")) + '">' + escapeHtml(ctx.name) + '</span>' +
           '<span class="count">' + members.length + '</span>' +
-          '<button class="group-add" data-action="add-to-context" data-kind="' + kind + '" data-id="' + ctx.id + '" title="Add to this context">+</button>' +
+          '<button class="group-add" data-action="add-to-context" data-kind="' + kind + '" data-id="' + ctx.id + '" title="' + escapeHtml(t("group.addToContext")) + '">+</button>' +
           '<span class="group-actions">' +
             '<button class="icon-btn" data-action="delete-context" data-id="' + ctx.id + '" title="Delete context">&times;</button>' +
           '</span>' +
@@ -1908,7 +1930,7 @@
       const roots = byParent[""] || [];
       activeHtml = roots.length
         ? roots.map(function(r){ return r.isGroup ? groupHtml(kind, r, byParent[r.id] || []) : leafCardHtml(kind, r); }).join("")
-        : '<div class="empty-note">Nothing here yet.</div>';
+        : '<div class="empty-note">' + escapeHtml(t("lane.nothingHereYet")) + '</div>';
       completedHtml = completedSectionHtml(kind, doneList, function(t){ return leafCardHtml(kind, t); });
     } else if (isActionKind(kind)){
       // Action lanes (chunk 3, §4.3d): items group by CONTEXT (registry), not
@@ -1929,7 +1951,7 @@
         const members = all.filter(function(t){ return !t.isGroup && t.contextId === ctx.id; });
         html += contextGroupHtml(kind, ctx, members);
       });
-      activeHtml = html || '<div class="empty-note">Nothing here yet.</div>';
+      activeHtml = html || '<div class="empty-note">' + escapeHtml(t("lane.nothingHereYet")) + '</div>';
       // chunk 7 (§4.15b): collapse repeated completions of one series into a
       // single "Title ×N" row. Only items carrying a seriesId collapse; plain
       // completed actions/waitings (no seriesId) stay individual.
@@ -1940,7 +1962,7 @@
       const roots = byParent[""] || [];
       activeHtml = roots.length
         ? roots.map(function(r){ return r.isGroup ? groupHtml(kind, r, byParent[r.id] || []) : leafCardHtml(kind, r); }).join("")
-        : '<div class="empty-note">Nothing here yet.</div>';
+        : '<div class="empty-note">' + escapeHtml(t("lane.nothingHereYet")) + '</div>';
       completedHtml = completedSectionHtml(kind, state.completed[kind] || [], function(t){ return completedItemHtml(kind, t); });
     }
     // chunk 7 (§4.13b): a yellow-bordered calendar widget rides at the top of
@@ -2002,7 +2024,7 @@
           '<span class="lane-label-title">' + escapeHtml(LIST_TITLES[k]) + '</span>' +
           '<span class="lane-label-right">' +
             '<span class="count">0</span>' +
-            '<button class="info-btn" data-action="toggle-info" data-kind="' + k + '" type="button" title="Information">i</button>' +
+            '<button class="info-btn" data-action="toggle-info" data-kind="' + k + '" type="button" title="' + escapeHtml(t("chrome.info")) + '">i</button>' +
           '</span>' +
         '</div>' +
         // The lane's "i" gets BOTH halves; the review's ⓘ gets only LANE_INFO.
@@ -2111,7 +2133,11 @@
     // The settings menu's contents differ per mode (Language/Background move
     // out of it on desktop), and it is positioned against chrome that just
     // changed — rebuild it rather than leaving a menu from the other layout.
-    if (qs(".settings-menu")) closeDialog();
+    // ⚠ Scoped to #dialog-root: the header's Language/Background dropdowns
+    // reuse the same "settings-menu" class for their chrome (T17), and a bare
+    // qs(".settings-menu") matches whichever comes first in the DOM — the
+    // header, not this one — see the matching fix in renderSettingsMenu.
+    if (qs("#dialog-root .settings-menu")) closeDialog();
     // Notes may only now be on screen, and its cards are derived from live
     // project state (trap T5).
     renderLane("notes");
@@ -2643,10 +2669,10 @@
     const s = state.screen;
     if (s && !s.staging && isProjectKind(s.kind) && projectDraftDirty(s)){
       openConfirmDialog(
-        "Are you sure? Exiting without saving will undo everything you did on this page — including actions you created, edited, or deleted, and any changes to the project’s own notes.",
+        t("confirm.projectDiscardMessage"),
         [
-          { label: "Discard changes", style: "danger", action: function(){ closeScreen(); } },
-          { label: "Keep editing", action: function(){} }
+          { label: t("discard.yes"), style: "danger", action: function(){ closeScreen(); } },
+          { label: t("discard.no"), action: function(){} }
         ]
       );
       return;
@@ -2984,11 +3010,10 @@
       if (stranded.length){
         const n = stranded.length;
         openConfirmDialog(
-          n + " calendar " + (n === 1 ? "entry is" : "entries are") + " scheduled after this new deadline. " +
-          "You can keep " + (n === 1 ? "it" : "them") + " — nothing will be moved or deleted.",
+          n === 1 ? t("confirm.strandedOne") : t("confirm.strandedMany").replace("{n}", n),
           [
-            { label: "Save anyway", style: "primary", action: commit },
-            { label: "Go back", action: function(){} }
+            { label: t("confirm.saveAnyway"), style: "primary", action: commit },
+            { label: t("confirm.goBack"), action: function(){} }
           ]
         );
         return;
@@ -3001,9 +3026,9 @@
     if (!s || !s.taskId) return;
     if (s.eventView){ deleteEventFromPage(); return; } // chunk 7 (§4.15b: Skip / Delete series / Cancel)
     if (s.noteView){ // chunk 6 (§4.9)
-      openConfirmDialog("Delete this note for good?", [
-        { label: "Delete", style: "danger", action: function(){ deleteNote(s.noteId); closeScreen(); } },
-        { label: "Cancel", action: function(){} }
+      openConfirmDialog(t("confirm.deleteNoteForGood"), [
+        { label: t("chrome.delete"), style: "danger", action: function(){ deleteNote(s.noteId); closeScreen(); } },
+        { label: t("chrome.cancel"), action: function(){} }
       ]);
       return;
     }
@@ -3011,8 +3036,8 @@
     // with the project's save (or evaporates on the project's ✕). A staged
     // create just disappears; a pre-existing linked action is marked deleted.
     if (s.staging){
-      openConfirmDialog("Delete this for good?", [
-        { label: "Delete", style: "danger", action: function(){
+      openConfirmDialog(t("confirm.deleteForGood"), [
+        { label: t("chrome.delete"), style: "danger", action: function(){
             const staged = s.staging.parent.draft.staged;
             const ci = (staged.creates || []).findIndex(function(c){ return c.id === s.taskId; });
             if (ci !== -1){
@@ -3027,13 +3052,13 @@
             } else { staged.deletes[s.taskId] = true; delete staged.edits[s.taskId]; delete staged.completes[s.taskId]; }
             closeScreen();
           } },
-        { label: "Cancel", action: function(){} }
+        { label: t("chrome.cancel"), action: function(){} }
       ]);
       return;
     }
-    openConfirmDialog("Delete this for good?", [
-      { label: "Delete", style: "danger", action: function(){ deleteTask(s.kind, s.taskId); closeScreen(); } },
-      { label: "Cancel", action: function(){} }
+    openConfirmDialog(t("confirm.deleteForGood"), [
+      { label: t("chrome.delete"), style: "danger", action: function(){ deleteTask(s.kind, s.taskId); closeScreen(); } },
+      { label: t("chrome.cancel"), action: function(){} }
     ]);
   }
   function screenComplete(){
@@ -3204,10 +3229,12 @@
     renderScreen(); // close the picker beneath the dialog first
     const many = dependents.length > 1;
     openConfirmDialog(
-      "\u201C" + label + "\u201D already has " + (many ? dependents.length + " habits" : "\u201C" + dependents[0].title + "\u201D") + " hooked to it. Hook to it anyway?",
+      many
+        ? t("confirm.hookTakeoverMany").replace("{label}", label).replace("{n}", dependents.length)
+        : t("confirm.hookTakeoverOne").replace("{label}", label).replace("{other}", dependents[0].title),
       [
-        { label: "Hook anyway", style: "primary", action: commit },
-        { label: many ? "Replace them" : "Replace that hook", action: function(){
+        { label: t("confirm.hookAnyway"), style: "primary", action: commit },
+        { label: many ? t("confirm.replaceThem") : t("confirm.replaceThatHook"), action: function(){
           // DRAFT ISOLATION (design principle): a takeover is recorded in
           // the draft and APPLIED AT SAVE — the earlier version stripped
           // the other dependents immediately, which meant ✕-cancelling
@@ -3219,7 +3246,7 @@
           if (d.pendingReplaceTargets.indexOf(targetId) === -1) d.pendingReplaceTargets.push(targetId);
           commit();
         }},
-        { label: "Cancel", action: function(){} }
+        { label: t("chrome.cancel"), action: function(){} }
       ]
     );
   }
@@ -3336,9 +3363,9 @@
         '<div class="screen-row">' +
           '<div class="screen-boxed-row">' +
             '<span class="field-icon">&#128197;</span>' +
-            '<input type="text" readonly inputmode="none" class="screen-date" data-field="deadline-date" placeholder="No deadline" value="' + escapeHtml(d.date || "") + '">' +
+            '<input type="text" readonly inputmode="none" class="screen-date" data-field="deadline-date" placeholder="' + escapeHtml(t("field.noDeadline")) + '" value="' + escapeHtml(d.date || "") + '">' +
             (d.date ? '<input type="text" readonly inputmode="none" class="screen-time" data-field="deadline-time" placeholder="--:--" value="' + escapeHtml(d.time || "") + '">' : "") +
-            (d.date ? '<button type="button" class="screen-clear-x" data-action="clear-deadline" title="Clear deadline">&times;</button>' : "") +
+            (d.date ? '<button type="button" class="screen-clear-x" data-action="clear-deadline" title="' + escapeHtml(t("field.clearDeadline")) + '">&times;</button>' : "") +
           '</div>' +
         '</div>' +
       '</div>'
@@ -3364,7 +3391,7 @@
     // rather than being interleaved with deadlined actions; nested dependents
     // on events are chunk 8.
     const eventRows = projectLinkedEventRowsHtml(s.draft && s.draft.projectId, stagedEventCreates(s));
-    if (!linked.length) return eventRows ? ('<div class="screen-hook-pick-label">Linked actions</div><div class="linked-actions-list">' + eventRows + '</div>') : "";
+    if (!linked.length) return eventRows ? ('<div class="screen-hook-pick-label">' + escapeHtml(t("project.linkedActionsLabel")) + '</div><div class="linked-actions-list">' + eventRows + '</div>') : "";
     const byId = {};
     linked.forEach(function(l){ byId[l.task.id] = l; });
     const dependents = {};
@@ -3433,17 +3460,17 @@
           // would have to be opened out of a set that has not been applied.
           if (stagedIds[n.id]){
             return '<div class="linked-action-item staged-note">' +
-              kindDot("notes") + escapeHtml(n.title || "Untitled") +
-              ' <span class="cal-agenda-kind">saves with the project</span></div>';
+              kindDot("notes") + escapeHtml(n.title || t("project.untitled")) +
+              ' <span class="cal-agenda-kind">' + escapeHtml(t("project.savesWithProject")) + '</span></div>';
           }
           return '<button type="button" class="linked-action-item" data-action="open-linked-note" data-id="' + n.id + '">' +
-            kindDot("notes") + escapeHtml(n.title || "Untitled") +
+            kindDot("notes") + escapeHtml(n.title || t("project.untitled")) +
           '</button>';
         }).join("") + '</div>'
       : "";
-    const hint = all.length ? "" : '<div class="empty-note">No notes linked yet.</div>';
+    const hint = all.length ? "" : '<div class="empty-note">' + escapeHtml(t("project.noNotesLinkedYet")) + '</div>';
     return rows + hint +
-      '<button type="button" class="btn btn-ghost btn-small project-add-note" data-action="new-linked-note">+ New note</button>';
+      '<button type="button" class="btn btn-ghost btn-small project-add-note" data-action="new-linked-note">' + escapeHtml(t("project.newNote")) + '</button>';
   }
   // The two lists share one slot and you toggle between them (user: "you should
   // be able to toggle back and forth"). Reuses the segmented control the
@@ -3463,8 +3490,8 @@
     // than showing an empty switch on a brand-new project.
     const seg =
       '<div class="cal-seg cal-seg-small project-linked-seg">' +
-        '<button type="button" class="cal-seg-btn' + (tab === "actions" ? " active" : "") + '" data-action="project-linked-tab" data-tab="actions">Actions</button>' +
-        '<button type="button" class="cal-seg-btn' + (tab === "notes" ? " active" : "") + '" data-action="project-linked-tab" data-tab="notes">Notes' +
+        '<button type="button" class="cal-seg-btn' + (tab === "actions" ? " active" : "") + '" data-action="project-linked-tab" data-tab="actions">' + escapeHtml(t("project.linkedActions")) + '</button>' +
+        '<button type="button" class="cal-seg-btn' + (tab === "notes" ? " active" : "") + '" data-action="project-linked-tab" data-tab="notes">' + escapeHtml(t("project.linkedNotesTab")) +
           (noteCount ? ' <span class="seg-count">' + noteCount + '</span>' : "") +
         '</button>' +
       '</div>';
@@ -3485,14 +3512,14 @@
     const bad = s.invalidField === "projectActions" ? " field-invalid" : "";
     const addAction =
       '<div class="project-add-row' + bad + '">' +
-        '<button type="button" class="btn btn-ghost btn-small project-add-note" data-action="generate-action" data-gen-kind="next">+ New action</button>' +
-        '<button type="button" class="btn btn-ghost btn-small project-add-note" data-action="generate-action" data-gen-kind="waiting">+ New waiting action</button>' +
-        '<button type="button" class="btn btn-ghost btn-small project-add-note" data-action="new-linked-event">+ New event</button>' +
+        '<button type="button" class="btn btn-ghost btn-small project-add-note" data-action="generate-action" data-gen-kind="next">' + escapeHtml(t("project.newAction")) + '</button>' +
+        '<button type="button" class="btn btn-ghost btn-small project-add-note" data-action="generate-action" data-gen-kind="waiting">' + escapeHtml(t("project.newWaitingAction")) + '</button>' +
+        '<button type="button" class="btn btn-ghost btn-small project-add-note" data-action="new-linked-event">' + escapeHtml(t("project.newEvent")) + '</button>' +
       '</div>';
     const body = tab === "notes"
       ? linkedNotesListHtml(s, pid)
-      : ((actionsHtml || '<div class="empty-note">Nothing linked yet.</div>') + addAction);
-    return '<div class="screen-hook-pick-label">Linked</div>' + seg + body;
+      : ((actionsHtml || '<div class="empty-note">' + escapeHtml(t("project.nothingLinkedYet")) + '</div>') + addAction);
+    return '<div class="screen-hook-pick-label">' + escapeHtml(t("project.linked")) + '</div>' + seg + body;
   }
   // `locked` (chunk 5, §12.1): when an action is opened as a child of the
   // project it is a member of, its project link is shown-but-disabled — you
@@ -3502,7 +3529,7 @@
     if (locked){
       return (
         '<div class="screen-row">' +
-          '<div class="screen-boxed-row screen-row-disabled" title="Linked to this project — remove it from the project&#39;s list instead">' +
+          '<div class="screen-boxed-row screen-row-disabled" title="' + escapeHtml(t("project.lockedTooltip")) + '">' +
             '<span class="field-icon">&#128279;</span>' +
             '<select class="screen-link-select" data-field="linkedProjectId" disabled>' + projectOptionsHtml(draft.linkedProjectId) + '</select>' +
           '</div>' +
@@ -3527,7 +3554,7 @@
   // §4.3e); when the registry is empty it names the way out rather than
   // greying out, per the no-field-labels teaching convention.
   function contextOptionsHtml(selectedId){
-    let html = '<option value="">No context</option>';
+    let html = '<option value="">' + escapeHtml(t("field.noContext")) + '</option>';
     state.contexts.forEach(function(c){
       html += '<option value="' + c.id + '"' + (c.id === selectedId ? " selected" : "") + '>' + escapeHtml(c.name) + '</option>';
     });
@@ -3539,7 +3566,7 @@
         '<div class="screen-row">' +
           '<div class="screen-boxed-row screen-row-disabled">' +
             '<span class="field-icon">&#128450;</span>' +
-            '<span style="font-size:12.5px;color:var(--text-soft);">No contexts yet — create them with + on the lane.</span>' +
+            '<span style="font-size:12.5px;color:var(--text-soft);">' + escapeHtml(t("field.noContextsYet")) + '</span>' +
           '</div>' +
         '</div>'
       );
@@ -3559,8 +3586,8 @@
   function conditionPillHtml(draft){
     return (
       '<div class="screen-condition-pill-row">' +
-        '<span class="screen-hooked-pill">&#129693; After ' + escapeHtml(draft.conditionLabel || "") + '</span>' +
-        '<button type="button" class="screen-clear-x" data-action="screen-unhook-condition" title="Remove condition">&times;</button>' +
+        '<span class="screen-hooked-pill">&#129693; ' + escapeHtml(t("waiting.after")) + ' ' + escapeHtml(draft.conditionLabel || "") + '</span>' +
+        '<button type="button" class="screen-clear-x" data-action="screen-unhook-condition" title="' + escapeHtml(t("waiting.removeCondition")) + '">&times;</button>' +
       '</div>'
     );
   }
@@ -3575,13 +3602,13 @@
       '<div>' +
         '<div class="screen-row">' +
           '<div class="screen-boxed-row' + (hasCondition ? " screen-row-disabled" : "") + (invalid ? " field-invalid" : "") + '">' +
-            '<input type="text" class="screen-waitfor-input" data-field="waitingForText" placeholder="Waiting for\u2026 (required \u2014 text or a hook)" value="' + escapeHtml(draft.whenText || "") + '"' + disabledAttr + '>' +
+            '<input type="text" class="screen-waitfor-input" data-field="waitingForText" placeholder="' + escapeHtml(t("waiting.forPlaceholder")) + '" value="' + escapeHtml(draft.whenText || "") + '"' + disabledAttr + '>' +
           '</div>' +
           // The hook button stays enabled while hooked — tapping it reopens
           // the picker to change the condition. (Bugfix: it was disabled
           // once hooked, which read as "locked" — removal is the pill's ×,
           // change is this button.)
-          '<button type="button" class="screen-icon-toggle' + (hasCondition ? " active" : "") + '" data-action="screen-open-condition-pick" title="' + (hasCondition ? "Change the hooked condition" : "Hook to a Next or Waiting action") + '">&#129693;</button>' +
+          '<button type="button" class="screen-icon-toggle' + (hasCondition ? " active" : "") + '" data-action="screen-open-condition-pick" title="' + (hasCondition ? escapeHtml(t("waiting.changeHook")) : escapeHtml(t("waiting.hookToTarget"))) + '">&#129693;</button>' +
         '</div>' +
       '</div>'
     );
@@ -3596,11 +3623,11 @@
       // Advanced options; the × clears it. Draft-only — it edits draft.bundleText
       // and commits on Save, so ✕ discards the removal like any other field.
       out += '<span class="bundle-pill-wrap">' +
-        '<button type="button" class="link-pill bundle-pill" data-action="screen-open-advanced" title="Edit in Advanced options">&#127852; ' + escapeHtml(draft.bundleText.trim()) + '</button>' +
-        '<button type="button" class="icon-btn bundle-pill-clear" data-action="clear-bundle" title="Remove this bundle">&times;</button>' +
+        '<button type="button" class="link-pill bundle-pill" data-action="screen-open-advanced" title="' + escapeHtml(t("advanced.editBundle")) + '">&#127852; ' + escapeHtml(draft.bundleText.trim()) + '</button>' +
+        '<button type="button" class="icon-btn bundle-pill-clear" data-action="clear-bundle" title="' + escapeHtml(t("advanced.removeBundle")) + '">&times;</button>' +
       '</span>';
     }
-    out += '<button type="button" class="btn btn-ghost btn-small screen-advanced-btn" data-action="screen-open-advanced">Advanced options…</button>';
+    out += '<button type="button" class="btn btn-ghost btn-small screen-advanced-btn" data-action="screen-open-advanced">' + escapeHtml(t("advanced.button")) + '</button>';
     return out;
   }
   // The cue set as ROWS (corrected in this QA round — the first row-model
@@ -3625,30 +3652,30 @@
         // state — only present (context name) or orphaned (deleted context).
         const hk = row.hook;
         const ctx = findContext(hk.id);
-        const label = ctx ? ctx.name : (hk.label || "a deleted context");
-        const suffix = ctx ? "" : " (deleted)";
+        const label = ctx ? ctx.name : (hk.label || t("habit.deletedContext"));
+        const suffix = ctx ? "" : t("habit.deletedSuffix");
         rows += '<div class="screen-hooked-pill-row">' +
-          '<span class="screen-hooked-pill' + (ctx ? "" : " cue-orphaned") + '">&#128279; ' + escapeHtml(label) + suffix + '</span>' +
-          '<button type="button" class="icon-btn" data-action="screen-remove-cue-row" data-row="' + i + '" title="Remove this cue">&times;</button>' +
+          '<span class="screen-hooked-pill' + (ctx ? "" : " cue-orphaned") + '">&#128279; ' + escapeHtml(label) + escapeHtml(suffix) + '</span>' +
+          '<button type="button" class="icon-btn" data-action="screen-remove-cue-row" data-row="' + i + '" title="' + escapeHtml(t("habit.removeCue")) + '">&times;</button>' +
         '</div>';
       } else if (row.hook){
         const hk = row.hook;
         const target = state.tasks.habit.find(function(h){ return h.id === hk.id && !h.isGroup; });
         const live = target ? hookLiveToday(hk) : false;
-        const label = target ? target.title : (hk.label || "a deleted habit");
-        const suffix = !target ? " (deleted)" : (live ? "" : " (not today)");
+        const label = target ? target.title : (hk.label || t("habit.deletedHabit"));
+        const suffix = !target ? t("habit.deletedSuffix") : (live ? "" : t("habit.notTodaySuffix"));
         rows += '<div class="screen-hooked-pill-row">' +
-          '<span class="screen-hooked-pill' + (!target ? " cue-orphaned" : (live ? "" : " cue-dim")) + '">&#128279; After ' + escapeHtml(label) + suffix + '</span>' +
-          '<button type="button" class="icon-btn" data-action="screen-remove-cue-row" data-row="' + i + '" title="Remove this cue">&times;</button>' +
+          '<span class="screen-hooked-pill' + (!target ? " cue-orphaned" : (live ? "" : " cue-dim")) + '">&#128279; ' + escapeHtml(t("waiting.after")) + ' ' + escapeHtml(label) + escapeHtml(suffix) + '</span>' +
+          '<button type="button" class="icon-btn" data-action="screen-remove-cue-row" data-row="' + i + '" title="' + escapeHtml(t("habit.removeCue")) + '">&times;</button>' +
         '</div>';
       } else {
         const placeholder = (i === 0 && !anyHook)
-          ? "When? (required) e.g. After I\u2019ve had my coffee\u2026"
-          : "Cue\u2026 (shows on days no hook is live)";
+          ? t("habit.cuePlaceholderFirst")
+          : t("habit.cuePlaceholderExtra");
         rows += '<div class="screen-when-field-row' + (invalid && i === 0 ? " field-invalid" : "") + '">' +
-          '<input type="text" class="habit-when-input" data-field="cueText" data-row="' + i + '" placeholder="' + placeholder + '" value="' + escapeHtml(row.text || "") + '">' +
-          '<button type="button" class="screen-icon-toggle" data-action="screen-open-hook-pick" data-row="' + i + '" title="Hook to another habit">&#129693;</button>' +
-          (rowsArr.length > 1 ? '<button type="button" class="icon-btn" data-action="screen-remove-cue-row" data-row="' + i + '" title="Remove this cue">&times;</button>' : "") +
+          '<input type="text" class="habit-when-input" data-field="cueText" data-row="' + i + '" placeholder="' + escapeHtml(placeholder) + '" value="' + escapeHtml(row.text || "") + '">' +
+          '<button type="button" class="screen-icon-toggle" data-action="screen-open-hook-pick" data-row="' + i + '" title="' + escapeHtml(t("habit.hookToAnother")) + '">&#129693;</button>' +
+          (rowsArr.length > 1 ? '<button type="button" class="icon-btn" data-action="screen-remove-cue-row" data-row="' + i + '" title="' + escapeHtml(t("habit.removeCue")) + '">&times;</button>' : "") +
         '</div>';
       }
     });
@@ -3671,13 +3698,13 @@
     // its sections read differently from the notes and condition pickers.
     let sections = "";
     if (targets.length){
-      sections += '<div class="screen-hook-pick-label">Habits</div>' +
+      sections += '<div class="screen-hook-pick-label">' + escapeHtml(t("habit.hookPickHabits")) + '</div>' +
         '<div class="screen-hook-pick-list">' +
-        targets.map(function(t){ return '<button type="button" class="screen-hook-pick-item" data-action="screen-pick-hook" data-id="' + t.id + '">' + escapeHtml(t.title) + '</button>'; }).join("") +
+        targets.map(function(hk){ return '<button type="button" class="screen-hook-pick-item" data-action="screen-pick-hook" data-id="' + hk.id + '">' + escapeHtml(hk.title) + '</button>'; }).join("") +
         '</div>';
     }
     if (ctxTargets.length){
-      sections += '<div class="screen-hook-pick-label">Contexts</div>' +
+      sections += '<div class="screen-hook-pick-label">' + escapeHtml(t("habit.hookPickContexts")) + '</div>' +
         '<div class="screen-hook-pick-list">' +
         ctxTargets.map(function(c){ return '<button type="button" class="screen-hook-pick-item" data-action="screen-pick-hook" data-ctx="1" data-id="' + c.id + '">' + escapeHtml(c.name) + '</button>'; }).join("") +
         '</div>';
@@ -3685,27 +3712,26 @@
     // Empty state names the way out, per the empty-picker-teaches rule
     // (§4.3d/§12.1b): no habits to hook to AND no contexts to cue on.
     const itemsHtml = sections ||
-      '<div class="screen-hook-pick-list"><div class="empty-note">No cues yet — add a habit, or create a context with + on the Next or Waiting lane.</div></div>';
+      '<div class="screen-hook-pick-list"><div class="empty-note">' + escapeHtml(t("habit.hookPickEmpty")) + '</div></div>';
     return (
       '<div class="pick-body">' +
         // The prompt is an intro, not a section heading — otherwise it would
         // take a divider and sit right on top of the first section's.
-        '<div class="pick-intro">Cue on which habit or context?</div>' +
+        '<div class="pick-intro">' + escapeHtml(t("habit.hookPickIntro")) + '</div>' +
         itemsHtml +
-        '<div class="screen-row" style="margin-top:8px;"><button type="button" class="btn btn-ghost btn-small" data-action="screen-cancel-hook-pick">Back</button></div>' +
+        '<div class="screen-row" style="margin-top:8px;"><button type="button" class="btn btn-ghost btn-small" data-action="screen-cancel-hook-pick">' + escapeHtml(t("picker.back")) + '</button></div>' +
       '</div>'
     );
   }
   // ---- Habit run engine UI (chunk 3): schedule chips, pause, run track ----
-  const DOW_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
   function habitScheduleHtml(draft, invalid){
-    const chips = DOW_LABELS.map(function(lab, i){
+    const chips = [0, 1, 2, 3, 4, 5, 6].map(function(i){
       const active = draft.schedule.indexOf(i) !== -1;
-      return '<button type="button" class="habit-day-chip' + (active ? " active" : "") + '" data-action="screen-toggle-schedule-day" data-dow="' + i + '" title="' + ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][i] + '">' + lab + '</button>';
+      return '<button type="button" class="habit-day-chip' + (active ? " active" : "") + '" data-action="screen-toggle-schedule-day" data-dow="' + i + '" title="' + escapeHtml(t("habit.dowFull." + i)) + '">' + escapeHtml(t("habit.dowLetter." + i)) + '</button>';
     }).join("");
     return (
       '<div class="screen-row">' +
-        '<div class="screen-hook-pick-label" style="margin-bottom:2px;">Scheduled days</div>' +
+        '<div class="screen-hook-pick-label" style="margin-bottom:2px;">' + escapeHtml(t("habit.scheduledDays")) + '</div>' +
       '</div>' +
       '<div class="screen-row"><div class="habit-day-row' + (invalid ? " field-invalid" : "") + '">' + chips + '</div></div>'
     );
@@ -3714,7 +3740,7 @@
     return (
       '<div class="screen-row">' +
         '<button type="button" class="btn btn-ghost btn-small habit-pause-btn' + (draft.paused ? " active" : "") + '" data-action="screen-toggle-pause">' +
-          (draft.paused ? "\u25B6 Unpause" : "\u23F8 Pause") +
+          (draft.paused ? "\u25B6 " + escapeHtml(t("habit.unpause")) : "\u23F8 " + escapeHtml(t("habit.pause"))) +
         '</button>' +
       '</div>'
     );
@@ -3903,21 +3929,21 @@
     if (ctx.projectId){
       // GROUP, don't filter (§12.1b): the project's own actions first, the rest
       // below — a condition may still target anything (§4.2).
-      body = group("This project", targets.filter(function(t){ return t.inProject && !t.isEvent; })) +
-             group("Everything else", targets.filter(function(t){ return !t.inProject && !t.isEvent; }));
+      body = group(t("picker.conditionThisProject"), targets.filter(function(t){ return t.inProject && !t.isEvent; })) +
+             group(t("picker.conditionEverythingElse"), targets.filter(function(t){ return !t.inProject && !t.isEvent; }));
     } else {
-      body = group("Next Actions", targets.filter(function(t){ return t.kind === "next" && !t.isEvent; })) +
-             group("Waiting Actions", targets.filter(function(t){ return t.kind === "waiting" && !t.isEvent; }));
+      body = group(t("picker.conditionNextActions"), targets.filter(function(t){ return t.kind === "next" && !t.isEvent; })) +
+             group(t("picker.conditionWaitingActions"), targets.filter(function(t){ return t.kind === "waiting" && !t.isEvent; }));
     }
-    body += group("Upcoming events", events); // chunk 8 (§10): condition on a pending event
+    body += group(t("picker.conditionUpcomingEvents"), events); // chunk 8 (§10): condition on a pending event
     // Empty state is a teaching surface, not an error (§12.1b) — name the exits.
     const empty = !targets.length
-      ? '<div class="empty-note">No actions to wait on yet. Add a next action first — or use ✎ to say what you’re waiting for.</div>' : "";
-    const noneHtml = '<div class="screen-hook-pick-list"><button type="button" class="screen-hook-pick-item screen-hook-pick-none" data-action="screen-clear-condition-pick">No condition</button></div>';
+      ? '<div class="empty-note">' + escapeHtml(t("picker.conditionEmpty")) + '</div>' : "";
+    const noneHtml = '<div class="screen-hook-pick-list"><button type="button" class="screen-hook-pick-item screen-hook-pick-none" data-action="screen-clear-condition-pick">' + escapeHtml(t("picker.noCondition")) + '</button></div>';
     return (
       '<div class="pick-body">' +
         noneHtml + body + empty +
-        '<div class="screen-row" style="margin-top:8px;"><button type="button" class="btn btn-ghost btn-small" data-action="screen-cancel-condition-pick">Back</button></div>' +
+        '<div class="screen-row" style="margin-top:8px;"><button type="button" class="btn btn-ghost btn-small" data-action="screen-cancel-condition-pick">' + escapeHtml(t("picker.back")) + '</button></div>' +
       '</div>'
     );
   }
@@ -3986,9 +4012,9 @@
         ? 'border-color:var(--paper-2);color:var(--text-soft);cursor:default;'
         : 'border-color:var(' + accentVar + ');color:var(' + accentVar + ');';
     const text = armed
-      ? "\u2713 Converting to " + escapeHtml(KIND_BADGE_LABEL[destKind]) + " on save"
+      ? "\u2713 " + escapeHtml(t("outcome.convertingToOnSave").replace("{kind}", KIND_BADGE_LABEL[destKind]))
       : ((arrow === "left" ? "&#8592; " : "") + escapeHtml(label) + (arrow === "right" ? " &#8594;" : ""));
-    const title = armed ? "Tap to undo" : disabled ? (disabledTitle || "Disarm Complete to convert") : "";
+    const title = armed ? escapeHtml(t("outcome.tapToUndo")) : disabled ? escapeHtml(disabledTitle || t("outcome.disarmToConvert")) : "";
     return (
       '<button type="button" class="btn screen-make-kind-btn' + (armed ? " armed" : "") + (disabled ? " disabled" : "") + '" data-action="make-kind" data-dest="' + destKind + '" ' +
         'title="' + title + '" style="' + style + '">' + text +
@@ -4018,50 +4044,54 @@
   // relevant secondary details, the kind's convert button greyed + inert
   // ("Restore the item to convert it"), and the Complete pill as "↩ Restore".
   function completedBodyHtml(s){
-    const t = s.completedTask, kind = s.kind;
-    let fields = '<div class="screen-field-title completed-static">' + escapeHtml(t.title) + '</div>';
-    if ((t.notesClean || "").trim()){
-      fields += '<div class="completed-static-desc">' + escapeHtml(t.notesClean.trim()) + '</div>';
+    // ⚠ Named `task`, not `t` — this function's body calls the i18n t()
+    // function extensively, and a local `const t` would shadow it silently
+    // (t.title etc. would still work, but any t("...") call would try to
+    // invoke the completed task object as a function and throw).
+    const task = s.completedTask, kind = s.kind;
+    let fields = '<div class="screen-field-title completed-static">' + escapeHtml(task.title) + '</div>';
+    if ((task.notesClean || "").trim()){
+      fields += '<div class="completed-static-desc">' + escapeHtml(task.notesClean.trim()) + '</div>';
     }
     const rows = [];
     if (kind === "waiting"){
-      if (t.conditionId) rows.push("🥅 After " + escapeHtml(t.conditionLabel || "another item"));
-      else if ((t.whenText || "").trim()) rows.push("🕐 Waiting for " + escapeHtml(t.whenText.trim()));
+      if (task.conditionId) rows.push("🥅 " + escapeHtml(t("waiting.after")) + " " + escapeHtml(task.conditionLabel || t("waiting.anotherItem")));
+      else if ((task.whenText || "").trim()) rows.push("🕐 " + escapeHtml(t("waiting.waitingForLabel")) + " " + escapeHtml(task.whenText.trim()));
     }
-    if (isActionKind(kind) && t.contextId){
-      const ctx = findContext(t.contextId);
-      if (ctx) rows.push("Context: " + escapeHtml(ctx.name));
+    if (isActionKind(kind) && task.contextId){
+      const ctx = findContext(task.contextId);
+      if (ctx) rows.push(escapeHtml(t("completed.context")) + " " + escapeHtml(ctx.name));
     }
-    if (isActionKind(kind) && t.linkedProjectId){
+    if (isActionKind(kind) && task.linkedProjectId){
       let proj = null;
       ["current", "future"].forEach(function(k){
-        const p = state.tasks[k].find(function(x){ return x.id === t.linkedProjectId; }) ||
-                  (state.completed[k] || []).find(function(x){ return x.id === t.linkedProjectId; });
+        const p = state.tasks[k].find(function(x){ return x.id === task.linkedProjectId; }) ||
+                  (state.completed[k] || []).find(function(x){ return x.id === task.linkedProjectId; });
         if (p) proj = p;
       });
-      if (proj) rows.push("🔗 Part of “" + escapeHtml(proj.title) + "”");
+      if (proj) rows.push("🔗 " + escapeHtml(t("completed.partOf")) + " “" + escapeHtml(proj.title) + "”");
     }
-    if (t.deadline && t.deadline.date){
-      const dd = dateStrToDate(t.deadline.date);
-      let ds = dd ? dd.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }) : t.deadline.date;
-      if (t.deadline.time) ds += " at " + escapeHtml(t.deadline.time);
-      rows.push("📅 Due " + escapeHtml(ds));
+    if (task.deadline && task.deadline.date){
+      const dd = dateStrToDate(task.deadline.date);
+      let ds = dd ? dd.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }) : task.deadline.date;
+      if (task.deadline.time) ds += " " + escapeHtml(t("completed.at")) + " " + escapeHtml(task.deadline.time);
+      rows.push("📅 " + escapeHtml(t("completed.due")) + " " + escapeHtml(ds));
     }
-    if ((t.bundleText || "").trim()){
-      rows.push("🍬 " + escapeHtml(t.bundleText.trim()));
+    if ((task.bundleText || "").trim()){
+      rows.push("🍬 " + escapeHtml(task.bundleText.trim()));
     }
     rows.forEach(function(r){ fields += '<div class="completed-info-row">' + r + '</div>'; });
-    if (t.completedAt){
-      fields += '<div class="completed-info-row completed-when">Completed ' + escapeHtml(t.completedAt) + '</div>';
+    if (task.completedAt){
+      fields += '<div class="completed-info-row completed-when">' + escapeHtml(t("completed.completedOn")) + ' ' + escapeHtml(task.completedAt) + '</div>';
     }
     // Convert button(s) for this kind — greyed and inert. screenMakeKind
     // guards completedView, so a tap does nothing even if the class slips.
-    const tip = "Restore the item to convert it";
-    if (kind === "next") fields += makeKindBtnHtml("waiting", "Make Waiting Action", "right", false, true, tip);
-    else if (kind === "waiting") fields += makeKindBtnHtml("next", "Make Next Action", "left", false, true, tip);
-    else if (kind === "current") fields += makeKindBtnHtml("future", "Make Future / Someday", "", false, true, tip);
-    else if (kind === "future") fields += makeKindBtnHtml("current", "Make Current Project", "", false, true, tip);
-    fields += '<button type="button" class="btn screen-complete-pill" data-action="completed-restore" title="Restore to the active list">↩ Restore</button>';
+    const tip = t("outcome.restoreToConvert");
+    if (kind === "next") fields += makeKindBtnHtml("waiting", t("outcome.makeWaiting"), "right", false, true, tip);
+    else if (kind === "waiting") fields += makeKindBtnHtml("next", t("outcome.makeNext"), "left", false, true, tip);
+    else if (kind === "current") fields += makeKindBtnHtml("future", t("outcome.makeFuture"), "", false, true, tip);
+    else if (kind === "future") fields += makeKindBtnHtml("current", t("outcome.makeCurrent"), "", false, true, tip);
+    fields += '<button type="button" class="btn screen-complete-pill" data-action="completed-restore" title="' + escapeHtml(t("outcome.restoreToActive")) + '">↩ ' + escapeHtml(t("outcome.restore")) + '</button>';
     return '<div class="screen-body">' + fields + '</div>';
   }
   function screenBodyHtml(s){
@@ -4102,7 +4132,7 @@
     let convertHtml = "";
 
     if (kind === "next"){
-      fields += '<textarea class="screen-field-desc" data-field="notesClean" placeholder="Description (optional)\u2026">' + escapeHtml(draft.notesClean) + '</textarea>';
+      fields += '<textarea class="screen-field-desc" data-field="notesClean" placeholder="' + escapeHtml(t("field.description")) + '">' + escapeHtml(draft.notesClean) + '</textarea>';
       fields += linkRowHtml(draft, linkLocked);
       fields += contextRowHtml(draft);
       fields += deadlineFieldsHtml(draft, kind);
@@ -4111,9 +4141,9 @@
         // whenever a deadline is set -- converting would have to silently drop
         // the date. Complete-armed also disables it (existing mutual exclusion).
         const dated = !!(draft.deadline && draft.deadline.date);
-        convertHtml += makeKindBtnHtml("waiting", "Make Waiting Action", "right", draft.convertTo === "waiting",
+        convertHtml += makeKindBtnHtml("waiting", t("outcome.makeWaiting"), "right", draft.convertTo === "waiting",
           !!draft.willComplete || dated,
-          dated ? "A waiting action can’t hold a date — clear the deadline first" : null);
+          dated ? t("waiting.blockedByDeadline") : null);
       }
       fields += advancedRowHtml(draft);
     } else if (kind === "waiting"){
@@ -4121,14 +4151,14 @@
       // description) — "the second most important piece of information
       // after the title" per 4.2.
       if (draft.conditionId) fields += conditionPillHtml(draft);
-      fields += '<textarea class="screen-field-desc" data-field="notesClean" placeholder="Description (optional)\u2026">' + escapeHtml(draft.notesClean) + '</textarea>';
+      fields += '<textarea class="screen-field-desc" data-field="notesClean" placeholder="' + escapeHtml(t("field.description")) + '">' + escapeHtml(draft.notesClean) + '</textarea>';
       fields += linkRowHtml(draft, linkLocked);
       fields += contextRowHtml(draft);
       fields += waitingForRowHtml(draft, s.invalidField === "waitingFor");
-      if (s.taskId) convertHtml += makeKindBtnHtml("next", "Make Next Action", "left", draft.convertTo === "next", !!draft.willComplete);
+      if (s.taskId) convertHtml += makeKindBtnHtml("next", t("outcome.makeNext"), "left", draft.convertTo === "next", !!draft.willComplete);
       fields += advancedRowHtml(draft);
     } else if (isProjectKind(kind)){
-      fields += '<textarea class="screen-field-desc" data-field="notesClean" placeholder="Description (optional)\u2026">' + escapeHtml(draft.notesClean) + '</textarea>';
+      fields += '<textarea class="screen-field-desc" data-field="notesClean" placeholder="' + escapeHtml(t("field.description")) + '">' + escapeHtml(draft.notesClean) + '</textarea>';
       // \u2691 Deadlines are CURRENT-only (user): "Future projects don't have deadlines
       // by definition." A Someday project is one you have NOT committed to starting
       // (\u00a74.3 / the lane's own info text), and a due date is a commitment \u2014 the two
@@ -4157,9 +4187,9 @@
           // a true statement about a saved thing and stays live; on a NEW one it
           // waits for the blocked save (invalidField) to have something to report.
           const showFlag = s.taskId ? !hasWay : (s.invalidField === "projectActions");
-          if (showFlag) fields += '<div class="screen-project-flag">No linked actions yet \u2014 every active project should have at least one next step.</div>';
+          if (showFlag) fields += '<div class="screen-project-flag">' + escapeHtml(t("project.noNextStepFlag")) + '</div>';
         }
-        if (s.taskId) convertHtml += makeKindBtnHtml("future", "Make Future / Someday", "", draft.convertTo === "future", !!draft.willComplete);
+        if (s.taskId) convertHtml += makeKindBtnHtml("future", t("outcome.makeFuture"), "", draft.convertTo === "future", !!draft.willComplete);
       } else {
         // ⚑ Future projects get LINKED NOTES (user: "it should be possible to
         // link notes to the future projects page"). Notes only, and no segmented
@@ -4181,14 +4211,14 @@
           }).length : 0;
           const fStaged = ((s.draft && s.draft.staged && s.draft.staged.noteCreates) || []).length;
           const fTotal = fCount + fStaged;
-          fields += '<div class="screen-hook-pick-label">Linked notes' +
+          fields += '<div class="screen-hook-pick-label">' + escapeHtml(t("project.linkedNotesLabel")) +
             (fTotal ? ' <span class="seg-count">' + fTotal + '</span>' : "") + '</div>' +
             linkedNotesListHtml(s, fpid);
         }
-        if (s.taskId) convertHtml += makeKindBtnHtml("current", "Make Current Project", "", draft.convertTo === "current", !!draft.willComplete);
+        if (s.taskId) convertHtml += makeKindBtnHtml("current", t("outcome.makeCurrent"), "", draft.convertTo === "current", !!draft.willComplete);
       }
     } else if (kind === "habit"){
-      fields += '<textarea class="screen-field-desc" data-field="notesClean" placeholder="Who will I be if I build this habit?">' + escapeHtml(draft.notesClean) + '</textarea>';
+      fields += '<textarea class="screen-field-desc" data-field="notesClean" placeholder="' + escapeHtml(t("habit.identityPlaceholder")) + '">' + escapeHtml(draft.notesClean) + '</textarea>';
       fields += habitWhenFieldsHtml(draft, s.invalidField === "habitWhen");
       fields += habitScheduleHtml(draft, s.invalidField === "habitSchedule");
       fields += advancedRowHtml(draft);
@@ -4214,8 +4244,8 @@
       const blocked = !armed && !!draft.convertTo;
       completeHtml += '<button type="button" class="btn screen-complete-pill' + (armed ? " done" : "") + (blocked ? " paused" : "") +
         '" data-action="screen-complete" title="' +
-        (armed ? "Completes when you save \u2014 tap to undo" : blocked ? "Disarm the convert to complete" : "Complete on save") + '">' +
-        (armed ? "\u2713 Completing on save" : "Complete") + '</button>';
+        escapeHtml(armed ? t("outcome.completingTapUndo") : blocked ? t("outcome.disarmToConvert") : t("outcome.completeOnSaveTitle")) + '">' +
+        (armed ? "\u2713 " + escapeHtml(t("outcome.completingOnSave")) : escapeHtml(t("outcome.complete"))) + '</button>';
     } else if (kind === "habit" && s.taskId){
       // Habit Complete is a toggle rather than a one-way archive (the page
       // stays open so the track/celebration update in place) — but it is
@@ -4232,8 +4262,8 @@
       // records the day correctly at save.
       const pausedNow = !!draft.paused;
       completeHtml += '<button type="button" class="btn screen-complete-pill' + (doneToday ? " done" : "") + (pausedNow ? " paused" : "") +
-        '" data-action="screen-complete" title="' + (pausedNow ? "Paused \u2014 unpause to complete" : "") + '">' +
-        (pausedNow ? "\u23F8 Paused" : (doneToday ? "\u2713 Completed today" : "Complete")) + '</button>';
+        '" data-action="screen-complete" title="' + (pausedNow ? escapeHtml(t("outcome.pausedUnpauseToComplete")) : "") + '">' +
+        (pausedNow ? "\u23F8 " + escapeHtml(t("outcome.paused")) : (doneToday ? "\u2713 " + escapeHtml(t("outcome.completedToday")) : escapeHtml(t("outcome.complete")))) + '</button>';
     }
     // The outcome group. Complete first, converts beside/below it, in one
     // bordered section — or nothing at all when the page has neither half.
@@ -4298,30 +4328,30 @@
     let tabsHtml = "";
     if (isHabit){
       tabsHtml = '<div class="adv-tabs">' +
-        '<button type="button" class="adv-tab' + (tab === "bundle" ? " active" : "") + '" data-tab="bundle">Bundling</button>' +
-        '<button type="button" class="adv-tab' + (tab === "cues" ? " active" : "") + '" data-tab="cues">Extra cues</button>' +
+        '<button type="button" class="adv-tab' + (tab === "bundle" ? " active" : "") + '" data-tab="bundle">' + escapeHtml(t("advanced.bundlingTab")) + '</button>' +
+        '<button type="button" class="adv-tab' + (tab === "cues" ? " active" : "") + '" data-tab="cues">' + escapeHtml(t("advanced.extraCuesTab")) + '</button>' +
       '</div>';
     }
     let content = "";
     if (tab === "bundle"){
       content =
-        '<p class="adv-note"><strong>Temptation bundling</strong> pairs something you enjoy with the thing you\u2019re doing: allow yourself the treat only while (or right after) doing this. e.g. \u201COnly my favorite podcast while running.\u201D</p>' +
-        '<textarea id="adv-bundle-input" class="adv-textarea" placeholder="What treat goes with this?">' + escapeHtml(s.draft.bundleText || "") + '</textarea>';
+        '<p class="adv-note"><strong>' + escapeHtml(t("advanced.temptationBundling")) + '</strong> ' + escapeHtml(t("advanced.bundleDescription")) + '</p>' +
+        '<textarea id="adv-bundle-input" class="adv-textarea" placeholder="' + escapeHtml(t("advanced.bundlePlaceholder")) + '">' + escapeHtml(s.draft.bundleText || "") + '</textarea>';
     } else {
       const rowCount = (s.draft.cueRows || []).length;
       const addHtml = rowCount >= MAX_HOOKS
-        ? '<p class="adv-note">Cue limit reached (' + MAX_HOOKS + ' rows \u2014 one per weekday).</p>'
-        : '<button type="button" class="btn btn-ghost btn-small" data-adv-add-cue="1">+ Add another cue\u2026</button>';
+        ? '<p class="adv-note">' + escapeHtml(t("advanced.cueLimitReached").replace("{n}", MAX_HOOKS)) + '</p>'
+        : '<button type="button" class="btn btn-ghost btn-small" data-adv-add-cue="1">' + escapeHtml(t("advanced.addAnotherCue")) + '</button>';
       content =
-        '<p class="adv-note"><strong>Not recommended.</strong> A habit is one cue followed by one automatic response \u2014 a habit with two cues is usually two habits, so consider creating a separate habit instead. Extra cues exist for rotating weekly routines (a different anchor on different days), not for stacking reminders.</p>' +
-        '<p class="adv-note">Added rows appear on the habit page itself \u2014 each with its own text box and hook icon, like the default \u2014 and are edited and removed there.</p>' +
+        '<p class="adv-note"><strong>' + escapeHtml(t("advanced.notRecommended")) + '</strong> ' + escapeHtml(t("advanced.notRecommendedDescription")) + '</p>' +
+        '<p class="adv-note">' + escapeHtml(t("advanced.addedRowsHint")) + '</p>' +
         addHtml;
     }
     qs("#dialog-root").innerHTML =
       '<div class="choice-dialog-backdrop"><div class="choice-dialog adv-dialog">' +
-      '<div class="adv-title">Advanced options</div>' + tabsHtml +
+      '<div class="adv-title">' + escapeHtml(t("advanced.buttonDialog")) + '</div>' + tabsHtml +
       '<div class="adv-content">' + content + '</div>' +
-      '<div class="choice-dialog-btns"><button type="button" class="primary" data-adv-done="1">Done</button></div>' +
+      '<div class="choice-dialog-btns"><button type="button" class="primary" data-adv-done="1">' + escapeHtml(t("advanced.done")) + '</button></div>' +
       '</div></div>';
     const backdrop = qs(".choice-dialog-backdrop");
     backdrop.addEventListener("click", function(e){
@@ -4583,7 +4613,7 @@
           Object.keys(snap.data).forEach(function(k){ Storage.set(k, snap.data[k]); });
           window.location.reload();
         }},
-        { label: "Cancel", action: function(){} }
+        { label: t("chrome.cancel"), action: function(){} }
       ]
     );
   }
@@ -4745,7 +4775,10 @@
     document.addEventListener("click", function(e){
       // Subtle navigation tick on real button presses (skip disabled
       // buttons, and skip picker selections where the hook chime plays).
-      const clickedBtn = e.target.closest("button:not([disabled])");
+      // The 📅 calendar widget is a <div>, not a <button> (it needs to be a
+      // plain node the desktop header can MOVE rather than clone — see
+      // calendarBtnEl above) so it's matched here by hand or it never ticks.
+      const clickedBtn = e.target.closest('button:not([disabled]), .cal-widget');
       if (clickedBtn){
         const act = clickedBtn.getAttribute("data-action") || "";
         if (act !== "screen-pick-hook" && act !== "screen-pick-condition") playNavClick();
@@ -5025,7 +5058,7 @@
               state.tasks[kind].forEach(function(t){ if (t.parent === groupId) t.parent = null; });
               deleteTask(kind, groupId);
             } },
-          { label: "Cancel", action: function(){} }
+          { label: t("chrome.cancel"), action: function(){} }
         ]);
         return;
       }
@@ -5057,7 +5090,7 @@
             // — otherwise it stayed stale until a full refresh.
             renderLane("next"); renderLane("waiting"); renderLane("habit");
           } },
-          { label: "Cancel", action: function(){} }
+          { label: t("chrome.cancel"), action: function(){} }
         ]);
         return;
       }
@@ -5095,7 +5128,7 @@
           "Delete all " + n + " completed item" + (n === 1 ? "" : "s") + "? This can’t be undone.",
           [
             { label: "Delete all", style: "danger", action: function(){ clearCompleted(kind); } },
-            { label: "Cancel", action: function(){} }
+            { label: t("chrome.cancel"), action: function(){} }
           ]
         );
         return;
@@ -5240,7 +5273,7 @@
         const kind = s.kind, id = s.taskId;
         openConfirmDialog("Delete this completed item? This can’t be undone.", [
           { label: "Delete", style: "danger", action: function(){ deleteCompleted(kind, id); closeScreen(); } },
-          { label: "Cancel", action: function(){} }
+          { label: t("chrome.cancel"), action: function(){} }
         ]);
         return;
       }
@@ -6254,15 +6287,15 @@
       '<div class="tray-backdrop" data-action="close-tray"></div>' +
       '<div class="tray-drawer">' +
         '<div class="tray-head">' +
-          '<span class="tray-title">Intray</span>' +
+          '<span class="tray-title">' + escapeHtml(t("tray.title")) + '</span>' +
           '<span style="flex:1"></span>' +
-          '<button type="button" class="icon-btn" data-action="tray-info" title="Information">&#9432;</button>' +
-          '<button type="button" class="icon-btn" data-action="close-tray" title="Close">&times;</button>' +
+          '<button type="button" class="icon-btn" data-action="tray-info" title="' + escapeHtml(t("chrome.info")) + '">&#9432;</button>' +
+          '<button type="button" class="icon-btn" data-action="close-tray" title="' + escapeHtml(t("chrome.close")) + '">&times;</button>' +
         '</div>' +
         '<div class="tray-info-panel" hidden>' + escapeHtml(trayInfoText()) + '</div>' +
         '<div class="tray-capture">' +
           '<input type="text" id="tray-input" placeholder="Capture a thought…" autocomplete="off">' +
-          '<button type="button" data-action="tray-add" title="Add">+</button>' +
+          '<button type="button" data-action="tray-add" title="' + escapeHtml(t("chrome.add")) + '">+</button>' +
         '</div>' +
         list +
         // The handle's other half: an arrow on the drawer's own edge that puts
@@ -6531,10 +6564,10 @@
     return (
       '<div class="screen-header">' +
         '<span class="screen-chrome-btn" style="visibility:hidden">&#8592;</span>' +
-        '<span class="screen-kind-badge">Review</span>' +
+        '<span class="screen-kind-badge">' + escapeHtml(t("review.badge")) + '</span>' +
         '<div class="screen-header-right">' +
-          '<button type="button" class="screen-chrome-btn" data-action="review-info" title="Information">&#9432;</button>' +
-          '<button type="button" class="screen-chrome-btn" data-action="review-close" title="Close">&#10005;</button>' +
+          '<button type="button" class="screen-chrome-btn" data-action="review-info" title="' + escapeHtml(t("chrome.info")) + '">&#9432;</button>' +
+          '<button type="button" class="screen-chrome-btn" data-action="review-close" title="' + escapeHtml(t("chrome.close")) + '">&#10005;</button>' +
         '</div>' +
       '</div>'
     );
@@ -6553,24 +6586,24 @@
   function reviewInfoPanelHtml(){
     return (
       '<div class="review-info-panel" hidden>' +
-        '<div class="review-info-block"><b>Sorting a new thought</b><br>' +
-          '<b>Next:</b> ' + escapeHtml(LANE_INFO.next) + '<br>' +
-          '<b>Waiting:</b> ' + escapeHtml(LANE_INFO.waiting) + '<br>' +
-          '<b>Project:</b> ' + escapeHtml(LANE_INFO.current) + '<br>' +
-          '<b>Future:</b> ' + escapeHtml(LANE_INFO.future) + '<br>' +
-          '<b>Habit:</b> ' + escapeHtml(LANE_INFO.habit) + '<br>' +
-          '<b>Note:</b> ' + escapeHtml(LANE_INFO.notes) +
+        '<div class="review-info-block"><b>' + escapeHtml(t("review.heading.sorting")) + '</b><br>' +
+          '<b>' + escapeHtml(t("review.infoNextLabel")) + '</b> ' + escapeHtml(LANE_INFO.next) + '<br>' +
+          '<b>' + escapeHtml(t("review.infoWaitingLabel")) + '</b> ' + escapeHtml(LANE_INFO.waiting) + '<br>' +
+          '<b>' + escapeHtml(t("review.infoProjectLabel")) + '</b> ' + escapeHtml(LANE_INFO.current) + '<br>' +
+          '<b>' + escapeHtml(t("review.infoFutureLabel")) + '</b> ' + escapeHtml(LANE_INFO.future) + '<br>' +
+          '<b>' + escapeHtml(t("review.infoHabitLabel")) + '</b> ' + escapeHtml(LANE_INFO.habit) + '<br>' +
+          '<b>' + escapeHtml(t("review.infoNoteLabel")) + '</b> ' + escapeHtml(LANE_INFO.notes) +
         '</div>' +
         // ⚑ Was "Deciding on an open loop" / "Orphaned waiting" (user: "open
         // loop is jargon from the book. It should be changed"). Both were terms
         // you had to already know — one borrowed from GTD, one the app invented.
         // The headings now describe the situation instead of naming it. "Stalled"
         // survives because it is ordinary English, not a term of art.
-        '<div class="review-info-block"><b>When something needs a decision</b><br>' +
-          '<b>Past its date:</b> ' + escapeHtml(reviewMenuInfo().pastdue) + '<br>' +
-          '<b>Stalled project:</b> ' + escapeHtml(reviewMenuInfo().stalled) + '<br>' +
-          '<b>Waiting on something gone:</b> ' + escapeHtml(reviewMenuInfo().orphaned) + '<br>' +
-          '<b>A repeat you missed:</b> ' + escapeHtml(reviewMenuInfo().missed) +
+        '<div class="review-info-block"><b>' + escapeHtml(t("review.heading.deciding")) + '</b><br>' +
+          '<b>' + escapeHtml(t("review.infoPastDueLabel")) + '</b> ' + escapeHtml(reviewMenuInfo().pastdue) + '<br>' +
+          '<b>' + escapeHtml(t("review.infoStalledLabel")) + '</b> ' + escapeHtml(reviewMenuInfo().stalled) + '<br>' +
+          '<b>' + escapeHtml(t("review.infoOrphanedLabel")) + '</b> ' + escapeHtml(reviewMenuInfo().orphaned) + '<br>' +
+          '<b>' + escapeHtml(t("review.infoMissedLabel")) + '</b> ' + escapeHtml(reviewMenuInfo().missed) +
         '</div>' +
       '</div>'
     );
@@ -6585,7 +6618,7 @@
     return '<button type="button" class="review-menu-btn' + (danger ? " danger" : "") + '" data-action="' + action + '"' + (extra || "") + '>' + label + '</button>';
   }
   function reviewNotNowBtn(key){
-    return '<button type="button" class="review-menu-btn review-notnow" data-action="review-defer" data-key="' + key + '">Not now</button>';
+    return '<button type="button" class="review-menu-btn review-notnow" data-action="review-defer" data-key="' + key + '">' + escapeHtml(t("review.notNow")) + '</button>';
   }
   // The active inline sub-form (Push date / Add next action / Free text) for
   // this card, if any. One at a time, held on the screen (draft-free — these
@@ -6607,7 +6640,7 @@
   function reviewFullPageBtn(kind, projectId){
     return '<button type="button" class="review-menu-btn review-form-full" ' +
       'data-action="review-form-full" data-kind="' + kind + '" data-project="' + projectId + '" ' +
-      'title="More fields — context, deadline, description">Full page &#8594;</button>';
+      'title="' + escapeHtml(t("review.fullPageTooltip")) + '">' + escapeHtml(t("review.fullPage")) + '</button>';
   }
   function reviewInlineFormHtml(placeholder, type, saveAction, saveLabel, value, invalid, fullKind, projectId){
     const isDate = type === "date";
@@ -6616,10 +6649,10 @@
         (isDate
           // review-form-date is the PICKER hook (pickers.js); review-form-input is
           // only the shared layout class. Keep them separate — see the note there.
-          ? '<input type="text" readonly inputmode="none" id="review-form-input" data-field="reviewForm" placeholder="Pick a date" class="review-form-input review-form-date' + (invalid ? " field-invalid" : "") + '" value="' + escapeHtml(value || "") + '">'
+          ? '<input type="text" readonly inputmode="none" id="review-form-input" data-field="reviewForm" placeholder="' + escapeHtml(t("field.pickDate")) + '" class="review-form-input review-form-date' + (invalid ? " field-invalid" : "") + '" value="' + escapeHtml(value || "") + '">'
           : '<input type="text" id="review-form-input" data-field="reviewForm" class="review-form-input' + (invalid ? " field-invalid" : "") + '" placeholder="' + escapeHtml(placeholder) + '" value="' + escapeHtml(value || "") + '" autocomplete="off">') +
         '<div class="review-inline-form-btns">' +
-          '<button type="button" class="review-menu-btn" data-action="review-form-cancel">Cancel</button>' +
+          '<button type="button" class="review-menu-btn" data-action="review-form-cancel">' + escapeHtml(t("review.cancel")) + '</button>' +
           (fullKind ? reviewFullPageBtn(fullKind, projectId) : "") +
           '<button type="button" class="review-menu-btn" data-action="' + saveAction + '">' + saveLabel + '</button>' +
         '</div>' +
@@ -6640,12 +6673,12 @@
     }
     return (
       '<div class="review-inline-form">' +
-        box("review-form-input", "What are you waiting on?", f.value, "title") +
-        box("review-form-input2", "Until what, or until when?", f.value2, "when") +
+        box("review-form-input", t("review.whatWaitingOn"), f.value, "title") +
+        box("review-form-input2", t("review.untilWhatWhen"), f.value2, "when") +
         '<div class="review-inline-form-btns">' +
-          '<button type="button" class="review-menu-btn" data-action="review-form-cancel">Cancel</button>' +
+          '<button type="button" class="review-menu-btn" data-action="review-form-cancel">' + escapeHtml(t("review.cancel")) + '</button>' +
           reviewFullPageBtn("waiting", key) +
-          '<button type="button" class="review-menu-btn" data-action="review-addwaiting-save">Add</button>' +
+          '<button type="button" class="review-menu-btn" data-action="review-addwaiting-save">' + escapeHtml(t("review.add")) + '</button>' +
         '</div>' +
       '</div>'
     );
@@ -6658,19 +6691,19 @@
       bodyHtml = '<div class="review-card-title">' + escapeHtml(l.text) + '</div>';
       menuHtml =
         '<div class="review-sort-chips">' +
-          reviewMenuBtn("review-sort", "Next", ' data-target="next" data-key="' + l.key + '"') +
-          reviewMenuBtn("review-sort", "Waiting", ' data-target="waiting" data-key="' + l.key + '"') +
-          reviewMenuBtn("review-sort", "Project", ' data-target="current" data-key="' + l.key + '"') +
-          reviewMenuBtn("review-sort", "Future", ' data-target="future" data-key="' + l.key + '"') +
-          reviewMenuBtn("review-sort", "Habit", ' data-target="habit" data-key="' + l.key + '"') +
-          reviewMenuBtn("review-sort", "Note", ' data-target="notes" data-key="' + l.key + '"') +
-          reviewMenuBtn("review-sort", "Calendar", ' data-target="calendar" data-key="' + l.key + '"') + // chunk 7 (§4.8b): the sixth chip
+          reviewMenuBtn("review-sort", t("review.next"), ' data-target="next" data-key="' + l.key + '"') +
+          reviewMenuBtn("review-sort", t("review.waiting"), ' data-target="waiting" data-key="' + l.key + '"') +
+          reviewMenuBtn("review-sort", t("review.project"), ' data-target="current" data-key="' + l.key + '"') +
+          reviewMenuBtn("review-sort", t("review.future"), ' data-target="future" data-key="' + l.key + '"') +
+          reviewMenuBtn("review-sort", t("review.habit"), ' data-target="habit" data-key="' + l.key + '"') +
+          reviewMenuBtn("review-sort", t("review.note"), ' data-target="notes" data-key="' + l.key + '"') +
+          reviewMenuBtn("review-sort", t("review.calendar"), ' data-target="calendar" data-key="' + l.key + '"') + // chunk 7 (§4.8b): the sixth chip
         '</div>' +
         '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + '</div>';
       return '<div class="review-card review-card-capture">' + bodyHtml + menuHtml + '</div>';
     }
     // A rolled-past repeating occurrence (user ruling). Handled before the shared
-    // path below because it has NO lane row to read a title or a bar from — it is
+    // path below because it has NO lane row to read a title or a bar from -- it is
     // the event plus a date. Tapping through goes to the event's page.
     //
     // The menu is the past-due pseudo-action's, minus anything that would act on
@@ -6682,11 +6715,11 @@
       bodyHtml =
         '<button type="button" class="review-card-open" data-action="review-open-event" data-id="' + l.id + '">' +
           '<span class="review-card-title">' + escapeHtml(effTitle(l.ev, l.occ)) + '</span>' +
-          '<span class="review-card-note">⚠ went by on ' + escapeHtml(when) + ' without being ticked</span>' +
+          '<span class="review-card-note">⚠ ' + escapeHtml(t("review.wentByOn")) + ' ' + escapeHtml(when) + ' ' + escapeHtml(t("review.withoutTicking")) + '</span>' +
         '</button>';
       menuHtml =
-        '<button type="button" class="review-menu-btn" data-action="review-missed-done" data-id="' + l.id + '">&#10003; I did it</button>' +
-        '<button type="button" class="review-menu-btn" data-action="review-missed-clear" data-id="' + l.id + '">Let it go</button>' +
+        '<button type="button" class="review-menu-btn" data-action="review-missed-done" data-id="' + l.id + '">&#10003; ' + escapeHtml(t("review.iDidIt")) + '</button>' +
+        '<button type="button" class="review-menu-btn" data-action="review-missed-clear" data-id="' + l.id + '">' + escapeHtml(t("review.letItGo")) + '</button>' +
         reviewNotNowBtn(l.key);
       return '<div class="review-card">' + bodyHtml + menuHtml + '</div>';
     }
@@ -6701,74 +6734,74 @@
     if (l.kind === "pastdue"){
       bodyHtml += l.pseudo ? pseudoBarHtml(l.task) : deadlineBarHtml(l.task);
     } else if (l.kind === "stalled"){
-      bodyHtml += '<span class="review-card-note">⚠ no way forward</span>';
+      bodyHtml += '<span class="review-card-note">⚠ ' + escapeHtml(t("review.noWayForward")) + '</span>';
     } else if (l.kind === "orphaned"){
-      bodyHtml += '<span class="review-card-note cue-orphaned-text">🪝 After ' + escapeHtml(l.task.conditionLabel || "a deleted item") + '</span>';
+      bodyHtml += '<span class="review-card-note cue-orphaned-text">🪝 ' + escapeHtml(t("waiting.after")) + ' ' + escapeHtml(l.task.conditionLabel || t("picker.deletedItem")) + '</span>';
     }
     bodyHtml += '</button>';
 
     const form = reviewFormFor(s, l.key);
     if (l.kind === "pastdue" && l.pseudo){
       // §2: the pseudo-action shape of the past-due kind is a CHECKBOX, not the
-      // deadline menu — you cannot "push" an event's date from here (it is
+      // deadline menu -- you cannot "push" an event's date from here (it is
       // rescheduled on its own page), only tick it done or defer it.
       // ⚑ QA #13: Delete joins Mark done. They look interchangeable but they
-      // are not — completing files the event into Completed, which is right for
+      // are not -- completing files the event into Completed, which is right for
       // something you did and wrong for something that simply died. Without a
       // delete here, the only way to clear a dead past-due event was to record
       // it as an accomplishment. Routed through the event (not the lane row):
       // deleting the row alone leaves the event live and the sweep re-mints it.
       menuHtml =
-        '<button type="button" class="review-menu-btn" data-action="review-complete" data-lane="' + l.laneKind + '" data-id="' + l.id + '">&#10003; Mark done</button>' +
-        '<button type="button" class="review-menu-btn danger" data-action="review-delete-event" data-id="' + l.id + '">&#128465; Delete</button>' +
+        '<button type="button" class="review-menu-btn" data-action="review-complete" data-lane="' + l.laneKind + '" data-id="' + l.id + '">&#10003; ' + escapeHtml(t("review.markDone")) + '</button>' +
+        '<button type="button" class="review-menu-btn danger" data-action="review-delete-event" data-id="' + l.id + '">&#128465; ' + escapeHtml(t("review.delete")) + '</button>' +
         reviewNotNowBtn(l.key);
     } else if (l.kind === "pastdue"){
       if (form && form.type === "date"){
-        menuHtml = reviewInlineFormHtml("", "date", "review-pushdate-save", "Save", (l.task.deadline && l.task.deadline.date) || "", invalid);
+        menuHtml = reviewInlineFormHtml("", "date", "review-pushdate-save", t("review.save"), (l.task.deadline && l.task.deadline.date) || "", invalid);
       } else {
         menuHtml =
-          reviewMenuBtn("review-form-start", "Push the date", ' data-key="' + l.key + '" data-type="date"') +
-          reviewMenuBtn("review-complete", "Complete it", ' data-lane="' + l.laneKind + '" data-id="' + l.id + '"') +
-          reviewMenuBtn("review-delete", "Delete it", ' data-lane="' + l.laneKind + '" data-id="' + l.id + '"', true) +
+          reviewMenuBtn("review-form-start", t("review.pushTheDate"), ' data-key="' + l.key + '" data-type="date"') +
+          reviewMenuBtn("review-complete", t("review.completeIt"), ' data-lane="' + l.laneKind + '" data-id="' + l.id + '"') +
+          reviewMenuBtn("review-delete", t("review.deleteIt"), ' data-lane="' + l.laneKind + '" data-id="' + l.id + '"', true) +
           reviewNotNowBtn(l.key);
       }
     } else if (l.kind === "stalled"){
       if (form && form.type === "text"){
-        menuHtml = reviewInlineFormHtml("What's the very next physical action?", "text", "review-addnext-save", "Add", "", invalid, "next", l.id);
+        menuHtml = reviewInlineFormHtml(t("review.whatsNextAction"), "text", "review-addnext-save", t("review.add"), "", invalid, "next", l.id);
       } else if (form && form.type === "waiting"){
         // ⚑ Two fields, not one (user: stalled projects need a waiting action
         // here too). A Waiting action is invalid without something to wait ON
         // (§4.2), so a single title box would create a broken row that the
-        // review would immediately re-report as orphaned — the exact loop this
+        // review would immediately re-report as orphaned -- the exact loop this
         // menu exists to close. The second field is free text rather than the
         // condition picker: the picker is a whole sub-view, and the review's
         // character is one decision, inline, without leaving.
         menuHtml = reviewWaitingFormHtml(s, l.key);
       } else {
         menuHtml =
-          reviewMenuBtn("review-form-start", "Add a next action", ' data-key="' + l.key + '" data-type="text"') +
-          reviewMenuBtn("review-form-start", "Add a waiting action", ' data-key="' + l.key + '" data-type="waiting"') +
+          reviewMenuBtn("review-form-start", t("review.addNextAction"), ' data-key="' + l.key + '" data-type="text"') +
+          reviewMenuBtn("review-form-start", t("review.addWaitingAction"), ' data-key="' + l.key + '" data-type="waiting"') +
           // ⚑ The third one the user asked for originally, parked until a project
           // could see the calendar. It can now: this opens the calendar for this
           // project, capped by its deadline, and returns HERE rather than to the
-          // project page — the review pushed the stack, so closeScreen lands back
+          // project page -- the review pushed the stack, so closeScreen lands back
           // in the queue where you left off.
-          reviewMenuBtn("review-add-event", "Add an event", ' data-id="' + l.id + '"') +
-          reviewMenuBtn("review-someday", "Move to Someday", ' data-id="' + l.id + '"') +
-          reviewMenuBtn("review-complete", "Complete it", ' data-lane="current" data-id="' + l.id + '"') +
-          reviewMenuBtn("review-delete", "Delete it", ' data-lane="current" data-id="' + l.id + '"', true) +
+          reviewMenuBtn("review-add-event", t("review.addAnEvent"), ' data-id="' + l.id + '"') +
+          reviewMenuBtn("review-someday", t("review.moveToSomeday"), ' data-id="' + l.id + '"') +
+          reviewMenuBtn("review-complete", t("review.completeIt"), ' data-lane="current" data-id="' + l.id + '"') +
+          reviewMenuBtn("review-delete", t("review.deleteIt"), ' data-lane="current" data-id="' + l.id + '"', true) +
           reviewNotNowBtn(l.key);
       }
     } else if (l.kind === "orphaned"){
       if (form && form.type === "text"){
-        menuHtml = reviewInlineFormHtml("Waiting for…", "text", "review-freetext-save", "Save", "", invalid);
+        menuHtml = reviewInlineFormHtml(t("review.waitingForDots"), "text", "review-freetext-save", t("review.save"), "", invalid);
       } else {
         menuHtml =
-          reviewMenuBtn("review-open", "Re-point the condition →", ' data-lane="waiting" data-id="' + l.id + '"') +
-          reviewMenuBtn("review-form-start", "Replace with free text", ' data-key="' + l.key + '" data-type="text"') +
-          reviewMenuBtn("review-promote", "Promote to Next", ' data-id="' + l.id + '"') +
-          reviewMenuBtn("review-complete", "Complete", ' data-lane="waiting" data-id="' + l.id + '"') +
-          reviewMenuBtn("review-delete", "Delete", ' data-lane="waiting" data-id="' + l.id + '"', true) +
+          reviewMenuBtn("review-open", t("review.repointCondition"), ' data-lane="waiting" data-id="' + l.id + '"') +
+          reviewMenuBtn("review-form-start", t("review.replaceWithFreeText"), ' data-key="' + l.key + '" data-type="text"') +
+          reviewMenuBtn("review-promote", t("review.promoteToNext"), ' data-id="' + l.id + '"') +
+          reviewMenuBtn("review-complete", t("review.complete"), ' data-lane="waiting" data-id="' + l.id + '"') +
+          reviewMenuBtn("review-delete", t("review.delete"), ' data-lane="waiting" data-id="' + l.id + '"', true) +
           reviewNotNowBtn(l.key);
       }
     }
@@ -6781,16 +6814,16 @@
     let html = '<div class="screen-body review-body">' + reviewInfoPanelHtml();
     if (!active.length){
       html += (deferredCount > 0)
-        ? '<div class="review-end review-end-deferred"><div class="review-end-big">' + deferredCount + ' deferred.</div>' +
-            '<div class="review-end-sub">You saw everything. These are waiting on you — they’ll be back next time you open the review.</div></div>'
-        : '<div class="review-end review-end-empty"><div class="review-end-big">All clear.</div>' +
-            '<div class="review-end-sub">Nothing slipping through the cracks.</div></div>';
+        ? '<div class="review-end review-end-deferred"><div class="review-end-big">' + deferredCount + escapeHtml(t("review.deferredSuffix")) + '</div>' +
+            '<div class="review-end-sub">' + escapeHtml(t("review.deferredSub")) + '</div></div>'
+        : '<div class="review-end review-end-empty"><div class="review-end-big">' + escapeHtml(t("review.allClear")) + '</div>' +
+            '<div class="review-end-sub">' + escapeHtml(t("review.nothingSlipping")) + '</div></div>';
       return html + '</div>';
     }
     const showAll = !!state.reviewShowAll;
     if (active.length > 1){
-      html += '<div class="review-toolbar"><span class="review-remaining">' + active.length + ' to review</span>' +
-        '<button type="button" class="btn btn-ghost btn-small" data-action="review-toggle-all">' + (showAll ? "One at a time" : "Show all") + '</button></div>';
+      html += '<div class="review-toolbar"><span class="review-remaining">' + active.length + ' ' + escapeHtml(t("review.toReview")) + '</span>' +
+        '<button type="button" class="btn btn-ghost btn-small" data-action="review-toggle-all">' + escapeHtml(showAll ? t("review.oneAtATime") : t("review.showAll")) + '</button></div>';
     }
     active.forEach(function(l, i){
       html += (showAll || i === 0) ? reviewCardHtml(l, s) : reviewRedactionHtml();
@@ -6911,10 +6944,10 @@
   }
   function reviewDelete(lane, id){
     const found = reviewFindTask(id);
-    const title = found ? (found.task.title || "this") : "this";
-    openConfirmDialog("Delete “" + title + "” for good?", [
-      { label: "Delete", style: "danger", action: function(){ deleteTask(lane, id); if (state.screen) state.screen.reviewForm = null; renderScreen(); } },
-      { label: "Cancel", action: function(){} }
+    const title = found ? (found.task.title || t("confirm.deleteThisItem")) : t("confirm.deleteThisItem");
+    openConfirmDialog(t("confirm.deleteTitleForGood").replace("{title}", title), [
+      { label: t("chrome.delete"), style: "danger", action: function(){ deleteTask(lane, id); if (state.screen) state.screen.reviewForm = null; renderScreen(); } },
+      { label: t("chrome.cancel"), action: function(){} }
     ]);
   }
   // QA #13. The id is the pseudo-action's task ID, which IS the event's taskId
@@ -6961,9 +6994,9 @@
     const surf = SURFACES[currentSurfaceId()] || SURFACES[DEFAULT_SURFACE];
     return (
       '<button type="button" class="settings-item" data-action="export-data">' +
-        '<span>&#11014;</span><span class="si-label">Export a backup</span></button>' +
+        '<span>&#11014;</span><span class="si-label">' + escapeHtml(t("settings.exportBackup")) + '</span></button>' +
       '<button type="button" class="settings-item" data-action="import-data">' +
-        '<span>&#11015;</span><span class="si-label">Import a backup</span></button>' +
+        '<span>&#11015;</span><span class="si-label">' + escapeHtml(t("settings.importBackup")) + '</span></button>' +
       '<div class="settings-sep"></div>' +
       // ▲ DESKTOP (author note 8): Background and Language become header
       // dropdowns and LEAVE this menu — one place per thing. The phone keeps
@@ -6981,11 +7014,11 @@
       // are scaffolding for building the app, and having them across the top of
       // every screen was the clutter the user wanted gone.
       '<button type="button" class="settings-item" data-action="settings-debug">' +
-        '<span>&#128295;</span><span class="si-label">Debugging</span>' +
+        '<span>&#128295;</span><span class="si-label">' + escapeHtml(t("settings.debuggingRow")) + '</span>' +
         '<span class="si-value">' + devOnCount() + '</span><span class="si-caret">&#8250;</span></button>' +
       '<div class="settings-sep"></div>' +
       '<button type="button" class="settings-item danger" data-action="clear-all-data">' +
-        '<span>&#8634;</span><span class="si-label">Restore app to defaults</span></button>' +
+        '<span>&#8634;</span><span class="si-label">' + escapeHtml(t("settings.restoreDefaultsRow")) + '</span></button>' +
       // ⚑ Which build this is. Not decoration: the app is tested on a phone
       // against GitHub Pages, which caches the HTML for a few minutes, so
       // "am I looking at the fix or at yesterday's copy?" is a real question
@@ -7001,7 +7034,7 @@
   function settingsDebugHtml(){
     let out =
       '<button type="button" class="settings-item settings-back" data-action="settings-root">' +
-        '<span>&#8249;</span><span class="si-label">Debugging</span></button>' +
+        '<span>&#8249;</span><span class="si-label">' + escapeHtml(t("settings.debuggingRow")) + '</span></button>' +
       '<div class="settings-sep"></div>';
     DEV_GROUPS.forEach(function(g){
       const on = devGroupOn(g);
@@ -7051,7 +7084,16 @@
     return out;
   }
   function renderSettingsMenu(){
-    const menu = qs(".settings-menu");
+    // ⚑ FIX (author QA: "the settings dropdown on desktop doesn't seem to
+    // work"). qs(".settings-menu") is document.querySelector — it returns the
+    // FIRST match anywhere on the page. The header's Language/Background
+    // dropdowns (T17) reuse this SAME class for their visual chrome, and
+    // #header-left sits earlier in the DOM than #dialog-root, so the bare
+    // selector was silently writing this menu's content into a HIDDEN header
+    // dropdown instead of the gear menu the user just opened — which is why
+    // it looked empty and unresponsive rather than throwing. Scope to
+    // #dialog-root, the one place openSettings() actually builds this menu.
+    const menu = qs("#dialog-root .settings-menu");
     if (!menu) return;
     menu.innerHTML = settingsPanel === "backgrounds" ? settingsBackgroundsHtml()
       : settingsPanel === "language" ? settingsLanguageHtml()
@@ -7064,8 +7106,8 @@
       '<div class="menu-scrim" data-action="settings-close"></div>' +
       '<div class="settings-menu"></div>';
     renderSettingsMenu();
-    qs(".menu-scrim").addEventListener("click", closeDialog);
-    qs(".settings-menu").addEventListener("click", function(e){
+    qs(".menu-scrim").addEventListener("click", closeDialog); // not reused elsewhere — unambiguous
+    qs("#dialog-root .settings-menu").addEventListener("click", function(e){
       const item = e.target.closest("[data-action]");
       if (!item) return;
       const action = item.getAttribute("data-action");
@@ -7099,9 +7141,9 @@
         return;
       }
       if (action === "clear-all-data"){
-        openConfirmDialog("Restore the app to its default state? Everything you’ve entered — notes, actions, projects, habits — will be permanently erased and replaced with the sample data. This can’t be undone.", [
-          { label: "Erase & restore defaults", style: "danger", action: clearAllAppData },
-          { label: "Cancel", action: function(){} }
+        openConfirmDialog(t("confirm.restoreDefaultsMessage"), [
+          { label: t("confirm.eraseRestoreDefaults"), style: "danger", action: clearAllAppData },
+          { label: t("chrome.cancel"), action: function(){} }
         ]);
       }
     });
@@ -7129,7 +7171,7 @@
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function(){ URL.revokeObjectURL(url); }, 1500);
   }
-  function importError(msg){ openConfirmDialog(msg, [{ label: "OK", style: "primary", action: function(){} }]); }
+  function importError(msg){ openConfirmDialog(msg, [{ label: t("confirm.ok"), style: "primary", action: function(){} }]); }
   function importAllData(){
     // A hidden file input — native <input type=file> is the one native dialog
     // that works in sandboxed contexts (unlike alert/confirm/prompt).
@@ -7142,17 +7184,17 @@
       const reader = new FileReader();
       reader.onload = function(){
         let payload;
-        try { payload = JSON.parse(reader.result); } catch (e){ importError("That file isn’t valid backup JSON."); return; }
+        try { payload = JSON.parse(reader.result); } catch (e){ importError(t("confirm.importInvalidJson")); return; }
         const data = payload && payload.data;
-        if (!data || typeof data !== "object"){ importError("That file doesn’t look like an OELA backup."); return; }
+        if (!data || typeof data !== "object"){ importError(t("confirm.importNotBackup")); return; }
         closeDialog();
-        openConfirmDialog("This will replace everything currently in the app.", [
-          { label: "Replace everything", style: "danger", action: function(){
+        openConfirmDialog(t("confirm.importReplaceWarning"), [
+          { label: t("confirm.replaceEverything"), style: "danger", action: function(){
               Storage.keys().forEach(function(k){ if (k.indexOf("gtd_") === 0) Storage.remove(k); });
               Object.keys(data).forEach(function(k){ if (k.indexOf("gtd_") === 0) Storage.set(k, data[k]); });
               window.location.reload();
             } },
-          { label: "Cancel", action: function(){} }
+          { label: t("chrome.cancel"), action: function(){} }
         ]);
       };
       reader.readAsText(file);
@@ -7194,7 +7236,7 @@
     const filterAttr = (!removable && st !== "deleted") ? ' data-action="filter-notes" data-id="' + link.id + '"' : '';
     return '<span class="note-chip note-chip-' + st + '"' + filterAttr + '>' +
       escapeHtml(name) +
-      (removable ? '<button type="button" class="chip-x" data-action="note-unlink" data-id="' + link.id + '" title="Remove">&times;</button>' : "") +
+      (removable ? '<button type="button" class="chip-x" data-action="note-unlink" data-id="' + link.id + '" title="' + escapeHtml(t("tags.remove")) + '">&times;</button>' : "") +
     '</span>';
   }
   // Tag chips for a note (§4.9b). One flat visual — tags never carry the
@@ -7207,7 +7249,7 @@
       if (!t) return null;
       const filterAttr = (!removable) ? ' data-action="filter-notes" data-id="' + id + '"' : '';
       return '<span class="note-chip note-chip-tag"' + filterAttr + '>#' + escapeHtml(t.name) +
-        (removable ? '<button type="button" class="chip-x" data-action="note-untag" data-id="' + id + '" title="Remove">&times;</button>' : "") +
+        (removable ? '<button type="button" class="chip-x" data-action="note-untag" data-id="' + id + '" title="' + escapeHtml(t("tags.remove")) + '">&times;</button>' : "") +
       '</span>';
     }).filter(Boolean);
   }
@@ -7336,9 +7378,9 @@
       const pickItem = function(o){
         return '<button type="button" class="notes-filter-item' + (o.id === state.notesFilter ? " current" : "") + '" data-action="notes-filter-pick" data-id="' + o.id + '">' + escapeHtml(o.kind === "tag" ? "#" + o.name : o.name) + '</button>';
       };
-      let items = ['<button type="button" class="notes-filter-item' + (state.notesFilter ? "" : " current") + '" data-action="notes-filter-pick" data-id="">All notes</button>'];
-      if (opts.projects.length) items = items.concat('<div class="notes-filter-section">Projects</div>', opts.projects.map(pickItem));
-      if (opts.tags.length) items = items.concat('<div class="notes-filter-section">Tags</div>', opts.tags.map(pickItem));
+      let items = ['<button type="button" class="notes-filter-item' + (state.notesFilter ? "" : " current") + '" data-action="notes-filter-pick" data-id="">' + escapeHtml(t("note.allNotes")) + '</button>'];
+      if (opts.projects.length) items = items.concat('<div class="notes-filter-section">' + escapeHtml(t("note.filterProjects")) + '</div>', opts.projects.map(pickItem));
+      if (opts.tags.length) items = items.concat('<div class="notes-filter-section">' + escapeHtml(t("note.filterTags")) + '</div>', opts.tags.map(pickItem));
       if (!opts.projects.length && !opts.tags.length) items.push('<div class="notes-filter-empty">Nothing to filter by yet — link a note to a project or add a tag.</div>');
       menu = '<div class="notes-filter-menu">' + items.join("") + '</div>';
     }
@@ -7411,17 +7453,17 @@
       // formatting, correctly interleaved. A separate stack would have to
       // duplicate that and would drift out of step with the caret the moment
       // the two disagreed.
-      '<button type="button" class="note-tool" data-md="undo" title="Undo">&#8630;</button>' +
-      '<button type="button" class="note-tool" data-md="redo" title="Redo">&#8631;</button>' +
+      '<button type="button" class="note-tool" data-md="undo" title="' + escapeHtml(t("note.undo")) + '">&#8630;</button>' +
+      '<button type="button" class="note-tool" data-md="redo" title="' + escapeHtml(t("note.redo")) + '">&#8631;</button>' +
       '<span class="note-tool-sep"></span>' +
-      '<button type="button" class="note-tool" data-md="bold" title="Bold"><b>B</b></button>' +
-      '<button type="button" class="note-tool" data-md="italic" title="Italic"><i>I</i></button>' +
-      '<button type="button" class="note-tool" data-md="underline" title="Underline"><span style="text-decoration:underline">U</span></button>' +
-      '<button type="button" class="note-tool" data-md="h2" title="Heading">H</button>' +
-      '<button type="button" class="note-tool" data-md="ul" title="Bullet list">&#8226;</button>' +
-      '<button type="button" class="note-tool" data-md="checklist" title="Checklist">&#9744;</button>' +
+      '<button type="button" class="note-tool" data-md="bold" title="' + escapeHtml(t("note.bold")) + '"><b>B</b></button>' +
+      '<button type="button" class="note-tool" data-md="italic" title="' + escapeHtml(t("note.italic")) + '"><i>I</i></button>' +
+      '<button type="button" class="note-tool" data-md="underline" title="' + escapeHtml(t("note.underline")) + '"><span style="text-decoration:underline">U</span></button>' +
+      '<button type="button" class="note-tool" data-md="h2" title="' + escapeHtml(t("note.heading")) + '">H</button>' +
+      '<button type="button" class="note-tool" data-md="ul" title="' + escapeHtml(t("note.bulletList")) + '">&#8226;</button>' +
+      '<button type="button" class="note-tool" data-md="checklist" title="' + escapeHtml(t("note.checklist")) + '">&#9744;</button>' +
       '<span class="note-tool-sep"></span>' +
-      '<button type="button" class="note-tool" data-action="note-add-link" title="Add a tag or linked project">&#8862;</button>' +
+      '<button type="button" class="note-tool" data-action="note-add-link" title="' + escapeHtml(t("note.addTagOrProject")) + '">&#8862;</button>' +
     '</div>';
   }
   // The contenteditable owns its DOM while you type (the input handler only
@@ -7489,11 +7531,11 @@
   function noteBodyHtml(s){
     const d = s.draft;
     if (d.projectPicker) return noteProjectPickerHtml(s);
-    let fields = '<input type="text" class="screen-field-title' + (s.invalidField === "title" ? " field-invalid" : "") + '" data-field="noteTitle" placeholder="Note title…" value="' + escapeHtml(d.title) + '">';
+    let fields = '<input type="text" class="screen-field-title' + (s.invalidField === "title" ? " field-invalid" : "") + '" data-field="noteTitle" placeholder="' + escapeHtml(t("note.titlePlaceholder")) + '" value="' + escapeHtml(d.title) + '">';
     fields += noteToolbarHtml();
     const bodyHtml = sanitizeNoteHtml(d.body);
     const bodyProbe = document.createElement("div"); bodyProbe.innerHTML = bodyHtml;
-    fields += '<div class="screen-field-desc note-body' + (isNoteBodyEmpty(bodyProbe) ? " is-empty" : "") + '" contenteditable="true" data-field="noteBody" data-placeholder="Write anything…">' + bodyHtml + '</div>';
+    fields += '<div class="screen-field-desc note-body' + (isNoteBodyEmpty(bodyProbe) ? " is-empty" : "") + '" contenteditable="true" data-field="noteBody" data-placeholder="' + escapeHtml(t("note.bodyPlaceholder")) + '">' + bodyHtml + '</div>';
     // Attached chips — projects now (many-valued, §4.9), tags too once §4.9b
     // lands. Draft-isolated: add/remove stage on the draft, commit on Save.
     const attached = (d.projectLinks || []).map(function(l){ return noteChipHtml(l, true); })
@@ -7528,29 +7570,29 @@
     // chooser has the same reason to.
     const notLinked = function(t){ return !t.isGroup && !linked.has(t.id) && !isDevScaffold(t); };
     const currentItems = pickList(state.tasks.current.filter(notLinked),
-      "No current projects to link — create one on the Projects tab.");
+      t("note.noCurrentToLink"));
     const futureItems = pickList(state.tasks.future.filter(notLinked),
-      "Nothing in Someday to link yet.");
+      t("note.noSomedayToLink"));
 
     const tagged = new Set((s.draft.tagIds || []));
     const tags = (state.tags || []).filter(function(t){ return !tagged.has(t.id); })
       .slice().sort(function(a, b){ return a.name.localeCompare(b.name); });
     const tagItems = tags.length
       ? tags.map(function(t){ return '<button type="button" class="screen-hook-pick-item" data-action="note-pick-tag" data-id="' + t.id + '">#' + escapeHtml(t.name) + '</button>'; }).join("")
-      : '<div class="empty-note">No tags yet — add some with “Manage tags”.</div>';
+      : '<div class="empty-note">' + escapeHtml(t("note.noTagsYet")) + '</div>';
 
     return '<div class="screen-body pick-body">' +
-      '<div class="screen-hook-pick-label">Tags</div>' +
+      '<div class="screen-hook-pick-label">' + escapeHtml(t("note.tagsHeading")) + '</div>' +
       '<div class="screen-hook-pick-list">' + tagItems + '</div>' +
       // The lanes' own names, so the section headings match the tabs they came
       // from rather than inventing a second vocabulary for the same two lists.
-      '<div class="screen-hook-pick-label">Link a current project</div>' +
+      '<div class="screen-hook-pick-label">' + escapeHtml(t("note.linkCurrentProject")) + '</div>' +
       '<div class="screen-hook-pick-list">' + currentItems + '</div>' +
-      '<div class="screen-hook-pick-label">Link a Someday project</div>' +
+      '<div class="screen-hook-pick-label">' + escapeHtml(t("note.linkSomedayProject")) + '</div>' +
       '<div class="screen-hook-pick-list">' + futureItems + '</div>' +
       '<div class="screen-row" style="margin-top:10px; justify-content:space-between;">' +
-        '<button type="button" class="btn btn-ghost btn-small" data-action="note-cancel-pick">Back</button>' +
-        '<button type="button" class="btn btn-ghost btn-small" data-action="note-manage-tags">Manage tags →</button>' + // wired in the Tags-page commit
+        '<button type="button" class="btn btn-ghost btn-small" data-action="note-cancel-pick">' + escapeHtml(t("picker.back")) + '</button>' +
+        '<button type="button" class="btn btn-ghost btn-small" data-action="note-manage-tags">' + escapeHtml(t("note.manageTags")) + '</button>' + // wired in the Tags-page commit
       '</div>' +
     '</div>';
   }
@@ -7645,7 +7687,7 @@
     let html = '<div class="screen-body">';
     // Tags first (user round) — this is the page's subject; the read-only
     // project list sits below it as the duplicate-name reference.
-    html += '<div class="screen-hook-pick-label">Tags</div>';
+    html += '<div class="screen-hook-pick-label">' + escapeHtml(t("note.tagsHeading")) + '</div>';
     html += '<div class="tags-rows">';
     (d.rows || []).forEach(function(r, i){
       const err = d.rowErrors && d.rowErrors[i];
@@ -7653,22 +7695,22 @@
       const removable = manage || !r.id;
       html += '<div class="tags-row-wrap">' +
         '<div class="tags-row">' +
-          '<input type="text" class="tags-row-input' + (err ? " field-invalid" : "") + '" data-field="tagRow" data-row="' + i + '" value="' + escapeHtml(r.name) + '" placeholder="tag name…"' + (editable ? "" : " readonly") + '>' +
-          (removable ? '<button type="button" class="tags-row-x" data-action="tag-remove-row" data-row="' + i + '" title="Remove">&times;</button>' : "") +
+          '<input type="text" class="tags-row-input' + (err ? " field-invalid" : "") + '" data-field="tagRow" data-row="' + i + '" value="' + escapeHtml(r.name) + '" placeholder="' + escapeHtml(t("tags.namePlaceholder")) + '"' + (editable ? "" : " readonly") + '>' +
+          (removable ? '<button type="button" class="tags-row-x" data-action="tag-remove-row" data-row="' + i + '" title="' + escapeHtml(t("tags.remove")) + '">&times;</button>' : "") +
         '</div>' +
-        (err === "completed" ? '<div class="tags-row-reason">A completed project already uses this name.</div>' : "") +
+        (err === "completed" ? '<div class="tags-row-reason">' + escapeHtml(t("tags.completedNameTaken")) + '</div>' : "") +
       '</div>';
     });
     html += '</div>';
-    html += '<button type="button" class="tags-add-btn" data-action="tag-add-row">+ Add tag</button>';
+    html += '<button type="button" class="tags-add-btn" data-action="tag-add-row">' + escapeHtml(t("tags.addTag")) + '</button>';
     if (!manage){
-      html += '<div class="tags-createonly-hint">Adding tags here — ← saves them and returns to your note. Rename or delete tags from the Notes + badge → Tags.</div>';
+      html += '<div class="tags-createonly-hint">' + escapeHtml(t("tags.createOnlyHint")) + '</div>';
     }
     // Projects below, READ-ONLY — the reference that makes duplicates visible.
-    html += '<div class="screen-hook-pick-label" style="margin-top:18px;">Projects (names already taken)</div>';
+    html += '<div class="screen-hook-pick-label" style="margin-top:18px;">' + escapeHtml(t("tags.projectsHeading")) + '</div>';
     html += '<div class="tags-proj-list">' + (projects.length
       ? projects.map(function(p){ return '<span class="tags-proj-chip">' + escapeHtml(p.title) + '</span>'; }).join("")
-      : '<span class="empty-note">No projects yet.</span>') + '</div>';
+      : '<span class="empty-note">' + escapeHtml(t("tags.noProjectsYet")) + '</span>') + '</div>';
     html += '</div>';
     return html;
   }
@@ -7708,11 +7750,11 @@
     if (inUse.length){
       // The in-use delete confirm fires ONCE, at Save (§7 linked-actions pattern).
       const msg = inUse.length === 1
-        ? "Delete “" + inUse[0].name + "”? It will be removed from " + noteCountForTag(inUse[0].id) + "."
-        : "Delete " + inUse.length + " tags? They’ll be removed from the notes that use them.";
+        ? t("confirm.deleteTagsOne").replace("{name}", inUse[0].name).replace("{notes}", noteCountForTag(inUse[0].id))
+        : t("confirm.deleteTagsMany").replace("{n}", inUse.length);
       openConfirmDialog(msg, [
-        { label: "Delete", style: "danger", action: commit },
-        { label: "Cancel", action: function(){} }
+        { label: t("chrome.delete"), style: "danger", action: commit },
+        { label: t("chrome.cancel"), action: function(){} }
       ]);
     } else commit();
   }

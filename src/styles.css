@@ -1901,6 +1901,26 @@ body.screen-open #tray-handle{ display:none; }
      .screen-body's 640px column, so that column has to widen for this screen
      only (trap T11). */
   .screen-overlay[data-kind="calendar"] .screen-card{ width:min(900px, 100%); }
+  /* ⚑ FIX (author QA: "the calendar is wide, but it is too tall"). .cal-cells
+     is 7 equal grid columns (`repeat(7, 1fr)`), so simply widening the CARD let
+     the columns fill the whole 900px unconstrained — and each .cal-cell keeps
+     a fixed aspect-ratio (1/1.15), so growing the WIDTH grew the HEIGHT right
+     along with it: six rows of ~119px-wide cells stack to over 800px tall.
+     Cap the GRID specifically (not the card, and not the nav/agenda rows below
+     it, which stay full width — they are text rows with no such constraint) so
+     cells grow noticeably over the phone's ~50px without ballooning height.
+     660px keeps six rows under ~600px on any reasonable desktop viewport.
+     --cal-cell-w is recomputed against the SAME cap on the SAME element
+     (.cal-body), which --cal-grid-h already reads via var() — CSS custom
+     properties resolve at USE time, so overriding it here is enough; List and
+     Day's reserved height (shared rule, base .cal-body) picks it up too,
+     without a second declaration. */
+  .screen-overlay[data-kind="calendar"] .cal-body{
+    --cal-cell-w: calc((660px - 40px - 18px) / 7);
+  }
+  .screen-overlay[data-kind="calendar"] .cal-swipe-viewport{
+    max-width:660px; margin:0 auto;
+  }
   .screen-body{
     max-width:none; padding:18px 26px 22px 26px;
   }
