@@ -96,42 +96,42 @@ const STRINGS = {
   // reworded in passing; INFO-TEXT.txt is the record of what was reviewed.
   "info.lane.next": {
     en: "This lane is for “next actions” and “contexts.” A next action is the single next physical step you need to move something forward. It is not a whole project, only the next action you can take in a project.",
-    "zh-Hans": "这个列表用于存放「下一步行动」和「情境」。下一步行动是推进某件事所需的下一个具体动作。它不是整个项目，而只是你在这个项目中可以采取的下一个行动。"
+    "zh-Hans": "这个列表用于存放“下一步行动”和“情境”。“下一步行动”是推进一件事情所需要采取的下一个具体行动。它不是整个项目，而只是这个项目当前可以执行的下一步。"
   },
   "info.lane.waiting": {
     en: "A waiting action is something you can't act on yet because it depends on something else—a reply from someone, a delivery, a decision, another action getting done, or a future event. Use the left arrow to promote a waiting action to the next action list, or hook it to a next action so it will promote automatically. Actions in a context will promote to their sibling context in the next action list.",
-    "zh-Hans": "等待项是你暂时无法着手的事，因为它取决于别的事情——某人的回复、一次送达、一个决定、另一个行动的完成，或是将来的某个事件。用左箭头把等待项提升到下一步行动列表，或者把它挂到某个下一步行动上，这样它就会自动提升。属于某个情境的行动，会提升到下一步行动列表中对应的同名情境里。"
+    "zh-Hans": "“等待行动”是指暂时还不能开始，因为它需要等待其他事情完成，例如等待他人回复、等待快递送达、等待决定、等待另一项行动完成，或等待将来的某个事件。你可以点击左箭头，把等待行动移到“下一步行动”列表；也可以把它关联到一项“下一步行动”，这样条件满足后，它就会自动移过去。属于某个情境的等待行动，也会自动移到“下一步行动”列表中对应的情境。"
   },
   "info.lane.current": {
     en: "A project is anything that takes more than one action to complete. It could be as simple as returning a library book or as involved as planning a vacation. Current projects should always have at least one step tied to them to prevent them from being stalled. This step might be an action, a waiting action, or even an event on the calendar.",
-    "zh-Hans": "项目是指任何需要一个以上行动才能完成的事。它可以简单到还一本图书馆的书，也可以复杂到筹划一次假期。当前项目应始终至少挂着一个步骤，以免陷入停滞。这个步骤可以是一个行动、一个等待项，甚至是日历上的一个事件。"
+    "zh-Hans": "凡是需要一个以上行动步骤才能完成的事情，都属于项目。它可以简单到归还一本图书馆的书，也可以复杂到规划一次假期。当前项目应始终至少关联一个步骤，以免陷入停滞。这个步骤可以是一项行动、一项等待行动，甚至是一个日历事件。"
   },
   "info.lane.future": {
     en: "This lane is for projects you're not committed to starting yet. Review this list at least once a month to keep the dreams alive.",
-    "zh-Hans": "这个列表用于存放你还没决定要开始的项目。至少每月回顾一次，让这些想法保持鲜活。"
+    "zh-Hans": "这个列表用于存放那些你还不打算开始，但又不想放弃的项目。至少每月回顾一次，让这些想法保持鲜活。"
   },
   "info.lane.habit": {
     en: "A habit is an automatic behaviour which is triggered by a cue. It's easiest to build habits when you're doing them at least once a week. Type in a cue when you're creating a habit or use the habit hook to create habit stacks in which one habit is the cue for the next habit in the stack.",
-    "zh-Hans": "习惯是一种由提示触发的自动行为。每周至少做一次的习惯最容易养成。创建习惯时输入一个提示，或者使用习惯挂钩来搭建习惯链——链条中的每个习惯都是下一个习惯的提示。"
+    "zh-Hans": "习惯是由提示（cue）触发的自动行为。如果一项行为每周至少会发生一次，通常最容易养成习惯。创建习惯时，请填写一个提示（cue）；也可以使用习惯挂钩，把多个习惯串联起来，让前一个习惯成为后一个习惯的提示（cue）。"
   },
   "info.lane.notes": {
     en: "This lane is for notes. It's useful for keeping track of ideas, links, email addresses, and assorted reference materials related to current and future projects.",
-    "zh-Hans": "这个列表用于存放笔记。它适合记录与当前项目和将来项目有关的想法、链接、电子邮件地址，以及各种参考资料。"
+    "zh-Hans": "这个列表用于存放笔记。你可以在这里记录与当前项目和将来项目有关的想法、链接、电子邮件地址，以及各种参考资料。"
   },
   // The →→ paragraphs: lane-only, deliberately withheld from the review's ⓘ.
   "info.lane.next.more": {
     en: "A “context” is a recurring place or time which offers you the opportunity to take an action. Here, we have created contextual lists, so you can group all your “at computer” and “getting off work” actions together.",
-    "zh-Hans": "「情境」是指反复出现的地点或时间，它给了你采取行动的机会。这里我们建立了情境清单，让你可以把所有「在电脑前」和「下班时」的行动归拢到一起。"
+    "zh-Hans": "“情境”是指反复出现、适合执行某项行动的地点或时机。在这里，你可以创建情境清单，把所有“在电脑前”或“下班后”才能完成的行动整理到一起。"
   },
   "info.lane.habit.more": {
     en: "Some apps track streaks, but everyone misses a habit occasionally. We don't track streaks here, but we do track personal bests. If you break your streak, then maybe you'll have a new personal best to beat. After all: ‘It's more important to be persistent than it is to be consistent.’ – Rebecca",
-    "zh-Hans": "有些应用会记录连续天数，但每个人都难免有中断的时候。这里我们不记录连续天数，而是记录个人最佳。就算中断了，你也不过是多了一个要超越的个人最佳而已。毕竟：「坚持比不间断更重要。」——Rebecca"
+    "zh-Hans": "有些应用会记录连续完成天数，但每个人偶尔都会中断。这里不记录连续天数，而是记录你的个人最佳。就算连续记录中断了，你也只是多了一个新的个人最佳可以挑战。毕竟：“坚持下去，比从不中断更重要。”——Rebecca"
   },
 
   // ---- the intray ----
   "info.tray": {
     en: "The intray is a tray that holds everything that needs dealing with. Stalled projects, overdue deadlines, and waiting actions which have lost their waiting condition, all belong here. You can use the text box to quickly add thoughts or reminders if you don't have time to add them to the proper list. You can sort through and process everything using the tray's review feature.",
-    "zh-Hans": "收件箱是一个存放所有待处理事项的地方。停滞的项目、过期的截止日期，以及失去了等待条件的等待项，都归到这里。如果你来不及把想法或提醒放进合适的列表，可以用输入框先快速记下来。之后用收件箱的回顾功能，把所有东西逐一整理和处理掉。"
+    "zh-Hans": "收件箱用于集中存放所有需要处理的事项。停滞的项目、已过截止日期的事项，以及失去等待条件的等待行动，都会出现在这里。如果一时来不及把想法或提醒整理到合适的列表，可以先用输入框快速记下来。之后再通过收件箱的“回顾”功能，逐项整理并处理。"
   },
   "tray.empty":   { en: "Empty for now — nothing slipping through the cracks.", "zh-Hans": "暂时是空的——没有任何事情被遗漏。" },
   "tray.review":  { en: "Review",  "zh-Hans": "回顾" },
@@ -142,23 +142,23 @@ const STRINGS = {
   // ---- the daily review's decision menus ----
   "info.review.pastdue": {
     en: "This was due and the moment has passed. Push it to a new date, tick it if it's actually done, delete it if it's dead — or Not now to see it again next time.",
-    "zh-Hans": "这件事已经到期，而时间已经过去了。把它推到新的日期，如果确实做完了就打勾，如果已经作废就删除——或者选「暂不处理」，下次再看到它。"
+    "zh-Hans": "这件事的截止时间已经过去了。可以把它改到新的日期；如果实际上已经完成，就勾选完成；如果已经不用做了，就删除；或者选择“暂不处理”，下次回顾时再处理。"
   },
   "info.review.stalled": {
     en: "This is a project with no way forward. Add the next physical step, a waiting action, or an event to keep it going, or move it to Someday if continuing the project isn't possible or practical. You can always come back to it in the future.",
-    "zh-Hans": "这是一个没有推进方式的项目。加上下一个具体步骤、一个等待项或一个事件，让它继续走下去；如果继续这个项目已不可行或不实际，就把它移到「将来某天」。你随时可以在将来回过头来处理它。"
+    "zh-Hans": "这个项目目前没有任何推进方式。请添加下一步行动、一项等待行动或一个日历事件，让项目继续推进；如果暂时不适合继续，也可以把它移到“将来”列表。以后随时都可以再回来处理。"
   },
   "info.review.orphaned": {
     en: "This was waiting on something that no longer exists. Point it at something else, replace it with a note to yourself, promote it if you can act now, or close it out.",
-    "zh-Hans": "这件事在等待一个已经不存在的东西。把它指向别的东西、改成一句写给自己的说明、如果现在就能动手就把它提升，或者干脆结束它。"
+    "zh-Hans": "这项等待行动原本依赖的条件已经不存在了。你可以把它改为等待其他事情、改成一条笔记、如果现在已经可以执行就把它移到“下一步行动”，或者直接结束它。"
   },
   "info.review.missed": {
     en: "A repeating thing whose day went by without being ticked. Often you did it and forgot to say so — 'I did it' records it on the day it happened. 'Let it go' clears it without pretending you did. Only the most recent one is ever kept, so this never piles up.",
-    "zh-Hans": "一件重复的事，它的那一天过去了却没有打勾。很多时候你其实做了，只是忘了记下来——「我做了」会把它记在实际发生的那一天。「算了吧」则会清掉它，而不假装你做过。这里只保留最近的一次，所以永远不会越积越多。"
+    "zh-Hans": "这是一项重复事项，它的执行日期已经过去，但还没有勾选完成。很多时候其实已经做了，只是忘了记录。“我做了”会把完成记录补到实际发生的那一天；“算了吧”则会直接清除这次记录，而不会假装已经完成。系统始终只保留最近的一次，因此不会越积越多。"
   },
   "info.review.capture": {
     en: "A stray thought you haven't filed yet. Send it to a lane — or Not now to leave it for later.",
-    "zh-Hans": "一个你还没归类的零散想法。把它送进某个列表——或者选「暂不处理」，留到以后。"
+    "zh-Hans": "这是一个还没有整理的零散想法。把它放到合适的列表中，或者选择“暂不处理”，留到以后再整理。"
   },
   "review.heading.sorting":  { en: "Sorting a new thought",        "zh-Hans": "整理一个新想法" },
   "review.heading.deciding": { en: "When something needs a decision", "zh-Hans": "当某件事需要做决定时" },
@@ -185,7 +185,7 @@ const STRINGS = {
   // "Done" is the desktop footer's filled button. It is the SAME action as the
   // phone's ← (screen-save): save and close. The word changes, the contract
   // does not.
-  "chrome.done":     { en: "Done",             "zh-Hans": "完成" },
+  "chrome.done":     { en: "Done",             "zh-Hans": "保存" },
   "chrome.doneTitle":{ en: "Save and close",   "zh-Hans": "保存并关闭" },
   // The discard gate (desktop ruling 5, applied on both layouts): ✕/Escape asks
   // only when the draft actually differs from what is saved. Register matched to
@@ -226,11 +226,11 @@ const STRINGS = {
   // case the old ruling was meant to survive the rewrite.
   "tutorial.t1.title": {
     en: "1 CLICK HERE TO START THE TUTORIAL",
-    "zh-Hans": "1 点击此处开始教程"
+    "zh-Hans": "1 点击这里开始教程"
   },
   "tutorial.t1.notes": {
     en: "This is a tutorial on the use of OELA, or the Over Engineered List App. This app is intended to help you organize and plan your life. It is partially inspired by the popular system in the book \"Getting Things Done,\" though I have made my own additions to that organizational system as well.\nYou are currently on a drafting page for a next action. These drafting pages allow you to create list items which show up in the various specialized lists in the app. The X in the top right corner exits this page without saving any changes you may have made. If you are on a phone, the exit and save button is the arrow in the top left corner. If you are on a computer, you can click the \"done\" button. To complete this part of the tutorial, hit the complete button then click the done button or tap the arrow. The next card will show up in the list.",
-    "zh-Hans": "这是关于使用 OELA（Over Engineered List App，过度设计清单应用）的教程。本应用旨在帮助你组织和规划生活。它的灵感部分源自《搞定》（Getting Things Done）一书中的经典系统，不过我也对该组织系统做出了自己的补充。\n你当前处于「下一步行动」的草稿页面。这些草稿页面允许你创建显示在应用中各个专业清单里的清单项目。右上角的 X 按钮可以在不保存任何修改的情况下退出此页面。如果你使用的是手机，退出并保存按钮是左上角的箭头。如果你使用的是电脑，可以点击「完成」按钮。要完成教程的这部分内容，请点击「完成」按钮，然后点击「完成」按钮或轻触箭头。下一张卡片就会显示在清单中。"
+    "zh-Hans": "这是 OELA（Over Engineered List App，过度设计清单应用）的使用教程。本应用旨在帮助你整理事务、规划生活。它的设计部分参考了《搞定》（Getting Things Done）中的经典方法，同时也加入了我自己的一些改进。\n你现在看到的是“下一步行动”的编辑页面。在这里，你可以创建会显示在应用各个列表中的条目。点击右上角的 X 会退出当前页面，并且不会保存任何修改。如果你使用的是手机，保存并退出请点击左上角的箭头；如果使用的是电脑，请点击“保存”按钮。要完成这一部分教程，请先点击“完成”按钮，再点击“保存”按钮或左上角箭头。完成后，下一张教程卡片会出现在列表中。"
   },
   "tutorial.t2.title": {
     en: "2 Tutorial: The interface",
@@ -238,23 +238,23 @@ const STRINGS = {
   },
   "tutorial.t2.notes": {
     en: "You may have noticed those colourful tabs at the top of the page on the main screen. These are the lanes or specialized lists. You can navigate to them by clicking or tapping them. The red list is for next actions. The yellow list is for waiting actions. The green and blue lists are for current and future projects. The purple and teal lists are for habits and notes. There is also a calendar which can be accessed either on the bar at the top of the screen, or through the yellow list.\nEach list has a specialized function and behaves slightly differently. You can see information about the list's purpose and function by pressing the small (i) icon next to the list's header. Try looking around at the different lanes. Exit this drafting page and take a look at the different lists available. When you're done, return to the red list and check the box on this action. The next tutorial card will appear in this list.",
-    "zh-Hans": "你可能已经注意到主屏幕页面顶部的那些彩色标签了。这些是泳道或专业清单。你可以通过点击或轻触它们来进行切换。红色清单代表下一步行动。黄色清单代表等待中的行动。绿色和蓝色清单分别代表当前项目和未来项目。紫色和青色清单代表习惯和笔记。此外还有一个日历，可以通过屏幕顶部的栏目或黄色清单进行访问。\n每个清单都有专门的功能，运作方式略有不同。你可以通过点击清单标题旁边的 (i) 图标来查看有关该清单用途和功能的信息。试着查看一下各个不同的泳道吧。退出此草稿页面，浏览一下可用的不同清单。完成后，返回红色清单并勾选此行动的复选框。下一张教程卡片就会出现在该清单中。"
+    "zh-Hans": "你可能已经注意到主界面顶部那些彩色标签了。它们就是应用中的各个列表。点击或轻触即可切换。红色列表用于“下一步行动”，黄色列表用于“等待行动”，绿色和蓝色列表分别用于当前项目和将来项目，紫色和青色列表分别用于习惯和笔记。此外，还有一个日历，可以从屏幕顶部的工具栏进入，也可以通过黄色列表进入。\n每个列表都有不同的用途，操作方式也略有区别。点击列表标题旁边的小 (i) 图标，就能查看该列表的用途和功能说明。现在请退出这个编辑页面，浏览一下各个列表。看完之后，回到红色列表，勾选这项行动的复选框。下一张教程卡片就会出现在这个列表中。"
   },
   "tutorial.t3.title": {
     en: "3 Tutorial: Creating Items",
-    "zh-Hans": "3 教程：创建项目"
+    "zh-Hans": "3 教程：创建条目"
   },
   "tutorial.t3.notes": {
     en: "Now that you've familiarized yourself with the different lists, you're ready to create your first item. If you're using a phone, you may have noticed a floating + badge in the bottom right corner. That is the creation button. Tap that to create items in your current lane. If you're on a computer, the creation buttons will be below the lane header. Go to the red list, and tap the badge or click the button to create a next action. Remember to hit the arrow/done button when you're finished.",
-    "zh-Hans": "既然你已经熟悉了不同的清单，现在就可以准备创建你的第一个项目了。如果你使用的是手机，可能会注意到右下角有一个悬浮的 + 标志。那就是创建按钮。轻触它即可在当前泳道中创建项目。如果你使用的是电脑，创建按钮将位于泳道标题下方。前往红色清单，轻触图标或点击按钮来创建一个下一步行动。完成后请记得点击箭头/完成按钮。"
+    "zh-Hans": "现在你已经熟悉了各个列表，可以创建你的第一个条目了。如果你使用的是手机，应该已经注意到右下角悬浮着一个 + 按钮，它就是新建按钮。轻触它，就能在当前列表中新建条目。如果你使用的是电脑，新建按钮位于列表标题下方。请切换到红色列表，点击 + 按钮或新建按钮，创建一个“下一步行动”。完成后，别忘了点击左上角箭头或“保存”按钮。"
   },
   "tutorial.t4.title": {
     en: "4 Tutorial: Creating a waiting action",
-    "zh-Hans": "4 教程：创建等待中的行动"
+    "zh-Hans": "4 教程：创建等待行动"
   },
   "tutorial.t4.notes": {
     en: "Now that you've created your first action, it's time to create a waiting action. A waiting action is an action that you plan to take, but it depends on something else. For example, you might plan to book a hotel for your vacation, but you have to book your flight first. When creating a waiting action, this app allows you to give a qualitative description of the thing you're waiting on, but you can also connect it to another action. Now that you've created a next action, go to the waiting action lane (yellow) and create a waiting action connected to the action you created in tutorial 3. When you complete that action, your waiting action will automatically move to the red list.",
-    "zh-Hans": "既然你已经创建了第一个行动，现在是时候创建一个等待中的行动了。等待中的行动是指你计划采取但取决于其他事件的行动。例如，你可能计划为假期预订酒店，但你必须先订机票。在创建等待中的行动时，本应用允许你对所等待的事物进行定性描述，但你也可以将其与另一个行动相关联。现在你已经创建了一个下一步行动，请前往等待行动泳道（黄色），创建一个关联到你在教程 3 中所创建行动的等待行动。当你完成那个行动时，你的等待行动将自动移动到红色清单。"
+    "zh-Hans": "现在你已经创建了第一个行动，接下来可以创建一个“等待行动”。等待行动指的是你打算去做，但必须先等其他事情完成才能进行的行动。例如，你打算预订假期酒店，但必须先订好机票。在创建等待行动时，你可以填写正在等待什么，也可以直接把它关联到另一项行动。现在请前往黄色列表，创建一个等待行动，并将它关联到你在教程 3 中创建的那项“下一步行动”。等那项行动完成后，这个等待行动会自动移到红色列表。"
   },
   "tutorial.t5.title": {
     en: "5 Tutorial: Creating a context",
@@ -262,7 +262,7 @@ const STRINGS = {
   },
   "tutorial.t5.notes": {
     en: "While you were creating your actions, you may have noticed the create context button. This button allows you to create a special sub-list in the action lanes. In the Getting Things Done system, contexts are lists of actions organized by where and when you do them. For example, you might have a list of errands which can only be done if your in the car, or a list of calls you can only make if you have a phone. Contexts offer you the opportunity to take an action. In this app, they are shared across both the next action and waiting on lanes, meaning that a waiting item in the calls context in the yellow lane will promote to the calls context in the next actions (red) lane.",
-    "zh-Hans": "在你创建行动时，可能已经注意到了「创建情境」按钮。该按钮允许你在行动泳道中创建特殊的子清单。在《搞定》（GTD）系统中，情境是根据执行地点和时间来组织的行动清单。例如，你可能有一份只有在车里才能完成的琐事清单，或者一份只有在有电话时才能打的电话清单。情境为你提供了采取行动的时机。在本应用中，它们在「下一步行动」和「等待中」泳道之间是共享的，这意味着黄色泳道中「电话」情境下的等待项目，将会晋升到「下一步行动」（红色）泳道的「电话」情境中。"
+    "zh-Hans": "在创建行动时，你可能已经注意到“创建情境”按钮。这个按钮可以让你在行动列表中创建一个专门的子列表。在《搞定》（Getting Things Done）系统中，情境是按照执行地点或时机来整理行动的方式。例如，你可以建立一个只有开车时才能处理的“跑腿”情境，或者一个只有手边有电话时才能处理的“打电话”情境。情境代表你具备了采取某项行动的条件。在本应用中，情境会同时应用于“下一步行动”和“等待行动”两个列表。也就是说，黄色列表中“打电话”情境里的等待项，在满足条件后，会自动移动到红色列表中对应的“打电话”情境。"
   },
   "tutorial.t6.title": {
     en: "6 Tutorial: Create a project",
@@ -270,15 +270,15 @@ const STRINGS = {
   },
   "tutorial.t6.notes": {
     en: "Projects are an important part of the organizational system this app uses. A project is anything you are currently working on that requires more than one action step to complete. Projects can be as simple as replacing a lightbulb, (identifying the type of light your fixture needs, going to the store, putting it in the socket) or as complicated as planning a vacation (booking time off, researching hotels, researching flights, etc.). If it takes more than one physical step, it's a project.\nYou can create projects on the project lane. Every project you create needs at least one linked action or calendar event. You can also create these from the project page.",
-    "zh-Hans": "项目是本应用所使用的组织系统的重要组成部分。项目是指你当前正在开展的、需要一个以上行动步骤才能完成的任何事情。项目可以简单到更换灯泡（确定灯具所需的灯泡类型、去商店购买、拧入灯座），也可以复杂到规划一次假期（请假、研究酒店、研究航班等）。只要需要一个以上的具体步骤，它就是一项项目。\n你可以在项目泳道上创建项目。你创建的每个项目都需要至少一个关联的行动或日历事件。你也可以直接从项目页面创建它们。"
+    "zh-Hans": "项目是本应用组织系统中非常重要的一部分。凡是你正在进行，而且需要一个以上具体行动步骤才能完成的事情，都属于项目。项目可以简单到换一个灯泡（确认灯泡型号、去商店购买、装进灯座），也可以复杂到规划一次假期（请假、查找酒店、查询航班等）。只要需要多个实际行动步骤，它就是一个项目。\n你可以在项目列表中创建项目。每个项目都必须至少关联一项行动或一个日历事件。你也可以直接在项目页面中创建这些内容。"
   },
   "tutorial.t7.title": {
     en: "7 Tutorial: The capture drawer and the daily review",
-    "zh-Hans": "7 教程：收集抽屉与每日复盘"
+    "zh-Hans": "7 教程：收件箱与回顾"
   },
   "tutorial.t7.notes": {
     en: "When you opened the app, you may have noticed the pullout drawer on the right of your screen. On the computer, this drawer can be opened by clicking on the large white handle. On the phone, you can tap the arrows or swipe right. This drawer has a text box so you can capture thoughts, reminders, and information quickly. Whenever you add something to the drawer, it will create a face down card in the drawer. Cards can appear there for other reasons as well. Passed deadlines, projects with no linked actions, and waiting actions which have lost their waiting condition will also appear as face down cards in the drawer.\nYou can review these cards by clicking the \"review\" button. The review system will show them to you one at a time so that you can make decisions about each one. Go to the drawer now and use the review system to link an action to the sample project with no linked actions.",
-    "zh-Hans": "当你打开应用时，可能已经注意到了屏幕右侧的拉出式抽屉。在电脑上，可以通过点击巨大的白色把手打开这个抽屉。在手机上，你可以轻触箭头或向右滑动。这个抽屉配有一个文本框，以便你快速收集想法、提醒和信息。每当你向抽屉中添加内容时，它就会在抽屉里创建一张背朝上的卡片。卡片也可能因其他原因出现在那里：过期的截止日期、没有关联行动的项目，以及失去等待条件的等待行动，都会作为背朝上的卡片出现在抽屉中。\n你可以通过点击「复盘」按钮来审查这些卡片。复盘系统将逐一向你展示它们，以便你对每一项做出决策。现在请前往抽屉，使用复盘系统将一个行动关联到那个没有关联行动的示例项目上。"
+    "zh-Hans": "打开应用时，你可能已经注意到屏幕右侧的抽屉。在电脑上，点击白色的大把手即可打开；在手机上，可以点击箭头或向右滑动打开。抽屉里有一个输入框，方便你快速记录想法、提醒或其他信息。每当你输入一条内容，就会在收件箱中生成一张背面朝上的卡片。除此之外，超过截止日期的事项、没有关联行动的项目，以及失去等待条件的等待行动，也都会以背面朝上的卡片出现在收件箱中。\n点击“回顾”按钮即可逐一处理这些卡片。回顾功能会一次显示一张卡片，让你决定如何处理。现在请打开抽屉，使用回顾功能，为那个没有关联行动的示例项目添加一项关联行动。"
   },
   "tutorial.t8.title": {
     en: "8 Tutorial Final: Habits",
@@ -286,15 +286,15 @@ const STRINGS = {
   },
   "tutorial.t8.notes": {
     en: "None of this organizational system would work without habits. Habits are here defined as an automatic behaviour which is triggered by a cue. For example, when you here the notification sound on your cellphone, you automatically reach to check your text messages. The Getting Things Done system requires you to make a habit of checking your contextual lists when you're in the right context, as well as regularly submitting and reviewing items in your intray.\nThis app has a robust habit tracking system which helps you build the habits you want. Go to the habit lane and try to create your own habit. Remember to enter a cue in the box. Alternatively, you can use the hook icon to make another habit the cue for your new habit.",
-    "zh-Hans": "如果没有习惯，整个组织系统都无法运转。这里的「习惯」被定义为由提示（cue）触发的自动行为。例如，当你听到手机的通知提示音时，你会自动伸手去查看短信。《搞定》（GTD）系统要求你在处于相应情境时养成检查情境清单的习惯，并养成定期提交和复盘收件箱项目的习惯。\n本应用拥有强大的习惯追踪系统，可帮助你建立心仪的习惯。请前往习惯泳道，尝试创建你自己的习惯。记得在框中输入提示。或者，你也可以使用挂钩图标，将另一个习惯设定为你新习惯的提示。"
+    "zh-Hans": "没有习惯，这套组织系统就无法真正发挥作用。这里所说的“习惯”，是指由提示（cue）触发的自动行为。例如，当你听到手机通知铃声时，就会下意识地拿起手机查看消息。《搞定》（Getting Things Done）系统要求你养成这样的习惯：当处于相应情境时查看情境清单，并定期把事项放进收件箱，再通过回顾进行整理。\n本应用提供了完整的习惯追踪系统，帮助你培养想养成的习惯。请前往习惯列表，尝试创建一个属于自己的习惯。记得在输入框中填写提示（cue）。你也可以使用挂钩图标，把另一个习惯设为这个新习惯的提示（cue）。"
   },
   "tutorial.tp.title": {
     en: "Sample stalled project.",
-    "zh-Hans": "停滞示例项目"
+    "zh-Hans": "示例停滞项目"
   },
   "tutorial.tp.notes": {
     en: "This project is a sample project intended for use in the tutorial. Its purpose is to get caught in the daily review during step 7 of the tutorial.",
-    "zh-Hans": "该项目是一个旨在用于教程中的示例项目。它的目的是在教程第 7 步的每日复盘过程中被捕获。"
+    "zh-Hans": "这是一个用于教程的示例项目，用途是在教程第 7 步的回顾中被捕获。"
   },
   "tutorial.tr.title": {
     en: "Tutorial",
@@ -302,7 +302,7 @@ const STRINGS = {
   },
   "tutorial.tr.notes": {
     en: "This project is a tutorial on how to use this app. Each of its linked actions is a different stage in the tutorial. You can see them listed below. You can also see these actions listed in the red and yellow lanes when you leave this page.",
-    "zh-Hans": "该项目是关于如何使用本应用的教程。其中每个关联的行动都是教程中的不同阶段。你可以在下方看到它们的列表。离开此页面后，你也可以在红色和黄色泳道中看到这些行动。"
+    "zh-Hans": "这个项目就是本应用的使用教程。每一项关联行动都对应教程中的一个步骤，你可以在下方看到它们。离开这个页面后，也可以在红色和黄色列表中找到这些行动。"
   },
 
   // =========================================================
@@ -320,7 +320,7 @@ const STRINGS = {
   "field.noDeadline":        { en: "No deadline",              "zh-Hans": "无期限" },
   "field.noLinkedProject":   { en: "No linked project",        "zh-Hans": "未链接项目" },
   "field.noContext":         { en: "No context",                "zh-Hans": "无情境" },
-  "field.noContextsYet":     { en: "No contexts yet — create them with + on the lane.", "zh-Hans": "还没有情境——在列表上用「+」创建。" },
+  "field.noContextsYet":     { en: "No contexts yet — create them with + on the lane.", "zh-Hans": "还没有情境——在列表上用“+”创建。" },
   "field.clearDeadline":     { en: "Clear deadline",            "zh-Hans": "清除期限" },
   "field.clearTime":         { en: "Clear time",                "zh-Hans": "清除时间" },
   "field.optional":          { en: "Optional",                  "zh-Hans": "可选" },
@@ -341,7 +341,7 @@ const STRINGS = {
   "outcome.makeNext":        { en: "Make Next Action",           "zh-Hans": "转为下一步行动" },
   "outcome.makeFuture":      { en: "Make Future / Someday",      "zh-Hans": "转为将来/某天项目" },
   "outcome.makeCurrent":     { en: "Make Current Project",       "zh-Hans": "转为当前项目" },
-  "outcome.disarmToConvert": { en: "Disarm Complete to convert", "zh-Hans": "先取消「完成」才能转换" },
+  "outcome.disarmToConvert": { en: "Disarm Complete to convert", "zh-Hans": "先取消“完成”才能转换" },
   "outcome.tapToUndo":       { en: "Tap to undo",                "zh-Hans": "点一下可撤销" },
   "outcome.convertingToOnSave": { en: "Converting to {kind} on save", "zh-Hans": "保存时将转为{kind}" },
   "outcome.restoreToConvert":{ en: "Restore the item to convert it", "zh-Hans": "先恢复该项目才能转换" },
@@ -364,7 +364,7 @@ const STRINGS = {
   "advanced.temptationBundling": { en: "Temptation bundling",    "zh-Hans": "诱惑捆绑" },
   "advanced.bundlePlaceholder": { en: "What treat goes with this?", "zh-Hans": "配上什么小奖励？" },
   "advanced.notRecommended": { en: "Not recommended.",            "zh-Hans": "不太推荐。" },
-  "advanced.bundleDescription": { en: "Temptation bundling pairs something you enjoy with the thing you’re doing: allow yourself the treat only while (or right after) doing this. e.g. “Only my favorite podcast while running.”", "zh-Hans": "诱惑捆绑把你喜欢的事和正在做的事绑在一起：只有在做这件事的时候（或刚做完）才允许自己享受那个奖励。例如「只有跑步的时候才听我最喜欢的播客」。" },
+  "advanced.bundleDescription": { en: "Temptation bundling pairs something you enjoy with the thing you’re doing: allow yourself the treat only while (or right after) doing this. e.g. “Only my favorite podcast while running.”", "zh-Hans": "诱惑捆绑把你喜欢的事和正在做的事绑在一起：只有在做这件事的时候（或刚做完）才允许自己享受那个奖励。例如“只有跑步的时候才听我最喜欢的播客”。" },
   "advanced.notRecommendedDescription": { en: "A habit is one cue followed by one automatic response — a habit with two cues is usually two habits, so consider creating a separate habit instead. Extra cues exist for rotating weekly routines (a different anchor on different days), not for stacking reminders.", "zh-Hans": "一个习惯是一个提示加一个自动反应——有两个提示的习惯通常其实是两个习惯，不如考虑单独创建一个。额外提示是为了轮换的每周惯例（不同的日子用不同的触发点），不是为了堆叠提醒。" },
   "advanced.addedRowsHint": { en: "Added rows appear on the habit page itself — each with its own text box and hook icon, like the default — and are edited and removed there.", "zh-Hans": "添加的行会出现在习惯页面本身——每一行都有自己的文本框和挂钩图标，和默认的一样——在那里编辑和删除。" },
   "advanced.cueLimitReached": { en: "Cue limit reached ({n} rows — one per weekday).", "zh-Hans": "已达到提示数量上限（{n} 行——每个工作日一行）。" },
@@ -384,7 +384,7 @@ const STRINGS = {
   "habit.hookPickIntro":     { en: "Cue on which habit or context?", "zh-Hans": "以哪个习惯或情境为提示？" },
   "habit.hookPickHabits":    { en: "Habits",                      "zh-Hans": "习惯" },
   "habit.hookPickContexts":  { en: "Contexts",                    "zh-Hans": "情境" },
-  "habit.hookPickEmpty":     { en: "No cues yet — add a habit, or create a context with + on the Next or Waiting lane.", "zh-Hans": "还没有提示——添加一个习惯，或在「下一步」或「等待」列表用「+」创建一个情境。" },
+  "habit.hookPickEmpty":     { en: "No cues yet — add a habit, or create a context with + on the Next or Waiting lane.", "zh-Hans": "还没有提示——添加一个习惯，或在“下一步”或“等待”列表用“+”创建一个情境。" },
   "habit.deletedContext":    { en: "a deleted context",           "zh-Hans": "一个已删除的情境" },
   "habit.deletedHabit":      { en: "a deleted habit",             "zh-Hans": "一个已删除的习惯" },
   "habit.deletedSuffix":     { en: " (deleted)",                  "zh-Hans": "（已删除）" },
@@ -474,16 +474,16 @@ const STRINGS = {
   "note.tagsHeading":        { en: "Tags",                         "zh-Hans": "标签" },
   "note.linkCurrentProject": { en: "Link a current project",        "zh-Hans": "链接一个当前项目" },
   "note.linkSomedayProject": { en: "Link a Someday project",        "zh-Hans": "链接一个将来项目" },
-  "note.noCurrentToLink":    { en: "No current projects to link — create one on the Projects tab.", "zh-Hans": "没有可以链接的当前项目——在「项目」标签页创建一个。" },
-  "note.noSomedayToLink":    { en: "Nothing in Someday to link yet.", "zh-Hans": "「将来」里还没有可以链接的项目。" },
-  "note.noTagsYet":          { en: "No tags yet — add some with “Manage tags”.", "zh-Hans": "还没有标签——用「管理标签」添加一些。" },
+  "note.noCurrentToLink":    { en: "No current projects to link — create one on the Projects tab.", "zh-Hans": "没有可以链接的当前项目——在“项目”标签页创建一个。" },
+  "note.noSomedayToLink":    { en: "Nothing in Someday to link yet.", "zh-Hans": "“将来”里还没有可以链接的项目。" },
+  "note.noTagsYet":          { en: "No tags yet — add some with “Manage tags”.", "zh-Hans": "还没有标签——用“管理标签”添加一些。" },
   "note.manageTags":         { en: "Manage tags →",                 "zh-Hans": "管理标签 →" },
 
   // ---- tags page ----
   "tags.namePlaceholder":    { en: "tag name…",                    "zh-Hans": "标签名称…" },
   "tags.addTag":             { en: "+ Add tag",                    "zh-Hans": "+ 添加标签" },
   "tags.remove":             { en: "Remove",                       "zh-Hans": "移除" },
-  "tags.createOnlyHint":     { en: "Adding tags here — ← saves them and returns to your note. Rename or delete tags from the Notes + badge → Tags.", "zh-Hans": "在这里添加标签——← 会保存并返回你的笔记。要重命名或删除标签，请从「笔记」的 + 徽章 → 「标签」进入。" },
+  "tags.createOnlyHint":     { en: "Adding tags here — ← saves them and returns to your note. Rename or delete tags from the Notes + badge → Tags.", "zh-Hans": "在这里添加标签——← 会保存并返回你的笔记。要重命名或删除标签，请从“笔记”的 + 徽章 → “标签”进入。" },
   "tags.projectsHeading":    { en: "Projects (names already taken)", "zh-Hans": "项目（名称已被占用）" },
   "tags.noProjectsYet":      { en: "No projects yet.",              "zh-Hans": "还没有项目。" },
   "tags.completedNameTaken": { en: "A completed project already uses this name.", "zh-Hans": "已有一个已完成的项目使用了这个名称。" },
@@ -556,10 +556,10 @@ const STRINGS = {
   },
   "confirm.deleteNoteForGood": { en: "Delete this note for good?", "zh-Hans": "永久删除这条笔记？" },
   "confirm.deleteForGood":   { en: "Delete this for good?",        "zh-Hans": "永久删除这个吗？" },
-  "confirm.deleteTagsOne":   { en: "Delete “{name}”? It will be removed from {notes}.", "zh-Hans": "删除「{name}」吗？它将从{notes}中移除。" },
+  "confirm.deleteTagsOne":   { en: "Delete “{name}”? It will be removed from {notes}.", "zh-Hans": "删除“{name}”吗？它将从{notes}中移除。" },
   "confirm.deleteTagsMany":  { en: "Delete {n} tags? They’ll be removed from the notes that use them.", "zh-Hans": "删除 {n} 个标签吗？它们将从使用它们的笔记中移除。" },
-  "confirm.hookTakeoverOne": { en: "“{label}” already has “{other}” hooked to it. Hook to it anyway?", "zh-Hans": "「{label}」上已经挂着「{other}」了。仍要挂上吗？" },
-  "confirm.hookTakeoverMany": { en: "“{label}” already has {n} habits hooked to it. Hook to it anyway?", "zh-Hans": "「{label}」上已经挂着 {n} 个习惯了。仍要挂上吗？" },
+  "confirm.hookTakeoverOne": { en: "“{label}” already has “{other}” hooked to it. Hook to it anyway?", "zh-Hans": "“{label}”上已经挂着“{other}”了。仍要挂上吗？" },
+  "confirm.hookTakeoverMany": { en: "“{label}” already has {n} habits hooked to it. Hook to it anyway?", "zh-Hans": "“{label}”上已经挂着 {n} 个习惯了。仍要挂上吗？" },
   "confirm.hookAnyway":      { en: "Hook anyway",                   "zh-Hans": "仍要挂上" },
   "confirm.replaceThem":     { en: "Replace them",                  "zh-Hans": "替换它们" },
   "confirm.replaceThatHook": { en: "Replace that hook",             "zh-Hans": "替换那个挂钩" },
@@ -573,7 +573,7 @@ const STRINGS = {
   "confirm.importReplaceWarning": { en: "This will replace everything currently in the app.", "zh-Hans": "这将替换应用中当前的所有内容。" },
   "confirm.replaceEverything": { en: "Replace everything",          "zh-Hans": "替换全部" },
   "confirm.ok":               { en: "OK",                           "zh-Hans": "好" },
-  "confirm.deleteTitleForGood": { en: "Delete “{title}” for good?", "zh-Hans": "永久删除「{title}」吗？" },
+  "confirm.deleteTitleForGood": { en: "Delete “{title}” for good?", "zh-Hans": "永久删除“{title}”吗？" },
   "confirm.deleteThisItem":   { en: "this",                         "zh-Hans": "这个" },
   "confirm.saveAnyway":       { en: "Save anyway",                  "zh-Hans": "仍要保存" },
   "confirm.goBack":           { en: "Go back",                      "zh-Hans": "返回" },
@@ -660,7 +660,7 @@ const STRINGS = {
   "event.repeatsPrompt":        { en: "This event repeats. What would you like to do?", "zh-Hans": "这个事件是重复的。你想怎么处理？" },
   "event.skipThisOne":          { en: "Skip this one",               "zh-Hans": "跳过这一次" },
   "event.deleteSeries":         { en: "Delete series",                "zh-Hans": "删除整个系列" },
-  "confirm.deleteTitleQuestion": { en: "Delete “{title}”?",           "zh-Hans": "删除「{title}」吗？" },
+  "confirm.deleteTitleQuestion": { en: "Delete “{title}”?",           "zh-Hans": "删除“{title}”吗？" },
 
   // ---- date & time pickers ----
   "picker.selectTime":          { en: "Select time",                 "zh-Hans": "选择时间" },

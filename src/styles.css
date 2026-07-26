@@ -1210,10 +1210,19 @@ body.has-frame .tray-drawer::after{
 .review-form-input:focus{ outline:2px solid var(--brass); outline-offset:1px; }
 .review-form-input.field-invalid{ outline:1.5px dashed var(--red); outline-offset:2px; }
 .review-inline-form-btns{ display:flex; gap:8px; flex-wrap:wrap; }
-/* Three buttons now (Cancel · Full page → · Add) rather than two, so they need a
+/* Three buttons now (Full page → · Cancel · Add) rather than two, so they need a
    floor to sit on: below it they wrap instead of squeezing the labels to ellipses
    on a narrow phone. */
 .review-inline-form-btns .review-menu-btn{ flex:1 1 96px; text-align:center; }
+/* Add is the unmistakable primary action (author ruling): filled, rightmost.
+   Full page → is the escape hatch, deliberately de-emphasized and moved to the
+   far side of the row, away from Add, so it stops getting fat-fingered when the
+   user means Add. Cancel sits between them — an unambiguous adjacency next to
+   Add, unlike the escape hatch it replaced there. */
+.review-inline-form-btns .review-menu-btn.review-form-primary{
+  background:var(--brass); color:var(--dark-on-accent); border-color:transparent; font-weight:600; }
+.review-inline-form-btns .review-menu-btn.review-form-primary:hover{ filter:brightness(1.08); }
+.review-inline-form-btns .review-menu-btn.review-form-full{ color:var(--text-soft); border-style:dashed; }
 /* Redaction: visible-but-sealed. You can see one more loop exists and count
    them; you cannot read or tap it (§4.8b). */
 .review-redaction{ height:56px; border-radius:10px; border:1px solid rgba(255,255,255,0.08);

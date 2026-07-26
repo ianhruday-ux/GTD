@@ -6061,10 +6061,10 @@
     if (touched){ renderLane("next"); renderLane("current"); }
   }
   function injectQAChecklist(){
-    // CHUNK 9 round — the service worker (service-worker-plan.md). §8.1's
+    // PUBLIC-APP-POLISH round (public-app-polish-plan.md). §8.1's
     // replace-don't-accumulate discipline: this is the ONLY injector, and the
-    // desktop round's groups below are swept out, not left dormant.
-    const FLAG = "gtd_qa_checklist_sw_v1";
+    // service-worker round's groups below are swept out, not left dormant.
+    const FLAG = "gtd_qa_checklist_publicpolish_v1";
     if (Storage.get(FLAG)) return;
     Storage.set(FLAG, "1");
     // Retire the superseded flags so they can't resurrect their injectors, and
@@ -6075,7 +6075,7 @@
      "gtd_qa_checklist_postsprint_v3", "gtd_qa_checklist_postsprint_v4",
      "gtd_qa_checklist_postsprint_v5", "gtd_qa_checklist_postsprint_v6",
      "gtd_qa_checklist_postsprint_v7", "gtd_qa_checklist_desktop_v1",
-     "gtd_qa_checklist_desktop_v2"].forEach(Storage.remove);
+     "gtd_qa_checklist_desktop_v2", "gtd_qa_checklist_sw_v1"].forEach(Storage.remove);
 
     // Replace, don't accumulate (8.1) — and actually mean it this time.
     // Earlier rounds bumped the flag but left the previous rounds' groups
@@ -6104,22 +6104,17 @@
       });
     }
 
-    addGroupWithItems('✅ QA — Works with no internet (do this on your phone)', [
-      { title: '1. Open it once online first', notes: 'Before testing offline, open the app normally with the internet on, and let it fully load — this is the one-time "install" that lets everything below work. You only need to do this once per device.' },
-      { title: '2. Turn on airplane mode and reopen it', notes: 'Fully close the app (swipe it away, don’t just leave it in the background), turn on airplane mode, then open the app again. It should look and load exactly the same as always — no error screen, no spinner that never finishes, no blank white page.' },
-      { title: '3. It still works while offline, not just opens', notes: 'Still in airplane mode: create a next action, tick something complete, open a project. Everything should work normally. Turn airplane mode back off when you’re done.' }
+    addGroupWithItems('✅ QA — Chinese translation', [
+      { title: '1. Switch to Chinese', notes: 'Open ⋯ (the gear menu) → Language → 简体中文. The whole app should relabel itself immediately — lane names, buttons, everything.' },
+      { title: '2. Read through the tutorial', notes: 'Open the "1 点击这里开始教程" card at the top of Next Actions and tap its checkbox to step through all 8 cards. None of the text should look cut off, blank, or garbled — flag anything that reads oddly even if you don’t read Chinese fluently, just from spacing or obviously-broken punctuation.' },
+      { title: '3. Check every lane’s (i)', notes: 'Tap the small (i) next to each of the six lane headers (Next, Waiting, Projects, Someday, Habits, Notes) and confirm an explanation shows up — none should be empty.' },
+      { title: '4. Run a daily review in Chinese', notes: 'Open the intray (the handle on the left edge of the screen) and tap 回顾. Read through whatever cards show up — nothing should be blank, and tapping the (i) at the top of the review should show a paragraph for every kind of card.' },
+      { title: '5. Switch back to English when done', notes: 'Same menu, pick English, to leave the app the way you’d normally use it.' }
     ]);
 
-    addGroupWithItems('✅ QA — The "New version available" bar', [
-      { title: '4. Note the build number before you start', notes: 'Open ⋯ (the gear menu) and look at the small "Build …" line — write down or remember what it says, so you can tell later whether the update actually took.' },
-      { title: '5. Get a new version pushed, then just wait', notes: 'Tell me when you’re ready and keep the app open on your phone (don’t close it) while I ship a small change. After a little while a small bar should appear near the bottom of the screen saying "New version available" with a Reload button — you don’t need to do anything to make it appear, it should show up on its own.' },
-      { title: '6. Tap Reload', notes: 'Tap the Reload button on that bar. The app should reload itself (you’ll see it flash/refresh) and the bar should go away. Open ⋯ again and check the Build line — it should now be different from what you wrote down in step 4.' },
-      { title: '7. It never interrupted anything', notes: 'This one matters: the bar should NEVER pop up while you are in the middle of typing something or editing a page — only when you are just looking at your lists, or it should simply wait quietly until you close whatever you had open. If it ever appears and grabs your attention away from something you were typing, or reloads the page without you tapping Reload, tell me right away — that specifically must not happen.' }
-    ]);
-
-    addGroupWithItems('✅ QA — One quick pass per device', [
-      { title: '8. Repeat the offline check on your computer', notes: 'Same as items 2–3 above, but in whatever browser you use on your computer: fully close the tab, disconnect from the internet (or use the browser’s offline mode if you know how), reopen it, confirm it still loads and works.' },
-      { title: '9. If you try it on an iPhone: add it to the home screen first', notes: 'iPhones only save the offline copy properly once the app is added to the home screen (Share button → "Add to Home Screen"). Do that first, then repeat the offline check from the home-screen icon, not from Safari directly.' }
+    addGroupWithItems('✅ QA — The review’s Add button', [
+      { title: '6. Find a stalled project in the review', notes: 'If the tutorial’s "Sample stalled project" card is still around, open the review — it should show up there (it has no linked action). Tap "Add a next action".' },
+      { title: '7. Check the three buttons', notes: 'You should see a small muted "Full page →" on the left, "Cancel" in the middle, and a solid highlighted "Add" on the right. Type something and tap the button you mean to — it should now be hard to hit the wrong one by accident.' }
     ]);
     saveTasksLocal("next");
   }
@@ -6636,9 +6631,9 @@
           ? '<input type="text" readonly inputmode="none" id="review-form-input" data-field="reviewForm" placeholder="' + escapeHtml(t("field.pickDate")) + '" class="review-form-input review-form-date' + (invalid ? " field-invalid" : "") + '" value="' + escapeHtml(value || "") + '">'
           : '<input type="text" id="review-form-input" data-field="reviewForm" class="review-form-input' + (invalid ? " field-invalid" : "") + '" placeholder="' + escapeHtml(placeholder) + '" value="' + escapeHtml(value || "") + '" autocomplete="off">') +
         '<div class="review-inline-form-btns">' +
-          '<button type="button" class="review-menu-btn" data-action="review-form-cancel">' + escapeHtml(t("review.cancel")) + '</button>' +
           (fullKind ? reviewFullPageBtn(fullKind, projectId) : "") +
-          '<button type="button" class="review-menu-btn" data-action="' + saveAction + '">' + saveLabel + '</button>' +
+          '<button type="button" class="review-menu-btn" data-action="review-form-cancel">' + escapeHtml(t("review.cancel")) + '</button>' +
+          '<button type="button" class="review-menu-btn review-form-primary" data-action="' + saveAction + '">' + saveLabel + '</button>' +
         '</div>' +
       '</div>'
     );
@@ -6660,9 +6655,9 @@
         box("review-form-input", t("review.whatWaitingOn"), f.value, "title") +
         box("review-form-input2", t("review.untilWhatWhen"), f.value2, "when") +
         '<div class="review-inline-form-btns">' +
-          '<button type="button" class="review-menu-btn" data-action="review-form-cancel">' + escapeHtml(t("review.cancel")) + '</button>' +
           reviewFullPageBtn("waiting", key) +
-          '<button type="button" class="review-menu-btn" data-action="review-addwaiting-save">' + escapeHtml(t("review.add")) + '</button>' +
+          '<button type="button" class="review-menu-btn" data-action="review-form-cancel">' + escapeHtml(t("review.cancel")) + '</button>' +
+          '<button type="button" class="review-menu-btn review-form-primary" data-action="review-addwaiting-save">' + escapeHtml(t("review.add")) + '</button>' +
         '</div>' +
       '</div>'
     );
