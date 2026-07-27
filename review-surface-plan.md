@@ -1,5 +1,18 @@
 # The review surface — planning document
 
+> ## ⛔ MUST FIX — live bug, independent of everything below
+>
+> **The Chinese info text for a missed repeat quotes buttons that do not exist.**
+> `info.review.missed` (zh-Hans) tells the user to press 「我做了」 and 「算了吧」; the buttons on
+> screen say **我做完了** (`review.iDidIt`) and **不管了** (`review.letItGo`). The English pair
+> matches exactly — only the Chinese drifted, in the native-speaker pass. A Chinese user is being
+> directed to a control that is not there.
+>
+> **Author has flagged this for fixing.** It rides along with the `Skipped` rename (§6a) if that
+> happens first — but if the rename is deferred for any reason, **fix this on its own anyway.**
+> Whoever fixes it: re-read the whole zh-Hans `info.review.*` block for the same class of drift, not
+> just this one string.
+
 **Status: nothing in §3–§6 is built.** This records the author's rulings from the review-surface
 conversation (2026-07-27) and the survey work done alongside them, so a later session can build
 without re-deriving any of it. Where it says **RULED**, the author decided it; where it says
@@ -173,20 +186,21 @@ card next to it is a compact three-row grid. They do not look like the same prod
 
 ---
 
-## 5. Item B — the proposal, and where desktop and phone must differ
+## 5. Item B — the shape, and where desktop and phone must differ
 
-**RULED (author): the three-band structure is adopted.** Build to it. The two corrections the author
-made when accepting it are recorded in §5a below and are binding.
+**RULED (author): the three-band structure is adopted — for the four non-capture kinds.** Build to
+it. **§5a is binding and narrows the scope of everything in this section: the capture card is out,
+and stays exactly as it is.** Read §5a before building anything here.
 
 **RULED (author): desktop and phone will probably need different interface choices here.** They
-already do, and §1's capture card is the working template for how: **one DOM, one *shape*, two
-arrangements via CSS.** The capture card proves the pattern — identical markup produces 3+3+2 on
-phone and 6+2 on desktop with nothing but `order` and `flex-basis` overrides, and it reads as the
-same card in both. Generalise that, do not invent a second mechanism.
+already do, and §1's capture card is the working template — **but for its CSS technique, not its
+structure.** The technique to copy: **one DOM, two arrangements** — identical markup produces 3+3+2
+on phone and 6+2 on desktop with nothing but `order` and `flex-basis` overrides, and it reads as the
+same card in both. Generalise *that*, and do not invent a second mechanism.
 
-### The shape every card should share
+### The shape the four Rule-B kinds should share
 
-Proposed, **not ruled** — this is the part to bring back to the author before building:
+**Not** the capture card — see §5a. For `missed`, `pastdue` (both shapes), `stalled` and `orphaned`:
 
 ```
 ┌─────────────────────────────────────────┐
@@ -211,37 +225,46 @@ capture card's row 3, promoted to a universal. A kind with nothing in a band sim
   stalled card to something that reads at a glance. Same DOM, `flex-wrap` + basis overrides in the
   ≥1000px block.
 
-Making the capture card's chip grid **band 1 of the same shape** — rather than a special case — is
-the move that makes "standardised" true rather than cosmetic. Its bottom band is already the target
-pattern.
+### 5a. ⚑ RULED — the capture card is NOT banded, and that is correct
 
-### 5a. The correction the author made when adopting this (binding)
+**This supersedes the paragraph above** and any earlier claim in this document that the capture card
+already *is* the three-band shape. That claim was wrong and the author caught it: **Calendar and
+2 min share row 2**, but Calendar is a sorting destination and 2 min means "off the list, I did it
+already" — under the bands they are on opposite sides of a boundary. What produces that row is
+wrapping arithmetic (seven destinations don't divide into rows of six), not grouping.
 
-The claim above — that the capture card already *is* the three-band shape — **was overstated, and
-the author caught it.** On the capture card, **Calendar and 2 min share row 2**, but they belong to
-different bands: Calendar is the seventh sorting destination (band 1), while 2 min means "off the
-list, I just did it" (band 2). So row 2 straddles a band boundary.
+**RULED (author): leave the capture card exactly as it is. Apply the bands to the other cards
+only.** The reasoning, which is the important part and is now the governing model for the whole
+surface:
 
-**What actually produces that row is wrapping arithmetic, not structure.** Seven sorting chips do
-not divide into rows of six, so Calendar spills onto row 2 and 2 min follows it. On phone the same
-thing happens with rows of three. The pairing is an accident that *looks* like grouping.
+> The capture card has more controls than any other card, and **the rule it follows is a different
+> one: band 3 sits at the bottom, and the rows above it mimic the LANE STRUCTURE.** The other cards
+> have no lane options available, so they need a different structural rule — and the bands are the
+> right rule for that.
 
-This does not sink the model, but it does mean the capture card needs one small change to stop
-being a counter-example to the pattern it is supposed to demonstrate:
+So there is **one universal and two organising rules**, not one rule everywhere:
 
-- **Adopt (recommended):** mark the band boundary inside row 2 with a **gap** — `Calendar` · gap ·
-  `2 min` — reusing the exact device the row already uses to separate the three lane pairs (the
-  20px `margin-right` on desktop). Costs no extra row, keeps the layout the author just approved,
-  and makes the structure honest. Applies to both phone and desktop.
-- **Rejected alternative, recorded so it is not re-proposed:** read 2 min as an *eighth destination*
-  ("where does this go? nowhere — I did it"), making the capture card all band 1 with no band 2.
-  Internally coherent, but it contradicts the existing styling ruling that 2 min is deliberately
-  **uncoloured because it sorts nothing** (styles.css `[data-target="quickdone"]`, app.js ~6705).
-  Taking this option would mean reopening that decision too.
+| | applies to | rule above band 3 |
+| --- | --- | --- |
+| **Universal** | *every* card | **band 3 at the bottom: Not now (left) · Delete (right)** |
+| Rule A — *mirror the lanes* | `capture` only | rows reproduce the lane structure the user already knows from the tab bar / desktop columns, plus Calendar and 2 min. Not banded. Already built; do not touch. |
+| Rule B — *bands* | `missed`, `pastdue` (both shapes), `stalled`, `orphaned` | band 1 *move it forward* → band 2 *take it off the list* → band 3 |
 
-**Do not let a band boundary fall silently inside a wrapped row anywhere else either.** Any band
-whose controls wrap needs the boundary marked, or the grouping the bands exist to communicate is
-invisible exactly where it matters most.
+**Why this is better than what this document originally proposed.** A capture card's buttons are
+**destinations** — the question is *"where does this go?"* and the honest answer is a picture of the
+places it could go. The other four kinds' buttons are **decisions** — there is no destination to
+show, so grouping by decision-type is the only structure available. Forcing one rule across both
+would have made the capture card worse (breaking its lane mirror to satisfy a boundary the user has
+no reason to care about) to make a table in a planning document tidier.
+
+**What the capture card still contributes to the standard:** band 3. Its Not now / Delete corner row
+is the universal, and it is the one part of it every other card must copy. That, and the
+one-DOM-two-arrangements CSS technique below — not its upper rows.
+
+**Consequence for §4's defect list:** defect 5 (flat seven-button stacks) is a Rule-B problem only.
+Defects 1–4 (verb drift, two delete treatments, `Not now` in two places, missing `.review-menu`
+wrapper) still apply to **every** card including capture, because they are about the universal band
+and about vocabulary, not about upper-row structure.
 
 ### Do this first, regardless of what §5 becomes
 
@@ -263,8 +286,8 @@ cover. They can ship in one small commit **before** the author rules on the shap
   `Mark done` still look like pure drift and should merge. **`Let it go` is now confirmed distinct
   and must NOT be merged into `Delete`** — §6a has the evidence. What remains open is only its
   *label*, which the author has called too long.
-- **Q2. Does the three-band shape in §5 survive contact with the author's intent?** It is a
-  proposal, inferred from the capture card. Confirm before building.
+- ~~**Q2. Does the three-band shape in §5 survive contact with the author's intent?**~~
+  **RESOLVED — adopted, with the capture card excluded. See §5a.**
 - **Q3. Does the past-due *pseudo-action* need its own info string,** or does `info.review.pastdue`
   (written for deadlines, which you can push) cover a card whose only options are tick and delete?
 - **Q4. Should the info panel stay open across cards** (§3 trap), or close each time?
@@ -272,6 +295,9 @@ cover. They can ship in one small commit **before** the author rules on the shap
   much closer to phone. Is "as close to the phone as the width allows" the standing rule for the
   whole surface, or does desktop get to use its width more aggressively (horizontal bands, §5)?
   These pull in opposite directions and the answer shapes §5.
+- **Q6. Does `Skipped` want the same treatment as the tick?** It now records a *status* rather than
+  naming an act (§6a), which puts it in the same grammatical family as `✓ Mark done`. Whether it
+  should also carry a glyph falls out of the icon question in §4 defect 1 — settle both together.
 
 ## 6a. `Let it go` — what it actually is (verified against the build)
 
@@ -302,10 +328,35 @@ label decision is made against facts rather than memory.
 **So renaming the button means editing that sentence too, in BOTH languages.** A rename that leaves
 the info text quoting a button that no longer exists is worse than no rename.
 
-**Label candidates** (author's call): `Skip` is shortest and matches the mental model, but breaks
-the `I did it` / `Let it go` symmetry; `I didn't` keeps the symmetry and stays short but reads as
-self-blame; `Didn't happen` is the most precise and still shorter than today's. Recommendation:
-`Skip` (`跳过`), with the info text rewritten to explain the pairing rather than rely on it.
+### ⚑ RULED — the button becomes `Skipped`, not `Skip`
+
+**RULED (author).** My recommendation was `Skip`; the author overruled it with a reason worth
+keeping, because it generalises past this one button:
+
+> **"Skipped" is an adjective that describes the event. "Skip" is a verb which might be confused
+> with "Not now."**
+
+That is exactly right and I had missed it. **`Not now` is also a skip** — it is the defer control
+that sits on every card, including this one. A button labelled `Skip` next to a button that
+literally means "skip this for now" is two verbs competing for the same act. `Skipped` sidesteps the
+collision by changing what the label is *about*: it is not an instruction to the user, it is a
+**status being recorded about the occurrence** — this instance was skipped. Same grammatical move as
+a tick recording "done".
+
+**Generalise this when settling the rest of the verb table (§4 defect 1).** On this surface, a label
+that describes *what becomes true of the item* is safer than a label that names *the act you are
+performing*, because the acts are all fairly similar ("get this off my screen") and the outcomes are
+not. Check every proposed label against `Not now` specifically — it is the one control on every
+card, so it is the one everything else can collide with.
+
+**Chinese:** `跳过` is the verb ("to skip") and carries the same collision. Prefer a past/stative
+form — `已跳过` ("skipped" / "has been skipped") is the direct equivalent of the author's reasoning.
+Confirm with a native speaker before shipping; the last Chinese pass is what introduced the
+must-fix bug at the top of this document.
+
+**Do not forget the info text.** `info.review.missed` names both buttons in quotes (see above), so
+the rename is a **two-string change in each language, four strings total** — plus the must-fix
+correction of the two Chinese quotes, which this rename supersedes and must not leave half-done.
 
 ### ⚑ Separate defect found while checking this — the Chinese info text quotes the wrong buttons
 
@@ -341,3 +392,6 @@ it whether or not the rename happens (and fold it in if it does).
   author's actual phone. Any new band layout must keep deterministic bases.
 - **The review is reached from inside the intray drawer.** A check script that clears `#tray-root`
   has thrown away its own entry point (see `checks/review_and_event_page.py`).
+- **Do not "standardise" the capture card into the bands.** §5a rules it out explicitly, and the
+  temptation will be strong precisely because it is the odd one out in every table in this
+  document. It is the odd one out *on purpose*: its buttons are destinations, not decisions.
