@@ -13,10 +13,13 @@
 > Whoever fixes it: re-read the whole zh-Hans `info.review.*` block for the same class of drift, not
 > just this one string.
 
-**Status: nothing in §3–§6 is built.** This records the author's rulings from the review-surface
-conversation (2026-07-27) and the survey work done alongside them, so a later session can build
-without re-deriving any of it. Where it says **RULED**, the author decided it; where it says
-**builder's call**, pick the simplest option and flag it in the handoff (CLAUDE.md).
+**Status: nothing in §3–§6 or §8 is built.** This records the author's rulings from the
+review-surface conversation (2026-07-27) and the survey work done alongside them, so a later session
+can build without re-deriving any of it. Where it says **RULED**, the author decided it; where it
+says **builder's call**, pick the simplest option and flag it in the handoff (CLAUDE.md).
+
+**§8 is unrelated to the review** — it is the Advanced button, noticed in the same conversation and
+parked here rather than in a document of its own. It can be built independently and in any order.
 
 Read with `spec.md` §4.8b (the daily review) and `src/app.js` `reviewCardHtml` / `reviewBodyHtml`
 (~line 6690 onward), plus the `.review-*` block in `src/styles.css` (~1193–1260 base, ~2060–2100
@@ -395,3 +398,117 @@ it whether or not the rename happens (and fold it in if it does).
 - **Do not "standardise" the capture card into the bands.** §5a rules it out explicitly, and the
   temptation will be strong precisely because it is the odd one out in every table in this
   document. It is the odd one out *on purpose*: its buttons are destinations, not decisions.
+
+---
+
+# 8. UNRELATED — the "Advanced" button
+
+Noticed by the author in the review-surface conversation; nothing to do with the review. Built:
+nothing. Surveyed against the current build, not remembered.
+
+## 8.1 What exists today
+
+**Two different controls** currently occupy the "the simple form isn't enough" role, and they behave
+differently:
+
+| | label | class | what it does | where |
+| --- | --- | --- | --- | --- |
+| **A. the dialog opener** | `Advanced options…` (`advanced.button`) | `.btn.btn-ghost.btn-small.screen-advanced-btn` | `screen-open-advanced` → opens the **Advanced modal** over the page you are on; Done returns you | drafting pages for **next**, **waiting**, **habit** (`advancedRowHtml`, app.js ~3618) |
+| **B. the calendar's** | `More options →` (`cal.moreOptions`) | `.cal-advanced-btn` | `cal-advanced` → `openEventCreateScreen()`, which **navigates to the full event page** and does not come back | calendar quick-add, **Event side only** (events.js ~924) |
+
+Both are transparent-background outline buttons today (`.btn-ghost` is `background:transparent`;
+`.cal-advanced-btn` likewise).
+
+**B carries everything already typed** — name, description, date, time, recurrence, interval,
+tickler, project link (events.js ~1079). It is a lossless hand-off, not a restart. Worth knowing
+before touching it.
+
+**B is absent from the Deadline side of the quick-add**, deliberately: that side creates a *task*,
+which has its own drafting page and its own route to context/project. Leave that alone.
+
+## 8.2 What the author ruled
+
+1. **The calendar's `More options →` becomes `Advanced`.**
+2. **It moves to the TOP of the controls**, not the bottom. Current order inside
+   `.cal-create-controls` (events.js ~907–927) is: Time → Description → Recurrence (+ interval) →
+   [habit bubble, conditional] → Tickler checkbox → **More options** (last). It should become first.
+3. **Every other "Advanced options…" button becomes just `Advanced`.**
+4. **Give them a grey fill so they stand out** (author: "try" — so this is a proposal to evaluate on
+   screen, not a fixed value).
+5. **There should be one on almost every drafting page**, with **Notes a likely exception**.
+
+## 8.3 Building it
+
+**Grey fill — reuse the app's existing grey, do not mint a new one.** `rgba(255,255,255,0.11)` is
+already the app's neutral raised fill (`.review-notnow`, and the `2 min` chip's
+`[data-target="quickdone"]`). One grey, already precedented, already checked against the wood
+background. Applies to both `.screen-advanced-btn` and `.cal-advanced-btn`.
+
+**⚑ Check the habit bubble when you move B to the top.** The CSS comment at styles.css ~1632 records
+a deliberate hierarchy: the advanced button is *"deliberately quieter than the habit bubble beside
+it — that one makes a suggestion about what you are building, this one just opens a door."*
+Promoting it to first position **and** giving it a fill reverses that hierarchy. That may well be
+fine — the author has now asked for it twice over (position and fill) — but look at the two together
+on screen before calling it done, and say what you saw in the handoff.
+
+**⚑ The ellipsis is doing work; dropping it has a cost.** `Advanced options…` ends in an ellipsis by
+the usual convention that the control opens a dialog. `Advanced` does not signal that. And the two
+controls being unified under one label **behave differently**: A opens a modal and returns you to
+the page; B leaves the page entirely. The author's instruction stands — from the user's side both
+mean "the simple form isn't enough, give me everything," and that is a defensible thing to name
+identically. **But verify on screen that the calendar's `Advanced` does not read as "opens a
+dialog,"** because it doesn't. If it does, the fix is B's arrow (`Advanced →`), which already
+carries "you are going somewhere" — not reopening the label.
+
+## 8.4 Coverage — what is actually missing
+
+Checked every drafting page:
+
+| page | has an Advanced button? | |
+| --- | --- | --- |
+| Next action | ✅ | |
+| Waiting action | ✅ | |
+| Habit | ✅ | |
+| **Current project** | ❌ | **the gap** |
+| **Future project** | ❌ | **the gap** |
+| Notes | ❌ | the author's predicted exception — **confirmed**, leave it |
+| Event page | ❌ | correct: this page *is* where B sends you. It is the advanced destination, not a page that needs its own door. |
+
+So the author's expectation is right, and the gap is exactly **the two project pages**.
+
+> ### ⚑ Q7 — BLOCKER for the project pages. Do not resolve this by inventing content.
+>
+> The Advanced dialog has exactly **two tabs**: *Bundling* (next/waiting) and *Extra cues* (habits).
+> **There is nothing defined for a project.** Adding the button to Current/Future without deciding
+> what goes inside opens an empty dialog.
+>
+> This is a **feature question, not a styling one**, and CLAUDE.md's standing rule applies — judgment
+> calls inside a feature are the builder's, inventing a feature is not. **Ask the author what a
+> project's Advanced dialog contains** before adding the button there.
+>
+> Everything else in §8 (rename, reposition, grey fill, on the three pages that already have one)
+> is unblocked and can ship without this.
+
+## 8.5 A third relative, for the author to rule on
+
+**`Full page →`** (`review.fullPage`) sits in the review's inline quick-add forms and does the same
+job as B — navigates to the full drafting page, carrying what has been typed. The author did not
+mention it, and it does **not** say "Advanced options", so it is not literally in scope.
+
+**Recommendation: leave it.** It lives inside the review, whose vocabulary is being standardised
+separately under §5, and `Full page →` is doing a different piece of teaching there — it names the
+destination rather than the depth. **Q8: confirm, or fold it into the `Advanced` family.**
+
+## 8.6 Verification
+
+- Each of next / waiting / habit: button reads `Advanced`, has the grey fill, still opens the
+  Advanced dialog, dialog still returns to the page with the draft intact.
+- Calendar, Event side: button reads `Advanced`, sits **first** in the controls, still carries
+  name/description/date/time/recurrence/interval/tickler/project through to the event page.
+- Calendar, Deadline side: **still has no such button** — that is correct, not a regression.
+- Both languages: `advanced.button` and `cal.moreOptions` are separate i18n keys and both need the
+  new label in EN **and** zh-Hans. `advanced.buttonDialog` is the *dialog's own title* and should
+  stay "Advanced options" — do not shorten that one by accident.
+- Draft isolation (CLAUDE.md): unchanged by any of this, but the standing verification procedure
+  still applies to any drafting page you re-render — enumerate every control the page renders,
+  mutate, ✕, confirm nothing persisted.
