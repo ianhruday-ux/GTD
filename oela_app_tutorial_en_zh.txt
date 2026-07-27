@@ -1,7 +1,65 @@
-App tutorial
+========================================================================
+PROMPT FOR CHATGPT — improve the Chinese in this document
+========================================================================
 
-The purpose of this document is to lay out a proper tutorial for the OELA productivity app. This tutorial should have both an English language and a Chinese language version. It uses the apps card system to teach users to use the apps systems. Cards will be formatted as follows: first I will name the card field, then I will give the contents of the field in English, finally, I will give the Chinese translation of the English text.
+You are a native Simplified-Chinese writer helping localize a phone
+productivity app called OELA. The Chinese already in this document was
+translated line-by-line from English and reads stiff and English-shaped
+("translationese"). Your job is to REWRITE the Chinese so it reads the way
+a native speaker would actually write it — natural, warm, conversational —
+while keeping the meaning exactly.
 
+WHAT TO REWRITE
+  • Only the two sections below: PART 1 (the tutorial cards) and PART 2
+    (the app info text).
+  • For each entry, rewrite only the "ZH:" line(s). Leave every "EN:" line
+    unchanged — the English is the source of truth for meaning.
+  • Leave all field labels and structure ("Description", "Linked Project",
+    "Waiting on", the numbers "1"–"8", blank lines) exactly as they are.
+
+HARD RULES (this text is instructions, not marketing prose)
+  1. PRESERVE EVERY STEP. These paragraphs tell users which buttons to
+     press and in what order. Do not add, drop, reorder, soften, or
+     "improve" any instruction. If the English says tap X then tap Y, the
+     Chinese must say tap X then tap Y. Keep every concrete detail (colors,
+     the (i) icon, the + badge, arrows, "red list", etc.).
+  2. FIX MEANING DRIFT. Where the current Chinese has quietly diverged from
+     the English, correct it back to the English meaning.
+  3. USE THE GLOSSARY BELOW verbatim for every app term, every time, so the
+     wording is consistent across the whole document.
+  4. PUNCTUATION: use Simplified-Chinese curly quotes “ ” (not the 「」
+     brackets that appear in some current lines). Keep 《》 for book titles.
+  5. Keep parenthetical English glosses where they already help a first-time
+     reader, e.g. OELA, （Getting Things Done）, （cue）.
+
+GLOSSARY — one Chinese term per concept, use consistently
+  • the lanes / the specialized lists → 列表 or 清单 (or by color, e.g.
+        “红色列表”).  DO NOT use 泳道 — it is kanban jargon and reads wrong.
+  • the daily review / the review feature / the review button → 回顾.
+        DO NOT use 复盘.
+  • the intray / capture drawer (the pull-out drawer that collects things)
+        → 收件箱 (you may call the physical pull-out itself 抽屉).
+  • next action → 下一步行动      • waiting action → 等待行动 / 等待项
+  • context → 情境                • project → 项目
+  • habit → 习惯                  • cue → 提示（cue）
+  • note → 笔记                   • calendar / event → 日历 / 事件
+  • Someday / Future → 将来 / 将来某天
+  • OELA stays “OELA”; 《搞定》 = Getting Things Done / GTD.
+
+OUTPUT
+  Return the whole document back with the rewritten "ZH:" lines in place and
+  everything else untouched, so it can be pasted straight back.
+
+(Note: the app's short button labels and default placeholder text are being
+handled separately — you do NOT need to touch anything outside PART 1 and
+PART 2 below.)
+
+========================================================================
+PART 1 — TUTORIAL CARDS
+========================================================================
+The purpose of this section is the in-app tutorial for OELA. It uses the
+app's card system to teach users the app's systems. Each card lists a field
+name, then the English contents (EN), then the Chinese (ZH).
 
 Next action card title:
 EN:	1 CLICK HERE TO START THE TUTORIAL
@@ -127,3 +185,258 @@ ZH:	停滞示例项目
 Description
 EN:	This project is a sample project intended for use in the tutorial. Its purpose is to get caught in the daily review during step 7 of the tutorial.
 ZH:	该项目是一个旨在用于教程中的示例项目。它的目的是在教程第 7 步的每日复盘过程中被捕获。
+
+========================================================================
+PART 2 — APP INFO TEXT
+========================================================================
+These are the ⓘ information blurbs behind each lane's info button, plus the
+intray and the daily-review decision menus. Same task as PART 1: rewrite the
+"ZH:" line(s) to read naturally, keep the English as the source of truth,
+and follow the glossary and rules above. Several of these describe exact app
+behavior — keep every step and detail.
+
+Next Actions lane — info
+EN:	This lane is for "next actions" and "contexts." A next action is the single next physical step you need to move something forward. It is not a whole project, only the next action you can take in a project.
+ZH:	这个列表用于存放“下一步行动”和“情境”。下一步行动是推进某件事所需的下一个具体动作。它不是整个项目，而只是你在这个项目中可以采取的下一个行动。
+
+Next Actions lane — info (continued, "context" explainer)
+EN:	A "context" is a recurring place or time which offers you the opportunity to take an action. Here, we have created contextual lists, so you can group all your "at computer" and "getting off work" actions together.
+ZH:	“情境”是指反复出现的地点或时间，它给了你采取行动的机会。这里我们建立了情境清单，让你可以把所有“在电脑前”和“下班时”的行动归拢到一起。
+
+Waiting On lane — info
+EN:	A waiting action is something you can't act on yet because it depends on something else—a reply from someone, a delivery, a decision, another action getting done, or a future event. Use the left arrow to promote a waiting action to the next action list, or hook it to a next action so it will promote automatically. Actions in a context will promote to their sibling context in the next action list.
+ZH:	等待项是你暂时无法着手的事，因为它取决于别的事情——某人的回复、一次送达、一个决定、另一个行动的完成，或是将来的某个事件。用左箭头把等待项提升到下一步行动列表，或者把它挂到某个下一步行动上，这样它就会自动提升。属于某个情境的行动，会提升到下一步行动列表中对应的同名情境里。
+
+Current Projects lane — info
+EN:	A project is anything that takes more than one action to complete. It could be as simple as returning a library book or as involved as planning a vacation. Current projects should always have at least one step tied to them to prevent them from being stalled. This step might be an action, a waiting action, or even an event on the calendar.
+ZH:	项目是指任何需要一个以上行动才能完成的事。它可以简单到还一本图书馆的书，也可以复杂到筹划一次假期。当前项目应始终至少挂着一个步骤，以免陷入停滞。这个步骤可以是一个行动、一个等待项，甚至是日历上的一个事件。
+
+Someday / Future lane — info
+EN:	This lane is for projects you're not committed to starting yet. Review this list at least once a month to keep the dreams alive.
+ZH:	这个列表用于存放你还没决定要开始的项目。至少每月回顾一次，让这些想法保持鲜活。
+
+Habits lane — info
+EN:	A habit is an automatic behaviour which is triggered by a cue. It's easiest to build habits when you're doing them at least once a week. Type in a cue when you're creating a habit or use the habit hook to create habit stacks in which one habit is the cue for the next habit in the stack.
+ZH:	习惯是一种由提示触发的自动行为。每周至少做一次的习惯最容易养成。创建习惯时输入一个提示，或者使用习惯挂钩来搭建习惯链——链条中的每个习惯都是下一个习惯的提示。
+
+Habits lane — info (continued, personal-bests explainer)
+EN:	Some apps track streaks, but everyone misses a habit occasionally. We don't track streaks here, but we do track personal bests. If you break your streak, then maybe you'll have a new personal best to beat. After all: 'It's more important to be persistent than it is to be consistent.' – Rebecca
+ZH:	有些应用会记录连续天数，但每个人都难免有中断的时候。这里我们不记录连续天数，而是记录个人最佳。就算中断了，你也不过是多了一个要超越的个人最佳而已。毕竟：“坚持比不间断更重要。”——Rebecca
+
+Notes lane — info
+EN:	This lane is for notes. It's useful for keeping track of ideas, links, email addresses, and assorted reference materials related to current and future projects.
+ZH:	这个列表用于存放笔记。它适合记录与当前项目和将来项目有关的想法、链接、电子邮件地址，以及各种参考资料。
+
+Intray — info
+EN:	The intray is a tray that holds everything that needs dealing with. Stalled projects, overdue deadlines, and waiting actions which have lost their waiting condition, all belong here. You can use the text box to quickly add thoughts or reminders if you don't have time to add them to the proper list. You can sort through and process everything using the tray's review feature.
+ZH:	收件箱是一个存放所有待处理事项的地方。停滞的项目、过期的截止日期，以及失去了等待条件的等待项，都归到这里。如果你来不及把想法或提醒放进合适的列表，可以用输入框先快速记下来。之后用收件箱的回顾功能，把所有东西逐一整理和处理掉。
+
+Daily review — "past due" decision
+EN:	This was due and the moment has passed. Push it to a new date, tick it if it's actually done, delete it if it's dead — or Not now to see it again next time.
+ZH:	这件事已经到期，而时间已经过去了。把它推到新的日期，如果确实做完了就打勾，如果已经作废就删除——或者选“暂不处理”，下次再看到它。
+
+Daily review — "stalled project" decision
+EN:	This is a project with no way forward. Add the next physical step, a waiting action, or an event to keep it going, or move it to Someday if continuing the project isn't possible or practical. You can always come back to it in the future.
+ZH:	这是一个没有推进方式的项目。加上下一个具体步骤、一个等待项或一个事件，让它继续走下去；如果继续这个项目已不可行或不实际，就把它移到“将来某天”。你随时可以在将来回过头来处理它。
+
+Daily review — "orphaned waiting" decision
+EN:	This was waiting on something that no longer exists. Point it at something else, replace it with a note to yourself, promote it if you can act now, or close it out.
+ZH:	这件事在等待一个已经不存在的东西。把它指向别的东西、改成一句写给自己的说明、如果现在就能动手就把它提升，或者干脆结束它。
+
+Daily review — "missed repeat" decision
+EN:	A repeating thing whose day went by without being ticked. Often you did it and forgot to say so — 'I did it' records it on the day it happened. 'Let it go' clears it without pretending you did. Only the most recent one is ever kept, so this never piles up.
+ZH:	一件重复的事，它的那一天过去了却没有打勾。很多时候你其实做了，只是忘了记下来——“我做了”会把它记在实际发生的那一天。“算了吧”则会清掉它，而不假装你做过。这里只保留最近的一次，所以永远不会越积越多。
+
+Daily review — "capture / new thought" decision
+EN:	A stray thought you haven't filed yet. Send it to a lane — or Not now to leave it for later.
+ZH:	一个你还没归类的零散想法。把它送进某个列表——或者选“暂不处理”，留到以后。
+
+======================================================================
+▼▼▼  VETTED CHATGPT REWRITE — APPLY THIS VERSION TO src/i18n.js  ▼▼▼
+Everything ABOVE this line is the pre-rewrite original (still contains
+泳道 / 复盘 / 「」 — do NOT use it). The Chinese BELOW is the reviewed
+rewrite: glossary-clean, natural, punctuation normalized. See
+public-app-polish-plan.md for the three open flags before applying.
+======================================================================
+
+Next action card title:
+EN:	1 CLICK HERE TO START THE TUTORIAL
+ZH:	1 点击这里开始教程
+Description
+EN:	This is a tutorial on the use of OELA, or the Over Engineered List App. This app is intended to help you organize and plan your life. It is partially inspired by the popular system in the book "Getting Things Done," though I have made my own additions to that organizational system as well.
+You are currently on a drafting page for a next action. These drafting pages allow you to create list items which show up in the various specialized lists in the app. The X in the top right corner exits this page without saving any changes you may have made. If you are on a phone, the exit and save button is the arrow in the top left corner. If you are on a computer, you can click the "done" button. To complete this part of the tutorial, hit the complete button then click the done button or tap the arrow. The next card will show up in the list.
+ZH:	这是 OELA（Over Engineered List App，过度设计清单应用）的使用教程。本应用旨在帮助你整理事务、规划生活。它的设计部分参考了《搞定》（Getting Things Done）中的经典方法，同时也加入了我自己的一些改进。
+你现在看到的是“下一步行动”的编辑页面。在这里，你可以创建会显示在应用各个列表中的条目。点击右上角的 X 会退出当前页面，并且不会保存任何修改。如果你使用的是手机，保存并退出请点击左上角的箭头；如果使用的是电脑，请点击“完成”按钮。要完成这一部分教程，请先点击“完成”复选框，再点击“完成”按钮或左上角箭头。完成后，下一张教程卡片会出现在列表中。
+Linked Project
+EN:	Tutorial Project
+ZH:	教程项目
+
+Waiting Action Title
+EN:	2 Tutorial: The interface
+ZH:	2 教程：界面介绍
+Description
+EN:	You may have noticed those colourful tabs at the top of the page on the main screen. These are the lanes or specialized lists. You can navigate to them by clicking or tapping them. The red list is for next actions. The yellow list is for waiting actions. The green and blue lists are for current and future projects. The purple and teal lists are for habits and notes. There is also a calendar which can be accessed either on the bar at the top of the screen, or through the yellow list.
+Each list has a specialized function and behaves slightly differently. You can see information about the list's purpose and function by pressing the small (i) icon next to the list's header. Try looking around at the different lanes. Exit this drafting page and take a look at the different lists available. When you're done, return to the red list and check the box on this action. The next tutorial card will appear in this list.
+ZH:	你可能已经注意到主界面顶部那些彩色标签了。它们就是应用中的各个列表。点击或轻触即可切换。红色列表用于“下一步行动”，黄色列表用于“等待行动”，绿色和蓝色列表分别用于当前项目和将来项目，紫色和青色列表分别用于习惯和笔记。此外，还有一个日历，可以从屏幕顶部的工具栏进入，也可以通过黄色列表进入。
+每个列表都有不同的用途，操作方式也略有区别。点击列表标题旁边的小 (i) 图标，就能查看该列表的用途和功能说明。现在请退出这个编辑页面，浏览一下各个列表。看完之后，回到红色列表，勾选这项行动的复选框。下一张教程卡片就会出现在这个列表中。
+Waiting on
+EN:	1 CLICK HERE TO START THE TUTORIAL
+ZH:	1 点击这里开始教程
+Linked Project
+EN:	Tutorial Project
+ZH:	教程项目
+
+Waiting Action Title
+EN:	3 Tutorial: Creating Items
+ZH:	3 教程：创建条目
+Description
+EN:	Now that you've familiarized yourself with the different lists, you're ready to create your first item. If you're using a phone, you may have noticed a floating + badge in the bottom right corner. That is the creation button. Tap that to create items in your current lane. If you're on a computer, the creation buttons will be below the lane header. Go to the red list, and tap the badge or click the button to create a next action. Remember to hit the arrow/done button when you're finished.
+ZH:	现在你已经熟悉了各个列表，可以创建你的第一个条目了。如果你使用的是手机，应该已经注意到右下角悬浮着一个 + 按钮，它就是新建按钮。轻触它，就能在当前列表中新建条目。如果你使用的是电脑，新建按钮位于列表标题下方。请切换到红色列表，点击 + 按钮或新建按钮，创建一个“下一步行动”。完成后，别忘了点击左上角箭头或“完成”按钮保存。
+Waiting on
+EN:	2 Tutorial: The interface
+ZH:	2 教程：界面介绍
+Linked Project
+EN:	Tutorial Project
+ZH:	教程项目
+
+Waiting Action Title
+EN:	4 Tutorial: Creating a waiting action
+ZH:	4 教程：创建等待行动
+Description
+EN:	Now that you've created your first action, it's time to create a waiting action. A waiting action is an action that you plan to take, but it depends on something else. For example, you might plan to book a hotel for your vacation, but you have to book your flight first. When creating a waiting action, this app allows you to give a qualitative description of the thing you're waiting on, but you can also connect it to another action. Now that you've created a next action, go to the waiting action lane (yellow) and create a waiting action connected to the action you created in tutorial 3. When you complete that action, your waiting action will automatically move to the red list.
+ZH:	现在你已经创建了第一个行动，接下来可以创建一个“等待行动”。等待行动指的是你打算去做，但必须先等其他事情完成才能进行的行动。例如，你打算预订假期酒店，但必须先订好机票。在创建等待行动时，你可以填写正在等待什么，也可以直接把它关联到另一项行动。现在请前往黄色列表，创建一个等待行动，并将它关联到你在教程 3 中创建的那项“下一步行动”。等那项行动完成后，这个等待行动会自动移到红色列表。
+Waiting on
+EN:	3 Tutorial: Creating Items
+ZH:	3 教程：创建条目
+Linked Project
+EN:	Tutorial Project
+ZH:	教程项目
+
+Waiting Action Title
+EN:	5 Tutorial: Creating a context
+ZH:	5 教程：创建情境
+Description
+EN:	While you were creating your actions, you may have noticed the create context button. This button allows you to create a special sub-list in the action lanes. In the Getting Things Done system, contexts are lists of actions organized by where and when you do them. For example, you might have a list of errands which can only be done if your in the car, or a list of calls you can only make if you have a phone. Contexts offer you the opportunity to take an action. In this app, they are shared across both the next action and waiting on lanes, meaning that a waiting item in the calls context in the yellow lane will promote to the calls context in the next actions (red) lane.
+ZH:	在创建行动时，你可能已经注意到“创建情境”按钮。这个按钮可以让你在行动列表中创建一个专门的子列表。在《搞定》（Getting Things Done）系统中，情境是按照执行地点或时机来整理行动的方式。例如，你可以建立一个只有开车时才能处理的“跑腿”情境，或者一个只有手边有电话时才能处理的“打电话”情境。情境代表你具备了采取某项行动的条件。在本应用中，情境会同时应用于“下一步行动”和“等待行动”两个列表。也就是说，黄色列表中“打电话”情境里的等待项，在满足条件后，会自动移动到红色列表中对应的“打电话”情境。
+Waiting on
+EN:	4 Tutorial: Creating a waiting action
+ZH:	4 教程：创建等待行动
+Linked Project
+EN:	Tutorial Project
+ZH:	教程项目
+
+Waiting Action Title
+EN:	6 Tutorial: Create a project
+ZH:	6 教程：创建项目
+Description
+EN:	Projects are an important part of the organizational system this app uses. A project is anything you are currently working on that requires more than one action step to complete. Projects can be as simple as replacing a lightbulb, (identifying the type of light your fixture needs, going to the store, putting it in the socket) or as complicated as planning a vacation (booking time off, researching hotels, researching flights, etc.). If it takes more than one physical step, it's a project.
+You can create projects on the project lane. Every project you create needs at least one linked action or calendar event. You can also create these from the project page.
+ZH:	项目是本应用组织系统中非常重要的一部分。凡是你正在进行，而且需要一个以上具体行动步骤才能完成的事情，都属于项目。项目可以简单到换一个灯泡（确认灯泡型号、去商店购买、装进灯座），也可以复杂到规划一次假期（请假、查找酒店、查询航班等）。只要需要多个实际行动步骤，它就是一个项目。
+你可以在项目列表中创建项目。每个项目都必须至少关联一项行动或一个日历事件。你也可以直接在项目页面中创建这些内容。
+Waiting Action Title
+EN:	5 Tutorial: Creating a context
+ZH:	5 教程：创建情境
+Linked Project
+EN:	Tutorial Project
+ZH:	教程项目
+
+Waiting Action Title
+EN:	7 Tutorial: The capture drawer and the daily review
+ZH:	7 教程：收件箱与回顾
+Description
+EN:	When you opened the app, you may have noticed the pullout drawer on the right of your screen. On the computer, this drawer can be opened by clicking on the large white handle. On the phone, you can tap the arrows or swipe right. This drawer has a text box so you can capture thoughts, reminders, and information quickly. Whenever you add something to the drawer, it will create a face down card in the drawer. Cards can appear there for other reasons as well. Passed deadlines, projects with no linked actions, and waiting actions which have lost their waiting condition will also appear as face down cards in the drawer.
+You can review these cards by clicking the "review" button. The review system will show them to you one at a time so that you can make decisions about each one. Go to the drawer now and use the review system to link an action to the sample project with no linked actions.
+ZH:	打开应用时，你可能已经注意到屏幕右侧的抽屉。在电脑上，点击白色的大把手即可打开；在手机上，可以点击箭头或向右滑动打开。抽屉里有一个输入框，方便你快速记录想法、提醒或其他信息。每当你输入一条内容，就会在收件箱中生成一张背面朝上的卡片。除此之外，超过截止日期的事项、没有关联行动的项目，以及失去等待条件的等待行动，也都会以背面朝上的卡片出现在收件箱中。
+点击“回顾”按钮即可逐一处理这些卡片。回顾功能会一次显示一张卡片，让你决定如何处理。现在请打开抽屉，使用回顾功能，为那个没有关联行动的示例项目添加一项关联行动。
+Waiting on
+EN:	6 Tutorial: Create a project
+ZH:	6 教程：创建项目
+Linked Project
+EN:	Tutorial Project
+ZH:	教程项目
+
+Waiting Action Title
+EN:	8 Tutorial Final: Habits
+ZH:	8 教程终章：习惯
+Description
+EN:	None of this organizational system would work without habits. Habits are here defined as an automatic behaviour which is triggered by a cue. For example, when you here the notification sound on your cellphone, you automatically reach to check your text messages. The Getting Things Done system requires you to make a habit of checking your contextual lists when you're in the right context, as well as regularly submitting and reviewing items in your intray.
+This app has a robust habit tracking system which helps you build the habits you want. Go to the habit lane and try to create your own habit. Remember to enter a cue in the box. Alternatively, you can use the hook icon to make another habit the cue for your new habit.
+ZH:	没有习惯，这套组织系统就无法真正发挥作用。这里所说的“习惯”，是指由提示（cue）触发的自动行为。例如，当你听到手机通知铃声时，就会下意识地拿起手机查看消息。《搞定》（Getting Things Done）系统要求你养成这样的习惯：当处于相应情境时查看情境清单，并定期把事项放进收件箱，再通过回顾进行整理。
+本应用提供了完整的习惯追踪系统，帮助你培养想养成的习惯。请前往习惯列表，尝试创建一个属于自己的习惯。记得在输入框中填写提示（cue）。你也可以使用挂钩图标，把另一个习惯设为这个新习惯的提示（cue）。
+Waiting on
+EN:	7 Tutorial: The capture drawer and the daily review
+ZH:	7 教程：收件箱与回顾
+Linked Project
+EN:	Tutorial Project
+ZH:	教程项目
+
+Project Title
+EN:	Tutorial
+ZH:	教程
+Description
+EN:	This project is a tutorial on how to use this app. Each of its linked actions is a different stage in the tutorial. You can see them listed below. You can also see these actions listed in the red and yellow lanes when you leave this page.
+ZH:	这个项目就是本应用的使用教程。每一项关联行动都对应教程中的一个步骤，你可以在下方看到它们。离开这个页面后，也可以在红色和黄色列表中找到这些行动。
+
+Project Title
+EN:	Sample stalled project.
+ZH:	示例停滞项目
+Description
+EN:	This project is a sample project intended for use in the tutorial. Its purpose is to get caught in the daily review during step 7 of the tutorial.
+ZH:	这是一个供教程使用的示例项目。它没有关联行动，因此会在教程第 7 步中出现在回顾功能里，供你练习处理。
+
+Next Actions lane — info
+EN:	This lane is for "next actions" and "contexts." A next action is the single next physical step you need to move something forward. It is not a whole project, only the next action you can take in a project.
+ZH:	这个列表用于存放“下一步行动”和“情境”。“下一步行动”是推进一件事情所需要采取的下一个具体行动。它不是整个项目，而只是这个项目当前可以执行的下一步。
+
+Next Actions lane — info (continued, "context" explainer)
+EN:	A "context" is a recurring place or time which offers you the opportunity to take an action. Here, we have created contextual lists, so you can group all your "at computer" and "getting off work" actions together.
+ZH:	“情境”是指反复出现、适合执行某项行动的地点或时机。在这里，你可以创建情境清单，把所有“在电脑前”或“下班后”才能完成的行动整理到一起。
+
+Waiting On lane — info
+EN:	A waiting action is something you can't act on yet because it depends on something else—a reply from someone, a delivery, a decision, another action getting done, or a future event. Use the left arrow to promote a waiting action to the next action list, or hook it to a next action so it will promote automatically. Actions in a context will promote to their sibling context in the next action list.
+ZH:	“等待行动”是指暂时还不能开始，因为它需要等待其他事情完成，例如等待他人回复、等待快递送达、等待决定、等待另一项行动完成，或等待将来的某个事件。你可以点击左箭头，把等待行动移到“下一步行动”列表；也可以把它关联到一项“下一步行动”，这样条件满足后，它就会自动移过去。属于某个情境的等待行动，也会自动移到“下一步行动”列表中对应的情境。
+
+Current Projects lane — info
+EN:	A project is anything that takes more than one action to complete. It could be as simple as returning a library book or as involved as planning a vacation. Current projects should always have at least one step tied to them to prevent them from being stalled. This step might be an action, a waiting action, or even an event on the calendar.
+ZH:	凡是需要一个以上行动步骤才能完成的事情，都属于项目。它可以简单到归还一本图书馆的书，也可以复杂到规划一次假期。当前项目应始终至少关联一个步骤，以免陷入停滞。这个步骤可以是一项行动、一项等待行动，甚至是一个日历事件。
+
+Someday / Future lane — info
+EN:	This lane is for projects you're not committed to starting yet. Review this list at least once a month to keep the dreams alive.
+ZH:	这个列表用于存放那些你还不打算开始，但又不想放弃的项目。至少每个月回顾一次，让这些想法始终保留下来。
+
+Habits lane — info
+EN:	A habit is an automatic behaviour which is triggered by a cue. It's easiest to build habits when you're doing them at least once a week. Type in a cue when you're creating a habit or use the habit hook to create habit stacks in which one habit is the cue for the next habit in the stack.
+ZH:	习惯是由提示（cue）触发的自动行为。如果一项行为每周至少会发生一次，通常最容易养成习惯。创建习惯时，请填写一个提示（cue）；也可以使用习惯挂钩，把多个习惯串联起来，让前一个习惯成为后一个习惯的提示（cue）。
+
+Habits lane — info (continued, personal-bests explainer)
+EN:	Some apps track streaks, but everyone misses a habit occasionally. We don't track streaks here, but we do track personal bests. If you break your streak, then maybe you'll have a new personal best to beat. After all: 'It's more important to be persistent than it is to be consistent.' – Rebecca
+ZH:	有些应用会记录连续完成天数，但每个人偶尔都会中断。这里不记录连续天数，而是记录你的个人最佳。就算连续记录中断了，你也只是多了一个新的个人最佳可以挑战。毕竟：“坚持下去，比从不中断更重要。”——Rebecca
+
+Notes lane — info
+EN:	This lane is for notes. It's useful for keeping track of ideas, links, email addresses, and assorted reference materials related to current and future projects.
+ZH:	这个列表用于存放笔记。你可以在这里记录与当前项目和将来项目有关的想法、链接、电子邮件地址，以及各种参考资料。
+
+Intray — info
+EN:	The intray is a tray that holds everything that needs dealing with. Stalled projects, overdue deadlines, and waiting actions which have lost their waiting condition, all belong here. You can use the text box to quickly add thoughts or reminders if you don't have time to add them to the proper list. You can sort through and process everything using the tray's review feature.
+ZH:	收件箱用于集中存放所有需要处理的事项。停滞的项目、已过截止日期的事项，以及失去等待条件的等待行动，都会出现在这里。如果一时来不及把想法或提醒整理到合适的列表，可以先用输入框快速记下来。之后再通过收件箱的“回顾”功能，逐项整理并处理。
+
+Daily review — "past due" decision
+EN:	This was due and the moment has passed. Push it to a new date, tick it if it's actually done, delete it if it's dead — or Not now to see it again next time.
+ZH:	这件事的截止时间已经过去了。可以把它改到新的日期；如果实际上已经完成，就勾选完成；如果已经不用做了，就删除；或者选择“暂不处理”，下次回顾时再处理。
+
+Daily review — "stalled project" decision
+EN:	This is a project with no way forward. Add the next physical step, a waiting action, or an event to keep it going, or move it to Someday if continuing the project isn't possible or practical. You can always come back to it in the future.
+ZH:	这个项目目前没有任何推进方式。请添加下一步行动、一项等待行动或一个日历事件，让项目继续推进；如果暂时不适合继续，也可以把它移到“将来”列表。以后随时都可以再回来处理。
+
+Daily review — "orphaned waiting" decision
+EN:	This was waiting on something that no longer exists. Point it at something else, replace it with a note to yourself, promote it if you can act now, or close it out.
+ZH:	这项等待行动原本依赖的条件已经不存在了。你可以把它改为等待其他事情、改成一条笔记、如果现在已经可以执行就把它移到“下一步行动”，或者直接结束它。
+
+Daily review — "missed repeat" decision
+EN:	A repeating thing whose day went by without being ticked. Often you did it and forgot to say so — 'I did it' records it on the day it happened. 'Let it go' clears it without pretending you did. Only the most recent one is ever kept, so this never piles up.
+ZH:	这是一项重复事项，它的执行日期已经过去，但还没有勾选完成。很多时候其实已经做了，只是忘了记录。“我做了”会把完成记录补到实际发生的那一天；“算了吧”则会直接清除这次记录，而不会假装已经完成。系统始终只保留最近的一次，因此不会越积越多。
+
+Daily review — "capture / new thought" decision
+EN:	A stray thought you haven't filed yet. Send it to a lane — or Not now to leave it for later.
+ZH:	这是一个还没有整理的零散想法。把它放到合适的列表中，或者选择“暂不处理”，留到以后再整理。
+

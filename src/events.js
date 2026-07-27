@@ -443,22 +443,12 @@ function eventTitleClashes(title, exceptEventId){
   });
 }
 
-// Sample events seeded alongside the sample tasks (§4.16 references a calendar,
-// so the seed set gives it something to show). Each mints its taskId now.
+// No sample events (author correction): disposable demo filler duplicated the
+// tutorial's job, same reasoning that already removed the generic filler
+// sample TASKS (Email Sarah, Website relaunch, etc. — see seedData in app.js)
+// before this — the calendar's equivalent just got missed in that pass.
 function seedEvents(){
-  const t = boundaryNow();
-  function iso(offsetDays){ const d = new Date(t.getFullYear(), t.getMonth(), t.getDate()); d.setDate(d.getDate() + offsetDays); return dateToStr(d); }
-  state.events = [
-    { id: genId(), taskId: genId(), title: "Dentist", date: iso(2), time: "14:30",
-      notesClean: "Cleaning + check-up", recurrence: "none", interval: 1, paused: false,
-      contextId: null, linkedProjectId: null, seriesId: null, tickler: false, completedOccs: [] },
-    { id: genId(), taskId: genId(), title: "Pay rent", date: iso(5), time: null,
-      notesClean: "", recurrence: "monthly", interval: 1, paused: false,
-      contextId: null, linkedProjectId: null, seriesId: genId(), tickler: false, completedOccs: [] },
-    { id: genId(), taskId: genId(), title: "Renew passport", date: iso(20), time: null,
-      notesClean: "Set-and-forget — off the calendar until it's due", recurrence: "none", interval: 1, paused: false,
-      contextId: null, linkedProjectId: null, seriesId: null, tickler: true, completedOccs: [] }
-  ];
+  state.events = [];
   saveEvents();
 }
 

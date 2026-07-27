@@ -940,6 +940,12 @@ footer{ text-align:center; color:var(--text-soft); font-size:11.5px; padding:30p
   overscroll-behavior:contain;
 }
 body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; }
+/* The 2-min quick-done page: no header (author ruling — just the capture's
+   text and two buttons), so it centers itself instead of sitting under one. */
+.quickdone-body{ justify-content:center; align-items:center; text-align:center; gap:24px; padding-top:15vh; }
+.quickdone-text{ font-size:17px; font-weight:600; color:var(--text-primary); }
+.quickdone-btns{ display:flex; gap:10px; width:100%; max-width:280px; }
+.quickdone-btns .btn{ flex:1 1 0; }
 .screen-field-title{
   width:100%; border:1px solid rgba(255,255,255,0.16); background:rgba(255,255,255,0.05);
   color:var(--text-primary); font-family:var(--font-body); font-weight:600; font-size:16px;
@@ -1222,33 +1228,74 @@ body.has-frame .tray-drawer::after{
 .review-card .deadline-bar{ margin-right:56px; }
 .review-card-note.cue-orphaned-text{ color:var(--red); }
 .review-menu{ display:flex; flex-direction:column; gap:7px; }
-.review-menu-row{ display:flex; }
+/* Split to the two bottom corners (author ruling) — Not now stays bottom-left,
+   Delete goes bottom-right. ⚑ Both modes now: desktop used to centre this row
+   and add 27px above it, which suited the old single-wide-row card; with the
+   chips wrapping 6 + 2 the corners read the same on both, so the @media
+   override is gone. */
+.review-menu-row{ display:flex; gap:8px; justify-content:space-between; }
 .review-menu-btn{ text-align:left; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.05);
   color:var(--text-primary); border-radius:8px; padding:10px 12px; font-size:14px; cursor:pointer; }
 .review-menu-btn:hover{ background:rgba(255,255,255,0.1); }
 .review-menu-btn.danger{ color:var(--red); border-color:rgba(194,74,61,0.45); }
-.review-menu-btn.review-notnow{ color:var(--text-soft); border-style:dashed; }
-.review-sort-chips{ display:flex; flex-wrap:wrap; gap:7px; }
-.review-sort-chips .review-menu-btn{ flex:1 0 auto; text-align:center; padding:9px 14px; }
+.review-menu-btn.review-notnow{ color:#fff; border-style:dashed; background:rgba(255,255,255,0.11); }
+/* Grey button, red text — deliberately NOT .danger, which also tints the
+   border. Same red as "Restore app to defaults" (settings-item.danger),
+   author-specified. */
+.review-menu-btn.review-delete-text{ color:var(--red); }
+/* Flex, with a deterministic percentage flex-basis rather than a content-based
+   one: exactly 3 fit per row regardless of viewport width (the earlier
+   flex-basis:96px version let content size decide how many fit, which
+   silently dropped to 2-per-row on a narrower phone — QA: author's actual
+   phone). `justify-content:center` is free with flex (grid can't do it without
+   restructuring the markup): rows 1–2 use the full width so it's invisible
+   there, but row 3 (Calendar + 2 min, only 2 of 3 slots) centers itself
+   instead of sitting flush left (author correction).
+   The markup order is pair-major (Next/Waiting, Project/Future, Habit/Note —
+   see app.js), which is what DESKTOP wants read left to right; PHONE wants a
+   different on-screen order — column-major, reproducing the tab bar's actual
+   shape (three side-by-side stacked pairs read as two ROWS of three: Next/
+   Project/Habit over Waiting/Future/Note) — so phone gets there via `order`
+   below rather than a second markup order. Desktop's own arrangement (all six
+   lane chips on row 1, Calendar + 2 min on row 2) lives in the @media block
+   (styles.css ~1000px), which re-bases the six to 1/6 and cancels these order
+   values to DOM order. Same three-row SHAPE in both modes, different split. */
+.review-sort-chips{ display:flex; flex-wrap:wrap; justify-content:center; gap:7px; }
+.review-sort-chips .review-menu-btn{ flex:0 0 calc((100% - 14px) / 3); min-width:0; text-align:center; padding:9px 14px; }
+/* Lane-colored border (unchanged) + white text on the SAME tint formula the
+   tab bar already uses for its own resting/unselected state (styles.css
+   .tab: color-mix 34% over transparent) — author correction: saturation
+   wasn't the problem, the color-mix(...,gray) fill was just too bright/solid;
+   this is dimmer AND already an established, precedented look elsewhere in
+   the app rather than a new one. */
+.review-sort-chips .review-menu-btn[data-target="next"]     { order:1; border-color:var(--red);    background:color-mix(in srgb, var(--red) 34%, transparent);    color:#fff; }
+.review-sort-chips .review-menu-btn[data-target="current"]  { order:2; border-color:var(--forest); background:color-mix(in srgb, var(--forest) 34%, transparent); color:#fff; }
+.review-sort-chips .review-menu-btn[data-target="habit"]    { order:3; border-color:var(--purple); background:color-mix(in srgb, var(--purple) 34%, transparent); color:#fff; }
+.review-sort-chips .review-menu-btn[data-target="waiting"]  { order:4; border-color:var(--yellow); background:color-mix(in srgb, var(--yellow) 34%, transparent); color:#fff; }
+.review-sort-chips .review-menu-btn[data-target="future"]   { order:5; border-color:var(--royal);  background:color-mix(in srgb, var(--royal) 34%, transparent);  color:#fff; }
+.review-sort-chips .review-menu-btn[data-target="notes"]    { order:6; border-color:var(--teal);   background:color-mix(in srgb, var(--teal) 34%, transparent);   color:#fff; }
+.review-sort-chips .review-menu-btn[data-target="calendar"] { order:7; border-color:var(--brass);  background:color-mix(in srgb, var(--brass) 34%, transparent);  color:#fff; }
+.review-sort-chips .review-menu-btn[data-target="quickdone"]{ order:8; background:rgba(255,255,255,0.11); }
 .review-inline-form{ display:flex; flex-direction:column; gap:8px; }
 .review-form-input{ border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.06); color:var(--text-primary);
   border-radius:8px; padding:10px 12px; font-size:15px; }
 .review-form-input:focus{ outline:2px solid var(--brass); outline-offset:1px; }
 .review-form-input.field-invalid{ outline:1.5px dashed var(--red); outline-offset:2px; }
-.review-inline-form-btns{ display:flex; gap:8px; flex-wrap:wrap; }
-/* Three buttons now (Full page → · Cancel · Add) rather than two, so they need a
-   floor to sit on: below it they wrap instead of squeezing the labels to ellipses
-   on a narrow phone. */
-.review-inline-form-btns .review-menu-btn{ flex:1 1 96px; text-align:center; }
-/* Add is the unmistakable primary action (author ruling): filled, rightmost.
-   Full page → is the escape hatch, deliberately de-emphasized and moved to the
-   far side of the row, away from Add, so it stops getting fat-fingered when the
-   user means Add. Cancel sits between them — an unambiguous adjacency next to
-   Add, unlike the escape hatch it replaced there. */
-.review-inline-form-btns .review-menu-btn.review-form-primary{
+/* Two rows, stacked: Cancel/Add (controls over the quick-add field itself —
+   keep or go back) on top, Open drafting page (a different kind of control —
+   more options for this action) below, spanning both. Author ruling: the two
+   groups answer different questions, so they get different rows, but Open
+   drafting page does not need a different color to read as separate — the
+   position already says that. */
+.review-inline-form-btns{ display:flex; flex-direction:column; gap:8px; }
+.review-inline-form-btns-row{ display:flex; gap:8px; }
+.review-inline-form-btns-row .review-menu-btn{ flex:1 1 0; text-align:center; }
+/* Add is the unmistakable primary action (author ruling): filled, on the
+   right. Cancel sits to its left, under the quick-add field. */
+.review-inline-form-btns-row .review-menu-btn.review-form-primary{
   background:var(--brass); color:var(--dark-on-accent); border-color:transparent; font-weight:600; }
-.review-inline-form-btns .review-menu-btn.review-form-primary:hover{ filter:brightness(1.08); }
-.review-inline-form-btns .review-menu-btn.review-form-full{ color:var(--text-soft); border-style:dashed; }
+.review-inline-form-btns-row .review-menu-btn.review-form-primary:hover{ filter:brightness(1.08); }
+.review-inline-form-btns .review-menu-btn.review-form-full{ text-align:center; width:100%; }
 /* Redaction: visible-but-sealed. You can see one more loop exists and count
    them; you cannot read or tap it (§4.8b). */
 .review-redaction{ height:56px; border-radius:10px; border:1px solid rgba(255,255,255,0.08);
@@ -1956,6 +2003,9 @@ body.screen-open #tray-handle{ display:none; }
   /* Project pages carry the staged-actions machinery and need the room. */
   .screen-overlay[data-kind="current"] .screen-card,
   .screen-overlay[data-kind="future"] .screen-card{ width:min(880px, 100%); }
+  /* ⚑ The review card is back on the base 700px (author): the widening to 780px
+     existed ONLY to fit the capture card's 8-chip single row, and that row is
+     gone — desktop now wraps to 6 + 2, closer to phone. No override needed. */
   /* ⚑ The calendar is visually a popup and structurally the SAME screen (ruling
      6). Widening the card is only half of it: the month grid is sized against
      .screen-body's 640px column, so that column has to widen for this screen
@@ -2034,6 +2084,44 @@ body.screen-open #tray-handle{ display:none; }
   /* The band is on the viewport now, not on main's box — so the lanes must NOT
      also pad themselves in by the same amount. */
   body.has-frame .lanes{ padding:0; }
+
+  /* --- the review's capture card: three rows, 6 / 2 / 2 (author) ---
+     Was one grouped 8-chip row on a widened card. That row is what forced the
+     780px card, and it read nothing like the phone. Desktop now mirrors phone's
+     SHAPE (lane chips, then Calendar + 2 min, then Not now / Delete) while
+     keeping its own arrangement of the lane chips: phone stacks them 3 + 3,
+     desktop puts all six on one row, because desktop's lanes are three
+     permanent side-by-side columns rather than a paged tab bar.
+
+     Phone's `order` is cancelled so the pair-major DOM order (Next/Waiting,
+     Project/Future, Habit/Note) reads left to right as-is — the same adjacency
+     desktop's own column headers show side by side, with a wider gap between
+     the three pairs than within one. */
+  .review-sort-chips{ display:flex; flex-wrap:wrap; justify-content:center; }
+  .review-sort-chips .review-menu-btn{ flex:0 1 auto; }
+  /* [data-target] (attribute-exists) matches every chip, INCLUDING quickdone
+     — same specificity as the mobile rules' [data-target="x"] selectors, so
+     this wins the cascade tie by source order instead of losing outright to a
+     plain .review-menu-btn reset (lower specificity always loses regardless
+     of order). */
+  .review-sort-chips .review-menu-btn[data-target]{ order:0; }
+  /* The six lane chips take a deterministic percentage basis, exactly as phone
+     does for its 1/3 — content-based widths would let a long label decide how
+     many fit and silently drop one to the next row. 7px × 5 gaps + 20px × 2
+     pair margins = 75px of fixed space, +3px of rounding slack. Calendar and
+     2 min keep flex:0 1 auto (above) and so wrap to row 2 at their natural
+     width, centred by justify-content. */
+  .review-sort-chips .review-menu-btn[data-target="next"],
+  .review-sort-chips .review-menu-btn[data-target="waiting"],
+  .review-sort-chips .review-menu-btn[data-target="current"],
+  .review-sort-chips .review-menu-btn[data-target="future"],
+  .review-sort-chips .review-menu-btn[data-target="habit"],
+  .review-sort-chips .review-menu-btn[data-target="notes"]{ flex:0 0 calc((100% - 78px) / 6); }
+  .review-sort-chips .review-menu-btn[data-target="waiting"],
+  .review-sort-chips .review-menu-btn[data-target="future"]{ margin-right:20px; }
+  /* Note ends row 1 — a trailing separator with nothing after it, and its
+     margin would still count toward the line's width and push Note onto row 2. */
+  .review-sort-chips .review-menu-btn[data-target="notes"]{ margin-right:0; }
 }
 
 /* The frame's desktop geometry: pinned to the viewport, over the header, under
@@ -2165,7 +2253,7 @@ body.screen-open #tray-handle{ display:none; }
 (function(){
 "use strict";
 
-const BUILD_STAMP = "26 Jul 03:04";  // replaced by build.py
+const BUILD_STAMP = "27 Jul 17:24";  // replaced by build.py
 
 // =========================================================
 // STORAGE ADAPTER (spec.md §3, known issue 4)
@@ -2732,12 +2820,15 @@ const STRINGS = {
   "review.habit":            { en: "Habit",                         "zh-Hans": "习惯" },
   "review.note":             { en: "Note",                          "zh-Hans": "笔记" },
   "review.calendar":         { en: "Calendar",                      "zh-Hans": "日历" },
+  "review.twoMin":           { en: "2 min",                         "zh-Hans": "2分钟" },
   "review.infoNextLabel":    { en: "Next:",                         "zh-Hans": "下一步：" },
   "review.infoWaitingLabel": { en: "Waiting:",                      "zh-Hans": "等待：" },
   "review.infoProjectLabel": { en: "Project:",                      "zh-Hans": "项目：" },
   "review.infoFutureLabel":  { en: "Future:",                       "zh-Hans": "将来：" },
   "review.infoHabitLabel":   { en: "Habit:",                        "zh-Hans": "习惯：" },
   "review.infoNoteLabel":    { en: "Note:",                         "zh-Hans": "笔记：" },
+  "review.infoTwoMinLabel":  { en: "2 min:",                        "zh-Hans": "2分钟：" },
+  "review.infoTwoMinText":   { en: "If you can get something done in 2 minutes, you should do it right away instead of recording it.", "zh-Hans": "如果一件事两分钟内就能做完，直接去做就好，不用特地记下来。" },
   "review.infoPastDueLabel": { en: "Past its date:",                "zh-Hans": "已过期：" },
   "review.infoStalledLabel": { en: "Stalled project:",              "zh-Hans": "停滞的项目：" },
   "review.infoOrphanedLabel": { en: "Waiting on something gone:",   "zh-Hans": "在等一个已经不存在的东西：" },
@@ -2745,6 +2836,8 @@ const STRINGS = {
   "review.noWayForward":     { en: "no way forward",                "zh-Hans": "没有下一步" },
   "review.iDidIt":           { en: "I did it",                      "zh-Hans": "我做完了" },
   "review.letItGo":          { en: "Let it go",                     "zh-Hans": "不管了" },
+  "review.quickDoneComplete": { en: "Complete",                     "zh-Hans": "完成" },
+  "review.quickDoneBack":    { en: "Back",                          "zh-Hans": "返回" },
   "review.wentByOn":         { en: "went by on",                    "zh-Hans": "已过期，日期是" },
   "review.withoutTicking":   { en: "without being ticked",          "zh-Hans": "但没有勾选" },
   "review.markDone":         { en: "Mark done",                     "zh-Hans": "标记完成" },
@@ -5725,7 +5818,6 @@ function injectChunkMap(){
     tags: [],       // chunk 6 (§4.9b): notes-only tag registry, { id, name } — mirrors gtd_contexts
     notesFilter: null, // chunk 6 (§4.9): transient project-OR-tag-id filter on the Notes lane
     notesFilterMenuOpen: false,
-    reviewShowAll: false, // chunk 6b (§4.8b): reveal-one-at-a-time vs "Show all"
     reviewDeferred: {}, // chunk 6b (§4.8b, user follow-up): in-memory "Not now" set — scoped to the CURRENTLY-OPEN review, cleared on every fresh open (not the app-day)
     trayReveal: false, // chunk 6b (user follow-up): captures are redacted in the drawer by default; this un-seals them for one drawer session
     qaTimeOffset: 0 // dev-only: MINUTES added to boundaryNow() (chunk 0c: hour/minute granular, not just whole days — the midnight-4am window (§4.14b) can only be tested by landing the clock inside it) — see the QA time-jump buttons
@@ -9972,17 +10064,21 @@ function injectChunkMap(){
     const root = qs("#screen-root");
     lockBodyScroll(!!s);
     if (!s){ root.innerHTML = ""; return; }
-    const key = (s.completedView ? "completed:" : s.reviewView ? "review:" : s.calendarView ? "calendar:" : "") + s.kind + ":" + (s.taskId || "new");
+    const key = (s.completedView ? "completed:" : s.reviewView ? "review:" : s.calendarView ? "calendar:" : s.quickDoneView ? "quickdone:" : "") + s.kind + ":" + (s.taskId || "new");
     // The desktop footer is appended to the two page shapes that have something
     // to commit or delete. The review and the calendar have neither — the
-    // review closes with its own ✕, the calendar with its ←.
+    // review closes with its own ✕, the calendar with its ←. quickDoneView has
+    // neither either — no header at all (author ruling: literally the capture's
+    // text and two buttons), so no footer to match.
     const inner = s.completedView
       ? completedHeaderHtml(s) + completedBodyHtml(s) + screenFooterHtml(s, "completed")
       : s.reviewView
         ? reviewHeaderHtml() + reviewBodyHtml(s)
         : s.calendarView
           ? calendarHeaderHtml(s) + calendarBodyHtml(s)
-          : screenHeaderHtml(s) + screenBodyHtml(s) + screenFooterHtml(s, "edit");
+          : s.quickDoneView
+            ? quickDoneBodyHtml(s)
+            : screenHeaderHtml(s) + screenBodyHtml(s) + screenFooterHtml(s, "edit");
     const existing = root.querySelector(".screen-overlay");
     if (existing && existing.getAttribute("data-screen-key") === key){
       // Same item re-rendering (hook added, day chip toggled, Complete
@@ -10458,7 +10554,6 @@ function injectChunkMap(){
       if (e.target.closest('[data-action="review-info"]')){
         const panel = qs(".review-info-panel"); if (panel) panel.hidden = !panel.hidden; return;
       }
-      if (e.target.closest('[data-action="review-toggle-all"]')){ state.reviewShowAll = !state.reviewShowAll; renderScreen(); return; }
       const revDefer = e.target.closest('[data-action="review-defer"]');
       if (revDefer){ deferReviewItem(revDefer.getAttribute("data-key")); if (state.screen) state.screen.reviewForm = null; renderScreen(); return; }
       const revOpen = e.target.closest('[data-action="review-open"]');
@@ -10527,6 +10622,12 @@ function injectChunkMap(){
       if (revPromote){ moveItem("waiting", "next", revPromote.getAttribute("data-id"), false); renderScreen(); return; }
       const revSort = e.target.closest('[data-action="review-sort"]');
       if (revSort){ reviewSortCapture(revSort.getAttribute("data-target"), revSort.getAttribute("data-key")); return; }
+      const revQuickDone = e.target.closest('[data-action="review-quickdone"]');
+      if (revQuickDone){ reviewQuickDone(revQuickDone.getAttribute("data-key")); return; }
+      const revDeleteCapture = e.target.closest('[data-action="review-delete-capture"]');
+      if (revDeleteCapture){ reviewDeleteCapture(revDeleteCapture.getAttribute("data-key")); return; }
+      if (e.target.closest('[data-action="quickdone-back"]')){ closeScreen(); return; }
+      if (e.target.closest('[data-action="quickdone-complete"]')){ quickDoneComplete(); return; }
 
       // CHUNK 2 (spec 4.3e) -- close the FAB menu on any click that isn't
       // the FAB itself or one of its own items. A side effect, not a
@@ -12117,7 +12218,6 @@ function injectChunkMap(){
 
   function openReviewScreen(){
     state.reviewDeferred = {}; // a fresh review always starts with everything on the table
-    state.reviewShowAll = false;
     state.screen = { kind: "review", reviewView: true, taskId: null, draft: {}, reviewForm: null };
     renderScreen();
   }
@@ -12161,7 +12261,8 @@ function injectChunkMap(){
           '<b>' + escapeHtml(t("review.infoProjectLabel")) + '</b> ' + escapeHtml(LANE_INFO.current) + '<br>' +
           '<b>' + escapeHtml(t("review.infoFutureLabel")) + '</b> ' + escapeHtml(LANE_INFO.future) + '<br>' +
           '<b>' + escapeHtml(t("review.infoHabitLabel")) + '</b> ' + escapeHtml(LANE_INFO.habit) + '<br>' +
-          '<b>' + escapeHtml(t("review.infoNoteLabel")) + '</b> ' + escapeHtml(LANE_INFO.notes) +
+          '<b>' + escapeHtml(t("review.infoNoteLabel")) + '</b> ' + escapeHtml(LANE_INFO.notes) + '<br>' +
+          '<b>' + escapeHtml(t("review.infoTwoMinLabel")) + '</b> ' + escapeHtml(t("review.infoTwoMinText")) +
         '</div>' +
         // ⚑ Was "Deciding on an open loop" / "Orphaned waiting" (user: "open
         // loop is jargon from the book. It should be changed"). Both were terms
@@ -12189,6 +12290,12 @@ function injectChunkMap(){
   function reviewNotNowBtn(key){
     return '<button type="button" class="review-menu-btn review-notnow" data-action="review-defer" data-key="' + key + '">' + escapeHtml(t("review.notNow")) + '</button>';
   }
+  // Grey button, red text only (author ruling — distinct from .danger, which
+  // also tints the border; captures is the pattern the other three decision
+  // menus will be brought in line with next, so this is the new baseline).
+  function reviewCaptureDeleteBtn(key){
+    return '<button type="button" class="review-menu-btn review-delete-text" data-action="review-delete-capture" data-key="' + key + '">' + escapeHtml(t("review.delete")) + '</button>';
+  }
   // The active inline sub-form (Push date / Add next action / Free text) for
   // this card, if any. One at a time, held on the screen (draft-free — these
   // are review decisions, applied immediately, not armed edits).
@@ -12197,11 +12304,14 @@ function injectChunkMap(){
   // to open the full creation page from the daily review, since there are options
   // someone might want to add to their newly minted action."
   //
-  // So the quick-add is the default and the full page is the escape hatch beside
+  // So the quick-add is the default and the full page is the escape hatch below
   // it, carrying whatever has already been typed. It is NOT a fourth menu item:
   // the fence (§4.8b) says the review offers decisions, and "add a next action" is
   // already the decision — which page you type it on is not a second choice to
-  // make before you have typed anything.
+  // make before you have typed anything. It sits on its own row, separate from
+  // Cancel/Add: those two answer "keep this or go back," this one answers "do I
+  // want more options for this action" — a different kind of control, not a
+  // third peer alongside them (author ruling).
   //
   // The full page goes through reviewOpenChild, so save-exiting lands back on the
   // review and the queue recomputes (the project drops out if it now has a way
@@ -12221,9 +12331,11 @@ function injectChunkMap(){
           ? '<input type="text" readonly inputmode="none" id="review-form-input" data-field="reviewForm" placeholder="' + escapeHtml(t("field.pickDate")) + '" class="review-form-input review-form-date' + (invalid ? " field-invalid" : "") + '" value="' + escapeHtml(value || "") + '">'
           : '<input type="text" id="review-form-input" data-field="reviewForm" class="review-form-input' + (invalid ? " field-invalid" : "") + '" placeholder="' + escapeHtml(placeholder) + '" value="' + escapeHtml(value || "") + '" autocomplete="off">') +
         '<div class="review-inline-form-btns">' +
+          '<div class="review-inline-form-btns-row">' +
+            '<button type="button" class="review-menu-btn" data-action="review-form-cancel">' + escapeHtml(t("review.cancel")) + '</button>' +
+            '<button type="button" class="review-menu-btn review-form-primary" data-action="' + saveAction + '">' + saveLabel + '</button>' +
+          '</div>' +
           (fullKind ? reviewFullPageBtn(fullKind, projectId) : "") +
-          '<button type="button" class="review-menu-btn" data-action="review-form-cancel">' + escapeHtml(t("review.cancel")) + '</button>' +
-          '<button type="button" class="review-menu-btn review-form-primary" data-action="' + saveAction + '">' + saveLabel + '</button>' +
         '</div>' +
       '</div>'
     );
@@ -12245,9 +12357,11 @@ function injectChunkMap(){
         box("review-form-input", t("review.whatWaitingOn"), f.value, "title") +
         box("review-form-input2", t("review.untilWhatWhen"), f.value2, "when") +
         '<div class="review-inline-form-btns">' +
+          '<div class="review-inline-form-btns-row">' +
+            '<button type="button" class="review-menu-btn" data-action="review-form-cancel">' + escapeHtml(t("review.cancel")) + '</button>' +
+            '<button type="button" class="review-menu-btn review-form-primary" data-action="review-addwaiting-save">' + escapeHtml(t("review.add")) + '</button>' +
+          '</div>' +
           reviewFullPageBtn("waiting", key) +
-          '<button type="button" class="review-menu-btn" data-action="review-form-cancel">' + escapeHtml(t("review.cancel")) + '</button>' +
-          '<button type="button" class="review-menu-btn review-form-primary" data-action="review-addwaiting-save">' + escapeHtml(t("review.add")) + '</button>' +
         '</div>' +
       '</div>'
     );
@@ -12258,6 +12372,19 @@ function injectChunkMap(){
     let bodyHtml = "", menuHtml = "";
     if (l.kind === "capture"){
       bodyHtml = '<div class="review-card-title">' + escapeHtml(l.text) + '</div>';
+      // DOM order is pair-major (Next/Waiting, Project/Future, Habit/Note —
+      // same adjacency as index.html's .tab-pair groups and desktop's
+      // COLUMN_PAIRS), because that's the order the DESKTOP layout wants
+      // on-screen (its column headers show each pair side by side). Phone
+      // wants a DIFFERENT on-screen order — its tab bar reads column-major,
+      // top row then bottom row (Next/Project/Habit over Waiting/Future/Note,
+      // since the three .tab-pair columns sit side by side, each stacked
+      // vertically) — so phone gets there via CSS `order` (styles.css), not by
+      // reshuffling this markup. One DOM, two visual arrangements. Each lane
+      // chip is colored to its lane's --lane-accent (styles.css tab map);
+      // Calendar takes --brass (accentVarForKind); 2 min carries data-target
+      //="quickdone" purely as a CSS order/selector hook — it sorts nothing and
+      // stays uncolored, like Not now / Delete below it.
       menuHtml =
         '<div class="review-sort-chips">' +
           reviewMenuBtn("review-sort", t("review.next"), ' data-target="next" data-key="' + l.key + '"') +
@@ -12267,8 +12394,9 @@ function injectChunkMap(){
           reviewMenuBtn("review-sort", t("review.habit"), ' data-target="habit" data-key="' + l.key + '"') +
           reviewMenuBtn("review-sort", t("review.note"), ' data-target="notes" data-key="' + l.key + '"') +
           reviewMenuBtn("review-sort", t("review.calendar"), ' data-target="calendar" data-key="' + l.key + '"') + // chunk 7 (§4.8b): the sixth chip
+          reviewMenuBtn("review-quickdone", t("review.twoMin"), ' data-target="quickdone" data-key="' + l.key + '"') +
         '</div>' +
-        '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + '</div>';
+        '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewCaptureDeleteBtn(l.key) + '</div>';
       return '<div class="review-card review-card-capture">' + bodyHtml + menuHtml + '</div>';
     }
     // A rolled-past repeating occurrence (user ruling). Handled before the shared
@@ -12389,13 +12517,15 @@ function injectChunkMap(){
             '<div class="review-end-sub">' + escapeHtml(t("review.nothingSlipping")) + '</div></div>';
       return html + '</div>';
     }
-    const showAll = !!state.reviewShowAll;
+    // ⚑ "Show all" is gone (author). Once the review has started, revealing the
+    // whole queue is not a thing anyone needs — and the redaction (§4.8b) only
+    // does its job if there is no button beside it offering to undo it. The
+    // count stays; it is information, not an escape hatch.
     if (active.length > 1){
-      html += '<div class="review-toolbar"><span class="review-remaining">' + active.length + ' ' + escapeHtml(t("review.toReview")) + '</span>' +
-        '<button type="button" class="btn btn-ghost btn-small" data-action="review-toggle-all">' + escapeHtml(showAll ? t("review.oneAtATime") : t("review.showAll")) + '</button></div>';
+      html += '<div class="review-toolbar"><span class="review-remaining">' + active.length + ' ' + escapeHtml(t("review.toReview")) + '</span></div>';
     }
     active.forEach(function(l, i){
-      html += (showAll || i === 0) ? reviewCardHtml(l, s) : reviewRedactionHtml();
+      html += (i === 0) ? reviewCardHtml(l, s) : reviewRedactionHtml();
     });
     return html + '</div>';
   }
@@ -12540,6 +12670,61 @@ function injectChunkMap(){
       } else if (target === "notes"){ openNoteScreen(null, { title: text, fromCaptureId: key }); }
       else { openScreen(target, null, { title: text }); if (state.screen) state.screen.fromCaptureId = key; }
     });
+  }
+  // The 2-minute-rule chip (author ruling): a capture that's faster to just do
+  // than to file. Opens a bare confirm page — no header, just the capture's
+  // text and Complete/Back — rather than sorting into a lane at all.
+  function reviewQuickDone(key){
+    const capture = (state.tray || []).find(function(t){ return t.id === key; });
+    if (!capture) { renderScreen(); return; }
+    const text = capture.text;
+    reviewOpenChild(function(){
+      state.screen = { kind: "next", quickDoneView: true, taskId: null, draft: {}, quickDoneText: text, fromCaptureId: key };
+      renderScreen();
+    });
+  }
+  // Complete arms nothing here — quickDoneView is not a drafting surface, it's
+  // a two-button confirm (draft isolation §-exempt the same way the list
+  // checkbox and the missed card's "I did it" are: an immediate action, not an
+  // armed one). Reuses createTask + completeTask so a quick-done item is, in
+  // every way the app can tell, an ordinary completed Next Action.
+  function quickDoneComplete(){
+    const s = state.screen;
+    if (!s || !s.quickDoneView) return;
+    const text = (s.quickDoneText || "").trim();
+    if (!text){ closeScreen(); return; }
+    createTask("next", { title: text }).then(function(task){
+      completeTask("next", task.id);
+      consumeCaptureForScreen(s);
+      closeScreen();
+    });
+  }
+  // Delete lives beside Not now because both answer "what to do with this
+  // capture" without filing it anywhere — but delete is data destruction, so
+  // (CLAUDE.md: never accidental) it goes behind the same confirm dialog every
+  // other delete in the review already uses.
+  function reviewDeleteCapture(key){
+    const capture = (state.tray || []).find(function(t){ return t.id === key; });
+    const title = capture ? capture.text : t("confirm.deleteThisItem");
+    openConfirmDialog(t("confirm.deleteTitleForGood").replace("{title}", title), [
+      { label: t("chrome.delete"), style: "danger", action: function(){
+          removeCapture(key);
+          if (state.screen) state.screen.reviewForm = null;
+          renderScreen();
+        } },
+      { label: t("chrome.cancel"), action: function(){} }
+    ]);
+  }
+  function quickDoneBodyHtml(s){
+    return (
+      '<div class="screen-body quickdone-body">' +
+        '<div class="quickdone-text">' + escapeHtml(s.quickDoneText || "") + '</div>' +
+        '<div class="quickdone-btns">' +
+          '<button type="button" class="btn btn-ghost" data-action="quickdone-back">' + escapeHtml(t("review.quickDoneBack")) + '</button>' +
+          '<button type="button" class="btn btn-brass" data-action="quickdone-complete">' + escapeHtml(t("review.quickDoneComplete")) + '</button>' +
+        '</div>' +
+      '</div>'
+    );
   }
 
   // =========================================================
@@ -13827,22 +14012,12 @@ function eventTitleClashes(title, exceptEventId){
   });
 }
 
-// Sample events seeded alongside the sample tasks (§4.16 references a calendar,
-// so the seed set gives it something to show). Each mints its taskId now.
+// No sample events (author correction): disposable demo filler duplicated the
+// tutorial's job, same reasoning that already removed the generic filler
+// sample TASKS (Email Sarah, Website relaunch, etc. — see seedData in app.js)
+// before this — the calendar's equivalent just got missed in that pass.
 function seedEvents(){
-  const t = boundaryNow();
-  function iso(offsetDays){ const d = new Date(t.getFullYear(), t.getMonth(), t.getDate()); d.setDate(d.getDate() + offsetDays); return dateToStr(d); }
-  state.events = [
-    { id: genId(), taskId: genId(), title: "Dentist", date: iso(2), time: "14:30",
-      notesClean: "Cleaning + check-up", recurrence: "none", interval: 1, paused: false,
-      contextId: null, linkedProjectId: null, seriesId: null, tickler: false, completedOccs: [] },
-    { id: genId(), taskId: genId(), title: "Pay rent", date: iso(5), time: null,
-      notesClean: "", recurrence: "monthly", interval: 1, paused: false,
-      contextId: null, linkedProjectId: null, seriesId: genId(), tickler: false, completedOccs: [] },
-    { id: genId(), taskId: genId(), title: "Renew passport", date: iso(20), time: null,
-      notesClean: "Set-and-forget — off the calendar until it's due", recurrence: "none", interval: 1, paused: false,
-      contextId: null, linkedProjectId: null, seriesId: null, tickler: true, completedOccs: [] }
-  ];
+  state.events = [];
   saveEvents();
 }
 
