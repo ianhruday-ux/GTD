@@ -890,7 +890,13 @@ and the settings surface would roughly double that chunk. It gets its own.
 - **Why this beats hiding:** you can see the stack is finite and shrinking. That is the difference
   between a chore and a task, and it makes the empty state land — the stack disappearing card by
   card *is* the reward.
-- **"Show all" toggle** stays as the second escape hatch. The discipline is a default, not a cage.
+- ~~**"Show all" toggle** stays as the second escape hatch. The discipline is a default, not a cage.~~
+  **REMOVED (author, review-surface round).** *"Once the review has started, there is no need for
+  such a button."* The escape hatch belongs to the **drawer** — you may still reveal the captures
+  sitting in the tray before you begin — but not to the review itself, where a button offering to
+  un-redact the queue is a button offering to make the redaction decorative. The remaining-count
+  (`N to review`) stays: it is information, not a hatch. `review.showAll` / `review.oneAtATime`
+  are now dead i18n keys, left in place rather than deleted.
 
 **The review offers decisions, not execution** — with **one deliberate exception, and it is narrower
 than it used to be: the exception is the PSEUDO-ACTION, not the past-due kind.** A past-due

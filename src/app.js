@@ -135,7 +135,6 @@
     tags: [],       // chunk 6 (§4.9b): notes-only tag registry, { id, name } — mirrors gtd_contexts
     notesFilter: null, // chunk 6 (§4.9): transient project-OR-tag-id filter on the Notes lane
     notesFilterMenuOpen: false,
-    reviewShowAll: false, // chunk 6b (§4.8b): reveal-one-at-a-time vs "Show all"
     reviewDeferred: {}, // chunk 6b (§4.8b, user follow-up): in-memory "Not now" set — scoped to the CURRENTLY-OPEN review, cleared on every fresh open (not the app-day)
     trayReveal: false, // chunk 6b (user follow-up): captures are redacted in the drawer by default; this un-seals them for one drawer session
     qaTimeOffset: 0 // dev-only: MINUTES added to boundaryNow() (chunk 0c: hour/minute granular, not just whole days — the midnight-4am window (§4.14b) can only be tested by landing the clock inside it) — see the QA time-jump buttons
@@ -4382,17 +4381,21 @@
     const root = qs("#screen-root");
     lockBodyScroll(!!s);
     if (!s){ root.innerHTML = ""; return; }
-    const key = (s.completedView ? "completed:" : s.reviewView ? "review:" : s.calendarView ? "calendar:" : "") + s.kind + ":" + (s.taskId || "new");
+    const key = (s.completedView ? "completed:" : s.reviewView ? "review:" : s.calendarView ? "calendar:" : s.quickDoneView ? "quickdone:" : "") + s.kind + ":" + (s.taskId || "new");
     // The desktop footer is appended to the two page shapes that have something
     // to commit or delete. The review and the calendar have neither — the
-    // review closes with its own ✕, the calendar with its ←.
+    // review closes with its own ✕, the calendar with its ←. quickDoneView has
+    // neither either — no header at all (author ruling: literally the capture's
+    // text and two buttons), so no footer to match.
     const inner = s.completedView
       ? completedHeaderHtml(s) + completedBodyHtml(s) + screenFooterHtml(s, "completed")
       : s.reviewView
         ? reviewHeaderHtml() + reviewBodyHtml(s)
         : s.calendarView
           ? calendarHeaderHtml(s) + calendarBodyHtml(s)
-          : screenHeaderHtml(s) + screenBodyHtml(s) + screenFooterHtml(s, "edit");
+          : s.quickDoneView
+            ? quickDoneBodyHtml(s)
+            : screenHeaderHtml(s) + screenBodyHtml(s) + screenFooterHtml(s, "edit");
     const existing = root.querySelector(".screen-overlay");
     if (existing && existing.getAttribute("data-screen-key") === key){
       // Same item re-rendering (hook added, day chip toggled, Complete
@@ -4868,7 +4871,6 @@
       if (e.target.closest('[data-action="review-info"]')){
         const panel = qs(".review-info-panel"); if (panel) panel.hidden = !panel.hidden; return;
       }
-      if (e.target.closest('[data-action="review-toggle-all"]')){ state.reviewShowAll = !state.reviewShowAll; renderScreen(); return; }
       const revDefer = e.target.closest('[data-action="review-defer"]');
       if (revDefer){ deferReviewItem(revDefer.getAttribute("data-key")); if (state.screen) state.screen.reviewForm = null; renderScreen(); return; }
       const revOpen = e.target.closest('[data-action="review-open"]');
@@ -4937,6 +4939,12 @@
       if (revPromote){ moveItem("waiting", "next", revPromote.getAttribute("data-id"), false); renderScreen(); return; }
       const revSort = e.target.closest('[data-action="review-sort"]');
       if (revSort){ reviewSortCapture(revSort.getAttribute("data-target"), revSort.getAttribute("data-key")); return; }
+      const revQuickDone = e.target.closest('[data-action="review-quickdone"]');
+      if (revQuickDone){ reviewQuickDone(revQuickDone.getAttribute("data-key")); return; }
+      const revDeleteCapture = e.target.closest('[data-action="review-delete-capture"]');
+      if (revDeleteCapture){ reviewDeleteCapture(revDeleteCapture.getAttribute("data-key")); return; }
+      if (e.target.closest('[data-action="quickdone-back"]')){ closeScreen(); return; }
+      if (e.target.closest('[data-action="quickdone-complete"]')){ quickDoneComplete(); return; }
 
       // CHUNK 2 (spec 4.3e) -- close the FAB menu on any click that isn't
       // the FAB itself or one of its own items. A side effect, not a
@@ -6527,7 +6535,6 @@
 
   function openReviewScreen(){
     state.reviewDeferred = {}; // a fresh review always starts with everything on the table
-    state.reviewShowAll = false;
     state.screen = { kind: "review", reviewView: true, taskId: null, draft: {}, reviewForm: null };
     renderScreen();
   }
@@ -6571,7 +6578,8 @@
           '<b>' + escapeHtml(t("review.infoProjectLabel")) + '</b> ' + escapeHtml(LANE_INFO.current) + '<br>' +
           '<b>' + escapeHtml(t("review.infoFutureLabel")) + '</b> ' + escapeHtml(LANE_INFO.future) + '<br>' +
           '<b>' + escapeHtml(t("review.infoHabitLabel")) + '</b> ' + escapeHtml(LANE_INFO.habit) + '<br>' +
-          '<b>' + escapeHtml(t("review.infoNoteLabel")) + '</b> ' + escapeHtml(LANE_INFO.notes) +
+          '<b>' + escapeHtml(t("review.infoNoteLabel")) + '</b> ' + escapeHtml(LANE_INFO.notes) + '<br>' +
+          '<b>' + escapeHtml(t("review.infoTwoMinLabel")) + '</b> ' + escapeHtml(t("review.infoTwoMinText")) +
         '</div>' +
         // ⚑ Was "Deciding on an open loop" / "Orphaned waiting" (user: "open
         // loop is jargon from the book. It should be changed"). Both were terms
@@ -6599,6 +6607,12 @@
   function reviewNotNowBtn(key){
     return '<button type="button" class="review-menu-btn review-notnow" data-action="review-defer" data-key="' + key + '">' + escapeHtml(t("review.notNow")) + '</button>';
   }
+  // Grey button, red text only (author ruling — distinct from .danger, which
+  // also tints the border; captures is the pattern the other three decision
+  // menus will be brought in line with next, so this is the new baseline).
+  function reviewCaptureDeleteBtn(key){
+    return '<button type="button" class="review-menu-btn review-delete-text" data-action="review-delete-capture" data-key="' + key + '">' + escapeHtml(t("review.delete")) + '</button>';
+  }
   // The active inline sub-form (Push date / Add next action / Free text) for
   // this card, if any. One at a time, held on the screen (draft-free — these
   // are review decisions, applied immediately, not armed edits).
@@ -6607,11 +6621,14 @@
   // to open the full creation page from the daily review, since there are options
   // someone might want to add to their newly minted action."
   //
-  // So the quick-add is the default and the full page is the escape hatch beside
+  // So the quick-add is the default and the full page is the escape hatch below
   // it, carrying whatever has already been typed. It is NOT a fourth menu item:
   // the fence (§4.8b) says the review offers decisions, and "add a next action" is
   // already the decision — which page you type it on is not a second choice to
-  // make before you have typed anything.
+  // make before you have typed anything. It sits on its own row, separate from
+  // Cancel/Add: those two answer "keep this or go back," this one answers "do I
+  // want more options for this action" — a different kind of control, not a
+  // third peer alongside them (author ruling).
   //
   // The full page goes through reviewOpenChild, so save-exiting lands back on the
   // review and the queue recomputes (the project drops out if it now has a way
@@ -6631,9 +6648,11 @@
           ? '<input type="text" readonly inputmode="none" id="review-form-input" data-field="reviewForm" placeholder="' + escapeHtml(t("field.pickDate")) + '" class="review-form-input review-form-date' + (invalid ? " field-invalid" : "") + '" value="' + escapeHtml(value || "") + '">'
           : '<input type="text" id="review-form-input" data-field="reviewForm" class="review-form-input' + (invalid ? " field-invalid" : "") + '" placeholder="' + escapeHtml(placeholder) + '" value="' + escapeHtml(value || "") + '" autocomplete="off">') +
         '<div class="review-inline-form-btns">' +
+          '<div class="review-inline-form-btns-row">' +
+            '<button type="button" class="review-menu-btn" data-action="review-form-cancel">' + escapeHtml(t("review.cancel")) + '</button>' +
+            '<button type="button" class="review-menu-btn review-form-primary" data-action="' + saveAction + '">' + saveLabel + '</button>' +
+          '</div>' +
           (fullKind ? reviewFullPageBtn(fullKind, projectId) : "") +
-          '<button type="button" class="review-menu-btn" data-action="review-form-cancel">' + escapeHtml(t("review.cancel")) + '</button>' +
-          '<button type="button" class="review-menu-btn review-form-primary" data-action="' + saveAction + '">' + saveLabel + '</button>' +
         '</div>' +
       '</div>'
     );
@@ -6655,9 +6674,11 @@
         box("review-form-input", t("review.whatWaitingOn"), f.value, "title") +
         box("review-form-input2", t("review.untilWhatWhen"), f.value2, "when") +
         '<div class="review-inline-form-btns">' +
+          '<div class="review-inline-form-btns-row">' +
+            '<button type="button" class="review-menu-btn" data-action="review-form-cancel">' + escapeHtml(t("review.cancel")) + '</button>' +
+            '<button type="button" class="review-menu-btn review-form-primary" data-action="review-addwaiting-save">' + escapeHtml(t("review.add")) + '</button>' +
+          '</div>' +
           reviewFullPageBtn("waiting", key) +
-          '<button type="button" class="review-menu-btn" data-action="review-form-cancel">' + escapeHtml(t("review.cancel")) + '</button>' +
-          '<button type="button" class="review-menu-btn review-form-primary" data-action="review-addwaiting-save">' + escapeHtml(t("review.add")) + '</button>' +
         '</div>' +
       '</div>'
     );
@@ -6668,6 +6689,19 @@
     let bodyHtml = "", menuHtml = "";
     if (l.kind === "capture"){
       bodyHtml = '<div class="review-card-title">' + escapeHtml(l.text) + '</div>';
+      // DOM order is pair-major (Next/Waiting, Project/Future, Habit/Note —
+      // same adjacency as index.html's .tab-pair groups and desktop's
+      // COLUMN_PAIRS), because that's the order the DESKTOP layout wants
+      // on-screen (its column headers show each pair side by side). Phone
+      // wants a DIFFERENT on-screen order — its tab bar reads column-major,
+      // top row then bottom row (Next/Project/Habit over Waiting/Future/Note,
+      // since the three .tab-pair columns sit side by side, each stacked
+      // vertically) — so phone gets there via CSS `order` (styles.css), not by
+      // reshuffling this markup. One DOM, two visual arrangements. Each lane
+      // chip is colored to its lane's --lane-accent (styles.css tab map);
+      // Calendar takes --brass (accentVarForKind); 2 min carries data-target
+      //="quickdone" purely as a CSS order/selector hook — it sorts nothing and
+      // stays uncolored, like Not now / Delete below it.
       menuHtml =
         '<div class="review-sort-chips">' +
           reviewMenuBtn("review-sort", t("review.next"), ' data-target="next" data-key="' + l.key + '"') +
@@ -6677,8 +6711,9 @@
           reviewMenuBtn("review-sort", t("review.habit"), ' data-target="habit" data-key="' + l.key + '"') +
           reviewMenuBtn("review-sort", t("review.note"), ' data-target="notes" data-key="' + l.key + '"') +
           reviewMenuBtn("review-sort", t("review.calendar"), ' data-target="calendar" data-key="' + l.key + '"') + // chunk 7 (§4.8b): the sixth chip
+          reviewMenuBtn("review-quickdone", t("review.twoMin"), ' data-target="quickdone" data-key="' + l.key + '"') +
         '</div>' +
-        '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + '</div>';
+        '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewCaptureDeleteBtn(l.key) + '</div>';
       return '<div class="review-card review-card-capture">' + bodyHtml + menuHtml + '</div>';
     }
     // A rolled-past repeating occurrence (user ruling). Handled before the shared
@@ -6799,13 +6834,15 @@
             '<div class="review-end-sub">' + escapeHtml(t("review.nothingSlipping")) + '</div></div>';
       return html + '</div>';
     }
-    const showAll = !!state.reviewShowAll;
+    // ⚑ "Show all" is gone (author). Once the review has started, revealing the
+    // whole queue is not a thing anyone needs — and the redaction (§4.8b) only
+    // does its job if there is no button beside it offering to undo it. The
+    // count stays; it is information, not an escape hatch.
     if (active.length > 1){
-      html += '<div class="review-toolbar"><span class="review-remaining">' + active.length + ' ' + escapeHtml(t("review.toReview")) + '</span>' +
-        '<button type="button" class="btn btn-ghost btn-small" data-action="review-toggle-all">' + escapeHtml(showAll ? t("review.oneAtATime") : t("review.showAll")) + '</button></div>';
+      html += '<div class="review-toolbar"><span class="review-remaining">' + active.length + ' ' + escapeHtml(t("review.toReview")) + '</span></div>';
     }
     active.forEach(function(l, i){
-      html += (showAll || i === 0) ? reviewCardHtml(l, s) : reviewRedactionHtml();
+      html += (i === 0) ? reviewCardHtml(l, s) : reviewRedactionHtml();
     });
     return html + '</div>';
   }
@@ -6950,6 +6987,61 @@
       } else if (target === "notes"){ openNoteScreen(null, { title: text, fromCaptureId: key }); }
       else { openScreen(target, null, { title: text }); if (state.screen) state.screen.fromCaptureId = key; }
     });
+  }
+  // The 2-minute-rule chip (author ruling): a capture that's faster to just do
+  // than to file. Opens a bare confirm page — no header, just the capture's
+  // text and Complete/Back — rather than sorting into a lane at all.
+  function reviewQuickDone(key){
+    const capture = (state.tray || []).find(function(t){ return t.id === key; });
+    if (!capture) { renderScreen(); return; }
+    const text = capture.text;
+    reviewOpenChild(function(){
+      state.screen = { kind: "next", quickDoneView: true, taskId: null, draft: {}, quickDoneText: text, fromCaptureId: key };
+      renderScreen();
+    });
+  }
+  // Complete arms nothing here — quickDoneView is not a drafting surface, it's
+  // a two-button confirm (draft isolation §-exempt the same way the list
+  // checkbox and the missed card's "I did it" are: an immediate action, not an
+  // armed one). Reuses createTask + completeTask so a quick-done item is, in
+  // every way the app can tell, an ordinary completed Next Action.
+  function quickDoneComplete(){
+    const s = state.screen;
+    if (!s || !s.quickDoneView) return;
+    const text = (s.quickDoneText || "").trim();
+    if (!text){ closeScreen(); return; }
+    createTask("next", { title: text }).then(function(task){
+      completeTask("next", task.id);
+      consumeCaptureForScreen(s);
+      closeScreen();
+    });
+  }
+  // Delete lives beside Not now because both answer "what to do with this
+  // capture" without filing it anywhere — but delete is data destruction, so
+  // (CLAUDE.md: never accidental) it goes behind the same confirm dialog every
+  // other delete in the review already uses.
+  function reviewDeleteCapture(key){
+    const capture = (state.tray || []).find(function(t){ return t.id === key; });
+    const title = capture ? capture.text : t("confirm.deleteThisItem");
+    openConfirmDialog(t("confirm.deleteTitleForGood").replace("{title}", title), [
+      { label: t("chrome.delete"), style: "danger", action: function(){
+          removeCapture(key);
+          if (state.screen) state.screen.reviewForm = null;
+          renderScreen();
+        } },
+      { label: t("chrome.cancel"), action: function(){} }
+    ]);
+  }
+  function quickDoneBodyHtml(s){
+    return (
+      '<div class="screen-body quickdone-body">' +
+        '<div class="quickdone-text">' + escapeHtml(s.quickDoneText || "") + '</div>' +
+        '<div class="quickdone-btns">' +
+          '<button type="button" class="btn btn-ghost" data-action="quickdone-back">' + escapeHtml(t("review.quickDoneBack")) + '</button>' +
+          '<button type="button" class="btn btn-brass" data-action="quickdone-complete">' + escapeHtml(t("review.quickDoneComplete")) + '</button>' +
+        '</div>' +
+      '</div>'
+    );
   }
 
   // =========================================================

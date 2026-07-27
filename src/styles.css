@@ -914,6 +914,12 @@ footer{ text-align:center; color:var(--text-soft); font-size:11.5px; padding:30p
   overscroll-behavior:contain;
 }
 body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; }
+/* The 2-min quick-done page: no header (author ruling — just the capture's
+   text and two buttons), so it centers itself instead of sitting under one. */
+.quickdone-body{ justify-content:center; align-items:center; text-align:center; gap:24px; padding-top:15vh; }
+.quickdone-text{ font-size:17px; font-weight:600; color:var(--text-primary); }
+.quickdone-btns{ display:flex; gap:10px; width:100%; max-width:280px; }
+.quickdone-btns .btn{ flex:1 1 0; }
 .screen-field-title{
   width:100%; border:1px solid rgba(255,255,255,0.16); background:rgba(255,255,255,0.05);
   color:var(--text-primary); font-family:var(--font-body); font-weight:600; font-size:16px;
@@ -1196,33 +1202,74 @@ body.has-frame .tray-drawer::after{
 .review-card .deadline-bar{ margin-right:56px; }
 .review-card-note.cue-orphaned-text{ color:var(--red); }
 .review-menu{ display:flex; flex-direction:column; gap:7px; }
-.review-menu-row{ display:flex; }
+/* Split to the two bottom corners (author ruling) — Not now stays bottom-left,
+   Delete goes bottom-right. ⚑ Both modes now: desktop used to centre this row
+   and add 27px above it, which suited the old single-wide-row card; with the
+   chips wrapping 6 + 2 the corners read the same on both, so the @media
+   override is gone. */
+.review-menu-row{ display:flex; gap:8px; justify-content:space-between; }
 .review-menu-btn{ text-align:left; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.05);
   color:var(--text-primary); border-radius:8px; padding:10px 12px; font-size:14px; cursor:pointer; }
 .review-menu-btn:hover{ background:rgba(255,255,255,0.1); }
 .review-menu-btn.danger{ color:var(--red); border-color:rgba(194,74,61,0.45); }
-.review-menu-btn.review-notnow{ color:var(--text-soft); border-style:dashed; }
-.review-sort-chips{ display:flex; flex-wrap:wrap; gap:7px; }
-.review-sort-chips .review-menu-btn{ flex:1 0 auto; text-align:center; padding:9px 14px; }
+.review-menu-btn.review-notnow{ color:#fff; border-style:dashed; background:rgba(255,255,255,0.11); }
+/* Grey button, red text — deliberately NOT .danger, which also tints the
+   border. Same red as "Restore app to defaults" (settings-item.danger),
+   author-specified. */
+.review-menu-btn.review-delete-text{ color:var(--red); }
+/* Flex, with a deterministic percentage flex-basis rather than a content-based
+   one: exactly 3 fit per row regardless of viewport width (the earlier
+   flex-basis:96px version let content size decide how many fit, which
+   silently dropped to 2-per-row on a narrower phone — QA: author's actual
+   phone). `justify-content:center` is free with flex (grid can't do it without
+   restructuring the markup): rows 1–2 use the full width so it's invisible
+   there, but row 3 (Calendar + 2 min, only 2 of 3 slots) centers itself
+   instead of sitting flush left (author correction).
+   The markup order is pair-major (Next/Waiting, Project/Future, Habit/Note —
+   see app.js), which is what DESKTOP wants read left to right; PHONE wants a
+   different on-screen order — column-major, reproducing the tab bar's actual
+   shape (three side-by-side stacked pairs read as two ROWS of three: Next/
+   Project/Habit over Waiting/Future/Note) — so phone gets there via `order`
+   below rather than a second markup order. Desktop's own arrangement (all six
+   lane chips on row 1, Calendar + 2 min on row 2) lives in the @media block
+   (styles.css ~1000px), which re-bases the six to 1/6 and cancels these order
+   values to DOM order. Same three-row SHAPE in both modes, different split. */
+.review-sort-chips{ display:flex; flex-wrap:wrap; justify-content:center; gap:7px; }
+.review-sort-chips .review-menu-btn{ flex:0 0 calc((100% - 14px) / 3); min-width:0; text-align:center; padding:9px 14px; }
+/* Lane-colored border (unchanged) + white text on the SAME tint formula the
+   tab bar already uses for its own resting/unselected state (styles.css
+   .tab: color-mix 34% over transparent) — author correction: saturation
+   wasn't the problem, the color-mix(...,gray) fill was just too bright/solid;
+   this is dimmer AND already an established, precedented look elsewhere in
+   the app rather than a new one. */
+.review-sort-chips .review-menu-btn[data-target="next"]     { order:1; border-color:var(--red);    background:color-mix(in srgb, var(--red) 34%, transparent);    color:#fff; }
+.review-sort-chips .review-menu-btn[data-target="current"]  { order:2; border-color:var(--forest); background:color-mix(in srgb, var(--forest) 34%, transparent); color:#fff; }
+.review-sort-chips .review-menu-btn[data-target="habit"]    { order:3; border-color:var(--purple); background:color-mix(in srgb, var(--purple) 34%, transparent); color:#fff; }
+.review-sort-chips .review-menu-btn[data-target="waiting"]  { order:4; border-color:var(--yellow); background:color-mix(in srgb, var(--yellow) 34%, transparent); color:#fff; }
+.review-sort-chips .review-menu-btn[data-target="future"]   { order:5; border-color:var(--royal);  background:color-mix(in srgb, var(--royal) 34%, transparent);  color:#fff; }
+.review-sort-chips .review-menu-btn[data-target="notes"]    { order:6; border-color:var(--teal);   background:color-mix(in srgb, var(--teal) 34%, transparent);   color:#fff; }
+.review-sort-chips .review-menu-btn[data-target="calendar"] { order:7; border-color:var(--brass);  background:color-mix(in srgb, var(--brass) 34%, transparent);  color:#fff; }
+.review-sort-chips .review-menu-btn[data-target="quickdone"]{ order:8; background:rgba(255,255,255,0.11); }
 .review-inline-form{ display:flex; flex-direction:column; gap:8px; }
 .review-form-input{ border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.06); color:var(--text-primary);
   border-radius:8px; padding:10px 12px; font-size:15px; }
 .review-form-input:focus{ outline:2px solid var(--brass); outline-offset:1px; }
 .review-form-input.field-invalid{ outline:1.5px dashed var(--red); outline-offset:2px; }
-.review-inline-form-btns{ display:flex; gap:8px; flex-wrap:wrap; }
-/* Three buttons now (Full page → · Cancel · Add) rather than two, so they need a
-   floor to sit on: below it they wrap instead of squeezing the labels to ellipses
-   on a narrow phone. */
-.review-inline-form-btns .review-menu-btn{ flex:1 1 96px; text-align:center; }
-/* Add is the unmistakable primary action (author ruling): filled, rightmost.
-   Full page → is the escape hatch, deliberately de-emphasized and moved to the
-   far side of the row, away from Add, so it stops getting fat-fingered when the
-   user means Add. Cancel sits between them — an unambiguous adjacency next to
-   Add, unlike the escape hatch it replaced there. */
-.review-inline-form-btns .review-menu-btn.review-form-primary{
+/* Two rows, stacked: Cancel/Add (controls over the quick-add field itself —
+   keep or go back) on top, Open drafting page (a different kind of control —
+   more options for this action) below, spanning both. Author ruling: the two
+   groups answer different questions, so they get different rows, but Open
+   drafting page does not need a different color to read as separate — the
+   position already says that. */
+.review-inline-form-btns{ display:flex; flex-direction:column; gap:8px; }
+.review-inline-form-btns-row{ display:flex; gap:8px; }
+.review-inline-form-btns-row .review-menu-btn{ flex:1 1 0; text-align:center; }
+/* Add is the unmistakable primary action (author ruling): filled, on the
+   right. Cancel sits to its left, under the quick-add field. */
+.review-inline-form-btns-row .review-menu-btn.review-form-primary{
   background:var(--brass); color:var(--dark-on-accent); border-color:transparent; font-weight:600; }
-.review-inline-form-btns .review-menu-btn.review-form-primary:hover{ filter:brightness(1.08); }
-.review-inline-form-btns .review-menu-btn.review-form-full{ color:var(--text-soft); border-style:dashed; }
+.review-inline-form-btns-row .review-menu-btn.review-form-primary:hover{ filter:brightness(1.08); }
+.review-inline-form-btns .review-menu-btn.review-form-full{ text-align:center; width:100%; }
 /* Redaction: visible-but-sealed. You can see one more loop exists and count
    them; you cannot read or tap it (§4.8b). */
 .review-redaction{ height:56px; border-radius:10px; border:1px solid rgba(255,255,255,0.08);
@@ -1930,6 +1977,9 @@ body.screen-open #tray-handle{ display:none; }
   /* Project pages carry the staged-actions machinery and need the room. */
   .screen-overlay[data-kind="current"] .screen-card,
   .screen-overlay[data-kind="future"] .screen-card{ width:min(880px, 100%); }
+  /* ⚑ The review card is back on the base 700px (author): the widening to 780px
+     existed ONLY to fit the capture card's 8-chip single row, and that row is
+     gone — desktop now wraps to 6 + 2, closer to phone. No override needed. */
   /* ⚑ The calendar is visually a popup and structurally the SAME screen (ruling
      6). Widening the card is only half of it: the month grid is sized against
      .screen-body's 640px column, so that column has to widen for this screen
@@ -2008,6 +2058,44 @@ body.screen-open #tray-handle{ display:none; }
   /* The band is on the viewport now, not on main's box — so the lanes must NOT
      also pad themselves in by the same amount. */
   body.has-frame .lanes{ padding:0; }
+
+  /* --- the review's capture card: three rows, 6 / 2 / 2 (author) ---
+     Was one grouped 8-chip row on a widened card. That row is what forced the
+     780px card, and it read nothing like the phone. Desktop now mirrors phone's
+     SHAPE (lane chips, then Calendar + 2 min, then Not now / Delete) while
+     keeping its own arrangement of the lane chips: phone stacks them 3 + 3,
+     desktop puts all six on one row, because desktop's lanes are three
+     permanent side-by-side columns rather than a paged tab bar.
+
+     Phone's `order` is cancelled so the pair-major DOM order (Next/Waiting,
+     Project/Future, Habit/Note) reads left to right as-is — the same adjacency
+     desktop's own column headers show side by side, with a wider gap between
+     the three pairs than within one. */
+  .review-sort-chips{ display:flex; flex-wrap:wrap; justify-content:center; }
+  .review-sort-chips .review-menu-btn{ flex:0 1 auto; }
+  /* [data-target] (attribute-exists) matches every chip, INCLUDING quickdone
+     — same specificity as the mobile rules' [data-target="x"] selectors, so
+     this wins the cascade tie by source order instead of losing outright to a
+     plain .review-menu-btn reset (lower specificity always loses regardless
+     of order). */
+  .review-sort-chips .review-menu-btn[data-target]{ order:0; }
+  /* The six lane chips take a deterministic percentage basis, exactly as phone
+     does for its 1/3 — content-based widths would let a long label decide how
+     many fit and silently drop one to the next row. 7px × 5 gaps + 20px × 2
+     pair margins = 75px of fixed space, +3px of rounding slack. Calendar and
+     2 min keep flex:0 1 auto (above) and so wrap to row 2 at their natural
+     width, centred by justify-content. */
+  .review-sort-chips .review-menu-btn[data-target="next"],
+  .review-sort-chips .review-menu-btn[data-target="waiting"],
+  .review-sort-chips .review-menu-btn[data-target="current"],
+  .review-sort-chips .review-menu-btn[data-target="future"],
+  .review-sort-chips .review-menu-btn[data-target="habit"],
+  .review-sort-chips .review-menu-btn[data-target="notes"]{ flex:0 0 calc((100% - 78px) / 6); }
+  .review-sort-chips .review-menu-btn[data-target="waiting"],
+  .review-sort-chips .review-menu-btn[data-target="future"]{ margin-right:20px; }
+  /* Note ends row 1 — a trailing separator with nothing after it, and its
+     margin would still count toward the line's width and push Note onto row 2. */
+  .review-sort-chips .review-menu-btn[data-target="notes"]{ margin-right:0; }
 }
 
 /* The frame's desktop geometry: pinned to the viewport, over the header, under
