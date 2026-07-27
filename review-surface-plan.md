@@ -175,6 +175,9 @@ card next to it is a compact three-row grid. They do not look like the same prod
 
 ## 5. Item B — the proposal, and where desktop and phone must differ
 
+**RULED (author): the three-band structure is adopted.** Build to it. The two corrections the author
+made when accepting it are recorded in §5a below and are binding.
+
 **RULED (author): desktop and phone will probably need different interface choices here.** They
 already do, and §1's capture card is the working template for how: **one DOM, one *shape*, two
 arrangements via CSS.** The capture card proves the pattern — identical markup produces 3+3+2 on
@@ -212,6 +215,34 @@ Making the capture card's chip grid **band 1 of the same shape** — rather than
 the move that makes "standardised" true rather than cosmetic. Its bottom band is already the target
 pattern.
 
+### 5a. The correction the author made when adopting this (binding)
+
+The claim above — that the capture card already *is* the three-band shape — **was overstated, and
+the author caught it.** On the capture card, **Calendar and 2 min share row 2**, but they belong to
+different bands: Calendar is the seventh sorting destination (band 1), while 2 min means "off the
+list, I just did it" (band 2). So row 2 straddles a band boundary.
+
+**What actually produces that row is wrapping arithmetic, not structure.** Seven sorting chips do
+not divide into rows of six, so Calendar spills onto row 2 and 2 min follows it. On phone the same
+thing happens with rows of three. The pairing is an accident that *looks* like grouping.
+
+This does not sink the model, but it does mean the capture card needs one small change to stop
+being a counter-example to the pattern it is supposed to demonstrate:
+
+- **Adopt (recommended):** mark the band boundary inside row 2 with a **gap** — `Calendar` · gap ·
+  `2 min` — reusing the exact device the row already uses to separate the three lane pairs (the
+  20px `margin-right` on desktop). Costs no extra row, keeps the layout the author just approved,
+  and makes the structure honest. Applies to both phone and desktop.
+- **Rejected alternative, recorded so it is not re-proposed:** read 2 min as an *eighth destination*
+  ("where does this go? nowhere — I did it"), making the capture card all band 1 with no band 2.
+  Internally coherent, but it contradicts the existing styling ruling that 2 min is deliberately
+  **uncoloured because it sorts nothing** (styles.css `[data-target="quickdone"]`, app.js ~6705).
+  Taking this option would mean reopening that decision too.
+
+**Do not let a band boundary fall silently inside a wrapped row anywhere else either.** Any band
+whose controls wrap needs the boundary marked, or the grouping the bands exist to communicate is
+invisible exactly where it matters most.
+
 ### Do this first, regardless of what §5 becomes
 
 These four are pure convergence, carry no design risk, and shrink the surface the redesign has to
@@ -228,11 +259,10 @@ cover. They can ship in one small commit **before** the author rules on the shap
 
 ## 6. Open questions — for the author, do not invent answers
 
-- **Q1. Which verb differences are meaningful?** `Let it go` (missed occurrence) vs `Complete` vs
-  `Mark done` vs `I did it`: `I did it` and `Mark done` look like pure drift and should merge, but
-  `Let it go` is arguably a *different decision* — "this didn't happen and won't" — with no
-  equivalent on other kinds. Flattening it to `Delete` would lose real meaning. **Author must rule
-  which pairs are duplicates and which are distinct.**
+- **Q1. Which verb differences are meaningful?** *(partly resolved — see §6a.)* `I did it` and
+  `Mark done` still look like pure drift and should merge. **`Let it go` is now confirmed distinct
+  and must NOT be merged into `Delete`** — §6a has the evidence. What remains open is only its
+  *label*, which the author has called too long.
 - **Q2. Does the three-band shape in §5 survive contact with the author's intent?** It is a
   proposal, inferred from the capture card. Confirm before building.
 - **Q3. Does the past-due *pseudo-action* need its own info string,** or does `info.review.pastdue`
@@ -242,6 +272,54 @@ cover. They can ship in one small commit **before** the author rules on the shap
   much closer to phone. Is "as close to the phone as the width allows" the standing rule for the
   whole surface, or does desktop get to use its width more aggressively (horizontal bands, §5)?
   These pull in opposite directions and the answer shapes §5.
+
+## 6a. `Let it go` — what it actually is (verified against the build)
+
+Established by reading `events.js` ~231–262 and `app.js` `reviewMissedClear` ~6931; recorded so the
+label decision is made against facts rather than memory.
+
+- **It only ever appears for a REPEATING event.** The miss is recorded inside the recurrence
+  roll-forward: when a repeating occurrence's whole app-day passes unticked, the app stores that
+  date in `ev.missedOcc` and advances the series. A **one-off** event never gets a `missedOcc` — it
+  keeps its pseudo-action and reaches the review as *past its date* instead. So the author's
+  recollection is correct.
+- **One slot only.** A newer miss overwrites an older unhandled one, so a month of ignored dailies
+  produces **one** card, not thirty.
+- **It clears the miss without recording a completion**, so it never counts as something achieved.
+  It destroys nothing — the series is untouched and the occurrence had already been rolled past —
+  which is why it is the one review action with no confirm dialog, and why the standing
+  data-destruction rule does not apply.
+- **Therefore it is a skip, not a delete.** `Delete` on this card would have to mean killing the
+  whole repeating series; `Let it go` means "this one instance didn't happen, and that's fine."
+  Genuinely different decisions. Merging them would be a data-loss bug wearing a tidy-up's clothes.
+
+**It is described in the info text**, and the description names both buttons in quotes:
+
+> `info.review.missed` — "A repeating thing whose day went by without being ticked. Often you did it
+> and forgot to say so — **'I did it'** records it on the day it happened. **'Let it go'** clears it
+> without pretending you did. Only the most recent one is ever kept, so this never piles up."
+
+**So renaming the button means editing that sentence too, in BOTH languages.** A rename that leaves
+the info text quoting a button that no longer exists is worse than no rename.
+
+**Label candidates** (author's call): `Skip` is shortest and matches the mental model, but breaks
+the `I did it` / `Let it go` symmetry; `I didn't` keeps the symmetry and stays short but reads as
+self-blame; `Didn't happen` is the most precise and still shorter than today's. Recommendation:
+`Skip` (`跳过`), with the info text rewritten to explain the pairing rather than rely on it.
+
+### ⚑ Separate defect found while checking this — the Chinese info text quotes the wrong buttons
+
+`info.review.missed` (zh-Hans) quotes button labels that **do not match the actual Chinese
+buttons**:
+
+| | button says | info text quotes |
+| --- | --- | --- |
+| `review.iDidIt` | 我做完了 | 「我做了」 |
+| `review.letItGo` | 不管了 | 「算了吧」 |
+
+The English pair matches exactly; only the Chinese drifted. A Chinese user is told to press a button
+that is not on screen. **This is a live bug independent of everything else in this document** — fix
+it whether or not the rename happens (and fold it in if it does).
 
 ## 7. Traps
 
