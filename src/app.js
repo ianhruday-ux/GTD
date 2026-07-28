@@ -2842,7 +2842,12 @@
       // over free text, and a Waiting action never carries a deadline.
       d.deadline = null;
       if (d.conditionId){ d.whenText = ""; }
-      if (!d.conditionId && !(d.whenText || "").trim()){
+      // ⚑ BUG FIX (author): this ran even with Complete armed, so a waiting
+      // action with an empty/cleared condition could never be completed --
+      // Save just re-rejected it as an invalid edit. A completing item is
+      // being retired, not kept alive on some ongoing wait; it needs no
+      // condition at all. Skip the requirement when willComplete is armed.
+      if (!d.willComplete && !d.conditionId && !(d.whenText || "").trim()){
         s.invalidField = "waitingFor";
         renderScreen();
         return;
