@@ -13,13 +13,78 @@
 > Whoever fixes it: re-read the whole zh-Hans `info.review.*` block for the same class of drift, not
 > just this one string.
 
-**Status: nothing in §3–§6 or §8 is built.** This records the author's rulings from the
-review-surface conversation (2026-07-27) and the survey work done alongside them, so a later session
-can build without re-deriving any of it. Where it says **RULED**, the author decided it; where it
-says **builder's call**, pick the simplest option and flag it in the handoff (CLAUDE.md).
+**Status: §1 is BUILT and committed. Nothing in §3–§6 or §8–§10 is built.** This records the
+author's rulings from the review-surface conversation (2026-07-27) and the survey work done
+alongside them, so a later session can build without re-deriving any of it. Where it says **RULED**,
+the author decided it; where it says **builder's call**, pick the simplest option and flag it in the
+handoff (CLAUDE.md).
 
-**§8 is unrelated to the review** — it is the Advanced button, noticed in the same conversation and
-parked here rather than in a document of its own. It can be built independently and in any order.
+**Only §2–§7 are about the review.** §8 (the Advanced button), §9 (the habit bubble) and §10 (the
+desktop calendar) are unrelated items noticed in the same conversation and parked here rather than
+in documents of their own.
+
+---
+
+## 0. START HERE — handoff, build order, and what is still open
+
+This document was written for a **fresh session that has none of the conversation behind it.** Every
+factual claim in it was measured or read against the build, not remembered; where a claim was later
+found wrong, the correction is inline and marked, and **the correction wins over anything earlier in
+the document that contradicts it.**
+
+### Read in this order
+
+1. `CLAUDE.md` — in particular the golden rule, draft isolation, and the two-questions rule.
+2. `spec.md` §4.8b for anything in §2–§7 here; §4.13–§4.16 for anything in §9–§10.
+3. This document's §0, then only the section you are building.
+
+### Suggested build order
+
+Each row is independently shippable and independently revertable. Nothing forces this order except
+the one dependency called out below.
+
+| # | work | size | notes |
+| --- | --- | --- | --- |
+| 1 | **MUST FIX banner above** — zh-Hans `info.review.missed` | tiny | Independent of everything. Do it first; it is a live bug in shipped text. |
+| 2 | §5 "Do this first" — the four convergence items | small | No design risk; shrinks what the §5 redesign has to cover. |
+| 3 | §3 — scope the review's ⓘ to the revealed card | small | Self-contained. Watch the DOM-only panel-state trap. |
+| 4 | §9 — the habit bubble's ✕ | small | Touches the same control stack as #6. |
+| 5 | §6a — rename `Let it go` → `Skipped` (+ its info text, both languages) | small | Supersedes #1 if done together; **do not leave it half-done.** |
+| 6 | **§10 — the two-column desktop calendar** | **large** | The biggest item, and the only one fixing a bug users hit today. **Carries §8's desktop half.** |
+| 7 | §8 — Advanced reposition + contrast | small | Phone half is independent; **desktop half is part of #6 and must not be built separately.** |
+| 8 | §5 + §5a — the three-band redesign of the four non-capture cards | medium | The most design-sensitive. Do it last, once #2 has cleared the noise. |
+
+**The one hard dependency:** §8's desktop placement for `More options` is *"top of the left-hand
+control column"* — a column that does not exist until §10 is built. Build §10 first, or build only
+§8's phone half.
+
+### Still open — ask the author, do not decide these alone
+
+`Q1` (partly), `Q3`, `Q4`, `Q5`, `Q6` in §6; `Q8` in §8.5; the reserve-height call in §10.5.
+**Resolved and closed:** Q2, Q7, Q9.
+
+### What was already built and committed this round
+
+§1 only: the desktop capture card's 6/2/2 layout with half-row spacing, and the removal of "Show
+all". Both are in `dist/` and in `spec.md`. Everything else here is plan.
+
+### ⚠ Testing gotcha — the service worker will show you a stale build
+
+Chunk 9 shipped, so `dist/sw.js` is live and **cache-first: for page loads it returns the cached
+`index.html` without asking the network** (src/sw.js, the `req.mode === "navigate"` branch). A hard
+reload does **not** help — the worker intercepts that too. This cost real time in the round that
+produced this document: a change was built, committed and verified in the file, and the author still
+saw the old UI.
+
+- **To see a fresh build reliably: use a private/incognito window,** where no worker is registered.
+  Serving on a *different port* also works, since the origin includes the port.
+- Automated checks are unaffected — Playwright contexts start clean — so **a screenshot from a
+  check script and what the author sees in their browser can legitimately disagree.** If the author
+  reports "I don't see it," verify the served bytes before you start debugging your own change.
+- CLAUDE.md predicted exactly this when it scheduled the worker last. It is not a bug; it is the
+  cost of having shipped it.
+
+---
 
 Read with `spec.md` §4.8b (the daily review) and `src/app.js` `reviewCardHtml` / `reviewBodyHtml`
 (~line 6690 onward), plus the `.review-*` block in `src/styles.css` (~1193–1260 base, ~2060–2100
@@ -444,9 +509,8 @@ first-pass → final so the reasoning survives:
      button.** Note this is a different place from the original "top of the controls" instruction:
      the toggle sits above `.cal-create-controls`, so the button leaves the control stack entirely
      and pairs with the segmented control instead.
-   - **DESKTOP — open**, and bound up with the calendar-layout question in §10. The author has no
-     preferred location; whichever §10 layout is chosen should supply one. Do not place it on
-     desktop before §10 is settled.
+   - **DESKTOP — RULED via §10.4:** top of the **left-hand control column** in the two-column
+     calendar. It has no separate existence from that layout; build it as part of §10.
    - **⚑ RULED (author): keep the row of space it vacates.** *"When you move the More options
      button, leave the extra row of space at the bottom of the page. The control panel should have a
      bit of a margin on both the phone and computer."* So this is **not** a pure move — the control
@@ -543,7 +607,7 @@ deliberate, so verify rather than assume.
 
 ---
 
-# 9. The "Make this a habit instead" bubble — findings, premise NOT yet confirmed
+# 9. The "Make this a habit instead" bubble — RESOLVED, ready to build
 
 Raised by the author (2026-07-27): *"That's a useful feature that got hidden when we changed the
 calendar. IIRC, when you selected repeat daily or weekly a little dismissible bubble would pop up
@@ -551,9 +615,10 @@ over the recurrence field asking if you want to make it a habit instead. It inte
 creation process. Currently, that bubble lives on the full page only, and you usually only see it
 after you've created the event."*
 
-**⚠ Do not build from that premise yet.** It is half-confirmed and half-contradicted by the build,
-and the difference decides what the work actually is. Findings below were produced by driving the
-real app, not by reading.
+**That premise turned out to be half-confirmed and half-contradicted by the build** — see §9.1. The
+author has since ruled on the outcome (§9.2), so this section **is** buildable now; the findings are
+kept because they explain why the build is a two-line change rather than a rebuild. Everything below
+was produced by driving the real app, not by reading.
 
 ## 9.1 What the build does today (verified)
 
@@ -594,19 +659,28 @@ positioning and phone-keyboard overlap is therefore **moot** — kept only so no
 popover. The draft-isolation and dismissal-scope items in §9.3 **still apply**, because they are
 about the ✕, not about the form.
 
-## 9.3 If (a) — things a popover build must not break
+## 9.3 Building the ✕
+
+**Applies to the ruled build:**
 
 - **Draft isolation (CLAUDE.md).** `cal-make-habit` → `calMakeHabit()` converts what is being drafted
-  into a habit. A dismissible popover adds a new piece of *drafting-page* state; dismissal must not
-  persist anything, and ✕ on the calendar must discard it like every other control.
-- **Where does "dismissed" live, and how long?** Per-draft (comes back next time you pick daily) is
-  almost certainly right and is the simplest; anything longer needs a storage key and an answer for
-  what Reset does to it. Flag whatever you choose.
-- **Phone.** The quick-add sits in a narrow column with the keyboard possibly up; a popover over the
-  recurrence field must not cover the field you are about to use, and must not need a precise tap
-  to dismiss. (See the pending phone-UX notes about keyboard/viewport behaviour.)
+  into a habit. The ✕ adds a new piece of *drafting-page* state; **dismissal must not persist
+  anything**, and ✕ on the calendar screen must discard it like every other control.
+- **Where does "dismissed" live, and how long?** Per-draft — it comes back next time you pick daily
+  — is almost certainly right and is the simplest. Anything longer needs a storage key and an answer
+  for what Reset does to it. Flag whatever you choose.
 - **Do not touch instance 2.** The event page's edit-only offer is correct as it is — the comment at
-  events.js ~1131 explains why (`makeHabitFromEvent` needs a real event).
+  events.js ~1131 explains why (`makeHabitFromEvent` needs a real event). The ✕ is for the calendar
+  quick-add's copy.
+- **The ✕ must not be mistaken for the bubble's own action.** The bubble is itself a button
+  (`cal-make-habit`); putting a second control inside it means a tap near the right edge must
+  dismiss, not convert. Precedent to copy: `.bundle-pill-wrap` (styles.css ~1106) already solves
+  exactly this — a pill button with a separate clearing ✕ beside it, as two siblings rather than one
+  nested inside the other. Use that shape.
+
+**Moot under the ruling, kept only so the popover is not re-proposed:** floating/absolute
+positioning over the recurrence field, and the phone-keyboard overlap that a popover would have
+created there.
 
 ## 9.4 Interaction with §8 — ✅ resolved: there is no conflict
 
@@ -687,15 +761,16 @@ off-screen** — the name field, the Event/Deadline toggle, and the **Add button
 fold. You cannot add anything to the calendar without scrolling first, on the most common laptop
 size there is. That is the real bug; the tall squares are how it happens.
 
-## 10.3 Proposals — put to the author
+## 10.3 Proposals — ✅ answered in §10.4; kept for the reasoning
 
 Three, in the conversation. Whichever is chosen must also answer **where `More options` goes on
 desktop** (§8.2), which is why the two questions were put together.
 
-- **A — Two columns: grid left, controls right.** Card widens (~1040px); the create panel becomes a
-  right-hand column beside the grid instead of a stack beneath it; cells become wide rectangles
-  rather than near-squares. Fixes height and width at once, matches how every desktop calendar
-  looks, and gives `More options` an obvious home at the top of the control column. Biggest change.
+- **A — Two columns. ✅ CHOSEN.** Card widens (~1040px); the create panel becomes a column beside the
+  grid instead of a stack beneath it; cells become wide rectangles rather than near-squares. Fixes
+  height and width at once, matches how every desktop calendar looks, and gives `More options` an
+  obvious home at the top of the control column. Biggest change. *(As offered, this said grid-left /
+  controls-right; the author then reversed the columns — see §10.4, which is authoritative.)*
 - **B — Minimal: size the cells from the available height.** Keep the single column; derive
   `--cal-cell-w` from a viewport-height budget rather than a fixed 660px width cap, so six rows
   always fit and the controls come back above the fold. Smallest change, closest to the phone —
@@ -710,10 +785,14 @@ scroll; every change here belongs in the ≥1000px block.
 
 ## 10.4 ⚑ RULED — Proposal A, with wide cells
 
-**RULED (author): Proposal A — two columns, grid left, create panel right. Cells become wide
-rectangles (~92 × 58), keeping the full width and cutting the height.**
+**RULED (author): Proposal A — two columns. Cells become wide rectangles (~92 × 58), keeping the
+full width and cutting the height.**
 
-This also settles the open half of §8.2: **`More options` goes at the top of the right-hand control
+**⚑ COLUMN ORDER CORRECTED (author, after choosing A): the CONTROLS go on the LEFT and the calendar
+on the RIGHT** — the reverse of the mockup that was chosen. The mockup showed grid-left; the ruling
+is controls-left. Where the two disagree, **this line wins.**
+
+This also settles the open half of §8.2: **`More options` goes at the top of the left-hand control
 column on desktop.** Phone keeps its own answer (right of the Event/Deadline toggle, above Add).
 
 ### Target geometry
@@ -723,11 +802,32 @@ column on desktop.** Phone keeps its own answer (right of the Event/Deadline tog
 | calendar card width | 900px | ~1040px |
 | cell | 92 × 105 | **92 × 58** |
 | six rows of grid | 539px | **~363px** |
-| `.cal-create` | 280px stacked *below* the grid | a right column *beside* it |
+| `.cal-create` | 280px stacked *below* the grid | a **left** column *beside* it |
 | worst case 1366 × 768 | **overflows by 429px** | must fit with room to spare |
 
-Left column ≈ 660px (the grid keeps its current width — it is only the height that was wrong),
-right column ≈ 340px, plus gap and the card's 26px side padding.
+Left column (controls) ≈ 340px, right column (calendar) ≈ 660px — the grid keeps its current width,
+it was only ever the height that was wrong — plus the gap and the card's 26px side padding.
+
+```
+CARD ~1040px
+┌──────────────────┬─────────────────────────────────────┐
+│  Name…           │  ‹      July 2026            ›      │
+│ ┌──────┬───────┐ │  Sun Mon Tue Wed Thu Fri Sat        │
+│ │Event │Deadln │ │  ┌────┬────┬────┬────┬────┬────┬──┐ │
+│ └──────┴───────┘ │  │    │    │  1 │  2 │  3 │  4 │5 │ │
+│  More options →  │  ├────┼────┼────┼────┼────┼────┼──┤ │
+│  🕐 --:--        │  │  6 │  7 │  8 │  9 │ 10 │ 11 │12│ │
+│  Description…    │  ├────┼────┼────┼────┼────┼────┼──┤ │
+│  🔄 Daily  ev 1  │  │ 13 │ 14 │ 15 │ 16 │ 17 │ 18 │19│ │
+│ ┌──────────────┐ │  ├────┼────┼────┼────┼────┼────┼──┤ │
+│ │Habit instead✕│ │  │ 20 │ 21 │ 22 │ 23 │ 24 │ 25 │26│ │
+│ └──────────────┘ │  ├────┼────┼────┼────┼────┼────┼──┤ │
+│  ☐ Hide until…   │  │ 27 │ 28 │ 29 │ 30 │ 31 │    │  │ │
+│     [ Add ]      │  └────┴────┴────┴────┴────┴────┴──┘ │
+│   ↑ keep bottom  │   wide cells, 92 × 58               │
+│     margin       │                                     │
+└──────────────────┴─────────────────────────────────────┘
+```
 
 ### Build notes
 
@@ -738,16 +838,16 @@ right column ≈ 340px, plus gap and the card's 26px side padding.
   — that is what was tried before and it is why this is still broken.
 - **`--cal-grid-h` hard-codes the old ratio** — `calc(6 * 1.15 * var(--cal-cell-w) + …)`. The `1.15`
   must change with the cell, or every consumer of that variable reserves the wrong height.
-- **Check List and Day views.** `.cal-agenda, .cal-day-empty{ min-height:var(--cal-grid-h) }` — they
-  reserve the month grid's height so switching views doesn't jump. Shrinking the grid shrinks their
-  reserve too. Verify all three views at 1366 × 768 before calling it done.
+- **Day and List are fixed by the same work — see §10.5**, which measures them. Short version: both
+  overflow today for the same reason, both need *both* halves of this change, and neither is a
+  follow-up task.
 - **`.cal-swipe-viewport{ max-width:660px; margin:0 auto }`** (desktop, styles.css ~2003) must become
-  the left column instead of a centred 660px block. The viewport renders neighbouring months for the
-  swipe transition — confirm the transform still lands correctly at the new width.
+  the **right** column instead of a centred 660px block. The viewport renders neighbouring months
+  for the swipe transition — confirm the transform still lands correctly at the new width.
 - **The Deadline side of the create panel is shorter than the Event side** (no recurrence, no
-  tickler, no habit bubble, no More options). The right column must look deliberate in both states,
-  not half-empty on one.
-- **Keep the control panel's bottom margin** (§8.2, author) — that ruling applies to the right
+  tickler, no habit bubble, no More options). The **left** column must look deliberate in both
+  states, not half-empty on one.
+- **Keep the control panel's bottom margin** (§8.2, author) — that ruling applies to the **left**
   column's lower edge here, not just to the phone's stack.
 - **Do not shrink the card below what the grid needs.** 1040px is a starting figure, not a measured
   one; measure the finished thing and adjust.
@@ -762,3 +862,54 @@ Drive the real build at **1366 × 768** (the worst case, and the size that expos
 - Month, Day and List views all fit;
 - phone at 400 × 860 is byte-for-byte unchanged in layout terms (cells still 49 × 56, still no
   scroll).
+
+## 10.5 What this does to Day and List — measured
+
+Author asked directly. Measured at 1366 × 768 with one event seeded on the selected day.
+
+**Both are broken today, in exactly the same way, and by the same variable:**
+
+| view | needs | has | scrolls? | the tall child |
+| --- | --- | --- | --- | --- |
+| Month | 1073px | 644px | **yes** | `.cal-swipe-viewport` 669px |
+| **Day** | 1032px | 644px | **yes** | `.cal-agenda` **628px** |
+| **List** | 1032px | 644px | **yes** | `.cal-agenda.cal-list` **628px** |
+
+**`.cal-agenda` is 628px tall while containing ONE row.** All of that height is
+`min-height: var(--cal-grid-h)` — the month grid's reserved height, applied so switching views
+doesn't make the card jump (styles.css ~1466). So a day with one appointment reserves 628px of
+empty space, purely to match a month grid that is itself 270px too tall.
+
+### So the fix reaches them, but only half by itself
+
+`--cal-grid-h` is derived from the cell, so shrinking the cell to 92 × 58 drops the reserve from
+~628px to **~363px** automatically. Day and List inherit that with no extra work.
+
+**That alone is not enough.** Run the numbers for Day after only the cell change:
+
+```
+  34px  .cal-daynav
+ 363px  .cal-agenda   (new reserve)
+ 280px  .cal-create   ← still in the vertical stack
+  ~90px padding/gaps
+ ─────
+ 767px  needed, against 644px available  → STILL SCROLLS
+```
+
+**It is moving `.cal-create` out of the vertical stack into its own column that fixes Day and
+List** — the same move that fixes Month. After that, Day is ~34 + 363 + padding ≈ **440px**, and
+fits comfortably.
+
+**Conclusion for the builder: all three views are fixed by the same two changes, and neither change
+alone is sufficient for Day/List.** Do not treat Day and List as a follow-up — they come along
+automatically if both halves of §10.4 are built, and they stay broken if only the cell size is
+touched.
+
+### One judgment call left in this area
+
+With the controls in a column of their own, `--cal-grid-h`'s reserve still does its job — it keeps
+the calendar column a stable height across Month/Day/List so the card doesn't resize as you switch.
+Keep it. But **363px of reserve for a one-row day is still mostly empty**, and now it is empty
+*beside* a control column rather than above one. If it looks wrong once built, the fix is to reduce
+the reserve rather than remove it — removing it reintroduces the jump it exists to prevent.
+Builder's call; flag what you chose.
