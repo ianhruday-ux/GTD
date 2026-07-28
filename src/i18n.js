@@ -144,6 +144,14 @@ const STRINGS = {
     en: "This was due and the moment has passed. Push it to a new date, tick it if it's actually done, delete it if it's dead — or Not now to see it again next time.",
     "zh-Hans": "这件事的截止时间已经过去了。可以把它改到新的日期；如果实际上已经完成，就勾选完成；如果已经不用做了，就删除；或者选择“暂不处理”，下次回顾时再处理。"
   },
+  // ⚑ Distinct from info.review.pastdue (review-surface-plan.md §3, Q3
+  // revisited): the pseudo-action shape can't push a date, and can now also
+  // be skipped (a live, not-yet-rolled-past recurring occurrence) — the
+  // shared deadline wording stopped being accurate once Skip was added here.
+  "info.review.pastdueEvent": {
+    en: "This event's time has passed without being ticked. Tick it if you actually did it, skip it if you didn't (a repeating event moves on to its next occurrence), or delete it to remove the event for good — or Not now to see it again next time.",
+    "zh-Hans": "这个事件的时间已经过去，但还没有勾选完成。如果确实做了就勾选完成；如果没做就跳过（如果是重复事件，会自动进入下一次）；要彻底删除这个事件就选删除——或者选择“暂不处理”，下次再看到它。"
+  },
   "info.review.stalled": {
     en: "This is a project with no way forward. Add the next physical step, a waiting action, or an event to keep it going, or move it to Someday if continuing the project isn't possible or practical. You can always come back to it in the future.",
     "zh-Hans": "这个项目目前没有任何推进方式。请添加下一步行动、一项等待行动或一个日历事件，让项目继续推进；如果暂时不适合继续，也可以把它移到“将来”列表。以后随时都可以再回来处理。"
@@ -153,8 +161,8 @@ const STRINGS = {
     "zh-Hans": "这项等待行动原本依赖的条件已经不存在了。你可以把它改为等待其他事情、改成一条笔记、如果现在已经可以执行就把它移到“下一步行动”，或者直接结束它。"
   },
   "info.review.missed": {
-    en: "A repeating thing whose day went by without being ticked. Often you did it and forgot to say so — 'Mark done' records it on the day it happened. 'Skipped' clears it without pretending you did. Only the most recent one is ever kept, so this never piles up.",
-    "zh-Hans": "这是一项重复事项，它的执行日期已经过去，但还没有勾选完成。很多时候其实已经做了，只是忘了记录。“标记完成”会把完成记录补到实际发生的那一天；“已跳过”则会直接清除这次记录，而不会假装已经完成。系统始终只保留最近的一次，因此不会越积越多。"
+    en: "A repeating thing whose day went by without being ticked. Often you did it and forgot to say so — 'Completed' records it on the day it happened. 'Skipped' clears it without pretending you did. Only the most recent one is ever kept, so this never piles up.",
+    "zh-Hans": "这是一项重复事项，它的执行日期已经过去，但还没有勾选完成。很多时候其实已经做了，只是忘了记录。“已完成”会把完成记录补到实际发生的那一天；“已跳过”则会直接清除这次记录，而不会假装已经完成。系统始终只保留最近的一次，因此不会越积越多。"
   },
   "info.review.capture": {
     en: "A stray thought you haven't filed yet. Send it to a lane — or Not now to leave it for later.",
@@ -518,18 +526,22 @@ const STRINGS = {
   "review.infoOrphanedLabel": { en: "Waiting on something gone:",   "zh-Hans": "在等一个已经不存在的东西：" },
   "review.infoMissedLabel":  { en: "A repeat you missed:",          "zh-Hans": "一个你错过的重复项：" },
   "review.noWayForward":     { en: "no way forward",                "zh-Hans": "没有下一步" },
-  // review.iDidIt retired — merged into review.markDone (missed + past-due
-  // pseudo-action now share one "mark this done" verb; author ruling).
+  // review.iDidIt retired — merged into review.completed, later unified
+  // further across every "mark this done" verb on the review surface
+  // (author rulings, second and third QA rounds).
   "review.skipped":          { en: "Skipped",                       "zh-Hans": "已跳过" },
   "review.quickDoneComplete": { en: "Complete",                     "zh-Hans": "完成" },
   "review.quickDoneBack":    { en: "Back",                          "zh-Hans": "返回" },
   "review.wentByOn":         { en: "went by on",                    "zh-Hans": "已过期，日期是" },
   "review.withoutTicking":   { en: "without being ticked",          "zh-Hans": "但没有勾选" },
-  "review.markDone":         { en: "Mark done",                     "zh-Hans": "标记完成" },
+  // ⚑ UNIFIED (author, third QA round): "Mark done" / "Complete it" /
+  // "Complete" were three names for the identical act across five card
+  // kinds — one shared key now, everywhere a review card resolves an item
+  // as done. Same move for delete: "Delete" / "Delete it" -> review.delete
+  // alone (its two other call sites below now point here).
+  "review.completed":        { en: "Completed",                     "zh-Hans": "已完成" },
   "review.delete":           { en: "Delete",                        "zh-Hans": "删除" },
   "review.pushTheDate":      { en: "Push the date",                 "zh-Hans": "推迟日期" },
-  "review.completeIt":       { en: "Complete it",                   "zh-Hans": "完成它" },
-  "review.deleteIt":         { en: "Delete it",                     "zh-Hans": "删除它" },
   "review.whatsNextAction":  { en: "What's the very next physical action?", "zh-Hans": "接下来最具体的下一步是什么？" },
   "review.add":              { en: "Add",                           "zh-Hans": "添加" },
   "review.addNextAction":    { en: "+Next",                         "zh-Hans": "+下一步" },
@@ -542,7 +554,6 @@ const STRINGS = {
   "review.repointCondition": { en: "Re-point the condition →",      "zh-Hans": "重新指向条件 →" },
   "review.replaceWithFreeText": { en: "Replace with free text",     "zh-Hans": "换成自由文本" },
   "review.promoteToNext":    { en: "+Next",                         "zh-Hans": "+下一步" },
-  "review.complete":         { en: "Complete",                      "zh-Hans": "完成" },
   "review.cancel":           { en: "Cancel",                        "zh-Hans": "取消" },
   "review.save":             { en: "Save",                          "zh-Hans": "保存" },
   "review.fullPage":         { en: "Full page →",                   "zh-Hans": "完整页面 →" },

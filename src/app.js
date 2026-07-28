@@ -4905,6 +4905,8 @@
       if (revDelete){ reviewDelete(revDelete.getAttribute("data-lane"), revDelete.getAttribute("data-id")); return; }
       const revDeleteEvent = e.target.closest('[data-action="review-delete-event"]');
       if (revDeleteEvent){ reviewDeleteEvent(revDeleteEvent.getAttribute("data-id")); return; }
+      const revSkipLive = e.target.closest('[data-action="review-skip-live"]');
+      if (revSkipLive){ reviewSkipLive(revSkipLive.getAttribute("data-id")); return; }
       // ⚑ QA (user): the quick-add's escape hatch to the real creation page,
       // carrying whatever has been typed so far. Same reviewOpenChild contract as
       // the tap-through and the calendar: the review is pushed, so save-exiting
@@ -6074,7 +6076,7 @@
     // REVIEW-SURFACE round (review-surface-plan.md). §8.1's
     // replace-don't-accumulate discipline: this is the ONLY injector, and the
     // public-app-polish round's groups below are swept out, not left dormant.
-    const FLAG = "gtd_qa_checklist_reviewsurface_v3";
+    const FLAG = "gtd_qa_checklist_reviewsurface_v4";
     if (Storage.get(FLAG)) return;
     Storage.set(FLAG, "1");
     // Retire the superseded flags so they can't resurrect their injectors, and
@@ -6087,7 +6089,7 @@
      "gtd_qa_checklist_postsprint_v7", "gtd_qa_checklist_desktop_v1",
      "gtd_qa_checklist_desktop_v2", "gtd_qa_checklist_sw_v1",
      "gtd_qa_checklist_publicpolish_v1", "gtd_qa_checklist_reviewsurface_v1",
-     "gtd_qa_checklist_reviewsurface_v2"].forEach(Storage.remove);
+     "gtd_qa_checklist_reviewsurface_v2", "gtd_qa_checklist_reviewsurface_v3"].forEach(Storage.remove);
 
     // Replace, don't accumulate (8.1) — and actually mean it this time.
     // Earlier rounds bumped the flag but left the previous rounds' groups
@@ -6119,15 +6121,17 @@
     addGroupWithItems('✅ QA — The review’s new grouped buttons', [
       { title: '1. Open the daily review', notes: 'Open the intray (the handle on the left edge of the screen, or the left column on a computer) and tap Review. Look at whichever card shows up first.' },
       { title: '2. Check the buttons are grouped, not one long list', notes: 'A card with several buttons (like a stalled project) should show them in a few small groups with a thin line between each group, ending with "Not now" in the bottom-left corner and a red "Delete" in the bottom-right — not seven buttons in one plain column.' },
-      { title: '3. Check the colored buttons', notes: 'Buttons that add something to a list — "+Next", "+Waiting", "+Event", "Someday →" — should be short and colored like that list\'s tab (red, yellow, brass, blue). Buttons that don\'t send it anywhere (like "Complete it") stay plain grey. Same on the phone and on a computer.' },
-      { title: '4. Find a missed repeating habit or event, if one shows up', notes: 'Its "give up on this one" button should now say "Skipped", not "Let it go".' },
-      { title: '5. Tap the (i) info button at the top of the review', notes: 'It should explain only the ONE card you\'re looking at — not a wall of text about every kind of card at once.' }
+      { title: '3. Check the colored buttons', notes: 'Buttons that add something to a list — "+Next", "+Waiting", "+Event", "Someday →" — should be short and colored like that list\'s tab (red, yellow, brass, blue). Buttons that don\'t send it anywhere (like "Completed") stay plain grey. Same on the phone and on a computer.' },
+      { title: '4. Check the wording is the same everywhere', notes: 'Every card\'s "this got done" button should say "Completed" (not "Mark done" or "Complete it"), and every Delete button should just say "Delete" (not "Delete it").' },
+      { title: '5. Find an overdue repeating habit or event, if one shows up', notes: 'Whether it\'s still showing today or already moved on to tomorrow, it should offer a "Skipped" button (not "Let it go") alongside "Completed" — a way to say "this one didn\'t happen, and that\'s fine" without deleting the whole repeating series.' },
+      { title: '6. Check Delete acts right away, no popup', notes: 'Tapping Delete on a review card should delete it immediately, with no "are you sure?" popup — except a repeating calendar event, which still asks whether you mean just this occurrence or the whole series (that one stays, since "delete" is genuinely unclear there).' },
+      { title: '7. Tap the (i) info button at the top of the review', notes: 'It should explain only the ONE card you\'re looking at — not a wall of text about every kind of card at once.' }
     ]);
 
     addGroupWithItems('✅ QA — Calendar changes', [
-      { title: '6. Open the calendar and set something to repeat', notes: 'Start adding an event, set it to repeat Daily or Weekly. A purple box should offer to make it a habit instead, with a small X on the end to dismiss it if you don\'t want it.' },
-      { title: '7. On a computer, open the calendar', notes: 'The whole calendar should fit on screen without needing to scroll, with the day squares wide and short (not tall) and the "Add" button always visible — not hidden below the fold.' },
-      { title: '8. Check the "More options" / "Advanced options" buttons', notes: 'Wherever you see one of these (a next action, a waiting action, a habit, or the calendar), it should now have a light grey fill so it stands out a bit, instead of blending into the background.' }
+      { title: '8. Open the calendar and set something to repeat', notes: 'Start adding an event, set it to repeat Daily or Weekly. A purple box should offer to make it a habit instead, with a small X on the end to dismiss it if you don\'t want it.' },
+      { title: '9. On a computer, open the calendar', notes: 'The whole calendar should fit on screen without needing to scroll, with the day squares wide and short (not tall) and the "Add" button always visible — not hidden below the fold.' },
+      { title: '10. Check the "More options" / "Advanced options" buttons', notes: 'Wherever you see one of these (a next action, a waiting action, a habit, or the calendar), it should now have a light grey fill so it stands out a bit, instead of blending into the background.' }
     ]);
     saveTasksLocal("next");
   }
@@ -6570,6 +6574,7 @@
   function reviewMenuInfo(){
     return {
       pastdue: t("info.review.pastdue"),
+      pastdueEvent: t("info.review.pastdueEvent"),
       stalled: t("info.review.stalled"),
       orphaned: t("info.review.orphaned"),
       missed: t("info.review.missed"),
@@ -6603,11 +6608,14 @@
       // you had to already know — one borrowed from GTD, one the app invented.
       // The headings now describe the situation instead of naming it. "Stalled"
       // survives because it is ordinary English, not a term of art.
-      // pastdue's pseudo-action shape reuses the deadline wording rather than
-      // getting its own string (builder's call, review-surface-plan.md Q3) —
-      // simplest option where the doc left it open; revisit if it reads wrong.
+      // ⚑ REVISITED (Q3): the pseudo-action shape got its own info string once
+      // it could also be Skipped — the deadline wording ("push it to a new
+      // date") never applied to it and now omits an option it actually has.
+      // Same label as pastdue (still "Past its date:") since that's still
+      // literally true; only the paragraph after it differs.
       const label = {
         pastdue: t("review.infoPastDueLabel"),
+        pastdueEvent: t("review.infoPastDueLabel"),
         stalled: t("review.infoStalledLabel"),
         orphaned: t("review.infoOrphanedLabel"),
         missed: t("review.infoMissedLabel")
@@ -6769,7 +6777,7 @@
       // nothing, so the universal corner row is Not now alone.
       menuHtml =
         reviewBandHtml(
-          '<button type="button" class="review-menu-btn" data-action="review-missed-done" data-id="' + l.id + '">&#10003; ' + escapeHtml(t("review.markDone")) + '</button>' +
+          '<button type="button" class="review-menu-btn" data-action="review-missed-done" data-id="' + l.id + '">&#10003; ' + escapeHtml(t("review.completed")) + '</button>' +
           '<button type="button" class="review-menu-btn" data-action="review-missed-clear" data-id="' + l.id + '">' + escapeHtml(t("review.skipped")) + '</button>'
         ) +
         '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + '</div>';
@@ -6797,16 +6805,26 @@
       // §2: the pseudo-action shape of the past-due kind is a CHECKBOX, not the
       // deadline menu -- you cannot "push" an event's date from here (it is
       // rescheduled on its own page), only tick it done or defer it.
-      // ⚑ QA #13: Delete joins Mark done. They look interchangeable but they
+      // ⚑ QA #13: Delete joins Completed. They look interchangeable but they
       // are not -- completing files the event into Completed, which is right for
       // something you did and wrong for something that simply died. Without a
       // delete here, the only way to clear a dead past-due event was to record
       // it as an accomplishment. Routed through the event (not the lane row):
       // deleting the row alone leaves the event live and the sweep re-mints it.
       // No band 1 — you cannot push an event's date from here (§2, above).
-      // Band 2 (take it off the list): Mark done.
+      // Band 2 (take it off the list): Completed, and — for a REPEATING event
+      // only — Skipped (author, third QA round: the already-rolled-past
+      // "missed" card had Skipped, this still-live one didn't, which read as
+      // a gap). A one-shot has no next occurrence to roll onto, so it keeps
+      // just Completed/Delete, unchanged.
+      const pastdueEv = findEvent(l.task.eventId);
       menuHtml =
-        reviewBandHtml('<button type="button" class="review-menu-btn" data-action="review-complete" data-lane="' + l.laneKind + '" data-id="' + l.id + '">&#10003; ' + escapeHtml(t("review.markDone")) + '</button>') +
+        reviewBandHtml(
+          '<button type="button" class="review-menu-btn" data-action="review-complete" data-lane="' + l.laneKind + '" data-id="' + l.id + '">&#10003; ' + escapeHtml(t("review.completed")) + '</button>' +
+          (pastdueEv && isRecurring(pastdueEv)
+            ? '<button type="button" class="review-menu-btn" data-action="review-skip-live" data-id="' + l.id + '">' + escapeHtml(t("review.skipped")) + '</button>'
+            : "")
+        ) +
         '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewMenuBtn("review-delete-event", "&#128465; " + escapeHtml(t("review.delete")), ' data-id="' + l.id + '"', true) + '</div>';
     } else if (l.kind === "pastdue"){
       if (form && form.type === "date"){
@@ -6814,11 +6832,11 @@
       } else {
         // Band 1 (move it forward): push the date — keeps it alive with a new
         // target, same family as stalled's "give it a next step". Band 2
-        // (take it off the list): Complete it.
+        // (take it off the list): Completed.
         menuHtml =
           reviewBandHtml(reviewMenuBtn("review-form-start", t("review.pushTheDate"), ' data-key="' + l.key + '" data-type="date"')) +
-          reviewBandHtml(reviewMenuBtn("review-complete", t("review.completeIt"), ' data-lane="' + l.laneKind + '" data-id="' + l.id + '"')) +
-          '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewMenuBtn("review-delete", t("review.deleteIt"), ' data-lane="' + l.laneKind + '" data-id="' + l.id + '"', true) + '</div>';
+          reviewBandHtml(reviewMenuBtn("review-complete", t("review.completed"), ' data-lane="' + l.laneKind + '" data-id="' + l.id + '"')) +
+          '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewMenuBtn("review-delete", t("review.delete"), ' data-lane="' + l.laneKind + '" data-id="' + l.id + '"', true) + '</div>';
       }
     } else if (l.kind === "stalled"){
       if (form && form.type === "text"){
@@ -6840,7 +6858,7 @@
         // sort chips): a band button that SENDS the item to a lane carries
         // that lane's data-target purely for CSS coloring (styles.css) — its
         // click routing is unchanged, still data-action/data-key/data-id.
-        // A button that resolves/edits in place (Complete it) stays plain.
+        // A button that resolves/edits in place (Completed) stays plain.
         menuHtml =
           reviewBandHtml(
             reviewMenuBtn("review-form-start", t("review.addNextAction"), ' data-key="' + l.key + '" data-type="text" data-target="next"') +
@@ -6854,9 +6872,9 @@
           ) +
           reviewBandHtml(
             reviewMenuBtn("review-someday", t("review.moveToSomeday"), ' data-id="' + l.id + '" data-target="future"') +
-            reviewMenuBtn("review-complete", t("review.completeIt"), ' data-lane="current" data-id="' + l.id + '"')
+            reviewMenuBtn("review-complete", t("review.completed"), ' data-lane="current" data-id="' + l.id + '"')
           ) +
-          '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewMenuBtn("review-delete", t("review.deleteIt"), ' data-lane="current" data-id="' + l.id + '"', true) + '</div>';
+          '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewMenuBtn("review-delete", t("review.delete"), ' data-lane="current" data-id="' + l.id + '"', true) + '</div>';
       }
     } else if (l.kind === "orphaned"){
       if (form && form.type === "text"){
@@ -6871,7 +6889,7 @@
             reviewMenuBtn("review-form-start", t("review.replaceWithFreeText"), ' data-key="' + l.key + '" data-type="text"') +
             reviewMenuBtn("review-promote", t("review.promoteToNext"), ' data-id="' + l.id + '" data-target="next"')
           ) +
-          reviewBandHtml(reviewMenuBtn("review-complete", t("review.complete"), ' data-lane="waiting" data-id="' + l.id + '"')) +
+          reviewBandHtml(reviewMenuBtn("review-complete", t("review.completed"), ' data-lane="waiting" data-id="' + l.id + '"')) +
           '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewMenuBtn("review-delete", t("review.delete"), ' data-lane="waiting" data-id="' + l.id + '"', true) + '</div>';
       }
     }
@@ -6881,7 +6899,13 @@
   function reviewBodyHtml(s){
     const active = reviewActiveLoops();
     const deferredCount = computeOpenLoops().length - active.length;
-    const revealedKind = active.length ? active[0].kind : null;
+    // "pastdueEvent" is a synthetic kind, info-panel only (§3 Q3, revisited):
+    // the pseudo-action shape of "pastdue" now needs its own info string,
+    // but the review-card renderer, computeOpenLoops, etc. all still key off
+    // the real l.kind ("pastdue") + l.pseudo — only the info lookup cares.
+    const revealedKind = active.length
+      ? (active[0].kind === "pastdue" && active[0].pseudo ? "pastdueEvent" : active[0].kind)
+      : null;
     let html = '<div class="screen-body review-body">' + reviewInfoPanelHtml(revealedKind, !!(s && s.reviewInfoOpen));
     if (!active.length){
       html += (deferredCount > 0)
@@ -7015,24 +7039,63 @@
     if (state.screen) state.screen.reviewForm = null;
     renderScreen();
   }
+  // ⚑ NO CONFIRM (author ruling, third QA round — a deliberate exception to
+  // CLAUDE.md's standing "every destructive action gets a confirm" rule,
+  // scoped to the review only): the review is a GTD triage pass, and
+  // deleting is as valid a sort as any other — friction here fights the
+  // thing the review exists to do. Delete also sits at the opposite corner
+  // from every other control (band 3, bottom-right, maximum distance from
+  // Not now and the bands above), which is the app's existing defence
+  // against a stray tap. Every OTHER delete in the app (a drafting page's
+  // 🗑, the event page's own delete) is unaffected — this ruling is
+  // reviewDelete/reviewDeleteCapture/reviewDeleteEvent's alone.
   function reviewDelete(lane, id){
-    const found = reviewFindTask(id);
-    const title = found ? (found.task.title || t("confirm.deleteThisItem")) : t("confirm.deleteThisItem");
-    openConfirmDialog(t("confirm.deleteTitleForGood").replace("{title}", title), [
-      { label: t("chrome.delete"), style: "danger", action: function(){ deleteTask(lane, id); if (state.screen) state.screen.reviewForm = null; renderScreen(); } },
-      { label: t("chrome.cancel"), action: function(){} }
-    ]);
+    deleteTask(lane, id);
+    if (state.screen) state.screen.reviewForm = null;
+    renderScreen();
   }
   // QA #13. The id is the pseudo-action's task ID, which IS the event's taskId
   // (§4.14a) — that stability is exactly what lets the review address the event
   // without carrying a second identifier.
+  // The ONE exception to the no-confirm ruling above: a RECURRING event, where
+  // "delete" is ambiguous (this occurrence, or the whole series?) — that's
+  // disambiguation, not a safety net, so it stays. Reuses confirmDeleteEvent's
+  // own recurring branch unchanged (also used by the full event page); only
+  // the non-recurring path diverges from it here, going straight to
+  // deleteEventEntirely instead of confirmDeleteEvent's plain "are you sure".
   function reviewDeleteEvent(taskId){
     const ev = findEventByTaskId(taskId);
     if (!ev){ renderScreen(); return; }
-    confirmDeleteEvent(ev, function(){
+    if (isRecurring(ev)){
+      confirmDeleteEvent(ev, function(){
+        if (state.screen) state.screen.reviewForm = null;
+        renderScreen();
+      });
+    } else {
+      deleteEventEntirely(ev);
       if (state.screen) state.screen.reviewForm = null;
       renderScreen();
-    });
+    }
+  }
+  // §9/§2 (review-surface-plan.md, author third QA round): "Skipped" for a
+  // still-live (not yet rolled-past) recurring occurrence — the same act as
+  // reviewMissedClear performs for an already-rolled one, done a day early.
+  // Reuses skipOccurrence(ev) verbatim — it's the exact same function the
+  // event page's own "Skip this one" (confirmDeleteEvent's recurring
+  // branch) already calls, so this gets its override-pruning and both-lane
+  // re-render for free rather than a second, thinner reimplementation.
+  // Records nothing in completedOccs (not credited) and nothing in
+  // missedOcc (this isn't a silently-discovered miss; the user is choosing
+  // it right now). No confirm dialog: destroys nothing, every other
+  // occurrence is untouched. Recurring-only — a one-shot has no next
+  // occurrence to roll onto, so the card never offers this button for one
+  // (reviewCardHtml gates it on isRecurring(ev)).
+  function reviewSkipLive(taskId){
+    const ev = findEventByTaskId(taskId);
+    if (!ev){ renderScreen(); return; }
+    skipOccurrence(ev);
+    if (state.screen) state.screen.reviewForm = null;
+    renderScreen();
   }
   function reviewSortCapture(target, key){
     const capture = (state.tray || []).find(function(t){ return t.id === key; });
@@ -7074,20 +7137,14 @@
     });
   }
   // Delete lives beside Not now because both answer "what to do with this
-  // capture" without filing it anywhere — but delete is data destruction, so
-  // (CLAUDE.md: never accidental) it goes behind the same confirm dialog every
-  // other delete in the review already uses.
+  // capture" without filing it anywhere. No confirm (author ruling, third QA
+  // round — see reviewDelete's comment): the review is a triage pass, not a
+  // drafting page, and this corner is already the app's defence against a
+  // stray tap.
   function reviewDeleteCapture(key){
-    const capture = (state.tray || []).find(function(t){ return t.id === key; });
-    const title = capture ? capture.text : t("confirm.deleteThisItem");
-    openConfirmDialog(t("confirm.deleteTitleForGood").replace("{title}", title), [
-      { label: t("chrome.delete"), style: "danger", action: function(){
-          removeCapture(key);
-          if (state.screen) state.screen.reviewForm = null;
-          renderScreen();
-        } },
-      { label: t("chrome.cancel"), action: function(){} }
-    ]);
+    removeCapture(key);
+    if (state.screen) state.screen.reviewForm = null;
+    renderScreen();
   }
   function quickDoneBodyHtml(s){
     return (

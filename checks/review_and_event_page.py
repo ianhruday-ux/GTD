@@ -84,12 +84,17 @@ with serve(DIST) as url, sync_playwright() as p:
     open_review()
     card = pg.locator('.review-card:has-text("Shading probe")').first
     check(card.count() == 1, "the past-due event reaches the review")
-    check(card.locator('[data-action="review-complete"]').count() == 1, "it still offers Mark done")
+    check(card.locator('[data-action="review-complete"]').count() == 1, "it still offers Completed")
     check(card.locator('[data-action="review-delete-event"]').count() == 1, "it now offers Delete (#13)")
 
     # deleting must remove the EVENT, not just the row (or the sweep re-mints it)
-    card.locator('[data-action="review-delete-event"]').click(); pg.wait_for_timeout(400)
-    pg.locator('.choice-dialog button:has-text("Delete")').first.click(); pg.wait_for_timeout(600)
+    # ⚑ NO confirm dialog for a one-shot review delete (author ruling, third QA
+    # round — review deletes are triage, not drafting; the only exception is a
+    # recurring event, where "delete" is ambiguous). This fixture is one-shot.
+    check(pg.locator('.choice-dialog').count() == 0, "no confirm dialog is showing yet")
+    card.locator('[data-action="review-delete-event"]').click(); pg.wait_for_timeout(600)
+    check(pg.locator('.choice-dialog').count() == 0,
+          "and none appears — a one-shot event deletes immediately from the review")
     gone_ev = pg.evaluate("() => !JSON.parse(localStorage.getItem('gtd_events')).some(e => e.title === 'Shading probe')")
     check(gone_ev, "Delete removes the underlying event, not only the lane row")
     pg.reload(); load()
