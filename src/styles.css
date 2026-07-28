@@ -1258,6 +1258,28 @@ body.has-frame .tray-drawer::after{
 .review-band .review-menu-btn[data-target="waiting"]{ border-color:var(--yellow); background:color-mix(in srgb, var(--yellow) 34%, transparent); color:#fff; }
 .review-band .review-menu-btn[data-target="future"]{ border-color:var(--royal); background:color-mix(in srgb, var(--royal) 34%, transparent); color:#fff; }
 .review-band .review-menu-btn[data-target="calendar"]{ border-color:var(--brass); background:color-mix(in srgb, var(--brass) 34%, transparent); color:#fff; }
+/* The orphaned card's quick-add row (author, fifth QA round): a text box,
+   a hook icon, and Add, replacing two separate full-width buttons that did
+   the same job ("say what this is waiting on now") one field at a time.
+   Still a .review-band for the divider rhythm before the next band, but
+   overridden to a single non-wrapping row instead of a wrapped chip grid —
+   the input needs to grow, not sit fixed-width like a chip. */
+.review-band.review-quickadd-row{ flex-wrap:nowrap; justify-content:flex-start; align-items:stretch; }
+.review-quickadd-row .review-form-input{ flex:1; min-width:0; }
+.review-hook-btn{
+  flex:0 0 auto; width:38px; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.05);
+  color:var(--text-primary); border-radius:8px; font-size:15px; cursor:pointer;
+  display:inline-flex; align-items:center; justify-content:center;
+}
+.review-hook-btn:hover{ background:rgba(255,255,255,0.1); }
+/* Add is the primary action here, same brass-filled treatment as every
+   other "commit this" button in the app (e.g. the inline add-forms'
+   .review-form-primary, scoped there to .review-inline-form-btns-row —
+   this row isn't that markup, so it needs its own rule). */
+.review-quickadd-row .review-form-primary{
+  flex:0 0 auto; background:var(--brass); color:var(--dark-on-accent); border-color:transparent; font-weight:600;
+}
+.review-quickadd-row .review-form-primary:hover{ filter:brightness(1.08); }
 /* Flex, with a deterministic percentage flex-basis rather than a content-based
    one: exactly 3 fit per row regardless of viewport width (the earlier
    flex-basis:96px version let content size decide how many fit, which

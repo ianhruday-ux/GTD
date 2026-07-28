@@ -551,8 +551,8 @@ const STRINGS = {
   "review.whatWaitingOn":    { en: "What are you waiting on?",      "zh-Hans": "你在等待什么？" },
   "review.untilWhatWhen":    { en: "Until what, or until when?",    "zh-Hans": "等到什么，或者等到什么时候？" },
   "review.waitingForDots":   { en: "Waiting for…",                  "zh-Hans": "在等待…" },
-  "review.repointCondition": { en: "Re-point the condition →",      "zh-Hans": "重新指向条件 →" },
-  "review.replaceWithFreeText": { en: "Replace with free text",     "zh-Hans": "换成自由文本" },
+  // review.repointCondition / review.replaceWithFreeText retired — merged
+  // into one quick-add field (text box + hook icon), fifth QA round.
   "review.promoteToNext":    { en: "+Next",                         "zh-Hans": "+下一步" },
   "review.cancel":           { en: "Cancel",                        "zh-Hans": "取消" },
   "review.save":             { en: "Save",                          "zh-Hans": "保存" },

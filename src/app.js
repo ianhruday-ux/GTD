@@ -6078,7 +6078,7 @@
     // REVIEW-SURFACE round (review-surface-plan.md). §8.1's
     // replace-don't-accumulate discipline: this is the ONLY injector, and the
     // public-app-polish round's groups below are swept out, not left dormant.
-    const FLAG = "gtd_qa_checklist_reviewsurface_v6";
+    const FLAG = "gtd_qa_checklist_reviewsurface_v7";
     if (Storage.get(FLAG)) return;
     Storage.set(FLAG, "1");
     // Retire the superseded flags so they can't resurrect their injectors, and
@@ -6092,7 +6092,8 @@
      "gtd_qa_checklist_desktop_v2", "gtd_qa_checklist_sw_v1",
      "gtd_qa_checklist_publicpolish_v1", "gtd_qa_checklist_reviewsurface_v1",
      "gtd_qa_checklist_reviewsurface_v2", "gtd_qa_checklist_reviewsurface_v3",
-     "gtd_qa_checklist_reviewsurface_v4", "gtd_qa_checklist_reviewsurface_v5"].forEach(Storage.remove);
+     "gtd_qa_checklist_reviewsurface_v4", "gtd_qa_checklist_reviewsurface_v5",
+     "gtd_qa_checklist_reviewsurface_v6"].forEach(Storage.remove);
 
     // Replace, don't accumulate (8.1) — and actually mean it this time.
     // Earlier rounds bumped the flag but left the previous rounds' groups
@@ -6129,13 +6130,14 @@
       { title: '5. Find an overdue repeating habit or event, if one shows up', notes: 'Whether it\'s still showing today or already moved on to tomorrow, it should offer "Completed", "Skipped" (not "Let it go"), and "Delete" — the same three, looking and working exactly the same, on both.' },
       { title: '6. Tap Skipped just once', notes: 'It should resolve fully and move the review on to something else — not turn into another card for the same event that you then have to tap Skipped on again.' },
       { title: '7. Check Delete acts right away, no popup', notes: 'Tapping Delete on a review card should delete it immediately, with no "are you sure?" popup — except a repeating calendar event, which still asks whether you mean just this occurrence or the whole series (that one stays, since "delete" is genuinely unclear there).' },
-      { title: '8. Tap the (i) info button at the top of the review', notes: 'It should explain only the ONE card you\'re looking at — not a wall of text about every kind of card at once.' }
+      { title: '8. Find a waiting action review card that lost its condition', notes: 'It should show one compact row — a text box, a small hook icon, and Add — instead of two separate big buttons for the same job.' },
+      { title: '9. Tap the (i) info button at the top of the review', notes: 'It should explain only the ONE card you\'re looking at — not a wall of text about every kind of card at once.' }
     ]);
 
     addGroupWithItems('✅ QA — Calendar changes', [
-      { title: '9. Open the calendar and set something to repeat', notes: 'Start adding an event, set it to repeat Daily or Weekly. A purple box should offer to make it a habit instead, with a small X on the end to dismiss it if you don\'t want it.' },
-      { title: '10. On a computer, open the calendar', notes: 'The whole calendar should fit on screen without needing to scroll, with the day squares wide and short (not tall) and the "Add" button always visible — not hidden below the fold.' },
-      { title: '11. Check the "More options" / "Advanced options" buttons', notes: 'Wherever you see one of these (a next action, a waiting action, a habit, or the calendar), it should now have a light grey fill so it stands out a bit, instead of blending into the background.' }
+      { title: '10. Open the calendar and set something to repeat', notes: 'Start adding an event, set it to repeat Daily or Weekly. A purple box should offer to make it a habit instead, with a small X on the end to dismiss it if you don\'t want it.' },
+      { title: '11. On a computer, open the calendar', notes: 'The whole calendar should fit on screen without needing to scroll, with the day squares wide and short (not tall) and the "Add" button always visible — not hidden below the fold.' },
+      { title: '12. Check the "More options" / "Advanced options" buttons', notes: 'Wherever you see one of these (a next action, a waiting action, a habit, or the calendar), it should now have a light grey fill so it stands out a bit, instead of blending into the background.' }
     ]);
     saveTasksLocal("next");
   }
@@ -6885,21 +6887,31 @@
           '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewMenuBtn("review-delete", t("review.delete"), ' data-lane="current" data-id="' + l.id + '"', true) + '</div>';
       }
     } else if (l.kind === "orphaned"){
-      if (form && form.type === "text"){
-        menuHtml = reviewInlineFormHtml(t("review.waitingForDots"), "text", "review-freetext-save", t("review.save"), "", invalid);
-      } else {
-        // Band 1 (move it forward): the three ways to give it a condition to
-        // wait on again, or act on it now. Band 2 (take it off the list):
-        // Complete.
-        menuHtml =
-          reviewBandHtml(
-            reviewMenuBtn("review-open", t("review.repointCondition"), ' data-lane="waiting" data-id="' + l.id + '"') +
-            reviewMenuBtn("review-form-start", t("review.replaceWithFreeText"), ' data-key="' + l.key + '" data-type="text"') +
-            reviewMenuBtn("review-promote", t("review.promoteToNext"), ' data-id="' + l.id + '" data-target="next"')
-          ) +
-          reviewBandHtml(reviewMenuBtn("review-complete", t("review.completed"), ' data-lane="waiting" data-id="' + l.id + '"')) +
-          '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewMenuBtn("review-delete", t("review.delete"), ' data-lane="waiting" data-id="' + l.id + '"', true) + '</div>';
+      // Simplified (author, fifth QA round): "Re-point the condition" and
+      // "Replace with free text" were two separate full-width buttons for
+      // what's really one job — say what this is waiting on now. Replaced
+      // with the same compact quick-add row the waiting page's own field
+      // uses: a text box (free text), a hook icon beside it (re-point to a
+      // Next/Waiting condition — same navigation "Re-point the condition"
+      // used, just an icon now), and Add. Always present, not gated behind
+      // a button (there's nothing left to gate — this IS band 1 now).
+      // reviewForm is primed here rather than via a "start" click, since
+      // there's no longer a collapsed state to expand from; reviewSaveFreeText
+      // and the Enter-to-submit handler (both pre-existing) need it set to
+      // find this card by key.
+      if (!(form && form.type === "text")){
+        if (state.screen) state.screen.reviewForm = { key: l.key, type: "text", invalid: false };
       }
+      const curForm = reviewFormFor(s, l.key) || {};
+      menuHtml =
+        '<div class="review-band review-quickadd-row">' +
+          '<input type="text" id="review-form-input" data-field="reviewForm" class="review-form-input' + (curForm.invalid ? " field-invalid" : "") + '" placeholder="' + escapeHtml(t("review.waitingForDots")) + '" value="' + escapeHtml(curForm.value || "") + '" autocomplete="off">' +
+          '<button type="button" class="review-hook-btn" data-action="review-open" data-lane="waiting" data-id="' + l.id + '" title="' + escapeHtml(t("waiting.hookToTarget")) + '">&#129693;</button>' +
+          '<button type="button" class="review-menu-btn review-form-primary" data-action="review-freetext-save">' + escapeHtml(t("review.add")) + '</button>' +
+        '</div>' +
+        reviewBandHtml(reviewMenuBtn("review-promote", t("review.promoteToNext"), ' data-id="' + l.id + '" data-target="next"')) +
+        reviewBandHtml(reviewMenuBtn("review-complete", t("review.completed"), ' data-lane="waiting" data-id="' + l.id + '"')) +
+        '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewMenuBtn("review-delete", t("review.delete"), ' data-lane="waiting" data-id="' + l.id + '"', true) + '</div>';
     }
     return '<div class="review-card review-card-' + l.kind + '">' + bodyHtml + '<div class="review-menu">' + menuHtml + '</div></div>';
   }

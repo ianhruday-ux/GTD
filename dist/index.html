@@ -1284,6 +1284,28 @@ body.has-frame .tray-drawer::after{
 .review-band .review-menu-btn[data-target="waiting"]{ border-color:var(--yellow); background:color-mix(in srgb, var(--yellow) 34%, transparent); color:#fff; }
 .review-band .review-menu-btn[data-target="future"]{ border-color:var(--royal); background:color-mix(in srgb, var(--royal) 34%, transparent); color:#fff; }
 .review-band .review-menu-btn[data-target="calendar"]{ border-color:var(--brass); background:color-mix(in srgb, var(--brass) 34%, transparent); color:#fff; }
+/* The orphaned card's quick-add row (author, fifth QA round): a text box,
+   a hook icon, and Add, replacing two separate full-width buttons that did
+   the same job ("say what this is waiting on now") one field at a time.
+   Still a .review-band for the divider rhythm before the next band, but
+   overridden to a single non-wrapping row instead of a wrapped chip grid —
+   the input needs to grow, not sit fixed-width like a chip. */
+.review-band.review-quickadd-row{ flex-wrap:nowrap; justify-content:flex-start; align-items:stretch; }
+.review-quickadd-row .review-form-input{ flex:1; min-width:0; }
+.review-hook-btn{
+  flex:0 0 auto; width:38px; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.05);
+  color:var(--text-primary); border-radius:8px; font-size:15px; cursor:pointer;
+  display:inline-flex; align-items:center; justify-content:center;
+}
+.review-hook-btn:hover{ background:rgba(255,255,255,0.1); }
+/* Add is the primary action here, same brass-filled treatment as every
+   other "commit this" button in the app (e.g. the inline add-forms'
+   .review-form-primary, scoped there to .review-inline-form-btns-row —
+   this row isn't that markup, so it needs its own rule). */
+.review-quickadd-row .review-form-primary{
+  flex:0 0 auto; background:var(--brass); color:var(--dark-on-accent); border-color:transparent; font-weight:600;
+}
+.review-quickadd-row .review-form-primary:hover{ filter:brightness(1.08); }
 /* Flex, with a deterministic percentage flex-basis rather than a content-based
    one: exactly 3 fit per row regardless of viewport width (the earlier
    flex-basis:96px version let content size decide how many fit, which
@@ -2371,7 +2393,7 @@ body.screen-open #tray-handle{ display:none; }
 (function(){
 "use strict";
 
-const BUILD_STAMP = "28 Jul 00:29";  // replaced by build.py
+const BUILD_STAMP = "28 Jul 01:02";  // replaced by build.py
 
 // =========================================================
 // STORAGE ADAPTER (spec.md §3, known issue 4)
@@ -2985,8 +3007,8 @@ const STRINGS = {
   "review.whatWaitingOn":    { en: "What are you waiting on?",      "zh-Hans": "你在等待什么？" },
   "review.untilWhatWhen":    { en: "Until what, or until when?",    "zh-Hans": "等到什么，或者等到什么时候？" },
   "review.waitingForDots":   { en: "Waiting for…",                  "zh-Hans": "在等待…" },
-  "review.repointCondition": { en: "Re-point the condition →",      "zh-Hans": "重新指向条件 →" },
-  "review.replaceWithFreeText": { en: "Replace with free text",     "zh-Hans": "换成自由文本" },
+  // review.repointCondition / review.replaceWithFreeText retired — merged
+  // into one quick-add field (text box + hook icon), fifth QA round.
   "review.promoteToNext":    { en: "+Next",                         "zh-Hans": "+下一步" },
   "review.cancel":           { en: "Cancel",                        "zh-Hans": "取消" },
   "review.save":             { en: "Save",                          "zh-Hans": "保存" },
@@ -5732,14 +5754,14 @@ function initTimePickerFields(){
 // (this file + its boot() call) if the convention is ever retired.
 // =========================================================
 function injectChunkMap(){
-  const FLAG = "gtd_chunk_map_v16";
+  const FLAG = "gtd_chunk_map_v17";
   if (Storage.get(FLAG)) return;
   Storage.set(FLAG, "1");
   ["gtd_chunk_map_v1", "gtd_chunk_map_v2", "gtd_chunk_map_v3", "gtd_chunk_map_v4",
    "gtd_chunk_map_v5", "gtd_chunk_map_v6", "gtd_chunk_map_v7", "gtd_chunk_map_v8",
    "gtd_chunk_map_v9", "gtd_chunk_map_v10", "gtd_chunk_map_v11",
    "gtd_chunk_map_v12", "gtd_chunk_map_v13", "gtd_chunk_map_v14",
-   "gtd_chunk_map_v15"].forEach(Storage.remove);  // retire superseded flags
+   "gtd_chunk_map_v15", "gtd_chunk_map_v16"].forEach(Storage.remove);  // retire superseded flags
 
   // Replace, don't accumulate (8.2, mirroring 8.1): sweep any previous
   // chunk-map group (tagged via devContext, not a title match, since the
@@ -5795,7 +5817,7 @@ function injectChunkMap(){
     { title: "✓ Events on the project page", notes: "DONE. A project shows its linked events and can create them — including on the creation page, where the event is held as a draft and only becomes real when the project is saved. ‘Add an event’ in the daily review came with it." },
     { title: "✓ Linked notes on the project page", notes: "DONE. The link runs both ways now. A current project's Linked panel has an Actions side and a Notes side you toggle between, and a Someday project has a Linked notes section of its own — notes only, since a Someday project holds no actions by design." },
     { title: "Re-test backups against the new fields", notes: "TO DO. Export and import have not been exercised since deadlines gained a start date and a push counter, repeats gained a missed-day marker, and the backgrounds changed names. Backups are the one thing that has to survive real use." },
-    { title: "✓ The review surface, standardised", notes: "DONE. Fixed a live bug where the Chinese text for a missed repeat quoted buttons that no longer existed. The review's five card kinds (missed, past due, stalled, orphaned, and the sort-a-thought capture card) now share one delete style and one 'Not now' corner position instead of five different looks. The four decision cards (everything but capture) are now grouped into bands — 'ways to move it forward', 'ways to take it off the list', then Not now/Delete — separated by a divider line, same layout on phone and computer, so a card that used to be seven buttons in a column now reads at a glance. Buttons that send the item to a list are short and colored like that list's tab ('+Next', '+Waiting', '+Event', 'Someday →'), modeled on the capture card's own colored buttons; buttons that resolve or edit in place stay plain. The missed-repeat button 'Let it go' is renamed 'Skipped' (in both languages) so it can't be misread as the same action as 'Not now' — and 'Skipped' now also appears on a repeating event that's overdue TODAY (not just one that already rolled past to tomorrow), so you don't have to wait a day to say 'this one didn't happen'. Every 'this got done' button across all five cards now says the same thing, 'Completed', and every delete button just says 'Delete'. Delete in the review no longer asks 'are you sure' — the review is a sorting pass, not a place that needs that friction, and Delete sits in its own corner away from every other button — except a repeating event, where delete stays ambiguous (this occurrence, or the whole series?) and keeps its dialog. Delete (with that same dialog) is now on BOTH the still-live overdue card and the already-rolled 'missed' card — no reason those should behave differently. Fixed a real bug reported while testing all this: a repeating event that had built up a backlog (an older recorded miss AND today's live occurrence at once) used to need Skipped tapped TWICE — the first tap resolved today's occurrence but silently left the older miss behind, which then reappeared disguised as the same event, as if nothing had happened. Skipping now retires the older miss too, the same way completing already did. The review's (i) info button now explains only the one card on screen, not all five kinds at once, and stays open as you move to the next card." },
+    { title: "✓ The review surface, standardised", notes: "DONE. Fixed a live bug where the Chinese text for a missed repeat quoted buttons that no longer existed. The review's five card kinds (missed, past due, stalled, orphaned, and the sort-a-thought capture card) now share one delete style and one 'Not now' corner position instead of five different looks. The four decision cards (everything but capture) are now grouped into bands — 'ways to move it forward', 'ways to take it off the list', then Not now/Delete — separated by a divider line, same layout on phone and computer, so a card that used to be seven buttons in a column now reads at a glance. Buttons that send the item to a list are short and colored like that list's tab ('+Next', '+Waiting', '+Event', 'Someday →'), modeled on the capture card's own colored buttons; buttons that resolve or edit in place stay plain. The missed-repeat button 'Let it go' is renamed 'Skipped' (in both languages) so it can't be misread as the same action as 'Not now' — and 'Skipped' now also appears on a repeating event that's overdue TODAY (not just one that already rolled past to tomorrow), so you don't have to wait a day to say 'this one didn't happen'. Every 'this got done' button across all five cards now says the same thing, 'Completed', and every delete button just says 'Delete'. Delete in the review no longer asks 'are you sure' — the review is a sorting pass, not a place that needs that friction, and Delete sits in its own corner away from every other button — except a repeating event, where delete stays ambiguous (this occurrence, or the whole series?) and keeps its dialog. Delete (with that same dialog) is now on BOTH the still-live overdue card and the already-rolled 'missed' card — no reason those should behave differently. Fixed a real bug reported while testing all this: a repeating event that had built up a backlog (an older recorded miss AND today's live occurrence at once) used to need Skipped tapped TWICE — the first tap resolved today's occurrence but silently left the older miss behind, which then reappeared disguised as the same event, as if nothing had happened. Skipping now retires the older miss too, the same way completing already did. Simplified the orphaned card too: 'Re-point the condition' and 'Replace with free text' were two separate big buttons for one job (say what this is waiting on now) — replaced with one compact row, matching the waiting page's own field: a text box, a hook icon (still opens the full page to pick a new condition), and Add. The review's (i) info button now explains only the one card on screen, not all five kinds at once, and stays open as you move to the next card." },
     { title: "✓ The habit-bubble dismiss, and the Advanced buttons", notes: "DONE. The calendar's 'Make this a habit instead' suggestion (shown when you set something to repeat daily or weekly) now has a small X to dismiss it — it comes back next time you pick daily or weekly on a fresh item. Every 'Advanced options' / 'More options' button across the app got a light grey fill for contrast, and the calendar's copy moved up next to the Event/Deadline toggle instead of sitting at the bottom of the form, on both phone and computer." },
     { title: "✓ The desktop calendar, fixed", notes: "DONE. The computer calendar used to overflow the screen at every size tested, including 1920x1080 — the day squares were too tall and the Add button could sit below the fold. It's now two columns (the form on the left, wide short day-squares on the right), fits on screen at any reasonable window size, and the phone layout is untouched." },
     { title: "✓ 9 — Service worker + offline + install polish", notes: "DONE. The app now works with no internet — it saves a copy of itself the first time you open it online, so airplane mode after that still loads and works. When I ship a change while you have the app open, a small bar appears saying “New version available” with a Reload button; nothing ever updates or interrupts you without that tap. See the fresh QA checklist in Next Actions to try both." },
@@ -11897,7 +11919,7 @@ function injectChunkMap(){
     // REVIEW-SURFACE round (review-surface-plan.md). §8.1's
     // replace-don't-accumulate discipline: this is the ONLY injector, and the
     // public-app-polish round's groups below are swept out, not left dormant.
-    const FLAG = "gtd_qa_checklist_reviewsurface_v6";
+    const FLAG = "gtd_qa_checklist_reviewsurface_v7";
     if (Storage.get(FLAG)) return;
     Storage.set(FLAG, "1");
     // Retire the superseded flags so they can't resurrect their injectors, and
@@ -11911,7 +11933,8 @@ function injectChunkMap(){
      "gtd_qa_checklist_desktop_v2", "gtd_qa_checklist_sw_v1",
      "gtd_qa_checklist_publicpolish_v1", "gtd_qa_checklist_reviewsurface_v1",
      "gtd_qa_checklist_reviewsurface_v2", "gtd_qa_checklist_reviewsurface_v3",
-     "gtd_qa_checklist_reviewsurface_v4", "gtd_qa_checklist_reviewsurface_v5"].forEach(Storage.remove);
+     "gtd_qa_checklist_reviewsurface_v4", "gtd_qa_checklist_reviewsurface_v5",
+     "gtd_qa_checklist_reviewsurface_v6"].forEach(Storage.remove);
 
     // Replace, don't accumulate (8.1) — and actually mean it this time.
     // Earlier rounds bumped the flag but left the previous rounds' groups
@@ -11948,13 +11971,14 @@ function injectChunkMap(){
       { title: '5. Find an overdue repeating habit or event, if one shows up', notes: 'Whether it\'s still showing today or already moved on to tomorrow, it should offer "Completed", "Skipped" (not "Let it go"), and "Delete" — the same three, looking and working exactly the same, on both.' },
       { title: '6. Tap Skipped just once', notes: 'It should resolve fully and move the review on to something else — not turn into another card for the same event that you then have to tap Skipped on again.' },
       { title: '7. Check Delete acts right away, no popup', notes: 'Tapping Delete on a review card should delete it immediately, with no "are you sure?" popup — except a repeating calendar event, which still asks whether you mean just this occurrence or the whole series (that one stays, since "delete" is genuinely unclear there).' },
-      { title: '8. Tap the (i) info button at the top of the review', notes: 'It should explain only the ONE card you\'re looking at — not a wall of text about every kind of card at once.' }
+      { title: '8. Find a waiting action review card that lost its condition', notes: 'It should show one compact row — a text box, a small hook icon, and Add — instead of two separate big buttons for the same job.' },
+      { title: '9. Tap the (i) info button at the top of the review', notes: 'It should explain only the ONE card you\'re looking at — not a wall of text about every kind of card at once.' }
     ]);
 
     addGroupWithItems('✅ QA — Calendar changes', [
-      { title: '9. Open the calendar and set something to repeat', notes: 'Start adding an event, set it to repeat Daily or Weekly. A purple box should offer to make it a habit instead, with a small X on the end to dismiss it if you don\'t want it.' },
-      { title: '10. On a computer, open the calendar', notes: 'The whole calendar should fit on screen without needing to scroll, with the day squares wide and short (not tall) and the "Add" button always visible — not hidden below the fold.' },
-      { title: '11. Check the "More options" / "Advanced options" buttons', notes: 'Wherever you see one of these (a next action, a waiting action, a habit, or the calendar), it should now have a light grey fill so it stands out a bit, instead of blending into the background.' }
+      { title: '10. Open the calendar and set something to repeat', notes: 'Start adding an event, set it to repeat Daily or Weekly. A purple box should offer to make it a habit instead, with a small X on the end to dismiss it if you don\'t want it.' },
+      { title: '11. On a computer, open the calendar', notes: 'The whole calendar should fit on screen without needing to scroll, with the day squares wide and short (not tall) and the "Add" button always visible — not hidden below the fold.' },
+      { title: '12. Check the "More options" / "Advanced options" buttons', notes: 'Wherever you see one of these (a next action, a waiting action, a habit, or the calendar), it should now have a light grey fill so it stands out a bit, instead of blending into the background.' }
     ]);
     saveTasksLocal("next");
   }
@@ -12704,21 +12728,31 @@ function injectChunkMap(){
           '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewMenuBtn("review-delete", t("review.delete"), ' data-lane="current" data-id="' + l.id + '"', true) + '</div>';
       }
     } else if (l.kind === "orphaned"){
-      if (form && form.type === "text"){
-        menuHtml = reviewInlineFormHtml(t("review.waitingForDots"), "text", "review-freetext-save", t("review.save"), "", invalid);
-      } else {
-        // Band 1 (move it forward): the three ways to give it a condition to
-        // wait on again, or act on it now. Band 2 (take it off the list):
-        // Complete.
-        menuHtml =
-          reviewBandHtml(
-            reviewMenuBtn("review-open", t("review.repointCondition"), ' data-lane="waiting" data-id="' + l.id + '"') +
-            reviewMenuBtn("review-form-start", t("review.replaceWithFreeText"), ' data-key="' + l.key + '" data-type="text"') +
-            reviewMenuBtn("review-promote", t("review.promoteToNext"), ' data-id="' + l.id + '" data-target="next"')
-          ) +
-          reviewBandHtml(reviewMenuBtn("review-complete", t("review.completed"), ' data-lane="waiting" data-id="' + l.id + '"')) +
-          '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewMenuBtn("review-delete", t("review.delete"), ' data-lane="waiting" data-id="' + l.id + '"', true) + '</div>';
+      // Simplified (author, fifth QA round): "Re-point the condition" and
+      // "Replace with free text" were two separate full-width buttons for
+      // what's really one job — say what this is waiting on now. Replaced
+      // with the same compact quick-add row the waiting page's own field
+      // uses: a text box (free text), a hook icon beside it (re-point to a
+      // Next/Waiting condition — same navigation "Re-point the condition"
+      // used, just an icon now), and Add. Always present, not gated behind
+      // a button (there's nothing left to gate — this IS band 1 now).
+      // reviewForm is primed here rather than via a "start" click, since
+      // there's no longer a collapsed state to expand from; reviewSaveFreeText
+      // and the Enter-to-submit handler (both pre-existing) need it set to
+      // find this card by key.
+      if (!(form && form.type === "text")){
+        if (state.screen) state.screen.reviewForm = { key: l.key, type: "text", invalid: false };
       }
+      const curForm = reviewFormFor(s, l.key) || {};
+      menuHtml =
+        '<div class="review-band review-quickadd-row">' +
+          '<input type="text" id="review-form-input" data-field="reviewForm" class="review-form-input' + (curForm.invalid ? " field-invalid" : "") + '" placeholder="' + escapeHtml(t("review.waitingForDots")) + '" value="' + escapeHtml(curForm.value || "") + '" autocomplete="off">' +
+          '<button type="button" class="review-hook-btn" data-action="review-open" data-lane="waiting" data-id="' + l.id + '" title="' + escapeHtml(t("waiting.hookToTarget")) + '">&#129693;</button>' +
+          '<button type="button" class="review-menu-btn review-form-primary" data-action="review-freetext-save">' + escapeHtml(t("review.add")) + '</button>' +
+        '</div>' +
+        reviewBandHtml(reviewMenuBtn("review-promote", t("review.promoteToNext"), ' data-id="' + l.id + '" data-target="next"')) +
+        reviewBandHtml(reviewMenuBtn("review-complete", t("review.completed"), ' data-lane="waiting" data-id="' + l.id + '"')) +
+        '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewMenuBtn("review-delete", t("review.delete"), ' data-lane="waiting" data-id="' + l.id + '"', true) + '</div>';
     }
     return '<div class="review-card review-card-' + l.kind + '">' + bodyHtml + '<div class="review-menu">' + menuHtml + '</div></div>';
   }
