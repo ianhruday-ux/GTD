@@ -2,7 +2,13 @@
 condition" and "Replace with free text" buttons -- two full-width buttons for
 one job -- are replaced by a single compact row: a text box, a hook icon
 (navigates to the full waiting page to re-point the condition, same as
-before), and Add. "+Next" stays as its own chip.
+before), and Add.
+
+Sixth QA round: the promote button is no longer a colored "+Next" chip --
+unlike every other +Next (which CREATES a new item), this one CONVERTS the
+same waiting action in place, so it's relabeled "Make Next Action" and
+plain-styled to match the drafting page's own convert button instead of
+looking like a create-flavored chip.
 """
 import os, functools, http.server, socketserver, socket, threading, contextlib, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -81,7 +87,7 @@ with serve(DIST) as url, sync_playwright() as p:
             pg.wait_for_timeout(300)
         return revealed_title() == title
 
-    # ---------- the simplified card shows exactly field + hook + Add + +Next ----------
+    # ---------- the simplified card shows exactly field + hook + Add + Make Next Action ----------
     seed_orphan(pg)
     pg.reload(); pg.wait_for_timeout(1000)
     open_review()
@@ -91,7 +97,11 @@ with serve(DIST) as url, sync_playwright() as p:
     check(pg.locator('[data-action="review-freetext-save"]').count() == 1, "the Add button is present")
     promote_text = pg.evaluate("""() => { const b = document.querySelector('[data-action="review-promote"]');
       return b ? b.textContent.trim() : null; }""")
-    check(promote_text == "+Next", f"+Next is still offered, labelled correctly ({promote_text!r})")
+    check(promote_text == "Make Next Action",
+          f"the promote button is labelled 'Make Next Action', matching the drafting page's convert button, not '+Next' ({promote_text!r})")
+    promote_colored = pg.evaluate("""() => { const b = document.querySelector('[data-action="review-promote"]');
+      return b ? b.hasAttribute('data-target') : null; }""")
+    check(promote_colored is False, "and carries no data-target — plain grey, not lane-colored like the create chips")
     body_text = pg.evaluate("() => document.querySelector('.review-card').textContent")
     check("Re-point" not in body_text, "the old 'Re-point the condition' button is gone")
     check("Replace with free text" not in body_text, "the old 'Replace with free text' button is gone")

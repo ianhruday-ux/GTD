@@ -6078,7 +6078,7 @@
     // REVIEW-SURFACE round (review-surface-plan.md). §8.1's
     // replace-don't-accumulate discipline: this is the ONLY injector, and the
     // public-app-polish round's groups below are swept out, not left dormant.
-    const FLAG = "gtd_qa_checklist_reviewsurface_v7";
+    const FLAG = "gtd_qa_checklist_reviewsurface_v8";
     if (Storage.get(FLAG)) return;
     Storage.set(FLAG, "1");
     // Retire the superseded flags so they can't resurrect their injectors, and
@@ -6093,7 +6093,7 @@
      "gtd_qa_checklist_publicpolish_v1", "gtd_qa_checklist_reviewsurface_v1",
      "gtd_qa_checklist_reviewsurface_v2", "gtd_qa_checklist_reviewsurface_v3",
      "gtd_qa_checklist_reviewsurface_v4", "gtd_qa_checklist_reviewsurface_v5",
-     "gtd_qa_checklist_reviewsurface_v6"].forEach(Storage.remove);
+     "gtd_qa_checklist_reviewsurface_v6", "gtd_qa_checklist_reviewsurface_v7"].forEach(Storage.remove);
 
     // Replace, don't accumulate (8.1) — and actually mean it this time.
     // Earlier rounds bumped the flag but left the previous rounds' groups
@@ -6130,14 +6130,15 @@
       { title: '5. Find an overdue repeating habit or event, if one shows up', notes: 'Whether it\'s still showing today or already moved on to tomorrow, it should offer "Completed", "Skipped" (not "Let it go"), and "Delete" — the same three, looking and working exactly the same, on both.' },
       { title: '6. Tap Skipped just once', notes: 'It should resolve fully and move the review on to something else — not turn into another card for the same event that you then have to tap Skipped on again.' },
       { title: '7. Check Delete acts right away, no popup', notes: 'Tapping Delete on a review card should delete it immediately, with no "are you sure?" popup — except a repeating calendar event, which still asks whether you mean just this occurrence or the whole series (that one stays, since "delete" is genuinely unclear there).' },
-      { title: '8. Find a waiting action review card that lost its condition', notes: 'It should show one compact row — a text box, a small hook icon, and Add — instead of two separate big buttons for the same job.' },
-      { title: '9. Tap the (i) info button at the top of the review', notes: 'It should explain only the ONE card you\'re looking at — not a wall of text about every kind of card at once.' }
+      { title: '8. Find a waiting action review card that lost its condition', notes: 'It should show one compact row — a text box, a small hook icon, and Add — instead of two separate big buttons for the same job. Below that, a plain grey "Make Next Action" button, not a colored "+Next" chip — it converts this same item, so it shouldn\'t look like the buttons that create a new one.' },
+      { title: '9. Tap the (i) on a stalled project, a waiting action that lost its condition, and a freshly captured thought', notes: 'Each one\'s "add a next action"-style button does something different (creates a linked item, converts the same item, or files a new item) — the info text should say which, in your own words. Read all three and check they still sound like you.' },
+      { title: '10. Tap the (i) info button at the top of the review', notes: 'It should explain only the ONE card you\'re looking at — not a wall of text about every kind of card at once.' }
     ]);
 
     addGroupWithItems('✅ QA — Calendar changes', [
-      { title: '10. Open the calendar and set something to repeat', notes: 'Start adding an event, set it to repeat Daily or Weekly. A purple box should offer to make it a habit instead, with a small X on the end to dismiss it if you don\'t want it.' },
-      { title: '11. On a computer, open the calendar', notes: 'The whole calendar should fit on screen without needing to scroll, with the day squares wide and short (not tall) and the "Add" button always visible — not hidden below the fold.' },
-      { title: '12. Check the "More options" / "Advanced options" buttons', notes: 'Wherever you see one of these (a next action, a waiting action, a habit, or the calendar), it should now have a light grey fill so it stands out a bit, instead of blending into the background.' }
+      { title: '11. Open the calendar and set something to repeat', notes: 'Start adding an event, set it to repeat Daily or Weekly. A purple box should offer to make it a habit instead, with a small X on the end to dismiss it if you don\'t want it.' },
+      { title: '12. On a computer, open the calendar', notes: 'The whole calendar should fit on screen without needing to scroll, with the day squares wide and short (not tall) and the "Add" button always visible — not hidden below the fold.' },
+      { title: '13. Check the "More options" / "Advanced options" buttons', notes: 'Wherever you see one of these (a next action, a waiting action, a habit, or the calendar), it should now have a light grey fill so it stands out a bit, instead of blending into the background.' }
     ]);
     saveTasksLocal("next");
   }
@@ -6599,7 +6600,16 @@
     if (!kind) return ""; // nothing on the page (all-clear / all-deferred) — no panel, no ⓘ
     let body;
     if (kind === "capture"){
+      // ⚑ info.review.capture (author, sixth QA round: "the next action
+      // buttons on the stalled project and capture classification do
+      // different things — the info text should reflect this"). Tapping a
+      // lane here FILES this thought as a brand-new item — unlike stalled's
+      // +Next/+Waiting/+Event (a new item too, but linked to the project)
+      // and unlike orphaned's "Make Next Action" (no new item at all, the
+      // same waiting action converts in place). Previously written but never
+      // actually rendered — wired in here alongside the fix.
       body = '<div class="review-info-block"><b>' + escapeHtml(t("review.heading.sorting")) + '</b><br>' +
+          escapeHtml(t("info.review.capture")) + '<br><br>' +
           '<b>' + escapeHtml(t("review.infoNextLabel")) + '</b> ' + escapeHtml(LANE_INFO.next) + '<br>' +
           '<b>' + escapeHtml(t("review.infoWaitingLabel")) + '</b> ' + escapeHtml(LANE_INFO.waiting) + '<br>' +
           '<b>' + escapeHtml(t("review.infoProjectLabel")) + '</b> ' + escapeHtml(LANE_INFO.current) + '<br>' +
@@ -6909,7 +6919,16 @@
           '<button type="button" class="review-hook-btn" data-action="review-open" data-lane="waiting" data-id="' + l.id + '" title="' + escapeHtml(t("waiting.hookToTarget")) + '">&#129693;</button>' +
           '<button type="button" class="review-menu-btn review-form-primary" data-action="review-freetext-save">' + escapeHtml(t("review.add")) + '</button>' +
         '</div>' +
-        reviewBandHtml(reviewMenuBtn("review-promote", t("review.promoteToNext"), ' data-id="' + l.id + '" data-target="next"')) +
+        // ⚑ Deliberately NOT a colored "+Next" chip (author, sixth QA round:
+        // "I got confused about what that button did because its behaviour
+        // is substantially different from the other +Next buttons"). Every
+        // other +Next creates a NEW item (stalled: a fresh linked action;
+        // capture: files the thought as one); this one converts the SAME
+        // waiting action in place, no new item — exactly what the drafting
+        // page's own "Make Next Action" convert button does, so it reuses
+        // that button's label (outcome.makeNext) and plain, uncolored style
+        // instead of looking like the create-flavored chips.
+        reviewBandHtml(reviewMenuBtn("review-promote", t("outcome.makeNext"), ' data-id="' + l.id + '"')) +
         reviewBandHtml(reviewMenuBtn("review-complete", t("review.completed"), ' data-lane="waiting" data-id="' + l.id + '"')) +
         '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewMenuBtn("review-delete", t("review.delete"), ' data-lane="waiting" data-id="' + l.id + '"', true) + '</div>';
     }

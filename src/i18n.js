@@ -152,21 +152,38 @@ const STRINGS = {
     en: "This event's time has passed without being ticked. Tick it if you actually did it, skip it if you didn't (a repeating event moves on to its next occurrence), or delete it to remove the event for good — or Not now to see it again next time.",
     "zh-Hans": "这个事件的时间已经过去，但还没有勾选完成。如果确实做了就勾选完成；如果没做就跳过（如果是重复事件，会自动进入下一次）；要彻底删除这个事件就选删除——或者选择“暂不处理”，下次再看到它。"
   },
+  // ⚑ ADDED clause (author, sixth QA round): distinguishes this +Next/
+  // +Waiting/+Event from capture's — this one is linked to the project,
+  // not a stray new item on its own.
   "info.review.stalled": {
-    en: "This is a project with no way forward. Add the next physical step, a waiting action, or an event to keep it going, or move it to Someday if continuing the project isn't possible or practical. You can always come back to it in the future.",
-    "zh-Hans": "这个项目目前没有任何推进方式。请添加下一步行动、一项等待行动或一个日历事件，让项目继续推进；如果暂时不适合继续，也可以把它移到“将来”列表。以后随时都可以再回来处理。"
+    en: "This is a project with no way forward. Add the next physical step, a waiting action, or an event — linked to this project rather than standing on its own — to keep it going, or move it to Someday if continuing the project isn't possible or practical. You can always come back to it in the future.",
+    "zh-Hans": "这个项目目前没有任何推进方式。请添加下一步行动、一项等待行动或一个日历事件——它们都会关联到这个项目，而不是单独存在的条目——让项目继续推进；如果暂时不适合继续，也可以把它移到“将来”列表。以后随时都可以再回来处理。"
   },
+  // ⚑ REWRITTEN (author, sixth QA round): the old text never mentioned
+  // Completed or Delete at all ("close it out" tried to cover both) and
+  // called the convert option "promote" when the button now reads "Make
+  // Next Action" — clarified as the SAME item, not a new one, which is the
+  // whole point of contrast with stalled's +Next (a fresh, linked item)
+  // and capture's Next (a fresh, unlinked item).
   "info.review.orphaned": {
-    en: "This was waiting on something that no longer exists. Point it at something else, replace it with a note to yourself, promote it if you can act now, or close it out.",
-    "zh-Hans": "这项等待行动原本依赖的条件已经不存在了。你可以把它改为等待其他事情、改成一条笔记、如果现在已经可以执行就把它移到“下一步行动”，或者直接结束它。"
+    en: "This was waiting on something that no longer exists. Point it at something else, replace it with a note to yourself, or make it a next action if you can act on it now — the same item, not a new one. Mark it done if it's already handled, or delete it if it's dead — or Not now to see it again next time.",
+    "zh-Hans": "这项等待行动原本依赖的条件已经不存在了。你可以把它指向别的东西、改成一条写给自己的笔记，或者如果现在就能做，就把它转为下一步行动——还是同一个条目，不会新建一个。如果已经处理好了就勾选完成，如果已经没用了就删除——或者选择“暂不处理”，下次再看到它。"
   },
   "info.review.missed": {
     en: "A repeating thing whose day went by without being ticked. Often you did it and forgot to say so — 'Completed' records it on the day it happened. 'Skipped' clears it without pretending you did. Delete removes the whole repeating series, not just this occurrence. Only the most recent miss is ever kept, so this never piles up.",
     "zh-Hans": "这是一项重复事项，它的执行日期已经过去，但还没有勾选完成。很多时候其实已经做了，只是忘了记录。“已完成”会把完成记录补到实际发生的那一天；“已跳过”则会直接清除这次记录，而不会假装已经完成。“删除”会删除整个重复系列，而不只是这一次。系统始终只保留最近的一次，因此不会越积越多。"
   },
+  // ⚑ Now actually rendered (author, sixth QA round) — previously written
+  // but never wired into reviewInfoPanelHtml's capture branch. Shortened
+  // to just the mechanic (the six lane bullets below already say what each
+  // lane is for, and the card's own Not now button doesn't need re-
+  // explaining here): tapping a lane FILES this thought as a brand-new
+  // item — the contrast this round is drawing out is with stalled's
+  // +Next/+Waiting/+Event (also new, but linked to the project) and
+  // orphaned's "Make Next Action" (no new item at all).
   "info.review.capture": {
-    en: "A stray thought you haven't filed yet. Send it to a lane — or Not now to leave it for later.",
-    "zh-Hans": "这是一个还没有整理的零散想法。把它放到合适的列表中，或者选择“暂不处理”，留到以后再整理。"
+    en: "Tap a lane to turn this thought into a new item there.",
+    "zh-Hans": "点击任意一个列表，就会把这个想法变成那里的一个新条目。"
   },
   "review.heading.sorting":  { en: "Sorting a new thought",        "zh-Hans": "整理一个新想法" },
   "review.heading.deciding": { en: "When something needs a decision", "zh-Hans": "当某件事需要做决定时" },
@@ -553,7 +570,10 @@ const STRINGS = {
   "review.waitingForDots":   { en: "Waiting for…",                  "zh-Hans": "在等待…" },
   // review.repointCondition / review.replaceWithFreeText retired — merged
   // into one quick-add field (text box + hook icon), fifth QA round.
-  "review.promoteToNext":    { en: "+Next",                         "zh-Hans": "+下一步" },
+  // review.promoteToNext retired — the orphaned card's promote button now
+  // reuses outcome.makeNext's label directly (sixth QA round): it converts
+  // the existing item, unlike every other "+Next", so it needed to look
+  // like the drafting page's own convert button, not a create-flavored chip.
   "review.cancel":           { en: "Cancel",                        "zh-Hans": "取消" },
   "review.save":             { en: "Save",                          "zh-Hans": "保存" },
   "review.fullPage":         { en: "Full page →",                   "zh-Hans": "完整页面 →" },
