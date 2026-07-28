@@ -202,9 +202,13 @@ installed app stays resident for days, and a phone opened at 9am after being sus
 must still process the 4am boundary; the Android hardware/gesture **back** action must map onto
 the screen stack (**RULED in §4.6 — BACK = CANCEL (✕), never Save**, with the resolution order
 dialog → drawer → page → exit; this line used to pose it as an open question and was stale); on-screen
-keyboard resize will fight the floating Complete badge the same way the URL bar did; and fonts must
-be vendored locally (currently loaded from Google Fonts — a CDN dependency that breaks the
-offline promise).
+keyboard resize will fight the floating Complete badge the same way the URL bar did. *(Struck: "and
+fonts must be vendored locally." **DONE 2026-07-28, in the browser build, ahead of the wrapper** —
+it was never really wrapper work. The CDN `<link>` broke the offline promise in the shipped web app
+too, so it was fixed there: `tools_getfonts.py` vendors the latin subsets into `src/assets/fonts/`
+and `build.py` inlines them as base64, keeping `dist/index.html` one self-contained file. Guarded by
+`checks/offline_fonts.py`, which aborts every off-origin request and then measures rendered glyph
+widths, so a returning CDN link fails the check rather than passing it quietly.)*
 
 *(Struck this round: "destructive controls must relocate into the settings surface **the wrapper
 introduces**." **The settings surface is chunk 6**, not a wrapper feature — the resequence moved it

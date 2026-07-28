@@ -135,7 +135,7 @@ browser, it changes who owns it. Almost nothing gets rebuilt.
 | # | Item | Detail |
 |---|---|---|
 | **B1** | **Boundary sweep is boot-only** | Confirmed: `processHabitBoundaries()` / `processEventBoundaries()` run at boot (`app.js:8091–8092`) and on a QA time jump (`4583–4584`) and nowhere else. The only `visibilitychange` listener in the app cancels a stuck drag (`app.js:5848`). An installed app stays resident for days: phone suspended overnight, opened at 9am, **never processes the 4am boundary.** Habits, recurring events and every deadline bar are wrong until a cold start. Must also fire on resume |
-| **B2** | **Fonts load from a CDN** | `index.html:24–25` pulls Space Grotesk, Inter and IBM Plex Mono from `fonts.googleapis.com`. **This breaks the offline promise in the browser build too** — it is not a wrapper bug, it is an existing bug the wrapper merely makes obvious. Vendor them locally. See §3.5 |
+| **B2** | ~~**Fonts load from a CDN**~~ | **FIXED 2026-07-28, ahead of the wrapper** (author's ruling: leave the web version in as good a state as possible first). It was never wrapper work — the CDN `<link>` broke the offline promise in the shipped web app too. `tools_getfonts.py` vendors the latin subsets; `build.py` inlines them as base64 so `dist/index.html` stays one self-contained file. +137 KB (1.24 MB total). Inter and Space Grotesk turned out to be **variable** fonts — one file each covers every weight — which halved the cost. Guarded by `checks/offline_fonts.py` |
 | **B3** | **Service worker will register inside the wrapper** | `swClient.js` skips registration only on `file:`. Capacitor serves from `https://localhost` / `capacitor://localhost` — a registerable origin — so the SW **will** install, putting a second cache layer on top of assets that are already bundled locally. In a wrapper, app updates arrive as a new APK; a stale SW cache can serve the old app on top of the new binary. This is the exact bricking scenario `service-worker-plan.md` was written to prevent, in a context where the kill switch is harder to deliver. **Ruling needed:** the SW should almost certainly no-op inside the wrapper ⚑ |
 | **B4** | **Android back button** | See §5. Small, because the work is already done |
 
@@ -164,12 +164,12 @@ Per the author's step 2, sorted into the three buckets agreed in conversation.
 
 **Fix now, in both builds:**
 
-- **B2 — fonts from a CDN.** The app claims to work with zero network. It does not: first paint on a
-  cold cache with no connection falls back to system fonts, and `dist/index.html` is otherwise
-  genuinely self-contained. This is a real browser-build bug found by the audit. ⚑ Recommend fixing
-  it before the wrapper starts, since it is independent of everything else here.
+- ~~**B2 — fonts from a CDN.**~~ **Done 2026-07-28.** The app claimed to work with zero network and
+  did not: first paint on a cold cache with no connection fell back to system fonts, in a file that
+  was otherwise genuinely self-contained. Fixed in the browser build ahead of the wrapper, since it
+  was independent of everything else here. Verified from both a served origin and `file:`.
 - **`spec.md` §3 known issue 1 is stale.** The screen stack landed. Mark it resolved so the next
-  session doesn't design around a limitation that no longer exists.
+  session doesn't design around a limitation that no longer exists. *(Still outstanding.)*
 
 **Fix in its wrapper chunk:** B1, B3, B4, S1–S4.
 
@@ -304,6 +304,6 @@ Deliberately not in this document, because both depend on the author's response 
 
 **Immediate open questions for the author:**
 
-1. Fix B2 (fonts) now, as a standalone browser-build fix, before the wrapper begins?
+1. ~~Fix B2 (fonts) now?~~ **Answered: yes. Done 2026-07-28.**
 2. The lanes back-button ruling (§5).
 3. Dropbox first, or Drive `appDataFolder` first?

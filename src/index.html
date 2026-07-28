@@ -21,8 +21,15 @@
 <meta name="theme-color" content="#171513">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<!-- The three families used to be <link>ed from fonts.googleapis.com. They are
+     VENDORED now (src/assets/fonts/, inlined as base64 by build.py) because the
+     CDN link was the one thing breaking the app's central promise: with no
+     network and a cold cache, every surface fell back to system fonts, in a
+     file that is otherwise entirely self-contained. Regenerate the files with
+     tools_getfonts.py; never hand-edit them. -->
+<style>
+<!--BUILD:FONTS-->
+</style>
 <style>
 <!--BUILD:STYLES-->
 </style>
