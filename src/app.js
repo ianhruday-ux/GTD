@@ -4905,6 +4905,8 @@
       if (revDelete){ reviewDelete(revDelete.getAttribute("data-lane"), revDelete.getAttribute("data-id")); return; }
       const revDeleteEvent = e.target.closest('[data-action="review-delete-event"]');
       if (revDeleteEvent){ reviewDeleteEvent(revDeleteEvent.getAttribute("data-id")); return; }
+      const revDeleteEventMissed = e.target.closest('[data-action="review-delete-event-missed"]');
+      if (revDeleteEventMissed){ reviewDeleteEventById(revDeleteEventMissed.getAttribute("data-id")); return; }
       const revSkipLive = e.target.closest('[data-action="review-skip-live"]');
       if (revSkipLive){ reviewSkipLive(revSkipLive.getAttribute("data-id")); return; }
       // ⚑ QA (user): the quick-add's escape hatch to the real creation page,
@@ -6076,7 +6078,7 @@
     // REVIEW-SURFACE round (review-surface-plan.md). §8.1's
     // replace-don't-accumulate discipline: this is the ONLY injector, and the
     // public-app-polish round's groups below are swept out, not left dormant.
-    const FLAG = "gtd_qa_checklist_reviewsurface_v4";
+    const FLAG = "gtd_qa_checklist_reviewsurface_v5";
     if (Storage.get(FLAG)) return;
     Storage.set(FLAG, "1");
     // Retire the superseded flags so they can't resurrect their injectors, and
@@ -6089,7 +6091,8 @@
      "gtd_qa_checklist_postsprint_v7", "gtd_qa_checklist_desktop_v1",
      "gtd_qa_checklist_desktop_v2", "gtd_qa_checklist_sw_v1",
      "gtd_qa_checklist_publicpolish_v1", "gtd_qa_checklist_reviewsurface_v1",
-     "gtd_qa_checklist_reviewsurface_v2", "gtd_qa_checklist_reviewsurface_v3"].forEach(Storage.remove);
+     "gtd_qa_checklist_reviewsurface_v2", "gtd_qa_checklist_reviewsurface_v3",
+     "gtd_qa_checklist_reviewsurface_v4"].forEach(Storage.remove);
 
     // Replace, don't accumulate (8.1) — and actually mean it this time.
     // Earlier rounds bumped the flag but left the previous rounds' groups
@@ -6123,7 +6126,7 @@
       { title: '2. Check the buttons are grouped, not one long list', notes: 'A card with several buttons (like a stalled project) should show them in a few small groups with a thin line between each group, ending with "Not now" in the bottom-left corner and a red "Delete" in the bottom-right — not seven buttons in one plain column.' },
       { title: '3. Check the colored buttons', notes: 'Buttons that add something to a list — "+Next", "+Waiting", "+Event", "Someday →" — should be short and colored like that list\'s tab (red, yellow, brass, blue). Buttons that don\'t send it anywhere (like "Completed") stay plain grey. Same on the phone and on a computer.' },
       { title: '4. Check the wording is the same everywhere', notes: 'Every card\'s "this got done" button should say "Completed" (not "Mark done" or "Complete it"), and every Delete button should just say "Delete" (not "Delete it").' },
-      { title: '5. Find an overdue repeating habit or event, if one shows up', notes: 'Whether it\'s still showing today or already moved on to tomorrow, it should offer a "Skipped" button (not "Let it go") alongside "Completed" — a way to say "this one didn\'t happen, and that\'s fine" without deleting the whole repeating series.' },
+      { title: '5. Find an overdue repeating habit or event, if one shows up', notes: 'Whether it\'s still showing today or already moved on to tomorrow, it should offer "Completed", "Skipped" (not "Let it go"), and "Delete" — the same three, looking and working exactly the same, on both.' },
       { title: '6. Check Delete acts right away, no popup', notes: 'Tapping Delete on a review card should delete it immediately, with no "are you sure?" popup — except a repeating calendar event, which still asks whether you mean just this occurrence or the whole series (that one stays, since "delete" is genuinely unclear there).' },
       { title: '7. Tap the (i) info button at the top of the review', notes: 'It should explain only the ONE card you\'re looking at — not a wall of text about every kind of card at once.' }
     ]);
@@ -6759,9 +6762,11 @@
     // path below because it has NO lane row to read a title or a bar from -- it is
     // the event plus a date. Tapping through goes to the event's page.
     //
-    // The menu is the past-due pseudo-action's, minus anything that would act on
-    // the wrong occurrence: you cannot push a date that is already behind you,
-    // and Delete here must clear THIS miss, not the live series.
+    // The menu is close kin to the past-due pseudo-action's, minus anything
+    // that would act on the wrong occurrence: you cannot push a date that is
+    // already behind you. Delete deletes the whole event/series, same as
+    // everywhere else in the review (author ruling, fourth QA round) — the
+    // "just this miss" case is what Skipped is for.
     if (l.kind === "missed"){
       const when = dateStrToDate(l.occ).toLocaleDateString(undefined,
         { weekday: "long", day: "numeric", month: "long" });
@@ -6773,14 +6778,16 @@
       // No band 1 (move forward) — a missed occurrence has nothing to add,
       // only a way to resolve it. Band 2 (take it off the list): both options
       // resolve the miss, just with different honesty about what happened.
-      // No delete either — see reviewMissedClear's comment: this destroys
-      // nothing, so the universal corner row is Not now alone.
+      // Delete (author ruling, fourth QA round: "no reason those pages
+      // should look or behave any differently" from the live pastdue-pseudo
+      // card) — same corner, same recurring-aware dialog, resolved by event
+      // id since a missed card has no lane row to hang a task id off.
       menuHtml =
         reviewBandHtml(
           '<button type="button" class="review-menu-btn" data-action="review-missed-done" data-id="' + l.id + '">&#10003; ' + escapeHtml(t("review.completed")) + '</button>' +
           '<button type="button" class="review-menu-btn" data-action="review-missed-clear" data-id="' + l.id + '">' + escapeHtml(t("review.skipped")) + '</button>'
         ) +
-        '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + '</div>';
+        '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewMenuBtn("review-delete-event-missed", "&#128465; " + escapeHtml(t("review.delete")), ' data-id="' + l.id + '"', true) + '</div>';
       return '<div class="review-card">' + bodyHtml + '<div class="review-menu">' + menuHtml + '</div></div>';
     }
     // Derived kinds share a tap-through title (opens the real page) + a
@@ -7054,17 +7061,17 @@
     if (state.screen) state.screen.reviewForm = null;
     renderScreen();
   }
-  // QA #13. The id is the pseudo-action's task ID, which IS the event's taskId
-  // (§4.14a) — that stability is exactly what lets the review address the event
-  // without carrying a second identifier.
   // The ONE exception to the no-confirm ruling above: a RECURRING event, where
   // "delete" is ambiguous (this occurrence, or the whole series?) — that's
   // disambiguation, not a safety net, so it stays. Reuses confirmDeleteEvent's
   // own recurring branch unchanged (also used by the full event page); only
   // the non-recurring path diverges from it here, going straight to
   // deleteEventEntirely instead of confirmDeleteEvent's plain "are you sure".
-  function reviewDeleteEvent(taskId){
-    const ev = findEventByTaskId(taskId);
+  // Shared by both the live past-due pseudo-action card AND the already-
+  // rolled-past missed card (author ruling: "no reason those pages should
+  // look or behave any differently") — every recurring event in the review
+  // gets Delete, and gets the same dialog.
+  function reviewDeleteEventCore(ev){
     if (!ev){ renderScreen(); return; }
     if (isRecurring(ev)){
       confirmDeleteEvent(ev, function(){
@@ -7077,6 +7084,14 @@
       renderScreen();
     }
   }
+  // QA #13. The id is the pseudo-action's task ID, which IS the event's taskId
+  // (§4.14a) — that stability is exactly what lets the review address the event
+  // without carrying a second identifier. Used by the live pastdue card.
+  function reviewDeleteEvent(taskId){ reviewDeleteEventCore(findEventByTaskId(taskId)); }
+  // The missed card carries the EVENT's own id (l.id = ev.id — it has no lane
+  // row to hang a task id off), not a task id, so it needs the plain findEvent
+  // lookup rather than reviewDeleteEvent's findEventByTaskId.
+  function reviewDeleteEventById(eventId){ reviewDeleteEventCore(findEvent(eventId)); }
   // §9/§2 (review-surface-plan.md, author third QA round): "Skipped" for a
   // still-live (not yet rolled-past) recurring occurrence — the same act as
   // reviewMissedClear performs for an already-rolled one, done a day early.

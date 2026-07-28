@@ -161,8 +161,8 @@ const STRINGS = {
     "zh-Hans": "这项等待行动原本依赖的条件已经不存在了。你可以把它改为等待其他事情、改成一条笔记、如果现在已经可以执行就把它移到“下一步行动”，或者直接结束它。"
   },
   "info.review.missed": {
-    en: "A repeating thing whose day went by without being ticked. Often you did it and forgot to say so — 'Completed' records it on the day it happened. 'Skipped' clears it without pretending you did. Only the most recent one is ever kept, so this never piles up.",
-    "zh-Hans": "这是一项重复事项，它的执行日期已经过去，但还没有勾选完成。很多时候其实已经做了，只是忘了记录。“已完成”会把完成记录补到实际发生的那一天；“已跳过”则会直接清除这次记录，而不会假装已经完成。系统始终只保留最近的一次，因此不会越积越多。"
+    en: "A repeating thing whose day went by without being ticked. Often you did it and forgot to say so — 'Completed' records it on the day it happened. 'Skipped' clears it without pretending you did. Delete removes the whole repeating series, not just this occurrence. Only the most recent miss is ever kept, so this never piles up.",
+    "zh-Hans": "这是一项重复事项，它的执行日期已经过去，但还没有勾选完成。很多时候其实已经做了，只是忘了记录。“已完成”会把完成记录补到实际发生的那一天；“已跳过”则会直接清除这次记录，而不会假装已经完成。“删除”会删除整个重复系列，而不只是这一次。系统始终只保留最近的一次，因此不会越积越多。"
   },
   "info.review.capture": {
     en: "A stray thought you haven't filed yet. Send it to a lane — or Not now to leave it for later.",

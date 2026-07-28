@@ -178,6 +178,47 @@ with serve(DIST) as url, sync_playwright() as p:
     pg.wait_for_timeout(300)
     still_exists = pg.evaluate("() => JSON.parse(localStorage.getItem('gtd_events') || '[]').length")
     check(still_exists == 1, "Cancel leaves the event untouched")
+
+    # ---------- the ALREADY-ROLLED "missed" card: same button, same dialog ----------
+    # Author ruling: "It should be on both pages, and it should get the
+    # dialogue. There is no reason those pages should look or behave any
+    # differently." Weekly at 23:00 dated the 12th (missed_repeats.py's own
+    # fixture shape): today's occurrence (the 19th) hasn't passed yet, so the
+    # ONLY open loop is the recorded miss -- the review shows the missed card,
+    # not the live pseudo-action.
+    pg.evaluate("""() => {
+      const e = { id: 'zz-ev2', taskId: 'zz-ev2-task', title: 'ZZ missed recurring', date: '2026-06-12',
+        time: '23:00', notesClean: '', recurrence: 'weekly', interval: 1,
+        paused: false, contextId: null, linkedProjectId: null,
+        seriesId: 'zz-s2', tickler: false, completedOccs: [] };
+      localStorage.setItem('gtd_events', JSON.stringify([e]));
+      const n = JSON.parse(localStorage.getItem('gtd_tasks_next') || '[]');
+      localStorage.setItem('gtd_tasks_next', JSON.stringify(n.filter(t => !t.id.startsWith('zz-ev'))));
+    }""")
+    pg.reload(); pg.wait_for_timeout(1000)
+    pg.evaluate("() => { const r=document.querySelector('#tray-root'); if(r) r.innerHTML=''; }")
+    jclick('[data-action="open-tray"]'); pg.wait_for_timeout(350)
+    jclick('[data-action="open-review"]'); pg.wait_for_timeout(600)
+    title2 = revealed_title()
+    check(title2 == "ZZ missed recurring", f"fixture: the already-rolled missed card is revealed ({title2})")
+    is_missed_menu = pg.evaluate("""() => !!document.querySelector('[data-action="review-missed-clear"]')""")
+    check(is_missed_menu, "confirmed it's the missed shape, not the live pseudo-action")
+    check(pg.locator('[data-action="review-delete-event-missed"]').count() == 1,
+          "the missed card now offers Delete too")
+    jclick('[data-action="review-delete-event-missed"]'); pg.wait_for_timeout(400)
+    check(not no_dialog(), "and it gets the SAME disambiguation dialog as the live card")
+    dialog_text2 = pg.evaluate("""() => { const d = document.querySelector('.choice-dialog');
+      return d ? d.textContent : ''; }""")
+    check("Skip" in dialog_text2 or "skip" in dialog_text2.lower(),
+          f"same skip-this-one / delete-series choice ({dialog_text2[:120]!r})")
+    pg.evaluate("""() => { const btns = [...document.querySelectorAll('.choice-dialog button')];
+      const del = btns.find(b => b.textContent.trim().toLowerCase().includes('series'));
+      if (del) del.click(); }""")
+    pg.wait_for_timeout(400)
+    ev_gone = pg.evaluate("""() => !JSON.parse(localStorage.getItem('gtd_events') || '[]')
+      .some(e => e.id === 'zz-ev2')""")
+    check(ev_gone, "'Delete series' actually removes the event")
+
     errs += errs2
 
     check(len(errs) == 0, f"no JS errors ({errs})")

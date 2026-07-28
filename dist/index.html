@@ -2371,7 +2371,7 @@ body.screen-open #tray-handle{ display:none; }
 (function(){
 "use strict";
 
-const BUILD_STAMP = "27 Jul 22:10";  // replaced by build.py
+const BUILD_STAMP = "27 Jul 22:33";  // replaced by build.py
 
 // =========================================================
 // STORAGE ADAPTER (spec.md §3, known issue 4)
@@ -2595,8 +2595,8 @@ const STRINGS = {
     "zh-Hans": "这项等待行动原本依赖的条件已经不存在了。你可以把它改为等待其他事情、改成一条笔记、如果现在已经可以执行就把它移到“下一步行动”，或者直接结束它。"
   },
   "info.review.missed": {
-    en: "A repeating thing whose day went by without being ticked. Often you did it and forgot to say so — 'Completed' records it on the day it happened. 'Skipped' clears it without pretending you did. Only the most recent one is ever kept, so this never piles up.",
-    "zh-Hans": "这是一项重复事项，它的执行日期已经过去，但还没有勾选完成。很多时候其实已经做了，只是忘了记录。“已完成”会把完成记录补到实际发生的那一天；“已跳过”则会直接清除这次记录，而不会假装已经完成。系统始终只保留最近的一次，因此不会越积越多。"
+    en: "A repeating thing whose day went by without being ticked. Often you did it and forgot to say so — 'Completed' records it on the day it happened. 'Skipped' clears it without pretending you did. Delete removes the whole repeating series, not just this occurrence. Only the most recent miss is ever kept, so this never piles up.",
+    "zh-Hans": "这是一项重复事项，它的执行日期已经过去，但还没有勾选完成。很多时候其实已经做了，只是忘了记录。“已完成”会把完成记录补到实际发生的那一天；“已跳过”则会直接清除这次记录，而不会假装已经完成。“删除”会删除整个重复系列，而不只是这一次。系统始终只保留最近的一次，因此不会越积越多。"
   },
   "info.review.capture": {
     en: "A stray thought you haven't filed yet. Send it to a lane — or Not now to leave it for later.",
@@ -5732,13 +5732,13 @@ function initTimePickerFields(){
 // (this file + its boot() call) if the convention is ever retired.
 // =========================================================
 function injectChunkMap(){
-  const FLAG = "gtd_chunk_map_v14";
+  const FLAG = "gtd_chunk_map_v15";
   if (Storage.get(FLAG)) return;
   Storage.set(FLAG, "1");
   ["gtd_chunk_map_v1", "gtd_chunk_map_v2", "gtd_chunk_map_v3", "gtd_chunk_map_v4",
    "gtd_chunk_map_v5", "gtd_chunk_map_v6", "gtd_chunk_map_v7", "gtd_chunk_map_v8",
    "gtd_chunk_map_v9", "gtd_chunk_map_v10", "gtd_chunk_map_v11",
-   "gtd_chunk_map_v12", "gtd_chunk_map_v13"].forEach(Storage.remove);  // retire superseded flags
+   "gtd_chunk_map_v12", "gtd_chunk_map_v13", "gtd_chunk_map_v14"].forEach(Storage.remove);  // retire superseded flags
 
   // Replace, don't accumulate (8.2, mirroring 8.1): sweep any previous
   // chunk-map group (tagged via devContext, not a title match, since the
@@ -5794,7 +5794,7 @@ function injectChunkMap(){
     { title: "✓ Events on the project page", notes: "DONE. A project shows its linked events and can create them — including on the creation page, where the event is held as a draft and only becomes real when the project is saved. ‘Add an event’ in the daily review came with it." },
     { title: "✓ Linked notes on the project page", notes: "DONE. The link runs both ways now. A current project's Linked panel has an Actions side and a Notes side you toggle between, and a Someday project has a Linked notes section of its own — notes only, since a Someday project holds no actions by design." },
     { title: "Re-test backups against the new fields", notes: "TO DO. Export and import have not been exercised since deadlines gained a start date and a push counter, repeats gained a missed-day marker, and the backgrounds changed names. Backups are the one thing that has to survive real use." },
-    { title: "✓ The review surface, standardised", notes: "DONE. Fixed a live bug where the Chinese text for a missed repeat quoted buttons that no longer existed. The review's five card kinds (missed, past due, stalled, orphaned, and the sort-a-thought capture card) now share one delete style and one 'Not now' corner position instead of five different looks. The four decision cards (everything but capture) are now grouped into bands — 'ways to move it forward', 'ways to take it off the list', then Not now/Delete — separated by a divider line, same layout on phone and computer, so a card that used to be seven buttons in a column now reads at a glance. Buttons that send the item to a list are short and colored like that list's tab ('+Next', '+Waiting', '+Event', 'Someday →'), modeled on the capture card's own colored buttons; buttons that resolve or edit in place stay plain. The missed-repeat button 'Let it go' is renamed 'Skipped' (in both languages) so it can't be misread as the same action as 'Not now' — and 'Skipped' now also appears on a repeating event that's overdue TODAY (not just one that already rolled past to tomorrow), so you don't have to wait a day to say 'this one didn't happen'. Every 'this got done' button across all five cards now says the same thing, 'Completed', and every delete button just says 'Delete'. Delete in the review no longer asks 'are you sure' — the review is a sorting pass, not a place that needs that friction, and Delete sits in its own corner away from every other button — except a repeating event, where delete stays ambiguous (this occurrence, or the whole series?) and keeps its dialog. The review's (i) info button now explains only the one card on screen, not all five kinds at once, and stays open as you move to the next card." },
+    { title: "✓ The review surface, standardised", notes: "DONE. Fixed a live bug where the Chinese text for a missed repeat quoted buttons that no longer existed. The review's five card kinds (missed, past due, stalled, orphaned, and the sort-a-thought capture card) now share one delete style and one 'Not now' corner position instead of five different looks. The four decision cards (everything but capture) are now grouped into bands — 'ways to move it forward', 'ways to take it off the list', then Not now/Delete — separated by a divider line, same layout on phone and computer, so a card that used to be seven buttons in a column now reads at a glance. Buttons that send the item to a list are short and colored like that list's tab ('+Next', '+Waiting', '+Event', 'Someday →'), modeled on the capture card's own colored buttons; buttons that resolve or edit in place stay plain. The missed-repeat button 'Let it go' is renamed 'Skipped' (in both languages) so it can't be misread as the same action as 'Not now' — and 'Skipped' now also appears on a repeating event that's overdue TODAY (not just one that already rolled past to tomorrow), so you don't have to wait a day to say 'this one didn't happen'. Every 'this got done' button across all five cards now says the same thing, 'Completed', and every delete button just says 'Delete'. Delete in the review no longer asks 'are you sure' — the review is a sorting pass, not a place that needs that friction, and Delete sits in its own corner away from every other button — except a repeating event, where delete stays ambiguous (this occurrence, or the whole series?) and keeps its dialog. Delete (with that same dialog) is now on BOTH the still-live overdue card and the already-rolled 'missed' card — no reason those should behave differently. The review's (i) info button now explains only the one card on screen, not all five kinds at once, and stays open as you move to the next card." },
     { title: "✓ The habit-bubble dismiss, and the Advanced buttons", notes: "DONE. The calendar's 'Make this a habit instead' suggestion (shown when you set something to repeat daily or weekly) now has a small X to dismiss it — it comes back next time you pick daily or weekly on a fresh item. Every 'Advanced options' / 'More options' button across the app got a light grey fill for contrast, and the calendar's copy moved up next to the Event/Deadline toggle instead of sitting at the bottom of the form, on both phone and computer." },
     { title: "✓ The desktop calendar, fixed", notes: "DONE. The computer calendar used to overflow the screen at every size tested, including 1920x1080 — the day squares were too tall and the Add button could sit below the fold. It's now two columns (the form on the left, wide short day-squares on the right), fits on screen at any reasonable window size, and the phone layout is untouched." },
     { title: "✓ 9 — Service worker + offline + install polish", notes: "DONE. The app now works with no internet — it saves a copy of itself the first time you open it online, so airplane mode after that still loads and works. When I ship a change while you have the app open, a small bar appears saying “New version available” with a Reload button; nothing ever updates or interrupts you without that tap. See the fresh QA checklist in Next Actions to try both." },
@@ -10723,6 +10723,8 @@ function injectChunkMap(){
       if (revDelete){ reviewDelete(revDelete.getAttribute("data-lane"), revDelete.getAttribute("data-id")); return; }
       const revDeleteEvent = e.target.closest('[data-action="review-delete-event"]');
       if (revDeleteEvent){ reviewDeleteEvent(revDeleteEvent.getAttribute("data-id")); return; }
+      const revDeleteEventMissed = e.target.closest('[data-action="review-delete-event-missed"]');
+      if (revDeleteEventMissed){ reviewDeleteEventById(revDeleteEventMissed.getAttribute("data-id")); return; }
       const revSkipLive = e.target.closest('[data-action="review-skip-live"]');
       if (revSkipLive){ reviewSkipLive(revSkipLive.getAttribute("data-id")); return; }
       // ⚑ QA (user): the quick-add's escape hatch to the real creation page,
@@ -11894,7 +11896,7 @@ function injectChunkMap(){
     // REVIEW-SURFACE round (review-surface-plan.md). §8.1's
     // replace-don't-accumulate discipline: this is the ONLY injector, and the
     // public-app-polish round's groups below are swept out, not left dormant.
-    const FLAG = "gtd_qa_checklist_reviewsurface_v4";
+    const FLAG = "gtd_qa_checklist_reviewsurface_v5";
     if (Storage.get(FLAG)) return;
     Storage.set(FLAG, "1");
     // Retire the superseded flags so they can't resurrect their injectors, and
@@ -11907,7 +11909,8 @@ function injectChunkMap(){
      "gtd_qa_checklist_postsprint_v7", "gtd_qa_checklist_desktop_v1",
      "gtd_qa_checklist_desktop_v2", "gtd_qa_checklist_sw_v1",
      "gtd_qa_checklist_publicpolish_v1", "gtd_qa_checklist_reviewsurface_v1",
-     "gtd_qa_checklist_reviewsurface_v2", "gtd_qa_checklist_reviewsurface_v3"].forEach(Storage.remove);
+     "gtd_qa_checklist_reviewsurface_v2", "gtd_qa_checklist_reviewsurface_v3",
+     "gtd_qa_checklist_reviewsurface_v4"].forEach(Storage.remove);
 
     // Replace, don't accumulate (8.1) — and actually mean it this time.
     // Earlier rounds bumped the flag but left the previous rounds' groups
@@ -11941,7 +11944,7 @@ function injectChunkMap(){
       { title: '2. Check the buttons are grouped, not one long list', notes: 'A card with several buttons (like a stalled project) should show them in a few small groups with a thin line between each group, ending with "Not now" in the bottom-left corner and a red "Delete" in the bottom-right — not seven buttons in one plain column.' },
       { title: '3. Check the colored buttons', notes: 'Buttons that add something to a list — "+Next", "+Waiting", "+Event", "Someday →" — should be short and colored like that list\'s tab (red, yellow, brass, blue). Buttons that don\'t send it anywhere (like "Completed") stay plain grey. Same on the phone and on a computer.' },
       { title: '4. Check the wording is the same everywhere', notes: 'Every card\'s "this got done" button should say "Completed" (not "Mark done" or "Complete it"), and every Delete button should just say "Delete" (not "Delete it").' },
-      { title: '5. Find an overdue repeating habit or event, if one shows up', notes: 'Whether it\'s still showing today or already moved on to tomorrow, it should offer a "Skipped" button (not "Let it go") alongside "Completed" — a way to say "this one didn\'t happen, and that\'s fine" without deleting the whole repeating series.' },
+      { title: '5. Find an overdue repeating habit or event, if one shows up', notes: 'Whether it\'s still showing today or already moved on to tomorrow, it should offer "Completed", "Skipped" (not "Let it go"), and "Delete" — the same three, looking and working exactly the same, on both.' },
       { title: '6. Check Delete acts right away, no popup', notes: 'Tapping Delete on a review card should delete it immediately, with no "are you sure?" popup — except a repeating calendar event, which still asks whether you mean just this occurrence or the whole series (that one stays, since "delete" is genuinely unclear there).' },
       { title: '7. Tap the (i) info button at the top of the review', notes: 'It should explain only the ONE card you\'re looking at — not a wall of text about every kind of card at once.' }
     ]);
@@ -12577,9 +12580,11 @@ function injectChunkMap(){
     // path below because it has NO lane row to read a title or a bar from -- it is
     // the event plus a date. Tapping through goes to the event's page.
     //
-    // The menu is the past-due pseudo-action's, minus anything that would act on
-    // the wrong occurrence: you cannot push a date that is already behind you,
-    // and Delete here must clear THIS miss, not the live series.
+    // The menu is close kin to the past-due pseudo-action's, minus anything
+    // that would act on the wrong occurrence: you cannot push a date that is
+    // already behind you. Delete deletes the whole event/series, same as
+    // everywhere else in the review (author ruling, fourth QA round) — the
+    // "just this miss" case is what Skipped is for.
     if (l.kind === "missed"){
       const when = dateStrToDate(l.occ).toLocaleDateString(undefined,
         { weekday: "long", day: "numeric", month: "long" });
@@ -12591,14 +12596,16 @@ function injectChunkMap(){
       // No band 1 (move forward) — a missed occurrence has nothing to add,
       // only a way to resolve it. Band 2 (take it off the list): both options
       // resolve the miss, just with different honesty about what happened.
-      // No delete either — see reviewMissedClear's comment: this destroys
-      // nothing, so the universal corner row is Not now alone.
+      // Delete (author ruling, fourth QA round: "no reason those pages
+      // should look or behave any differently" from the live pastdue-pseudo
+      // card) — same corner, same recurring-aware dialog, resolved by event
+      // id since a missed card has no lane row to hang a task id off.
       menuHtml =
         reviewBandHtml(
           '<button type="button" class="review-menu-btn" data-action="review-missed-done" data-id="' + l.id + '">&#10003; ' + escapeHtml(t("review.completed")) + '</button>' +
           '<button type="button" class="review-menu-btn" data-action="review-missed-clear" data-id="' + l.id + '">' + escapeHtml(t("review.skipped")) + '</button>'
         ) +
-        '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + '</div>';
+        '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewMenuBtn("review-delete-event-missed", "&#128465; " + escapeHtml(t("review.delete")), ' data-id="' + l.id + '"', true) + '</div>';
       return '<div class="review-card">' + bodyHtml + '<div class="review-menu">' + menuHtml + '</div></div>';
     }
     // Derived kinds share a tap-through title (opens the real page) + a
@@ -12872,17 +12879,17 @@ function injectChunkMap(){
     if (state.screen) state.screen.reviewForm = null;
     renderScreen();
   }
-  // QA #13. The id is the pseudo-action's task ID, which IS the event's taskId
-  // (§4.14a) — that stability is exactly what lets the review address the event
-  // without carrying a second identifier.
   // The ONE exception to the no-confirm ruling above: a RECURRING event, where
   // "delete" is ambiguous (this occurrence, or the whole series?) — that's
   // disambiguation, not a safety net, so it stays. Reuses confirmDeleteEvent's
   // own recurring branch unchanged (also used by the full event page); only
   // the non-recurring path diverges from it here, going straight to
   // deleteEventEntirely instead of confirmDeleteEvent's plain "are you sure".
-  function reviewDeleteEvent(taskId){
-    const ev = findEventByTaskId(taskId);
+  // Shared by both the live past-due pseudo-action card AND the already-
+  // rolled-past missed card (author ruling: "no reason those pages should
+  // look or behave any differently") — every recurring event in the review
+  // gets Delete, and gets the same dialog.
+  function reviewDeleteEventCore(ev){
     if (!ev){ renderScreen(); return; }
     if (isRecurring(ev)){
       confirmDeleteEvent(ev, function(){
@@ -12895,6 +12902,14 @@ function injectChunkMap(){
       renderScreen();
     }
   }
+  // QA #13. The id is the pseudo-action's task ID, which IS the event's taskId
+  // (§4.14a) — that stability is exactly what lets the review address the event
+  // without carrying a second identifier. Used by the live pastdue card.
+  function reviewDeleteEvent(taskId){ reviewDeleteEventCore(findEventByTaskId(taskId)); }
+  // The missed card carries the EVENT's own id (l.id = ev.id — it has no lane
+  // row to hang a task id off), not a task id, so it needs the plain findEvent
+  // lookup rather than reviewDeleteEvent's findEventByTaskId.
+  function reviewDeleteEventById(eventId){ reviewDeleteEventCore(findEvent(eventId)); }
   // §9/§2 (review-surface-plan.md, author third QA round): "Skipped" for a
   // still-live (not yet rolled-past) recurring occurrence — the same act as
   // reviewMissedClear performs for an already-rolled one, done a day early.
