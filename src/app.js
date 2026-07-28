@@ -6924,13 +6924,15 @@
         // is substantially different from the other +Next buttons"). Every
         // other +Next creates a NEW item (stalled: a fresh linked action;
         // capture: files the thought as one); this one converts the SAME
-        // waiting action in place, no new item. Reuses the actual arrow
-        // button the waiting lane card itself shows in place of a checkbox
-        // (.promote-arrow, leafCardHtml) rather than the drafting page's
-        // "Make Next Action" pill — same class, same glyph, same immediate
-        // (non-draft) move semantics, just recolored red here since this
-        // card only ever promotes toward Next Actions.
-        reviewBandHtml('<button type="button" class="promote-arrow review-promote-arrow" data-action="review-promote" data-id="' + l.id + '" title="' + escapeHtml(t("lane.moveTo").replace("{lane}", LIST_TITLES["next"])) + '">&#8592;</button>') +
+        // waiting action in place, no new item — exactly what the drafting
+        // page's own "Make Next Action" convert button does. Reuses THAT
+        // button's actual markup (makeKindBtnHtml's unarmed/enabled render
+        // for destKind "next": .btn.screen-make-kind-btn, red border+text,
+        // "← " arrow prefix) rather than a generic .review-menu-btn chip or
+        // the lane card's bare .promote-arrow icon — both tried and both
+        // wrong (author, seventh QA round). Click still fires immediately
+        // via review-promote, same as every other review decision.
+        reviewBandHtml('<button type="button" class="btn screen-make-kind-btn" data-action="review-promote" data-id="' + l.id + '" style="border-color:var(--red);color:var(--red);">&#8592; ' + escapeHtml(t("outcome.makeNext")) + '</button>') +
         reviewBandHtml(reviewMenuBtn("review-complete", t("review.completed"), ' data-lane="waiting" data-id="' + l.id + '"')) +
         '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewMenuBtn("review-delete", t("review.delete"), ' data-lane="waiting" data-id="' + l.id + '"', true) + '</div>';
     }

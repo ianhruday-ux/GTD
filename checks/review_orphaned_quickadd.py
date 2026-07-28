@@ -10,11 +10,18 @@ same waiting action in place, so it's relabeled "Make Next Action" and
 plain-styled to match the drafting page's own convert button instead of
 looking like a create-flavored chip.
 
-Seventh QA round (author correction): that was still the wrong button --
-"reuse the button on the waiting action page... red, left pointing arrow"
-meant the waiting lane card's own .promote-arrow icon (the one that stands
-in for a checkbox on Waiting/Future cards), not the drafting page's grey
-"Make Next Action" pill. Same class, same glyph, same immediate move.
+Seventh QA round (author correction, round 1): tried the waiting lane
+card's bare .promote-arrow icon instead -- still wrong. That icon is a
+bare glyph with no button chrome, colored by the CURRENT lane (yellow on
+Waiting), not the drafting page's actual convert button.
+
+Seventh QA round (author correction, round 2): "the button on the
+drafting page is red and has a left pointing arrow on it... the lane
+buttons don't have arrows ON them" -- meant makeKindBtnHtml's real render
+for destKind "next": a proper .btn.screen-make-kind-btn (bordered, not a
+bare icon), red border+text (accentVarForKind("next") = --red), with a
+literal "← " prefix in front of the "Make Next Action" label. That is
+what's reused here now, verbatim style formula and all.
 """
 import os, functools, http.server, socketserver, socket, threading, contextlib, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -103,11 +110,12 @@ with serve(DIST) as url, sync_playwright() as p:
     check(pg.locator('[data-action="review-freetext-save"]').count() == 1, "the Add button is present")
     promote_class = pg.evaluate("""() => { const b = document.querySelector('[data-action="review-promote"]');
       return b ? b.className : null; }""")
-    check(promote_class is not None and "promote-arrow" in promote_class,
-          f"the promote button reuses the waiting lane card's .promote-arrow class ({promote_class!r})")
-    promote_glyph = pg.evaluate("""() => { const b = document.querySelector('[data-action="review-promote"]');
+    check(promote_class is not None and "screen-make-kind-btn" in promote_class,
+          f"the promote button reuses the drafting page's .screen-make-kind-btn class ({promote_class!r})")
+    promote_text = pg.evaluate("""() => { const b = document.querySelector('[data-action="review-promote"]');
       return b ? b.textContent.trim() : null; }""")
-    check(promote_glyph == "←", f"and shows the same left-arrow glyph, not a text label ({promote_glyph!r})")
+    check(promote_text == "← Make Next Action",
+          f"and shows the same '← ' arrow prefix + label as the drafting page's convert button ({promote_text!r})")
     colors = pg.evaluate("""() => {
       const probe = document.createElement('div');
       probe.style.color = 'var(--red)';
@@ -118,7 +126,7 @@ with serve(DIST) as url, sync_playwright() as p:
       return { promote: b ? getComputedStyle(b).color : null, red };
     }""")
     check(colors["promote"] == colors["red"],
-          f"and is colored via --red, not left plain grey (promote={colors['promote']!r}, --red={colors['red']!r})")
+          f"and is colored via --red, matching the drafting page's convert button (promote={colors['promote']!r}, --red={colors['red']!r})")
     body_text = pg.evaluate("() => document.querySelector('.review-card').textContent")
     check("Re-point" not in body_text, "the old 'Re-point the condition' button is gone")
     check("Replace with free text" not in body_text, "the old 'Replace with free text' button is gone")
