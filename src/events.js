@@ -1571,7 +1571,11 @@ function commitNewEvent(ev, staging){
   state.events.push(ev);
   saveEvents();
   processEventBoundaries();
-  renderLane("next"); renderLane("waiting");
+  // ⚑ BUG FIX (author): renderLane("current") was missing here, so linking a
+  // new event to a project (projectHasWayForward -> projectHasLinkedEvent)
+  // never cleared that project's stale "no linked actions" flag on the Current
+  // Projects lane until something else happened to re-render it.
+  renderLane("next"); renderLane("waiting"); renderLane("current");
 }
 
 // A capture sorted to Calendar (§4.8b Calendar chip) is filed once something

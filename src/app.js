@@ -6732,7 +6732,16 @@
     return (
       '<div class="review-inline-form">' +
         box("review-form-input", t("review.whatWaitingOn"), f.value, "title") +
-        box("review-form-input2", t("review.untilWhatWhen"), f.value2, "when") +
+        // ⚑ Hook icon added here (author): this field was free-text only, with
+        // no way to attach a real Next/Waiting condition short of escaping to
+        // the full page — inconsistent with every other waiting-for field in
+        // the app, which all offer the hook. Same icon/action as the orphaned
+        // card's (review-form-full, since there's no task id yet to reuse
+        // review-open's edit-existing path — this is still a CREATE).
+        '<div class="review-band review-quickadd-row">' +
+          box("review-form-input2", t("review.untilWhatWhen"), f.value2, "when") +
+          '<button type="button" class="review-hook-btn" data-action="review-form-full" data-kind="waiting" data-project="' + key + '" title="' + escapeHtml(t("waiting.hookToTarget")) + '">&#129693;</button>' +
+        '</div>' +
         '<div class="review-inline-form-btns">' +
           '<div class="review-inline-form-btns-row">' +
             '<button type="button" class="review-menu-btn" data-action="review-form-cancel">' + escapeHtml(t("review.cancel")) + '</button>' +

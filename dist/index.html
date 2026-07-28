@@ -2393,7 +2393,7 @@ body.screen-open #tray-handle{ display:none; }
 (function(){
 "use strict";
 
-const BUILD_STAMP = "28 Jul 02:05";  // replaced by build.py
+const BUILD_STAMP = "28 Jul 02:20";  // replaced by build.py
 
 // =========================================================
 // STORAGE ADAPTER (spec.md §3, known issue 4)
@@ -12593,7 +12593,16 @@ function injectChunkMap(){
     return (
       '<div class="review-inline-form">' +
         box("review-form-input", t("review.whatWaitingOn"), f.value, "title") +
-        box("review-form-input2", t("review.untilWhatWhen"), f.value2, "when") +
+        // ⚑ Hook icon added here (author): this field was free-text only, with
+        // no way to attach a real Next/Waiting condition short of escaping to
+        // the full page — inconsistent with every other waiting-for field in
+        // the app, which all offer the hook. Same icon/action as the orphaned
+        // card's (review-form-full, since there's no task id yet to reuse
+        // review-open's edit-existing path — this is still a CREATE).
+        '<div class="review-band review-quickadd-row">' +
+          box("review-form-input2", t("review.untilWhatWhen"), f.value2, "when") +
+          '<button type="button" class="review-hook-btn" data-action="review-form-full" data-kind="waiting" data-project="' + key + '" title="' + escapeHtml(t("waiting.hookToTarget")) + '">&#129693;</button>' +
+        '</div>' +
         '<div class="review-inline-form-btns">' +
           '<div class="review-inline-form-btns-row">' +
             '<button type="button" class="review-menu-btn" data-action="review-form-cancel">' + escapeHtml(t("review.cancel")) + '</button>' +
@@ -15488,7 +15497,11 @@ function commitNewEvent(ev, staging){
   state.events.push(ev);
   saveEvents();
   processEventBoundaries();
-  renderLane("next"); renderLane("waiting");
+  // ⚑ BUG FIX (author): renderLane("current") was missing here, so linking a
+  // new event to a project (projectHasWayForward -> projectHasLinkedEvent)
+  // never cleared that project's stale "no linked actions" flag on the Current
+  // Projects lane until something else happened to re-render it.
+  renderLane("next"); renderLane("waiting"); renderLane("current");
 }
 
 // A capture sorted to Calendar (§4.8b Calendar chip) is filed once something
