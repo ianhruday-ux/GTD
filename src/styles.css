@@ -839,7 +839,82 @@ body.has-frame #fab-create{
   background:color-mix(in srgb, var(--lane-accent, var(--brass)) 38%, transparent);
 }
 .group-actions{ display:flex; gap:2px; }
-.group-body{ padding:0 11px 11px 11px; display:flex; flex-direction:column; gap:10px; }
+/* ⚑ Members are INDENTED and sit against a faint accent rail (user round): the
+   group's border is deliberately quiet on the wood, so "these items belong to
+   the list above" had almost nothing carrying it. The rail is drawn as a
+   ::before rather than a border-left so that brightening it mid-drag changes
+   no geometry. */
+.group-body{
+  --drop-hint-h:32px;              /* one card's worth; the min-height below reuses it */
+  position:relative;
+  padding:0 11px 11px 22px; display:flex; flex-direction:column; gap:10px;
+}
+.group-body::before{
+  content:""; position:absolute; left:11px; top:0; bottom:11px; width:2px;
+  border-radius:2px; pointer-events:none;
+  background:color-mix(in srgb, var(--lane-accent, var(--brass)) 45%, transparent);
+}
+
+/* ▲ The empty-list drop target (user round). Removing the quick-add rows left
+   an empty list as a header over 11px of padding — no visible place to aim a
+   drag at, and no sign the list could receive anything at all. This is a
+   card-sized dashed slot that says so.
+   · pointer-events:none — the hit test resolves through it to .group-body, and
+     it never eats a tap.
+   · It hides as soon as a card is in the body, so the live-dragged card takes
+     its place instead of sitting under a stale "drag items here".
+   · Its height is matched by the min-height below, so that swap moves nothing.
+*/
+.drop-hint{
+  height:var(--drop-hint-h); display:flex; align-items:center; justify-content:center;
+  font-size:11.5px; font-style:italic; color:var(--text-soft); opacity:0.55;
+  border:1px dashed rgba(255,255,255,0.14); border-radius:7px;
+  pointer-events:none; -webkit-user-select:none; user-select:none;
+}
+.group-body:has(.card) .drop-hint{ display:none; }
+
+/* ▲ Mid-drag legibility (user round: "it needs to be clearer both where to drag
+   it and when it's been captured"). Two levels, both painted with properties
+   that cost no layout — outline, background, colour — so nothing under the
+   finger can shift and interrupt the gesture in progress.
+   1. Every list/context body advertises itself while any drag is live.
+   2. The one the pointer is actually inside lights up in the lane's accent,
+      and its group's border comes up with it — that is the "captured" signal.
+   The min-height keeps a body from SHRINKING when the drop-hint gives way to
+   the dragged card; a zone that shrank under the finger could bounce the card
+   straight back out. */
+body.drag-active .group-body{
+  background:rgba(255,255,255,0.035);
+  outline:1px dashed rgba(255,255,255,0.16); outline-offset:-3px; border-radius:8px;
+}
+body.drag-active .group-body::before{ opacity:0.7; }
+/* Scoped to bodies that HAVE a hint — i.e. ones that started the drag empty.
+   The hint element stays in the DOM (only display:none'd) once the dragged card
+   arrives, so this floor holds for the whole gesture and the swap moves nothing.
+   box-sizing is border-box app-wide, so the body's own bottom padding has to be
+   added back in for the floor to equal a hint-only body's height. Bodies that
+   already had cards are left alone: a floor there would nudge a short one-item
+   list 2px the instant a drag began. */
+body.drag-active .group-body:has(.drop-hint){
+  min-height:calc(var(--drop-hint-h) + 11px);
+}
+body.drag-active .group-body.drop-zone-active{
+  background:color-mix(in srgb, var(--lane-accent, var(--brass)) 13%, transparent);
+  outline:1px solid color-mix(in srgb, var(--lane-accent, var(--brass)) 65%, transparent);
+}
+body.drag-active .group-body.drop-zone-active::before{
+  background:var(--lane-accent, var(--brass)); opacity:1;
+}
+body.drag-active .group-body.drop-zone-active .drop-hint{
+  opacity:0.95; color:var(--lane-accent, var(--brass));
+  border-color:color-mix(in srgb, var(--lane-accent, var(--brass)) 55%, transparent);
+}
+body.drag-active .group:has(> .group-body.drop-zone-active){
+  border-color:color-mix(in srgb, var(--lane-accent, var(--brass)) 50%, transparent);
+}
+body.drag-active .group:has(> .group-body.drop-zone-active) .group-title{
+  color:var(--lane-accent, var(--brass));
+}
 
 /* ----------------------------------------------------------------------------
    COMPLETED ARCHIVE  (= carried over =)

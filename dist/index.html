@@ -865,7 +865,82 @@ body.has-frame #fab-create{
   background:color-mix(in srgb, var(--lane-accent, var(--brass)) 38%, transparent);
 }
 .group-actions{ display:flex; gap:2px; }
-.group-body{ padding:0 11px 11px 11px; display:flex; flex-direction:column; gap:10px; }
+/* ⚑ Members are INDENTED and sit against a faint accent rail (user round): the
+   group's border is deliberately quiet on the wood, so "these items belong to
+   the list above" had almost nothing carrying it. The rail is drawn as a
+   ::before rather than a border-left so that brightening it mid-drag changes
+   no geometry. */
+.group-body{
+  --drop-hint-h:32px;              /* one card's worth; the min-height below reuses it */
+  position:relative;
+  padding:0 11px 11px 22px; display:flex; flex-direction:column; gap:10px;
+}
+.group-body::before{
+  content:""; position:absolute; left:11px; top:0; bottom:11px; width:2px;
+  border-radius:2px; pointer-events:none;
+  background:color-mix(in srgb, var(--lane-accent, var(--brass)) 45%, transparent);
+}
+
+/* ▲ The empty-list drop target (user round). Removing the quick-add rows left
+   an empty list as a header over 11px of padding — no visible place to aim a
+   drag at, and no sign the list could receive anything at all. This is a
+   card-sized dashed slot that says so.
+   · pointer-events:none — the hit test resolves through it to .group-body, and
+     it never eats a tap.
+   · It hides as soon as a card is in the body, so the live-dragged card takes
+     its place instead of sitting under a stale "drag items here".
+   · Its height is matched by the min-height below, so that swap moves nothing.
+*/
+.drop-hint{
+  height:var(--drop-hint-h); display:flex; align-items:center; justify-content:center;
+  font-size:11.5px; font-style:italic; color:var(--text-soft); opacity:0.55;
+  border:1px dashed rgba(255,255,255,0.14); border-radius:7px;
+  pointer-events:none; -webkit-user-select:none; user-select:none;
+}
+.group-body:has(.card) .drop-hint{ display:none; }
+
+/* ▲ Mid-drag legibility (user round: "it needs to be clearer both where to drag
+   it and when it's been captured"). Two levels, both painted with properties
+   that cost no layout — outline, background, colour — so nothing under the
+   finger can shift and interrupt the gesture in progress.
+   1. Every list/context body advertises itself while any drag is live.
+   2. The one the pointer is actually inside lights up in the lane's accent,
+      and its group's border comes up with it — that is the "captured" signal.
+   The min-height keeps a body from SHRINKING when the drop-hint gives way to
+   the dragged card; a zone that shrank under the finger could bounce the card
+   straight back out. */
+body.drag-active .group-body{
+  background:rgba(255,255,255,0.035);
+  outline:1px dashed rgba(255,255,255,0.16); outline-offset:-3px; border-radius:8px;
+}
+body.drag-active .group-body::before{ opacity:0.7; }
+/* Scoped to bodies that HAVE a hint — i.e. ones that started the drag empty.
+   The hint element stays in the DOM (only display:none'd) once the dragged card
+   arrives, so this floor holds for the whole gesture and the swap moves nothing.
+   box-sizing is border-box app-wide, so the body's own bottom padding has to be
+   added back in for the floor to equal a hint-only body's height. Bodies that
+   already had cards are left alone: a floor there would nudge a short one-item
+   list 2px the instant a drag began. */
+body.drag-active .group-body:has(.drop-hint){
+  min-height:calc(var(--drop-hint-h) + 11px);
+}
+body.drag-active .group-body.drop-zone-active{
+  background:color-mix(in srgb, var(--lane-accent, var(--brass)) 13%, transparent);
+  outline:1px solid color-mix(in srgb, var(--lane-accent, var(--brass)) 65%, transparent);
+}
+body.drag-active .group-body.drop-zone-active::before{
+  background:var(--lane-accent, var(--brass)); opacity:1;
+}
+body.drag-active .group-body.drop-zone-active .drop-hint{
+  opacity:0.95; color:var(--lane-accent, var(--brass));
+  border-color:color-mix(in srgb, var(--lane-accent, var(--brass)) 55%, transparent);
+}
+body.drag-active .group:has(> .group-body.drop-zone-active){
+  border-color:color-mix(in srgb, var(--lane-accent, var(--brass)) 50%, transparent);
+}
+body.drag-active .group:has(> .group-body.drop-zone-active) .group-title{
+  color:var(--lane-accent, var(--brass));
+}
 
 /* ----------------------------------------------------------------------------
    COMPLETED ARCHIVE  (= carried over =)
@@ -2393,7 +2468,7 @@ body.screen-open #tray-handle{ display:none; }
 (function(){
 "use strict";
 
-const BUILD_STAMP = "28 Jul 02:20";  // replaced by build.py
+const BUILD_STAMP = "28 Jul 15:47";  // replaced by build.py
 
 // =========================================================
 // STORAGE ADAPTER (spec.md §3, known issue 4)
@@ -2934,6 +3009,7 @@ const STRINGS = {
   "group.tapToExpand":       { en: "Tap to expand/collapse",         "zh-Hans": "点击展开/收起" },
   "group.addToContext":      { en: "Add to this context",            "zh-Hans": "添加到此情境" },
   "group.deleteContext":     { en: "Delete context",                 "zh-Hans": "删除情境" },
+  "group.dropHint":          { en: "Drag items here",                "zh-Hans": "把项目拖到这里" },
   "habit.tidyOrderTooltip":  { en: "Suggest an order from your hooks (you can still rearrange freely afterward)", "zh-Hans": "根据你的挂钩关系建议一个顺序（之后仍可自由调整）" },
   "habit.tidyOrder":         { en: "Tidy order",                     "zh-Hans": "整理顺序" },
   "tray.discard":            { en: "Discard",                        "zh-Hans": "丢弃" },
@@ -7699,6 +7775,18 @@ function injectChunkMap(){
       '</div>'
     );
   }
+  // An EMPTY list or context body used to be 11px of bottom padding and
+  // nothing else — since the quick-add rows were removed there was literally
+  // nothing on screen saying "this is where an item goes", and nothing big
+  // enough to aim a finger at mid-drag. This row is that target: an inert
+  // dashed slot the height of one card, so an empty list looks like a place
+  // that can receive something and is as easy to hit as a real card.
+  // pointer-events:none keeps it out of the way of the hit test (the drag
+  // resolves to the .group-body behind it) and out of the way of taps.
+  // It hides the moment a card is in the body — see .drop-hint in styles.css.
+  function dropHintHtml(){
+    return '<div class="drop-hint">' + escapeHtml(t("group.dropHint")) + '</div>';
+  }
   function groupHtml(kind, group, children){
     const collapsed = isCollapsed(kind, group.id);
     const moveDest = MOVE_MAP[kind];
@@ -7709,7 +7797,7 @@ function injectChunkMap(){
     // mirrors context deletion — the items survive, landing ungrouped at the
     // top of the lane, behind a confirm that says so. So the × is always live.
     const deleteTitle = "Delete list";
-    const childrenHtml = children.map(function(c){ return leafCardHtml(kind, c); }).join("");
+    const childrenHtml = children.map(function(c){ return leafCardHtml(kind, c); }).join("") || dropHintHtml();
     // devContext is set only on the dev-injected QA-checklist / chunk-map
     // groups (injectQAChecklist / injectChunkMap) — a plain data attribute
     // with no visual or behavioral effect, so the certification suite can
@@ -7747,7 +7835,7 @@ function injectChunkMap(){
   // (the §4.3d escape hatch: create a context, drag items in).
   function contextGroupHtml(kind, ctx, members){
     const collapsed = isCollapsed(kind, ctx.id);
-    const childrenHtml = members.map(function(c){ return leafCardHtml(kind, c); }).join("");
+    const childrenHtml = members.map(function(c){ return leafCardHtml(kind, c); }).join("") || dropHintHtml();
     return (
       '<div class="group" data-context-group="' + ctx.id + '">' +
         '<div class="group-header" data-action="toggle-group" data-id="' + ctx.id + '">' +
@@ -11381,6 +11469,26 @@ function injectChunkMap(){
     function clearDropIndicator(){
       if (dropIndicatorEl){ dropIndicatorEl.classList.remove("drop-before", "drop-after"); dropIndicatorEl = null; }
     }
+    // The rule above says *between which two cards* the item lands; this says
+    // *which list or context has caught it*, which is the part that was
+    // invisible for an empty group (user: "nor is it clear when it's been
+    // captured by the list/context"). Purely a class swap — the styles it
+    // drives are outline/background/border-colour only, never geometry, so
+    // marking a zone can never move what's under the finger mid-drag.
+    // cards-root is deliberately excluded: "loose at the top level" is the
+    // absence of a list, and outlining the whole lane would be noise.
+    let dropZoneEl = null;
+    function setDropZone(zone){
+      const next = (zone && zone.classList && !zone.classList.contains("cards-root")) ? zone : null;
+      if (dropZoneEl === next) return;
+      if (dropZoneEl) dropZoneEl.classList.remove("drop-zone-active");
+      dropZoneEl = next;
+      if (dropZoneEl) dropZoneEl.classList.add("drop-zone-active");
+    }
+    // Teardown for both cues. Called from every path that ends a drag —
+    // dragend, touchend, touchcancel and the watchdog's force-cancel — so a
+    // highlight can't outlive the gesture that drew it.
+    function clearDropCues(){ clearDropIndicator(); setDropZone(null); }
     // Clamps the hit-test point to the active-card area of a lane before
     // calling elementFromPoint. Without this, dragging past the last card
     // lands on the Completed section (or empty margin) below it — and past
@@ -11476,24 +11584,31 @@ function injectChunkMap(){
       if (!targetEl) return;
       const el = drag.el;
       // Which dropzone (a group-body or the cards-root) is the pointer over?
-      const hitCard = targetEl.closest("[data-drag-id]");
-      let zone;
-      if (hitCard && hitCard !== el && !el.contains(hitCard)){
-        zone = hitCard.parentElement.closest("[data-dropzone-parent]") || hitCard.parentElement;
-      } else {
-        // Pointer is over the dragged element itself, or over empty container
-        // space -- walk up to the nearest dropzone either way.
-        zone = targetEl.closest("[data-dropzone-parent]");
-      }
-      if (!zone || el.contains(zone)) return;
+      // The innermost enclosing dropzone IS the answer, in every case — over a
+      // card it is that card's container, over a group's header it is the root
+      // (so hovering a list's header drops BESIDE the list, as it should), and
+      // over a list's body it is that list.
+      //
+      // ⚑ This used to special-case "the pointer is over some card" and take
+      // that card's PARENT's dropzone, which quietly made an empty list
+      // undroppable: with no card in the body, the hit resolves to the
+      // .group-body, whose own closest [data-drag-id] is the GROUP element —
+      // so the zone became the group's parent, i.e. the lane root, and the item
+      // landed next to the list instead of in it. That is the real reason
+      // dragging into an empty list "didn't work" rather than merely being
+      // fiddly. The branch bought nothing: for a real card hit, the card's
+      // parent-dropzone and the card's enclosing dropzone are the same element.
+      let zone = targetEl.closest("[data-dropzone-parent]");
+      if (!zone || el.contains(zone)){ setDropZone(null); return; }
       const laneEl = zone.closest(".lane");
-      if (!laneEl || laneEl.getAttribute("data-kind") !== drag.kind) return;
+      if (!laneEl || laneEl.getAttribute("data-kind") !== drag.kind){ setDropZone(null); return; }
       // Groups only ever live at the top level -- force them to the cards-root
       // instead of letting them drop inside another group's body.
       if (drag.isGroup && !zone.classList.contains("cards-root")){
         zone = laneEl.querySelector(".cards-root");
-        if (!zone) return;
+        if (!zone){ setDropZone(null); return; }
       }
+      setDropZone(zone);
       // Draggable siblings in this zone, minus the dragged element itself.
       const sibs = Array.prototype.filter.call(zone.children, function(c){
         return c.nodeType === 1 && c.hasAttribute("data-drag-id") && c !== el && !el.contains(c);
@@ -11507,7 +11622,12 @@ function injectChunkMap(){
       // and a drop past the last card had to be kept ABOVE it. That row is gone
       // — creation moved to the + beside the count — so a group body now holds
       // nothing but cards and ref can simply stay null, meaning "append".)
-      if (ref !== el && el.nextSibling !== ref){
+      // ⚑ The "already there?" test has to include the CONTAINER, not just the
+      // next sibling. `el.nextSibling === ref` is also true when both are null
+      // — the dragged card is the last thing in the lane and the target zone is
+      // an empty list, i.e. exactly the case the user reported. The move was
+      // being skipped as a no-op and the card never entered the list.
+      if (el.parentElement !== zone || el.nextSibling !== ref){
         zone.insertBefore(el, ref);
       }
       // Drop indicator: a rule before the card we'd land in front of, else
@@ -11549,7 +11669,7 @@ function injectChunkMap(){
       const kind = liveDrag.kind;
       liveDrag = null;
       document.body.classList.remove("drag-active");
-      clearDropIndicator();
+      clearDropCues();
       stopAutoScroll();
       renderLane(kind); // restores state order on cancel; settles the DOM after a committed drop
     });
@@ -11605,7 +11725,7 @@ function injectChunkMap(){
       if (wasActive){
         liveDrag = null;
         document.body.classList.remove("drag-active");
-        clearDropIndicator();
+        clearDropCues();
         stopAutoScroll();
         renderLane(kind);
       }
@@ -11722,7 +11842,7 @@ function injectChunkMap(){
         const kind = liveDrag.kind;
         liveDrag = null;
         document.body.classList.remove("drag-active");
-        clearDropIndicator();
+        clearDropCues();
         renderLane(kind);
       } else {
         dlog("touchend", "no active drag (a tap, or the hold was cancelled)");
@@ -11735,7 +11855,7 @@ function injectChunkMap(){
         const kind = touchDrag.kind;
         liveDrag = null;
         document.body.classList.remove("drag-active");
-        clearDropIndicator();
+        clearDropCues();
         disarmDragWatchdog();
         stopAutoScroll();
         renderLane(kind);

@@ -478,6 +478,7 @@ const STRINGS = {
   "group.tapToExpand":       { en: "Tap to expand/collapse",         "zh-Hans": "点击展开/收起" },
   "group.addToContext":      { en: "Add to this context",            "zh-Hans": "添加到此情境" },
   "group.deleteContext":     { en: "Delete context",                 "zh-Hans": "删除情境" },
+  "group.dropHint":          { en: "Drag items here",                "zh-Hans": "把项目拖到这里" },
   "habit.tidyOrderTooltip":  { en: "Suggest an order from your hooks (you can still rearrange freely afterward)", "zh-Hans": "根据你的挂钩关系建议一个顺序（之后仍可自由调整）" },
   "habit.tidyOrder":         { en: "Tidy order",                     "zh-Hans": "整理顺序" },
   "tray.discard":            { en: "Discard",                        "zh-Hans": "丢弃" },
