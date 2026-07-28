@@ -61,7 +61,19 @@ with serve(DIST) as url, sync_playwright() as p:
         cdp.send("Input.dispatchTouchEvent", {"type": "touchEnd", "touchPoints": []})
         pg.wait_for_timeout(500)
 
-    pg.goto(url); close_tray()   # first boot seeds: Dentist = BASE+2 days, 14:30, one-shot
+    # ⚠ Dentist used to arrive as SAMPLE DATA. 8c6f171 deleted the sample events
+    # on purpose ("disposable demo filler duplicated the tutorial's job"), which
+    # left this file asserting against a fixture the app no longer creates — it
+    # failed on a missing card, not on a broken bar. It is a local fixture now.
+    DENTIST = [{"id": "ev-dentist", "taskId": "task-dentist", "title": "Dentist",
+                "date": "2026-08-05", "time": "14:30", "notesClean": "Cleaning + check-up",
+                "recurrence": "none", "interval": 1, "paused": False, "contextId": None,
+                "linkedProjectId": None, "seriesId": None, "tickler": False,
+                "completedOccs": []}]
+
+    pg.goto(url); close_tray()
+    pg.evaluate("evs => localStorage.setItem('gtd_events', JSON.stringify(evs))", DENTIST)
+    pg.reload(); close_tray()
 
     # ---- 1. the creation section is fully visible, never collapsed ----
     pg.click('[data-action="open-calendar"]'); pg.wait_for_timeout(400)

@@ -38,8 +38,28 @@ with serve(DIST) as url, sync_playwright() as p:
     pg.on("pageerror", lambda e: errors.append(str(e)))
     pg.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
 
-    BASE = datetime.datetime(2026, 8, 3, 10, 0, 0)   # Mon 10:00; seeds Dentist Aug 5 14:30,
-    pg.clock.install(time=BASE)                      # Pay rent (monthly, untimed) Aug 8
+    BASE = datetime.datetime(2026, 8, 3, 10, 0, 0)   # Mon 10:00
+    pg.clock.install(time=BASE)
+
+    # ⚠ These two events used to arrive as SAMPLE DATA. 8c6f171 deleted the
+    # sample events on purpose ("disposable demo filler duplicated the
+    # tutorial's job"), which left this file asserting against a fixture the
+    # app no longer creates — it failed on a missing card, not on a broken
+    # boundary. The fixtures live here now, where the assertions can see them.
+    # Both dates are AFTER BASE: seed a live occurrence in the past and the
+    # boundary sweep correctly rolls the series forward before the first
+    # assertion runs, so the test would measure the wrong day.
+    FIXTURES = [
+        {"id": "ev-dentist", "taskId": "task-dentist", "title": "Dentist",
+         "date": "2026-08-05", "time": "14:30", "notesClean": "Cleaning + check-up",
+         "recurrence": "none", "interval": 1, "paused": False, "contextId": None,
+         "linkedProjectId": None, "seriesId": None, "tickler": False, "completedOccs": []},
+        {"id": "ev-rent", "taskId": "task-rent", "title": "Pay rent",
+         "date": "2026-08-08", "time": None, "notesClean": "",
+         "recurrence": "monthly", "interval": 1, "paused": False, "contextId": None,
+         "linkedProjectId": None, "seriesId": "series-rent", "tickler": False,
+         "completedOccs": []},
+    ]
 
     def close_tray():
         # The intray auto-opens at boot and its slide transition never finishes
@@ -61,7 +81,9 @@ with serve(DIST) as url, sync_playwright() as p:
         pct = int("".join(c for c in style.split("--fill:")[1].split("%")[0] if c.isdigit()) or 0)
         return pct, cls
 
-    pg.goto(url); close_tray()   # first boot at BASE seeds the sample events
+    pg.goto(url); close_tray()   # first boot at BASE builds the store
+    pg.evaluate("evs => localStorage.setItem('gtd_events', JSON.stringify(evs))", FIXTURES)
+    pg.reload(); close_tray()    # the reload runs the 4 AM sweep over them
 
     # ---------- APPOINTMENT (Dentist, Aug 5 14:30) ----------
     at(days=1, hours=17, minutes=55)                      # Aug 4 03:55 — day BEFORE
