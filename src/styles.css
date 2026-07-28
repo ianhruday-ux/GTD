@@ -2071,7 +2071,12 @@ body.screen-open #tray-handle{ display:none; }
      Project/Future, Habit/Note) reads left to right as-is — the same adjacency
      desktop's own column headers show side by side, with a wider gap between
      the three pairs than within one. */
-  .review-sort-chips{ display:flex; flex-wrap:wrap; justify-content:center; }
+  /* ⚑ row-gap only, NOT the `gap` shorthand (author: "about half a row of space
+     between rows"). A chip row measures 37px here, so 18px is the half-row.
+     The column gap must stay 7px — the six-across flex-basis below subtracts a
+     fixed 78px (5 × 7px column gaps + 2 × 20px pair margins + 3px slack), and
+     widening it with the shorthand would push Note onto its own row. */
+  .review-sort-chips{ display:flex; flex-wrap:wrap; justify-content:center; row-gap:18px; }
   .review-sort-chips .review-menu-btn{ flex:0 1 auto; }
   /* [data-target] (attribute-exists) matches every chip, INCLUDING quickdone
      — same specificity as the mobile rules' [data-target="x"] selectors, so
@@ -2096,6 +2101,10 @@ body.screen-open #tray-handle{ display:none; }
   /* Note ends row 1 — a trailing separator with nothing after it, and its
      margin would still count toward the line's width and push Note onto row 2. */
   .review-sort-chips .review-menu-btn[data-target="notes"]{ margin-right:0; }
+  /* Same half-row rhythm across the LAST row boundary too, so all three rows
+     are evenly spaced rather than two loose and one tight. .review-card already
+     gaps its children by 12px, so this tops it up to the same 18px. */
+  .review-menu-row{ margin-top:6px; }
 }
 
 /* The frame's desktop geometry: pinned to the viewport, over the header, under
