@@ -210,7 +210,15 @@ def main():
         pg.click('#header-left [data-action="open-calendar"]'); pg.wait_for_timeout(600)
         w = pg.evaluate("""() => { const c = document.querySelector('.screen-overlay[data-kind="calendar"] .screen-card');
           return c ? Math.round(c.getBoundingClientRect().width) : 0; }""")
-        check(800 < w <= 900, "the calendar card is ~900px wide: %d" % w)
+        # ⚑ WIDENED AGAIN (review-surface-plan.md §10, RULED — Proposal A): the
+        # 900px single-column card still overflowed vertically at every size
+        # tested (up to 1920x1080) — capping the grid's WIDTH never touched the
+        # cell's aspect-ratio, so height still followed width. §10's fix is
+        # two-column: controls beside the grid instead of stacked below it,
+        # ~1040px card, wide (not near-square) cells. See
+        # checks/desktop_calendar_columns.py for the no-scroll / Add-visible
+        # verification this round's fix is actually about.
+        check(1000 < w <= 1040, "the calendar card is ~1040px wide: %d" % w)
         # ⚑ REVERSED (author QA: "the calendar is wide, but it is too tall").
         # T11 used to assert the grid grows to fill the widened 900px card —
         # that WAS the bug: 7 equal columns with a fixed cell aspect-ratio
@@ -222,8 +230,11 @@ def main():
               return g ? { w: Math.round(g.getBoundingClientRect().width), h: Math.round(g.getBoundingClientRect().height) } : null; }""")
         check(grid and 600 <= grid["w"] <= 700,
               f"the month grid is capped at ~660px, NOT grown to match the wide card ({grid})")
-        check(grid and grid["h"] < 700,
-              f"...which keeps six rows from ballooning past a reasonable height ({grid})")
+        # §10: cells are now wide rectangles (~92x58, aspect-ratio ~1/0.63),
+        # not the near-squares (1/1.15) that made the grid tall in the first
+        # place — six rows now run ~300px, not merely "under 700".
+        check(grid and grid["h"] < 400,
+              f"...six rows of WIDE cells stay well under the old near-square height ({grid})")
         pg.click('[data-action="cal-close"]'); pg.wait_for_timeout(400)
 
         print("\n-- the tray --")

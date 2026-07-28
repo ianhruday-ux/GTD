@@ -1101,7 +1101,11 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 .adv-textarea{ width:100%; min-height:64px; resize:vertical; border-radius:6px; background:var(--paper-2); border:1px solid rgba(255,255,255,0.12); color:var(--text-primary); font-size:13px; padding:8px; }
 .adv-hook-row{ display:flex; align-items:center; justify-content:space-between; font-size:12.5px; padding:4px 0; }
 .adv-content{ margin-bottom:10px; }
-.screen-advanced-btn{ align-self:flex-start; }
+/* §8 (review-surface-plan.md, RULED): grey fill for contrast, same neutral
+   raised fill as .cal-advanced-btn — .btn-ghost's transparent background is
+   overridden here (equal specificity, this rule comes later in the sheet). */
+.screen-advanced-btn{ align-self:flex-start; background:rgba(255,255,255,0.11); }
+.screen-advanced-btn:hover{ background:rgba(255,255,255,0.16); }
 .bundle-pill{ align-self:flex-start; }
 .bundle-pill-wrap{ display:inline-flex; align-items:center; gap:3px; align-self:flex-start; }
 .bundle-pill-clear{ font-size:15px; line-height:1; color:var(--text-soft); padding:2px 5px; }
@@ -1208,14 +1212,24 @@ body.has-frame .tray-drawer::after{
    chips wrapping 6 + 2 the corners read the same on both, so the @media
    override is gone. */
 .review-menu-row{ display:flex; gap:8px; justify-content:space-between; }
+/* §5/§5a (review-surface-plan.md, RULED): the three-band structure for
+   missed/pastdue/stalled/orphaned — band 1 "move it forward", band 2 "take
+   it off the list", then .review-menu-row (band 3, universal, unchanged).
+   A thin divider marks the boundary between whichever bands a kind actually
+   has — the adjacent-sibling selectors mean a kind that omits a band (e.g.
+   missed has no band 1) gets no stray empty gap or double divider. Phone:
+   stacked, full-width rows (unchanged from before banding). Desktop lays
+   each band's own buttons out horizontally — see the ≥1000px block. */
+.review-band{ display:flex; flex-direction:column; gap:7px; }
+.review-band + .review-band,
+.review-band + .review-menu-row{ padding-top:7px; border-top:1px solid rgba(255,255,255,0.08); }
 .review-menu-btn{ text-align:left; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.05);
   color:var(--text-primary); border-radius:8px; padding:10px 12px; font-size:14px; cursor:pointer; }
 .review-menu-btn:hover{ background:rgba(255,255,255,0.1); }
-.review-menu-btn.danger{ color:var(--red); border-color:rgba(194,74,61,0.45); }
 .review-menu-btn.review-notnow{ color:#fff; border-style:dashed; background:rgba(255,255,255,0.11); }
-/* Grey button, red text — deliberately NOT .danger, which also tints the
-   border. Same red as "Restore app to defaults" (settings-item.danger),
-   author-specified. */
+/* Grey button, red text — the review surface's one delete treatment (author
+   ruling). Was capture-only; every review delete control now shares it
+   (§5 defect 2). Same red as "Restore app to defaults" (settings-item.danger). */
 .review-menu-btn.review-delete-text{ color:var(--red); }
 /* Flex, with a deterministic percentage flex-basis rather than a content-based
    one: exactly 3 fit per row regardless of viewport width (the earlier
@@ -1606,7 +1620,11 @@ body.has-frame .tray-drawer::after{
   flex:0 0 auto; border:none; background:var(--brass); color:var(--dark-on-accent);
   font-weight:700; font-size:13.5px; border-radius:8px; padding:0 18px;
 }
-.cal-create-controls{ display:flex; flex-direction:column; gap:7px; }
+/* §8 (review-surface-plan.md, RULED): "More options" moved off the bottom
+   (up beside the Event/Deadline toggle) — but the row of space it vacated
+   stays, so the panel keeps a bit of margin rather than closing up flush.
+   Roughly the height + gap of the button that used to sit here. */
+.cal-create-controls{ display:flex; flex-direction:column; gap:7px; padding-bottom:28px; }
 .cal-boxed{
   display:flex; align-items:center; gap:6px; border:1px solid rgba(255,255,255,0.14);
   background:rgba(255,255,255,0.04); border-radius:8px; padding:0 10px; min-height:34px;
@@ -1624,20 +1642,30 @@ body.has-frame .tray-drawer::after{
 .cal-desc::placeholder{ color:var(--text-soft); }
 .cal-tickler-row{ display:flex; align-items:center; gap:8px; font-size:12px; color:var(--text-soft); }
 .cal-tickler-row input{ flex:0 0 auto; }
+/* §9 (review-surface-plan.md): a dismissible bubble — sibling pill + clear
+   button, same shape as .bundle-pill-wrap, so a tap near the edge dismisses
+   rather than triggering "Make this a habit instead". */
+.cal-habit-bubble-wrap{ display:inline-flex; align-items:center; gap:3px; align-self:flex-start; }
 .cal-habit-bubble{
-  align-self:flex-start; border:1px dashed var(--purple); background:rgba(142,111,176,0.12);
+  border:1px dashed var(--purple); background:rgba(142,111,176,0.12);
   color:var(--purple); border-radius:8px; padding:7px 12px; font-size:12px; font-weight:600; text-align:left;
 }
 .cal-habit-bubble:hover{ background:rgba(142,111,176,0.2); }
+.cal-habit-bubble-clear{ font-size:15px; line-height:1; color:var(--text-soft); padding:2px 5px; }
 /* "More options →" — the way from the quick-add row to the full event page.
-   Deliberately quieter than the habit bubble beside it: that one makes a
-   suggestion about what you are building, this one just opens a door. */
+   §8 (review-surface-plan.md, RULED): moved up beside the Event/Deadline
+   toggle and given a grey fill for contrast, reusing the app's existing
+   neutral raised fill (same as .review-notnow / the 2-min chip) rather than
+   minting a new one. The old "deliberately quieter than the habit bubble"
+   framing is gone (author, §9.4): the two controls answer different
+   questions and were never competing for the same attention. */
+.cal-seg-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
 .cal-advanced-btn{
-  align-self:flex-start; border:1px solid rgba(255,255,255,0.18); background:transparent;
-  color:var(--text-soft); border-radius:8px; padding:7px 12px; font-size:12px;
+  align-self:flex-start; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.11);
+  color:var(--text-primary); border-radius:8px; padding:7px 12px; font-size:12px;
   font-weight:600; text-align:left;
 }
-.cal-advanced-btn:hover{ background:rgba(255,255,255,0.08); color:var(--text-primary); }
+.cal-advanced-btn:hover{ background:rgba(255,255,255,0.16); }
 .screen-pause-btn{
   align-self:stretch; border:1px solid var(--dusty); background:transparent; color:var(--dusty);
   border-radius:8px; padding:9px 12px; font-size:13px; font-weight:600; text-align:center;
@@ -1984,26 +2012,61 @@ body.screen-open #tray-handle{ display:none; }
      6). Widening the card is only half of it: the month grid is sized against
      .screen-body's 640px column, so that column has to widen for this screen
      only (trap T11). */
-  .screen-overlay[data-kind="calendar"] .screen-card{ width:min(900px, 100%); }
-  /* ⚑ FIX (author QA: "the calendar is wide, but it is too tall"). .cal-cells
-     is 7 equal grid columns (`repeat(7, 1fr)`), so simply widening the CARD let
-     the columns fill the whole 900px unconstrained — and each .cal-cell keeps
-     a fixed aspect-ratio (1/1.15), so growing the WIDTH grew the HEIGHT right
-     along with it: six rows of ~119px-wide cells stack to over 800px tall.
-     Cap the GRID specifically (not the card, and not the nav/agenda rows below
-     it, which stay full width — they are text rows with no such constraint) so
-     cells grow noticeably over the phone's ~50px without ballooning height.
-     660px keeps six rows under ~600px on any reasonable desktop viewport.
-     --cal-cell-w is recomputed against the SAME cap on the SAME element
-     (.cal-body), which --cal-grid-h already reads via var() — CSS custom
-     properties resolve at USE time, so overriding it here is enough; List and
-     Day's reserved height (shared rule, base .cal-body) picks it up too,
-     without a second declaration. */
+  /* §10 (review-surface-plan.md, RULED — Proposal A, "the desktop calendar is
+     broken"): the previous round's fix (a bare width cap on the grid) only
+     ever addressed the WIDTH axis. .cal-cell carries a fixed aspect-ratio, so
+     height still followed width — six rows of even a capped-width grid still
+     ran to ~630px tall, and with .cal-create stacked below it too, the create
+     row (name field, Event/Deadline toggle, Add button) sat off-screen on a
+     1366x768 laptop: measured at 1073px needed against 644px available.
+     The real fix is two changes together, and neither is sufficient alone
+     (measured): flatten the cell's aspect ratio so six rows fit well inside
+     any reasonable viewport height, AND move .cal-create beside the grid
+     instead of below it, which is what actually returns the Add button (and,
+     for Day/List, most of a ~628px empty reserve) to above the fold. Column
+     order is CONTROLS-left / CALENDAR-right (author correction after Proposal
+     A was chosen — the first mockup showed the reverse). */
+  .screen-overlay[data-kind="calendar"] .screen-card{ width:min(1040px, 100%); }
   .screen-overlay[data-kind="calendar"] .cal-body{
+    display:grid; grid-template-columns:300px 1fr; column-gap:24px; align-items:start;
+    /* The grid's own width cap is unchanged from the previous round (the width
+       axis was never the bug) — --cal-cell-w recomputed against the SAME
+       660px cap, on the SAME element, which --cal-grid-h already reads via
+       var(). 0.63 replaces the phone's 1.15: wide rectangles (~92 x 58), not
+       near-squares — THIS is what cuts the height. List/Day's reserve (shared
+       base rule, .cal-agenda/.cal-day-empty min-height) drops from ~628px to
+       ~363px automatically, since it reads the same --cal-grid-h. */
     --cal-cell-w: calc((660px - 40px - 18px) / 7);
+    --cal-grid-h: calc(6 * 0.63 * var(--cal-cell-w) + 15px + 20px);
   }
-  .screen-overlay[data-kind="calendar"] .cal-swipe-viewport{
-    max-width:660px; margin:0 auto;
+  .screen-overlay[data-kind="calendar"] .cal-cell{ aspect-ratio:1/0.63; }
+  /* The right column: month/day nav, then whichever of the three view bodies
+     is rendered — always exactly two stacked rows, since only one of
+     (monthnav|daynav) and one of (swipe-viewport|agenda|day-empty) is in the
+     DOM at a time. */
+  .screen-overlay[data-kind="calendar"] .cal-monthnav,
+  .screen-overlay[data-kind="calendar"] .cal-daynav,
+  .screen-overlay[data-kind="calendar"] .cal-swipe-viewport,
+  .screen-overlay[data-kind="calendar"] .cal-agenda,
+  .screen-overlay[data-kind="calendar"] .cal-day-empty{
+    grid-column:2; max-width:660px;
+  }
+  .screen-overlay[data-kind="calendar"] .cal-swipe-viewport{ margin:0; }
+  /* The left column: the whole create panel, spanning both of the right
+     column's rows so it reads as a sidebar, not a third stacked row. §8's
+     "More options" already sits at the top of this panel (paired with the
+     Event/Deadline toggle, shared markup with the phone) — no separate
+     desktop placement needed, per §8.2's ruling that it "has no separate
+     existence from this layout." The phone's top divider (border/margin
+     separating .cal-create from the grid ABOVE it) is dropped here — there is
+     no "above" relationship once this is a side column. Deadline's shorter
+     panel is left top-aligned rather than centered/stretched to match Event's
+     height (builder's call — simplest, and top alignment reads as an
+     ordinary short form, not a broken one; flagged in case the author wants
+     it visually balanced instead). */
+  .screen-overlay[data-kind="calendar"] .cal-create{
+    grid-column:1; grid-row:1/3; align-self:start;
+    border-top:none; margin-top:0; padding-top:0;
   }
   .screen-body{
     max-width:none; padding:18px 26px 22px 26px;
@@ -2103,8 +2166,20 @@ body.screen-open #tray-handle{ display:none; }
   .review-sort-chips .review-menu-btn[data-target="notes"]{ margin-right:0; }
   /* Same half-row rhythm across the LAST row boundary too, so all three rows
      are evenly spaced rather than two loose and one tight. .review-card already
-     gaps its children by 12px, so this tops it up to the same 18px. */
-  .review-menu-row{ margin-top:6px; }
+     gaps its children by 12px, so this tops it up to the same 18px.
+     ⚑ Scoped to the capture card specifically (review-card-capture) — once
+     .review-menu-row became the universal band-3 corner row (§5a), this rule
+     would otherwise also add its 6px to every banded card's corner row on
+     top of the band divider's own 7px, a rhythm that was only ever tuned for
+     capture's three chip-rows. */
+  .review-card-capture .review-menu-row{ margin-top:6px; }
+  /* §5/§5a: bands lay their buttons out horizontally on desktop — the same
+     "one DOM, two arrangements" technique the capture chips already use,
+     generalised past capture per the author's own framing (§5). A
+     deterministic min-width (not percentage — band sizes vary 1–3 buttons
+     per kind, unlike capture's fixed 8) keeps wrapping predictable. */
+  .review-band{ flex-direction:row; flex-wrap:wrap; gap:8px; }
+  .review-band .review-menu-btn{ flex:1 1 160px; text-align:center; }
 }
 
 /* The frame's desktop geometry: pinned to the viewport, over the header, under

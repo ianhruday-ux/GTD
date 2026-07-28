@@ -4390,7 +4390,7 @@
     const inner = s.completedView
       ? completedHeaderHtml(s) + completedBodyHtml(s) + screenFooterHtml(s, "completed")
       : s.reviewView
-        ? reviewHeaderHtml() + reviewBodyHtml(s)
+        ? reviewHeaderHtml(reviewActiveLoops().length > 0) + reviewBodyHtml(s)
         : s.calendarView
           ? calendarHeaderHtml(s) + calendarBodyHtml(s)
           : s.quickDoneView
@@ -4869,7 +4869,9 @@
       if (e.target.closest('[data-action="open-review"]')){ closeTray(); openReviewScreen(); return; }
       if (e.target.closest('[data-action="review-close"]')){ closeScreen(); return; }
       if (e.target.closest('[data-action="review-info"]')){
-        const panel = qs(".review-info-panel"); if (panel) panel.hidden = !panel.hidden; return;
+        if (state.screen) state.screen.reviewInfoOpen = !state.screen.reviewInfoOpen;
+        const panel = qs(".review-info-panel"); if (panel) panel.hidden = !(state.screen && state.screen.reviewInfoOpen);
+        return;
       }
       const revDefer = e.target.closest('[data-action="review-defer"]');
       if (revDefer){ deferReviewItem(revDefer.getAttribute("data-key")); if (state.screen) state.screen.reviewForm = null; renderScreen(); return; }
@@ -6069,10 +6071,10 @@
     if (touched){ renderLane("next"); renderLane("current"); }
   }
   function injectQAChecklist(){
-    // PUBLIC-APP-POLISH round (public-app-polish-plan.md). §8.1's
+    // REVIEW-SURFACE round (review-surface-plan.md). §8.1's
     // replace-don't-accumulate discipline: this is the ONLY injector, and the
-    // service-worker round's groups below are swept out, not left dormant.
-    const FLAG = "gtd_qa_checklist_publicpolish_v1";
+    // public-app-polish round's groups below are swept out, not left dormant.
+    const FLAG = "gtd_qa_checklist_reviewsurface_v1";
     if (Storage.get(FLAG)) return;
     Storage.set(FLAG, "1");
     // Retire the superseded flags so they can't resurrect their injectors, and
@@ -6083,7 +6085,8 @@
      "gtd_qa_checklist_postsprint_v3", "gtd_qa_checklist_postsprint_v4",
      "gtd_qa_checklist_postsprint_v5", "gtd_qa_checklist_postsprint_v6",
      "gtd_qa_checklist_postsprint_v7", "gtd_qa_checklist_desktop_v1",
-     "gtd_qa_checklist_desktop_v2", "gtd_qa_checklist_sw_v1"].forEach(Storage.remove);
+     "gtd_qa_checklist_desktop_v2", "gtd_qa_checklist_sw_v1",
+     "gtd_qa_checklist_publicpolish_v1"].forEach(Storage.remove);
 
     // Replace, don't accumulate (8.1) — and actually mean it this time.
     // Earlier rounds bumped the flag but left the previous rounds' groups
@@ -6112,17 +6115,18 @@
       });
     }
 
-    addGroupWithItems('✅ QA — Chinese translation', [
-      { title: '1. Switch to Chinese', notes: 'Open ⋯ (the gear menu) → Language → 简体中文. The whole app should relabel itself immediately — lane names, buttons, everything.' },
-      { title: '2. Read through the tutorial', notes: 'Open the "1 点击这里开始教程" card at the top of Next Actions and tap its checkbox to step through all 8 cards. None of the text should look cut off, blank, or garbled — flag anything that reads oddly even if you don’t read Chinese fluently, just from spacing or obviously-broken punctuation.' },
-      { title: '3. Check every lane’s (i)', notes: 'Tap the small (i) next to each of the six lane headers (Next, Waiting, Projects, Someday, Habits, Notes) and confirm an explanation shows up — none should be empty.' },
-      { title: '4. Run a daily review in Chinese', notes: 'Open the intray (the handle on the left edge of the screen) and tap 回顾. Read through whatever cards show up — nothing should be blank, and tapping the (i) at the top of the review should show a paragraph for every kind of card.' },
-      { title: '5. Switch back to English when done', notes: 'Same menu, pick English, to leave the app the way you’d normally use it.' }
+    addGroupWithItems('✅ QA — The review’s new grouped buttons', [
+      { title: '1. Open the daily review', notes: 'Open the intray (the handle on the left edge of the screen, or the left column on a computer) and tap Review. Look at whichever card shows up first.' },
+      { title: '2. Check the buttons are grouped, not one long list', notes: 'A card with several buttons (like a stalled project) should show them in a few small groups with a thin line between each group, ending with "Not now" in the bottom-left corner and a red "Delete" in the bottom-right — not seven buttons in one plain column.' },
+      { title: '3. On a computer, the groups sit side by side', notes: 'On a wide window, each group\'s buttons should line up in a row instead of stacking — the same card should look noticeably more compact than on the phone.' },
+      { title: '4. Find a missed repeating habit or event, if one shows up', notes: 'Its "give up on this one" button should now say "Skipped", not "Let it go".' },
+      { title: '5. Tap the (i) info button at the top of the review', notes: 'It should explain only the ONE card you\'re looking at — not a wall of text about every kind of card at once.' }
     ]);
 
-    addGroupWithItems('✅ QA — The review’s Add button', [
-      { title: '6. Find a stalled project in the review', notes: 'If the tutorial’s "Sample stalled project" card is still around, open the review — it should show up there (it has no linked action). Tap "Add a next action".' },
-      { title: '7. Check the three buttons', notes: 'You should see a small muted "Full page →" on the left, "Cancel" in the middle, and a solid highlighted "Add" on the right. Type something and tap the button you mean to — it should now be hard to hit the wrong one by accident.' }
+    addGroupWithItems('✅ QA — Calendar changes', [
+      { title: '6. Open the calendar and set something to repeat', notes: 'Start adding an event, set it to repeat Daily or Weekly. A purple box should offer to make it a habit instead, with a small X on the end to dismiss it if you don\'t want it.' },
+      { title: '7. On a computer, open the calendar', notes: 'The whole calendar should fit on screen without needing to scroll, with the day squares wide and short (not tall) and the "Add" button always visible — not hidden below the fold.' },
+      { title: '8. Check the "More options" / "Advanced options" buttons', notes: 'Wherever you see one of these (a next action, a waiting action, a habit, or the calendar), it should now have a light grey fill so it stands out a bit, instead of blending into the background.' }
     ]);
     saveTasksLocal("next");
   }
@@ -6546,13 +6550,15 @@
     fn();
   }
 
-  function reviewHeaderHtml(){
+  // hasCard: false on the all-clear/all-deferred end state, where there is
+  // nothing on the page for the ⓘ to explain (§3, review-surface-plan.md).
+  function reviewHeaderHtml(hasCard){
     return (
       '<div class="screen-header">' +
         '<span class="screen-chrome-btn" style="visibility:hidden">&#8592;</span>' +
         '<span class="screen-kind-badge">' + escapeHtml(t("review.badge")) + '</span>' +
         '<div class="screen-header-right">' +
-          '<button type="button" class="screen-chrome-btn" data-action="review-info" title="' + escapeHtml(t("chrome.info")) + '">&#9432;</button>' +
+          (hasCard ? '<button type="button" class="screen-chrome-btn" data-action="review-info" title="' + escapeHtml(t("chrome.info")) + '">&#9432;</button>' : '') +
           '<button type="button" class="screen-chrome-btn" data-action="review-close" title="' + escapeHtml(t("chrome.close")) + '">&#10005;</button>' +
         '</div>' +
       '</div>'
@@ -6569,10 +6575,19 @@
       capture: t("info.review.capture")
     };
   }
-  function reviewInfoPanelHtml(){
-    return (
-      '<div class="review-info-panel" hidden>' +
-        '<div class="review-info-block"><b>' + escapeHtml(t("review.heading.sorting")) + '</b><br>' +
+  // Scoped to the revealed card's kind (§3, review-surface-plan.md) — the
+  // review shows exactly one card at a time, so "what's on the page" is
+  // unambiguous. `capture` is the only kind that needs the sorting block
+  // (sorting is what a capture card asks you to do); every other kind gets
+  // the single matching "deciding" paragraph, not all four. `open` persists
+  // across cards (state.screen.reviewInfoOpen) rather than closing on every
+  // decision, which is friendlier when working through several cards of the
+  // same kind in a row (builder's call, per review-surface-plan.md §3 trap).
+  function reviewInfoPanelHtml(kind, open){
+    if (!kind) return ""; // nothing on the page (all-clear / all-deferred) — no panel, no ⓘ
+    let body;
+    if (kind === "capture"){
+      body = '<div class="review-info-block"><b>' + escapeHtml(t("review.heading.sorting")) + '</b><br>' +
           '<b>' + escapeHtml(t("review.infoNextLabel")) + '</b> ' + escapeHtml(LANE_INFO.next) + '<br>' +
           '<b>' + escapeHtml(t("review.infoWaitingLabel")) + '</b> ' + escapeHtml(LANE_INFO.waiting) + '<br>' +
           '<b>' + escapeHtml(t("review.infoProjectLabel")) + '</b> ' + escapeHtml(LANE_INFO.current) + '<br>' +
@@ -6580,20 +6595,27 @@
           '<b>' + escapeHtml(t("review.infoHabitLabel")) + '</b> ' + escapeHtml(LANE_INFO.habit) + '<br>' +
           '<b>' + escapeHtml(t("review.infoNoteLabel")) + '</b> ' + escapeHtml(LANE_INFO.notes) + '<br>' +
           '<b>' + escapeHtml(t("review.infoTwoMinLabel")) + '</b> ' + escapeHtml(t("review.infoTwoMinText")) +
-        '</div>' +
-        // ⚑ Was "Deciding on an open loop" / "Orphaned waiting" (user: "open
-        // loop is jargon from the book. It should be changed"). Both were terms
-        // you had to already know — one borrowed from GTD, one the app invented.
-        // The headings now describe the situation instead of naming it. "Stalled"
-        // survives because it is ordinary English, not a term of art.
-        '<div class="review-info-block"><b>' + escapeHtml(t("review.heading.deciding")) + '</b><br>' +
-          '<b>' + escapeHtml(t("review.infoPastDueLabel")) + '</b> ' + escapeHtml(reviewMenuInfo().pastdue) + '<br>' +
-          '<b>' + escapeHtml(t("review.infoStalledLabel")) + '</b> ' + escapeHtml(reviewMenuInfo().stalled) + '<br>' +
-          '<b>' + escapeHtml(t("review.infoOrphanedLabel")) + '</b> ' + escapeHtml(reviewMenuInfo().orphaned) + '<br>' +
-          '<b>' + escapeHtml(t("review.infoMissedLabel")) + '</b> ' + escapeHtml(reviewMenuInfo().missed) +
-        '</div>' +
-      '</div>'
-    );
+        '</div>';
+    } else {
+      // ⚑ Was "Deciding on an open loop" / "Orphaned waiting" (user: "open
+      // loop is jargon from the book. It should be changed"). Both were terms
+      // you had to already know — one borrowed from GTD, one the app invented.
+      // The headings now describe the situation instead of naming it. "Stalled"
+      // survives because it is ordinary English, not a term of art.
+      // pastdue's pseudo-action shape reuses the deadline wording rather than
+      // getting its own string (builder's call, review-surface-plan.md Q3) —
+      // simplest option where the doc left it open; revisit if it reads wrong.
+      const label = {
+        pastdue: t("review.infoPastDueLabel"),
+        stalled: t("review.infoStalledLabel"),
+        orphaned: t("review.infoOrphanedLabel"),
+        missed: t("review.infoMissedLabel")
+      }[kind];
+      body = '<div class="review-info-block"><b>' + escapeHtml(t("review.heading.deciding")) + '</b><br>' +
+          '<b>' + escapeHtml(label) + '</b> ' + escapeHtml(reviewMenuInfo()[kind]) +
+        '</div>';
+    }
+    return '<div class="review-info-panel"' + (open ? "" : " hidden") + '>' + body + '</div>';
   }
 
   // A redacted card: visible (you can see one more loop exists and count them)
@@ -6601,18 +6623,25 @@
   // discipline decorative (§4.8b).
   function reviewRedactionHtml(){ return '<div class="review-redaction" aria-hidden="true"></div>'; }
 
-  function reviewMenuBtn(action, label, extra, danger){
-    return '<button type="button" class="review-menu-btn' + (danger ? " danger" : "") + '" data-action="' + action + '"' + (extra || "") + '>' + label + '</button>';
+  // Grey button, red text only (author ruling — the capture card's baseline,
+  // now shared by every delete control on the review surface; see
+  // review-delete-text below).
+  function reviewMenuBtn(action, label, extra, isDelete){
+    return '<button type="button" class="review-menu-btn' + (isDelete ? " review-delete-text" : "") + '" data-action="' + action + '"' + (extra || "") + '>' + label + '</button>';
   }
   function reviewNotNowBtn(key){
     return '<button type="button" class="review-menu-btn review-notnow" data-action="review-defer" data-key="' + key + '">' + escapeHtml(t("review.notNow")) + '</button>';
   }
-  // Grey button, red text only (author ruling — distinct from .danger, which
-  // also tints the border; captures is the pattern the other three decision
-  // menus will be brought in line with next, so this is the new baseline).
-  function reviewCaptureDeleteBtn(key){
-    return '<button type="button" class="review-menu-btn review-delete-text" data-action="review-delete-capture" data-key="' + key + '">' + escapeHtml(t("review.delete")) + '</button>';
-  }
+  // §5/§5a (review-surface-plan.md, RULED): the three-band structure for the
+  // four non-capture kinds — band 1 "move it forward", band 2 "take it off
+  // the list", band 3 (always .review-menu-row, the universal corner row —
+  // reused as-is from the capture card, which is where it originated). A kind
+  // with nothing for a band simply omits it (no empty div, so no stray
+  // divider from the adjacent-sibling CSS rule). One DOM, two arrangements:
+  // phone stacks each band's buttons, desktop lays them out horizontally
+  // (styles.css ≥1000px block) — same technique as .review-sort-chips,
+  // generalised past the capture card per the author's own framing.
+  function reviewBandHtml(html){ return html ? '<div class="review-band">' + html + '</div>' : ""; }
   // The active inline sub-form (Push date / Add next action / Free text) for
   // this card, if any. One at a time, held on the screen (draft-free — these
   // are review decisions, applied immediately, not armed edits).
@@ -6713,7 +6742,7 @@
           reviewMenuBtn("review-sort", t("review.calendar"), ' data-target="calendar" data-key="' + l.key + '"') + // chunk 7 (§4.8b): the sixth chip
           reviewMenuBtn("review-quickdone", t("review.twoMin"), ' data-target="quickdone" data-key="' + l.key + '"') +
         '</div>' +
-        '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewCaptureDeleteBtn(l.key) + '</div>';
+        '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewMenuBtn("review-delete-capture", t("review.delete"), ' data-key="' + l.key + '"', true) + '</div>';
       return '<div class="review-card review-card-capture">' + bodyHtml + menuHtml + '</div>';
     }
     // A rolled-past repeating occurrence (user ruling). Handled before the shared
@@ -6731,11 +6760,18 @@
           '<span class="review-card-title">' + escapeHtml(effTitle(l.ev, l.occ)) + '</span>' +
           '<span class="review-card-note">⚠ ' + escapeHtml(t("review.wentByOn")) + ' ' + escapeHtml(when) + ' ' + escapeHtml(t("review.withoutTicking")) + '</span>' +
         '</button>';
+      // No band 1 (move forward) — a missed occurrence has nothing to add,
+      // only a way to resolve it. Band 2 (take it off the list): both options
+      // resolve the miss, just with different honesty about what happened.
+      // No delete either — see reviewMissedClear's comment: this destroys
+      // nothing, so the universal corner row is Not now alone.
       menuHtml =
-        '<button type="button" class="review-menu-btn" data-action="review-missed-done" data-id="' + l.id + '">&#10003; ' + escapeHtml(t("review.iDidIt")) + '</button>' +
-        '<button type="button" class="review-menu-btn" data-action="review-missed-clear" data-id="' + l.id + '">' + escapeHtml(t("review.letItGo")) + '</button>' +
-        reviewNotNowBtn(l.key);
-      return '<div class="review-card">' + bodyHtml + menuHtml + '</div>';
+        reviewBandHtml(
+          '<button type="button" class="review-menu-btn" data-action="review-missed-done" data-id="' + l.id + '">&#10003; ' + escapeHtml(t("review.markDone")) + '</button>' +
+          '<button type="button" class="review-menu-btn" data-action="review-missed-clear" data-id="' + l.id + '">' + escapeHtml(t("review.skipped")) + '</button>'
+        ) +
+        '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + '</div>';
+      return '<div class="review-card">' + bodyHtml + '<div class="review-menu">' + menuHtml + '</div></div>';
     }
     // Derived kinds share a tap-through title (opens the real page) + a
     // context line, then a per-kind decision menu. A pseudo-action taps
@@ -6765,19 +6801,22 @@
       // delete here, the only way to clear a dead past-due event was to record
       // it as an accomplishment. Routed through the event (not the lane row):
       // deleting the row alone leaves the event live and the sweep re-mints it.
+      // No band 1 — you cannot push an event's date from here (§2, above).
+      // Band 2 (take it off the list): Mark done.
       menuHtml =
-        '<button type="button" class="review-menu-btn" data-action="review-complete" data-lane="' + l.laneKind + '" data-id="' + l.id + '">&#10003; ' + escapeHtml(t("review.markDone")) + '</button>' +
-        '<button type="button" class="review-menu-btn danger" data-action="review-delete-event" data-id="' + l.id + '">&#128465; ' + escapeHtml(t("review.delete")) + '</button>' +
-        reviewNotNowBtn(l.key);
+        reviewBandHtml('<button type="button" class="review-menu-btn" data-action="review-complete" data-lane="' + l.laneKind + '" data-id="' + l.id + '">&#10003; ' + escapeHtml(t("review.markDone")) + '</button>') +
+        '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewMenuBtn("review-delete-event", "&#128465; " + escapeHtml(t("review.delete")), ' data-id="' + l.id + '"', true) + '</div>';
     } else if (l.kind === "pastdue"){
       if (form && form.type === "date"){
         menuHtml = reviewInlineFormHtml("", "date", "review-pushdate-save", t("review.save"), (l.task.deadline && l.task.deadline.date) || "", invalid);
       } else {
+        // Band 1 (move it forward): push the date — keeps it alive with a new
+        // target, same family as stalled's "give it a next step". Band 2
+        // (take it off the list): Complete it.
         menuHtml =
-          reviewMenuBtn("review-form-start", t("review.pushTheDate"), ' data-key="' + l.key + '" data-type="date"') +
-          reviewMenuBtn("review-complete", t("review.completeIt"), ' data-lane="' + l.laneKind + '" data-id="' + l.id + '"') +
-          reviewMenuBtn("review-delete", t("review.deleteIt"), ' data-lane="' + l.laneKind + '" data-id="' + l.id + '"', true) +
-          reviewNotNowBtn(l.key);
+          reviewBandHtml(reviewMenuBtn("review-form-start", t("review.pushTheDate"), ' data-key="' + l.key + '" data-type="date"')) +
+          reviewBandHtml(reviewMenuBtn("review-complete", t("review.completeIt"), ' data-lane="' + l.laneKind + '" data-id="' + l.id + '"')) +
+          '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewMenuBtn("review-delete", t("review.deleteIt"), ' data-lane="' + l.laneKind + '" data-id="' + l.id + '"', true) + '</div>';
       }
     } else if (l.kind === "stalled"){
       if (form && form.type === "text"){
@@ -6792,31 +6831,41 @@
         // character is one decision, inline, without leaving.
         menuHtml = reviewWaitingFormHtml(s, l.key);
       } else {
+        // §5's own worked example (defect 5): band 1 (move it forward) is the
+        // three ways to give the project a next step; band 2 (take it off the
+        // list) is the two ways to remove it from play.
         menuHtml =
-          reviewMenuBtn("review-form-start", t("review.addNextAction"), ' data-key="' + l.key + '" data-type="text"') +
-          reviewMenuBtn("review-form-start", t("review.addWaitingAction"), ' data-key="' + l.key + '" data-type="waiting"') +
-          // ⚑ The third one the user asked for originally, parked until a project
-          // could see the calendar. It can now: this opens the calendar for this
-          // project, capped by its deadline, and returns HERE rather than to the
-          // project page -- the review pushed the stack, so closeScreen lands back
-          // in the queue where you left off.
-          reviewMenuBtn("review-add-event", t("review.addAnEvent"), ' data-id="' + l.id + '"') +
-          reviewMenuBtn("review-someday", t("review.moveToSomeday"), ' data-id="' + l.id + '"') +
-          reviewMenuBtn("review-complete", t("review.completeIt"), ' data-lane="current" data-id="' + l.id + '"') +
-          reviewMenuBtn("review-delete", t("review.deleteIt"), ' data-lane="current" data-id="' + l.id + '"', true) +
-          reviewNotNowBtn(l.key);
+          reviewBandHtml(
+            reviewMenuBtn("review-form-start", t("review.addNextAction"), ' data-key="' + l.key + '" data-type="text"') +
+            reviewMenuBtn("review-form-start", t("review.addWaitingAction"), ' data-key="' + l.key + '" data-type="waiting"') +
+            // ⚑ The third one the user asked for originally, parked until a project
+            // could see the calendar. It can now: this opens the calendar for this
+            // project, capped by its deadline, and returns HERE rather than to the
+            // project page -- the review pushed the stack, so closeScreen lands back
+            // in the queue where you left off.
+            reviewMenuBtn("review-add-event", t("review.addAnEvent"), ' data-id="' + l.id + '"')
+          ) +
+          reviewBandHtml(
+            reviewMenuBtn("review-someday", t("review.moveToSomeday"), ' data-id="' + l.id + '"') +
+            reviewMenuBtn("review-complete", t("review.completeIt"), ' data-lane="current" data-id="' + l.id + '"')
+          ) +
+          '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewMenuBtn("review-delete", t("review.deleteIt"), ' data-lane="current" data-id="' + l.id + '"', true) + '</div>';
       }
     } else if (l.kind === "orphaned"){
       if (form && form.type === "text"){
         menuHtml = reviewInlineFormHtml(t("review.waitingForDots"), "text", "review-freetext-save", t("review.save"), "", invalid);
       } else {
+        // Band 1 (move it forward): the three ways to give it a condition to
+        // wait on again, or act on it now. Band 2 (take it off the list):
+        // Complete.
         menuHtml =
-          reviewMenuBtn("review-open", t("review.repointCondition"), ' data-lane="waiting" data-id="' + l.id + '"') +
-          reviewMenuBtn("review-form-start", t("review.replaceWithFreeText"), ' data-key="' + l.key + '" data-type="text"') +
-          reviewMenuBtn("review-promote", t("review.promoteToNext"), ' data-id="' + l.id + '"') +
-          reviewMenuBtn("review-complete", t("review.complete"), ' data-lane="waiting" data-id="' + l.id + '"') +
-          reviewMenuBtn("review-delete", t("review.delete"), ' data-lane="waiting" data-id="' + l.id + '"', true) +
-          reviewNotNowBtn(l.key);
+          reviewBandHtml(
+            reviewMenuBtn("review-open", t("review.repointCondition"), ' data-lane="waiting" data-id="' + l.id + '"') +
+            reviewMenuBtn("review-form-start", t("review.replaceWithFreeText"), ' data-key="' + l.key + '" data-type="text"') +
+            reviewMenuBtn("review-promote", t("review.promoteToNext"), ' data-id="' + l.id + '"')
+          ) +
+          reviewBandHtml(reviewMenuBtn("review-complete", t("review.complete"), ' data-lane="waiting" data-id="' + l.id + '"')) +
+          '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewMenuBtn("review-delete", t("review.delete"), ' data-lane="waiting" data-id="' + l.id + '"', true) + '</div>';
       }
     }
     return '<div class="review-card review-card-' + l.kind + '">' + bodyHtml + '<div class="review-menu">' + menuHtml + '</div></div>';
@@ -6825,7 +6874,8 @@
   function reviewBodyHtml(s){
     const active = reviewActiveLoops();
     const deferredCount = computeOpenLoops().length - active.length;
-    let html = '<div class="screen-body review-body">' + reviewInfoPanelHtml();
+    const revealedKind = active.length ? active[0].kind : null;
+    let html = '<div class="screen-body review-body">' + reviewInfoPanelHtml(revealedKind, !!(s && s.reviewInfoOpen));
     if (!active.length){
       html += (deferredCount > 0)
         ? '<div class="review-end review-end-deferred"><div class="review-end-big">' + deferredCount + escapeHtml(t("review.deferredSuffix")) + '</div>' +
@@ -6911,7 +6961,7 @@
     createTask("waiting", { title: title, whenText: when, linkedProjectId: pid })
       .then(function(){ s.reviewForm = null; renderScreen(); });
   }
-  // "I did it" — you did the thing and forgot to tick it, which is the case the
+  // "Mark done" — you did the thing and forgot to tick it, which is the case the
   // user named. Records the completion against the occurrence's own date, so it
   // keeps its dimmed mark on the calendar for the day it actually happened
   // rather than today, and clears the miss.
@@ -6928,7 +6978,7 @@
     if (state.screen) state.screen.reviewForm = null;
     renderScreen();
   }
-  // "Let it go" — it did not happen and that is fine. Clears the miss WITHOUT
+  // "Skipped" — it did not happen and that is fine. Clears the miss WITHOUT
   // recording a completion, so it never counts as something you achieved.
   // ⚑ No confirm dialog: this destroys nothing (the series is untouched and the
   // occurrence was already rolled past), so the standing rule about destructive
@@ -7002,7 +7052,7 @@
   }
   // Complete arms nothing here — quickDoneView is not a drafting surface, it's
   // a two-button confirm (draft isolation §-exempt the same way the list
-  // checkbox and the missed card's "I did it" are: an immediate action, not an
+  // checkbox and the missed card's "Mark done" are: an immediate action, not an
   // armed one). Reuses createTask + completeTask so a quick-done item is, in
   // every way the app can tell, an ordinary completed Next Action.
   function quickDoneComplete(){

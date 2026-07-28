@@ -153,8 +153,8 @@ const STRINGS = {
     "zh-Hans": "这项等待行动原本依赖的条件已经不存在了。你可以把它改为等待其他事情、改成一条笔记、如果现在已经可以执行就把它移到“下一步行动”，或者直接结束它。"
   },
   "info.review.missed": {
-    en: "A repeating thing whose day went by without being ticked. Often you did it and forgot to say so — 'I did it' records it on the day it happened. 'Let it go' clears it without pretending you did. Only the most recent one is ever kept, so this never piles up.",
-    "zh-Hans": "这是一项重复事项，它的执行日期已经过去，但还没有勾选完成。很多时候其实已经做了，只是忘了记录。“我做了”会把完成记录补到实际发生的那一天；“算了吧”则会直接清除这次记录，而不会假装已经完成。系统始终只保留最近的一次，因此不会越积越多。"
+    en: "A repeating thing whose day went by without being ticked. Often you did it and forgot to say so — 'Mark done' records it on the day it happened. 'Skipped' clears it without pretending you did. Only the most recent one is ever kept, so this never piles up.",
+    "zh-Hans": "这是一项重复事项，它的执行日期已经过去，但还没有勾选完成。很多时候其实已经做了，只是忘了记录。“标记完成”会把完成记录补到实际发生的那一天；“已跳过”则会直接清除这次记录，而不会假装已经完成。系统始终只保留最近的一次，因此不会越积越多。"
   },
   "info.review.capture": {
     en: "A stray thought you haven't filed yet. Send it to a lane — or Not now to leave it for later.",
@@ -518,8 +518,9 @@ const STRINGS = {
   "review.infoOrphanedLabel": { en: "Waiting on something gone:",   "zh-Hans": "在等一个已经不存在的东西：" },
   "review.infoMissedLabel":  { en: "A repeat you missed:",          "zh-Hans": "一个你错过的重复项：" },
   "review.noWayForward":     { en: "no way forward",                "zh-Hans": "没有下一步" },
-  "review.iDidIt":           { en: "I did it",                      "zh-Hans": "我做完了" },
-  "review.letItGo":          { en: "Let it go",                     "zh-Hans": "不管了" },
+  // review.iDidIt retired — merged into review.markDone (missed + past-due
+  // pseudo-action now share one "mark this done" verb; author ruling).
+  "review.skipped":          { en: "Skipped",                       "zh-Hans": "已跳过" },
   "review.quickDoneComplete": { en: "Complete",                     "zh-Hans": "完成" },
   "review.quickDoneBack":    { en: "Back",                          "zh-Hans": "返回" },
   "review.wentByOn":         { en: "went by on",                    "zh-Hans": "已过期，日期是" },
@@ -616,6 +617,7 @@ const STRINGS = {
   "cal.moreOptions":            { en: "More options →",             "zh-Hans": "更多选项 →" },
   "cal.moreOptionsTooltip":     { en: "Open the full page — context, project link, and everything here", "zh-Hans": "打开完整页面——情境、项目链接，以及这里的一切" },
   "cal.makeHabitInstead":       { en: "Recurring chore? Make this a habit instead →", "zh-Hans": "重复的例行事务？改用习惯来记录 →" },
+  "cal.dismissHabitBubble":     { en: "Dismiss",                    "zh-Hans": "关闭" },
   "cal.add":                    { en: "Add",                        "zh-Hans": "添加" },
   "cal.eventOnPrefix":          { en: "Event on ",                   "zh-Hans": "事件安排在 " },
   "cal.duePrefix":              { en: "Due ",                        "zh-Hans": "截止于 " },

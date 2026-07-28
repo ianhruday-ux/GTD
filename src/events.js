@@ -570,6 +570,10 @@ function openCalendarScreen(prefill){
     calTab: "month", calY: d.getFullYear(), calM: d.getMonth(), calSel: sel,
     calKind: "event", calName: (prefill && prefill.name) || "", calTime: "", calDesc: "",
     calRecur: "none", calInterval: 1, calDeadlineFor: "next", calTickler: false,
+    // §9 (review-surface-plan.md): the habit-bubble ✕. Per-draft, not stored —
+    // clears whenever recurrence changes (see the "recur" field handler below),
+    // so the bubble comes back next time daily/weekly is picked, per author ruling.
+    calHabitBubbleDismissed: false,
     calInvalid: false, calFromCaptureId: (prefill && prefill.fromCaptureId) || null,
     // Opened from a project page (user): the event that gets added is linked to
     // that project, the project's deadline caps the date, and adding returns
@@ -900,10 +904,27 @@ function calCreateRowHtml(s){
       '<button type="button" class="cal-seg-btn' + (isEvent ? " active" : "") + '" data-action="cal-kind" data-kind="event">' + escapeHtml(t("cal.event")) + '</button>' +
       '<button type="button" class="cal-seg-btn' + (!isEvent ? " active" : "") + '" data-action="cal-kind" data-kind="deadline">' + escapeHtml(t("cal.deadline")) + '</button>' +
     '</div>';
+  // §8 (review-surface-plan.md, RULED): moved off the bottom of the controls
+  // and paired with the Event/Deadline toggle instead — PHONE placement is to
+  // its right, above Add (DESKTOP placement — top of the left control column
+  // — is §10's two-column layout, built separately). Events only (§8.1): the
+  // Deadline side creates a task, which has its own drafting page already.
+  const advancedBtn = isEvent
+    ? '<button type="button" class="cal-advanced-btn" data-action="cal-advanced" ' +
+        'title="' + escapeHtml(t("cal.moreOptionsTooltip")) + '">' +
+        escapeHtml(t("cal.moreOptions")) + '</button>'
+    : "";
   let controls;
   if (isEvent){
-    const habitBubble = (s.calRecur === "daily" || s.calRecur === "weekly")
-      ? '<button type="button" class="cal-habit-bubble" data-action="cal-make-habit">' + escapeHtml(t("cal.makeHabitInstead")) + '</button>' : "";
+    // §9 (review-surface-plan.md, Q9 RESOLVED): dismissible, not removed — a
+    // sibling ✕ next to the bubble, same shape as .bundle-pill-wrap, so a tap
+    // near the edge clears it instead of triggering "Make this a habit instead".
+    const habitBubble = (s.calRecur === "daily" || s.calRecur === "weekly") && !s.calHabitBubbleDismissed
+      ? '<span class="cal-habit-bubble-wrap">' +
+          '<button type="button" class="cal-habit-bubble" data-action="cal-make-habit">' + escapeHtml(t("cal.makeHabitInstead")) + '</button>' +
+          '<button type="button" class="icon-btn cal-habit-bubble-clear" data-action="cal-dismiss-habit-bubble" title="' + escapeHtml(t("cal.dismissHabitBubble")) + '">&times;</button>' +
+        '</span>'
+      : "";
     controls =
       '<div class="cal-create-controls">' +
         '<div class="cal-boxed"><span class="field-icon">&#128337;</span>' +
@@ -918,12 +939,6 @@ function calCreateRowHtml(s){
         '</div>' +
         habitBubble +
         '<label class="cal-tickler-row"><input type="checkbox" data-calfield="tickler"' + (s.calTickler ? " checked" : "") + '> ' + escapeHtml(t("cal.hideUntilItHappens")) + '</label>' +
-        // ⚑ The way to a context and a project link (user). Events only: the
-        // Deadline side of this row creates a TASK, which has its own drafting
-        // page and its own route to those fields already.
-        '<button type="button" class="cal-advanced-btn" data-action="cal-advanced" ' +
-          'title="' + escapeHtml(t("cal.moreOptionsTooltip")) + '">' +
-          escapeHtml(t("cal.moreOptions")) + '</button>' +
       '</div>';
   } else {
     controls =
@@ -946,7 +961,7 @@ function calCreateRowHtml(s){
     '<div class="cal-create">' +
       forProject +
       errMsg +
-      seg +
+      '<div class="cal-seg-row">' + seg + advancedBtn + '</div>' +
       '<div class="cal-create-main">' +
         '<input type="text" class="cal-name' + (s.calInvalid ? " field-invalid" : "") + '" data-calfield="name" placeholder="' + escapeHtml(isEvent ? t("cal.eventOnPrefix") : t("cal.duePrefix")) + escapeHtml(selLabel) + '…" value="' + escapeHtml(s.calName || "") + '" autocomplete="off">' +
         '<button type="button" class="cal-add-btn" data-action="cal-add">' + escapeHtml(t("cal.add")) + '</button>' +
@@ -1432,6 +1447,7 @@ function eventsHandleClick(e){
     if (e.target.closest('[data-action="cal-add"]')){ calAdd(); return true; }
     if (e.target.closest('[data-action="cal-advanced"]')){ openEventCreateScreen(); return true; }
     if (e.target.closest('[data-action="cal-make-habit"]')){ calMakeHabit(); return true; }
+    if (e.target.closest('[data-action="cal-dismiss-habit-bubble"]')){ s.calHabitBubbleDismissed = true; renderScreen(); return true; }
     const openEvt = e.target.closest('[data-action="cal-open-event"]');
     if (openEvt){ state.screenStack.push(s); state.screen = null; openEventScreen(openEvt.getAttribute("data-id"), openEvt.getAttribute("data-date") || null); return true; }
     const openTask = e.target.closest('[data-action="cal-open-task"]');
@@ -1589,7 +1605,7 @@ function eventsHandleFieldInput(e){
     else if (f === "desc"){ s.calDesc = calEl.value; }
     else if (f === "time"){ s.calTime = calEl.value; }
     else if (f === "interval"){ s.calInterval = Math.max(1, Number(calEl.value) || 1); }
-    else if (f === "recur"){ s.calRecur = calEl.value; renderScreen(); }
+    else if (f === "recur"){ s.calRecur = calEl.value; s.calHabitBubbleDismissed = false; renderScreen(); }
     else if (f === "tickler"){ s.calTickler = calEl.checked; }
     return true;
   }

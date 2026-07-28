@@ -39,9 +39,10 @@ def check(cond, msg):
 # This round's groups. ⚠ Update BOTH of these whenever injectQAChecklist is
 # rewritten — the sweep test works by clearing the CURRENT flag to force a
 # re-injection, so a stale flag name here makes the whole file pass vacuously.
-EXPECTED = ["Works with no internet (do this on your phone)",
-            'The "New version available" bar',
-            "One quick pass per device"]
+# Matched as substrings (see the `in` check below), so apostrophe style
+# (curly vs straight) in the app's actual title can't cause a false mismatch.
+EXPECTED = ["new grouped buttons",
+            "Calendar changes"]
 RETIRED = ["Chunk 7", "Chunk 8", "Per-occurrence", "Recheck chunk 6b",
            "Settings & appearance", "Calendar & review fixes", "Progress bars", "Pickers",
            "The new time picker", "The new date picker", "Deadlines that get pushed",
@@ -59,15 +60,25 @@ RETIRED = ["Chunk 7", "Chunk 8", "Per-occurrence", "Recheck chunk 6b",
            "The desktop layout (do these on a computer)",
            "The intray handle (redrawn — PHONE ONLY)",
            "The tutorial is now a chain (②–⑥ in Waiting On)",
-           "Make sure nothing else moved"]
-CURRENT_FLAG = "gtd_qa_checklist_sw_v1"
+           "Make sure nothing else moved",
+           # chunk 9's own checklist (gtd_qa_checklist_sw_v1) — superseded by
+           # the public-app-polish round, then by this one
+           "Works with no internet",
+           "New version available",
+           "One quick pass per device",
+           # the public-app-polish round (gtd_qa_checklist_publicpolish_v1) —
+           # superseded by this round (review-surface-plan.md)
+           "Chinese translation",
+           "review's Add button"]
+CURRENT_FLAG = "gtd_qa_checklist_reviewsurface_v1"
 SUPERSEDED_FLAGS = ["gtd_qa_checklist_chunk7_v1", "gtd_qa_checklist_override_v1",
                     "gtd_qa_checklist_override_v2", "gtd_qa_checklist_chunk8_v1",
                     "gtd_qa_checklist_postsprint_v1", "gtd_qa_checklist_postsprint_v2",
                     "gtd_qa_checklist_postsprint_v3", "gtd_qa_checklist_postsprint_v4",
                     "gtd_qa_checklist_postsprint_v5", "gtd_qa_checklist_postsprint_v6",
                     "gtd_qa_checklist_postsprint_v7", "gtd_qa_checklist_desktop_v1",
-                    "gtd_qa_checklist_desktop_v2"]
+                    "gtd_qa_checklist_desktop_v2", "gtd_qa_checklist_sw_v1",
+                    "gtd_qa_checklist_publicpolish_v1"]
 
 with serve(DIST) as url, sync_playwright() as p:
     b = p.chromium.launch()
@@ -155,24 +166,39 @@ with serve(DIST) as url, sync_playwright() as p:
     check("personal bests" in lane_habit,
           "and the habits lane DOES show the personal-bests paragraph")
 
+    # ⚑ §3 (review-surface-plan.md): the review's ⓘ is now SCOPED to the one
+    # card revealed on screen, not a dump of all five kinds at once. The
+    # default seed's first revealed card is the tutorial's stalled sample
+    # project, so its info panel should show ONLY the stalled-project text —
+    # not the lane-sorting block (capture-only) and not any other kind's
+    # deciding paragraph.
     pg.evaluate("() => { const r = document.querySelector('#tray-root'); if (r) r.innerHTML = ''; }")
     pg.evaluate("() => document.querySelector('[data-action=\"open-tray\"]').click()")
     pg.wait_for_timeout(350)
     pg.evaluate("() => document.querySelector('[data-action=\"open-review\"]').click()")
     pg.wait_for_timeout(600)
+    revealed_kind = pg.evaluate("""() => { const c = document.querySelector('.review-card');
+      return c ? c.className : ''; }""")
+    check("review-card-stalled" in revealed_kind,
+          f"fixture: the first revealed card is the stalled sample project ({revealed_kind})")
     pg.evaluate("() => document.querySelector('[data-action=\"review-info\"]').click()")
     pg.wait_for_timeout(300)
     panel = pg.evaluate("""() => { const p = document.querySelector('.review-info-panel');
       return p ? p.textContent : ''; }""")
-    check(len(panel) > 500, f"the review's info panel rendered ({len(panel)} chars)")
-    check("single next physical step" in panel,
-          "it reuses the shared half of the lane text")
+    check("no way forward. Add the next physical step" in panel,
+          "the stalled-project text is the user's own wording")
+    check("single next physical step" not in panel,
+          "but NOT the lane-sorting block — that's for capture cards only")
     check("recurring place or time" not in panel,
-          "but NOT the lane-only contexts paragraph (marked with a second arrow)")
+          "nor the lane-only contexts paragraph (marked with a second arrow)")
     check("personal bests" not in panel,
           "nor the lane-only personal-bests paragraph")
-    check("no way forward. Add the next physical step" in panel,
-          "and the stalled-project text is the user's own wording")
+    check("went by without being ticked" not in panel,
+          "nor another kind's deciding text (missed)")
+    check("This was due and the moment has passed" not in panel,
+          "nor another kind's deciding text (past due)")
+    check("waiting on something that no longer exists" not in panel,
+          "nor another kind's deciding text (orphaned)")
     pg.evaluate("""() => { const c = document.querySelector('[data-action="review-close"]'); if (c) c.click(); }""")
     pg.wait_for_timeout(300)
     pg.evaluate("() => { const r = document.querySelector('#tray-root'); if (r) r.innerHTML = ''; }")

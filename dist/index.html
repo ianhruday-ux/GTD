@@ -1127,7 +1127,11 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 .adv-textarea{ width:100%; min-height:64px; resize:vertical; border-radius:6px; background:var(--paper-2); border:1px solid rgba(255,255,255,0.12); color:var(--text-primary); font-size:13px; padding:8px; }
 .adv-hook-row{ display:flex; align-items:center; justify-content:space-between; font-size:12.5px; padding:4px 0; }
 .adv-content{ margin-bottom:10px; }
-.screen-advanced-btn{ align-self:flex-start; }
+/* §8 (review-surface-plan.md, RULED): grey fill for contrast, same neutral
+   raised fill as .cal-advanced-btn — .btn-ghost's transparent background is
+   overridden here (equal specificity, this rule comes later in the sheet). */
+.screen-advanced-btn{ align-self:flex-start; background:rgba(255,255,255,0.11); }
+.screen-advanced-btn:hover{ background:rgba(255,255,255,0.16); }
 .bundle-pill{ align-self:flex-start; }
 .bundle-pill-wrap{ display:inline-flex; align-items:center; gap:3px; align-self:flex-start; }
 .bundle-pill-clear{ font-size:15px; line-height:1; color:var(--text-soft); padding:2px 5px; }
@@ -1234,14 +1238,24 @@ body.has-frame .tray-drawer::after{
    chips wrapping 6 + 2 the corners read the same on both, so the @media
    override is gone. */
 .review-menu-row{ display:flex; gap:8px; justify-content:space-between; }
+/* §5/§5a (review-surface-plan.md, RULED): the three-band structure for
+   missed/pastdue/stalled/orphaned — band 1 "move it forward", band 2 "take
+   it off the list", then .review-menu-row (band 3, universal, unchanged).
+   A thin divider marks the boundary between whichever bands a kind actually
+   has — the adjacent-sibling selectors mean a kind that omits a band (e.g.
+   missed has no band 1) gets no stray empty gap or double divider. Phone:
+   stacked, full-width rows (unchanged from before banding). Desktop lays
+   each band's own buttons out horizontally — see the ≥1000px block. */
+.review-band{ display:flex; flex-direction:column; gap:7px; }
+.review-band + .review-band,
+.review-band + .review-menu-row{ padding-top:7px; border-top:1px solid rgba(255,255,255,0.08); }
 .review-menu-btn{ text-align:left; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.05);
   color:var(--text-primary); border-radius:8px; padding:10px 12px; font-size:14px; cursor:pointer; }
 .review-menu-btn:hover{ background:rgba(255,255,255,0.1); }
-.review-menu-btn.danger{ color:var(--red); border-color:rgba(194,74,61,0.45); }
 .review-menu-btn.review-notnow{ color:#fff; border-style:dashed; background:rgba(255,255,255,0.11); }
-/* Grey button, red text — deliberately NOT .danger, which also tints the
-   border. Same red as "Restore app to defaults" (settings-item.danger),
-   author-specified. */
+/* Grey button, red text — the review surface's one delete treatment (author
+   ruling). Was capture-only; every review delete control now shares it
+   (§5 defect 2). Same red as "Restore app to defaults" (settings-item.danger). */
 .review-menu-btn.review-delete-text{ color:var(--red); }
 /* Flex, with a deterministic percentage flex-basis rather than a content-based
    one: exactly 3 fit per row regardless of viewport width (the earlier
@@ -1632,7 +1646,11 @@ body.has-frame .tray-drawer::after{
   flex:0 0 auto; border:none; background:var(--brass); color:var(--dark-on-accent);
   font-weight:700; font-size:13.5px; border-radius:8px; padding:0 18px;
 }
-.cal-create-controls{ display:flex; flex-direction:column; gap:7px; }
+/* §8 (review-surface-plan.md, RULED): "More options" moved off the bottom
+   (up beside the Event/Deadline toggle) — but the row of space it vacated
+   stays, so the panel keeps a bit of margin rather than closing up flush.
+   Roughly the height + gap of the button that used to sit here. */
+.cal-create-controls{ display:flex; flex-direction:column; gap:7px; padding-bottom:28px; }
 .cal-boxed{
   display:flex; align-items:center; gap:6px; border:1px solid rgba(255,255,255,0.14);
   background:rgba(255,255,255,0.04); border-radius:8px; padding:0 10px; min-height:34px;
@@ -1650,20 +1668,30 @@ body.has-frame .tray-drawer::after{
 .cal-desc::placeholder{ color:var(--text-soft); }
 .cal-tickler-row{ display:flex; align-items:center; gap:8px; font-size:12px; color:var(--text-soft); }
 .cal-tickler-row input{ flex:0 0 auto; }
+/* §9 (review-surface-plan.md): a dismissible bubble — sibling pill + clear
+   button, same shape as .bundle-pill-wrap, so a tap near the edge dismisses
+   rather than triggering "Make this a habit instead". */
+.cal-habit-bubble-wrap{ display:inline-flex; align-items:center; gap:3px; align-self:flex-start; }
 .cal-habit-bubble{
-  align-self:flex-start; border:1px dashed var(--purple); background:rgba(142,111,176,0.12);
+  border:1px dashed var(--purple); background:rgba(142,111,176,0.12);
   color:var(--purple); border-radius:8px; padding:7px 12px; font-size:12px; font-weight:600; text-align:left;
 }
 .cal-habit-bubble:hover{ background:rgba(142,111,176,0.2); }
+.cal-habit-bubble-clear{ font-size:15px; line-height:1; color:var(--text-soft); padding:2px 5px; }
 /* "More options →" — the way from the quick-add row to the full event page.
-   Deliberately quieter than the habit bubble beside it: that one makes a
-   suggestion about what you are building, this one just opens a door. */
+   §8 (review-surface-plan.md, RULED): moved up beside the Event/Deadline
+   toggle and given a grey fill for contrast, reusing the app's existing
+   neutral raised fill (same as .review-notnow / the 2-min chip) rather than
+   minting a new one. The old "deliberately quieter than the habit bubble"
+   framing is gone (author, §9.4): the two controls answer different
+   questions and were never competing for the same attention. */
+.cal-seg-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
 .cal-advanced-btn{
-  align-self:flex-start; border:1px solid rgba(255,255,255,0.18); background:transparent;
-  color:var(--text-soft); border-radius:8px; padding:7px 12px; font-size:12px;
+  align-self:flex-start; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.11);
+  color:var(--text-primary); border-radius:8px; padding:7px 12px; font-size:12px;
   font-weight:600; text-align:left;
 }
-.cal-advanced-btn:hover{ background:rgba(255,255,255,0.08); color:var(--text-primary); }
+.cal-advanced-btn:hover{ background:rgba(255,255,255,0.16); }
 .screen-pause-btn{
   align-self:stretch; border:1px solid var(--dusty); background:transparent; color:var(--dusty);
   border-radius:8px; padding:9px 12px; font-size:13px; font-weight:600; text-align:center;
@@ -2010,26 +2038,61 @@ body.screen-open #tray-handle{ display:none; }
      6). Widening the card is only half of it: the month grid is sized against
      .screen-body's 640px column, so that column has to widen for this screen
      only (trap T11). */
-  .screen-overlay[data-kind="calendar"] .screen-card{ width:min(900px, 100%); }
-  /* ⚑ FIX (author QA: "the calendar is wide, but it is too tall"). .cal-cells
-     is 7 equal grid columns (`repeat(7, 1fr)`), so simply widening the CARD let
-     the columns fill the whole 900px unconstrained — and each .cal-cell keeps
-     a fixed aspect-ratio (1/1.15), so growing the WIDTH grew the HEIGHT right
-     along with it: six rows of ~119px-wide cells stack to over 800px tall.
-     Cap the GRID specifically (not the card, and not the nav/agenda rows below
-     it, which stay full width — they are text rows with no such constraint) so
-     cells grow noticeably over the phone's ~50px without ballooning height.
-     660px keeps six rows under ~600px on any reasonable desktop viewport.
-     --cal-cell-w is recomputed against the SAME cap on the SAME element
-     (.cal-body), which --cal-grid-h already reads via var() — CSS custom
-     properties resolve at USE time, so overriding it here is enough; List and
-     Day's reserved height (shared rule, base .cal-body) picks it up too,
-     without a second declaration. */
+  /* §10 (review-surface-plan.md, RULED — Proposal A, "the desktop calendar is
+     broken"): the previous round's fix (a bare width cap on the grid) only
+     ever addressed the WIDTH axis. .cal-cell carries a fixed aspect-ratio, so
+     height still followed width — six rows of even a capped-width grid still
+     ran to ~630px tall, and with .cal-create stacked below it too, the create
+     row (name field, Event/Deadline toggle, Add button) sat off-screen on a
+     1366x768 laptop: measured at 1073px needed against 644px available.
+     The real fix is two changes together, and neither is sufficient alone
+     (measured): flatten the cell's aspect ratio so six rows fit well inside
+     any reasonable viewport height, AND move .cal-create beside the grid
+     instead of below it, which is what actually returns the Add button (and,
+     for Day/List, most of a ~628px empty reserve) to above the fold. Column
+     order is CONTROLS-left / CALENDAR-right (author correction after Proposal
+     A was chosen — the first mockup showed the reverse). */
+  .screen-overlay[data-kind="calendar"] .screen-card{ width:min(1040px, 100%); }
   .screen-overlay[data-kind="calendar"] .cal-body{
+    display:grid; grid-template-columns:300px 1fr; column-gap:24px; align-items:start;
+    /* The grid's own width cap is unchanged from the previous round (the width
+       axis was never the bug) — --cal-cell-w recomputed against the SAME
+       660px cap, on the SAME element, which --cal-grid-h already reads via
+       var(). 0.63 replaces the phone's 1.15: wide rectangles (~92 x 58), not
+       near-squares — THIS is what cuts the height. List/Day's reserve (shared
+       base rule, .cal-agenda/.cal-day-empty min-height) drops from ~628px to
+       ~363px automatically, since it reads the same --cal-grid-h. */
     --cal-cell-w: calc((660px - 40px - 18px) / 7);
+    --cal-grid-h: calc(6 * 0.63 * var(--cal-cell-w) + 15px + 20px);
   }
-  .screen-overlay[data-kind="calendar"] .cal-swipe-viewport{
-    max-width:660px; margin:0 auto;
+  .screen-overlay[data-kind="calendar"] .cal-cell{ aspect-ratio:1/0.63; }
+  /* The right column: month/day nav, then whichever of the three view bodies
+     is rendered — always exactly two stacked rows, since only one of
+     (monthnav|daynav) and one of (swipe-viewport|agenda|day-empty) is in the
+     DOM at a time. */
+  .screen-overlay[data-kind="calendar"] .cal-monthnav,
+  .screen-overlay[data-kind="calendar"] .cal-daynav,
+  .screen-overlay[data-kind="calendar"] .cal-swipe-viewport,
+  .screen-overlay[data-kind="calendar"] .cal-agenda,
+  .screen-overlay[data-kind="calendar"] .cal-day-empty{
+    grid-column:2; max-width:660px;
+  }
+  .screen-overlay[data-kind="calendar"] .cal-swipe-viewport{ margin:0; }
+  /* The left column: the whole create panel, spanning both of the right
+     column's rows so it reads as a sidebar, not a third stacked row. §8's
+     "More options" already sits at the top of this panel (paired with the
+     Event/Deadline toggle, shared markup with the phone) — no separate
+     desktop placement needed, per §8.2's ruling that it "has no separate
+     existence from this layout." The phone's top divider (border/margin
+     separating .cal-create from the grid ABOVE it) is dropped here — there is
+     no "above" relationship once this is a side column. Deadline's shorter
+     panel is left top-aligned rather than centered/stretched to match Event's
+     height (builder's call — simplest, and top alignment reads as an
+     ordinary short form, not a broken one; flagged in case the author wants
+     it visually balanced instead). */
+  .screen-overlay[data-kind="calendar"] .cal-create{
+    grid-column:1; grid-row:1/3; align-self:start;
+    border-top:none; margin-top:0; padding-top:0;
   }
   .screen-body{
     max-width:none; padding:18px 26px 22px 26px;
@@ -2129,8 +2192,20 @@ body.screen-open #tray-handle{ display:none; }
   .review-sort-chips .review-menu-btn[data-target="notes"]{ margin-right:0; }
   /* Same half-row rhythm across the LAST row boundary too, so all three rows
      are evenly spaced rather than two loose and one tight. .review-card already
-     gaps its children by 12px, so this tops it up to the same 18px. */
-  .review-menu-row{ margin-top:6px; }
+     gaps its children by 12px, so this tops it up to the same 18px.
+     ⚑ Scoped to the capture card specifically (review-card-capture) — once
+     .review-menu-row became the universal band-3 corner row (§5a), this rule
+     would otherwise also add its 6px to every banded card's corner row on
+     top of the band divider's own 7px, a rhythm that was only ever tuned for
+     capture's three chip-rows. */
+  .review-card-capture .review-menu-row{ margin-top:6px; }
+  /* §5/§5a: bands lay their buttons out horizontally on desktop — the same
+     "one DOM, two arrangements" technique the capture chips already use,
+     generalised past capture per the author's own framing (§5). A
+     deterministic min-width (not percentage — band sizes vary 1–3 buttons
+     per kind, unlike capture's fixed 8) keeps wrapping predictable. */
+  .review-band{ flex-direction:row; flex-wrap:wrap; gap:8px; }
+  .review-band .review-menu-btn{ flex:1 1 160px; text-align:center; }
 }
 
 /* The frame's desktop geometry: pinned to the viewport, over the header, under
@@ -2262,7 +2337,7 @@ body.screen-open #tray-handle{ display:none; }
 (function(){
 "use strict";
 
-const BUILD_STAMP = "27 Jul 18:20";  // replaced by build.py
+const BUILD_STAMP = "27 Jul 20:24";  // replaced by build.py
 
 // =========================================================
 // STORAGE ADAPTER (spec.md §3, known issue 4)
@@ -2478,8 +2553,8 @@ const STRINGS = {
     "zh-Hans": "这项等待行动原本依赖的条件已经不存在了。你可以把它改为等待其他事情、改成一条笔记、如果现在已经可以执行就把它移到“下一步行动”，或者直接结束它。"
   },
   "info.review.missed": {
-    en: "A repeating thing whose day went by without being ticked. Often you did it and forgot to say so — 'I did it' records it on the day it happened. 'Let it go' clears it without pretending you did. Only the most recent one is ever kept, so this never piles up.",
-    "zh-Hans": "这是一项重复事项，它的执行日期已经过去，但还没有勾选完成。很多时候其实已经做了，只是忘了记录。“我做了”会把完成记录补到实际发生的那一天；“算了吧”则会直接清除这次记录，而不会假装已经完成。系统始终只保留最近的一次，因此不会越积越多。"
+    en: "A repeating thing whose day went by without being ticked. Often you did it and forgot to say so — 'Mark done' records it on the day it happened. 'Skipped' clears it without pretending you did. Only the most recent one is ever kept, so this never piles up.",
+    "zh-Hans": "这是一项重复事项，它的执行日期已经过去，但还没有勾选完成。很多时候其实已经做了，只是忘了记录。“标记完成”会把完成记录补到实际发生的那一天；“已跳过”则会直接清除这次记录，而不会假装已经完成。系统始终只保留最近的一次，因此不会越积越多。"
   },
   "info.review.capture": {
     en: "A stray thought you haven't filed yet. Send it to a lane — or Not now to leave it for later.",
@@ -2843,8 +2918,9 @@ const STRINGS = {
   "review.infoOrphanedLabel": { en: "Waiting on something gone:",   "zh-Hans": "在等一个已经不存在的东西：" },
   "review.infoMissedLabel":  { en: "A repeat you missed:",          "zh-Hans": "一个你错过的重复项：" },
   "review.noWayForward":     { en: "no way forward",                "zh-Hans": "没有下一步" },
-  "review.iDidIt":           { en: "I did it",                      "zh-Hans": "我做完了" },
-  "review.letItGo":          { en: "Let it go",                     "zh-Hans": "不管了" },
+  // review.iDidIt retired — merged into review.markDone (missed + past-due
+  // pseudo-action now share one "mark this done" verb; author ruling).
+  "review.skipped":          { en: "Skipped",                       "zh-Hans": "已跳过" },
   "review.quickDoneComplete": { en: "Complete",                     "zh-Hans": "完成" },
   "review.quickDoneBack":    { en: "Back",                          "zh-Hans": "返回" },
   "review.wentByOn":         { en: "went by on",                    "zh-Hans": "已过期，日期是" },
@@ -2941,6 +3017,7 @@ const STRINGS = {
   "cal.moreOptions":            { en: "More options →",             "zh-Hans": "更多选项 →" },
   "cal.moreOptionsTooltip":     { en: "Open the full page — context, project link, and everything here", "zh-Hans": "打开完整页面——情境、项目链接，以及这里的一切" },
   "cal.makeHabitInstead":       { en: "Recurring chore? Make this a habit instead →", "zh-Hans": "重复的例行事务？改用习惯来记录 →" },
+  "cal.dismissHabitBubble":     { en: "Dismiss",                    "zh-Hans": "关闭" },
   "cal.add":                    { en: "Add",                        "zh-Hans": "添加" },
   "cal.eventOnPrefix":          { en: "Event on ",                   "zh-Hans": "事件安排在 " },
   "cal.duePrefix":              { en: "Due ",                        "zh-Hans": "截止于 " },
@@ -5610,12 +5687,12 @@ function initTimePickerFields(){
 // (this file + its boot() call) if the convention is ever retired.
 // =========================================================
 function injectChunkMap(){
-  const FLAG = "gtd_chunk_map_v10";
+  const FLAG = "gtd_chunk_map_v11";
   if (Storage.get(FLAG)) return;
   Storage.set(FLAG, "1");
   ["gtd_chunk_map_v1", "gtd_chunk_map_v2", "gtd_chunk_map_v3", "gtd_chunk_map_v4",
    "gtd_chunk_map_v5", "gtd_chunk_map_v6", "gtd_chunk_map_v7", "gtd_chunk_map_v8",
-   "gtd_chunk_map_v9"].forEach(Storage.remove);  // retire superseded flags
+   "gtd_chunk_map_v9", "gtd_chunk_map_v10"].forEach(Storage.remove);  // retire superseded flags
 
   // Replace, don't accumulate (8.2, mirroring 8.1): sweep any previous
   // chunk-map group (tagged via devContext, not a title match, since the
@@ -5671,6 +5748,9 @@ function injectChunkMap(){
     { title: "✓ Events on the project page", notes: "DONE. A project shows its linked events and can create them — including on the creation page, where the event is held as a draft and only becomes real when the project is saved. ‘Add an event’ in the daily review came with it." },
     { title: "✓ Linked notes on the project page", notes: "DONE. The link runs both ways now. A current project's Linked panel has an Actions side and a Notes side you toggle between, and a Someday project has a Linked notes section of its own — notes only, since a Someday project holds no actions by design." },
     { title: "Re-test backups against the new fields", notes: "TO DO. Export and import have not been exercised since deadlines gained a start date and a push counter, repeats gained a missed-day marker, and the backgrounds changed names. Backups are the one thing that has to survive real use." },
+    { title: "✓ The review surface, standardised", notes: "DONE. Fixed a live bug where the Chinese text for a missed repeat quoted buttons that no longer existed. The review's five card kinds (missed, past due, stalled, orphaned, and the sort-a-thought capture card) now share one delete style and one 'Not now' corner position instead of five different looks. The four decision cards (everything but capture) are now grouped into bands — 'ways to move it forward', 'ways to take it off the list', then Not now/Delete — stacked on the phone and laid out side by side on a computer, so a card that used to be seven buttons in a column now reads at a glance. The missed-repeat button 'Let it go' is renamed 'Skipped' (in both languages) so it can't be misread as the same action as 'Not now'. The review's (i) info button now explains only the one card on screen, not all five kinds at once, and stays open as you move to the next card." },
+    { title: "✓ The habit-bubble dismiss, and the Advanced buttons", notes: "DONE. The calendar's 'Make this a habit instead' suggestion (shown when you set something to repeat daily or weekly) now has a small X to dismiss it — it comes back next time you pick daily or weekly on a fresh item. Every 'Advanced options' / 'More options' button across the app got a light grey fill for contrast, and the calendar's copy moved up next to the Event/Deadline toggle instead of sitting at the bottom of the form, on both phone and computer." },
+    { title: "✓ The desktop calendar, fixed", notes: "DONE. The computer calendar used to overflow the screen at every size tested, including 1920x1080 — the day squares were too tall and the Add button could sit below the fold. It's now two columns (the form on the left, wide short day-squares on the right), fits on screen at any reasonable window size, and the phone layout is untouched." },
     { title: "✓ 9 — Service worker + offline + install polish", notes: "DONE. The app now works with no internet — it saves a copy of itself the first time you open it online, so airplane mode after that still loads and works. When I ship a change while you have the app open, a small bar appears saying “New version available” with a Reload button; nothing ever updates or interrupts you without that tap. See the fresh QA checklist in Next Actions to try both." },
     { title: "A drawing tool for Notes — only if there is time", notes: "MAYBE. The first thing to cut if the month runs out." }
   ];
@@ -10082,7 +10162,7 @@ function injectChunkMap(){
     const inner = s.completedView
       ? completedHeaderHtml(s) + completedBodyHtml(s) + screenFooterHtml(s, "completed")
       : s.reviewView
-        ? reviewHeaderHtml() + reviewBodyHtml(s)
+        ? reviewHeaderHtml(reviewActiveLoops().length > 0) + reviewBodyHtml(s)
         : s.calendarView
           ? calendarHeaderHtml(s) + calendarBodyHtml(s)
           : s.quickDoneView
@@ -10561,7 +10641,9 @@ function injectChunkMap(){
       if (e.target.closest('[data-action="open-review"]')){ closeTray(); openReviewScreen(); return; }
       if (e.target.closest('[data-action="review-close"]')){ closeScreen(); return; }
       if (e.target.closest('[data-action="review-info"]')){
-        const panel = qs(".review-info-panel"); if (panel) panel.hidden = !panel.hidden; return;
+        if (state.screen) state.screen.reviewInfoOpen = !state.screen.reviewInfoOpen;
+        const panel = qs(".review-info-panel"); if (panel) panel.hidden = !(state.screen && state.screen.reviewInfoOpen);
+        return;
       }
       const revDefer = e.target.closest('[data-action="review-defer"]');
       if (revDefer){ deferReviewItem(revDefer.getAttribute("data-key")); if (state.screen) state.screen.reviewForm = null; renderScreen(); return; }
@@ -11761,10 +11843,10 @@ function injectChunkMap(){
     if (touched){ renderLane("next"); renderLane("current"); }
   }
   function injectQAChecklist(){
-    // PUBLIC-APP-POLISH round (public-app-polish-plan.md). §8.1's
+    // REVIEW-SURFACE round (review-surface-plan.md). §8.1's
     // replace-don't-accumulate discipline: this is the ONLY injector, and the
-    // service-worker round's groups below are swept out, not left dormant.
-    const FLAG = "gtd_qa_checklist_publicpolish_v1";
+    // public-app-polish round's groups below are swept out, not left dormant.
+    const FLAG = "gtd_qa_checklist_reviewsurface_v1";
     if (Storage.get(FLAG)) return;
     Storage.set(FLAG, "1");
     // Retire the superseded flags so they can't resurrect their injectors, and
@@ -11775,7 +11857,8 @@ function injectChunkMap(){
      "gtd_qa_checklist_postsprint_v3", "gtd_qa_checklist_postsprint_v4",
      "gtd_qa_checklist_postsprint_v5", "gtd_qa_checklist_postsprint_v6",
      "gtd_qa_checklist_postsprint_v7", "gtd_qa_checklist_desktop_v1",
-     "gtd_qa_checklist_desktop_v2", "gtd_qa_checklist_sw_v1"].forEach(Storage.remove);
+     "gtd_qa_checklist_desktop_v2", "gtd_qa_checklist_sw_v1",
+     "gtd_qa_checklist_publicpolish_v1"].forEach(Storage.remove);
 
     // Replace, don't accumulate (8.1) — and actually mean it this time.
     // Earlier rounds bumped the flag but left the previous rounds' groups
@@ -11804,17 +11887,18 @@ function injectChunkMap(){
       });
     }
 
-    addGroupWithItems('✅ QA — Chinese translation', [
-      { title: '1. Switch to Chinese', notes: 'Open ⋯ (the gear menu) → Language → 简体中文. The whole app should relabel itself immediately — lane names, buttons, everything.' },
-      { title: '2. Read through the tutorial', notes: 'Open the "1 点击这里开始教程" card at the top of Next Actions and tap its checkbox to step through all 8 cards. None of the text should look cut off, blank, or garbled — flag anything that reads oddly even if you don’t read Chinese fluently, just from spacing or obviously-broken punctuation.' },
-      { title: '3. Check every lane’s (i)', notes: 'Tap the small (i) next to each of the six lane headers (Next, Waiting, Projects, Someday, Habits, Notes) and confirm an explanation shows up — none should be empty.' },
-      { title: '4. Run a daily review in Chinese', notes: 'Open the intray (the handle on the left edge of the screen) and tap 回顾. Read through whatever cards show up — nothing should be blank, and tapping the (i) at the top of the review should show a paragraph for every kind of card.' },
-      { title: '5. Switch back to English when done', notes: 'Same menu, pick English, to leave the app the way you’d normally use it.' }
+    addGroupWithItems('✅ QA — The review’s new grouped buttons', [
+      { title: '1. Open the daily review', notes: 'Open the intray (the handle on the left edge of the screen, or the left column on a computer) and tap Review. Look at whichever card shows up first.' },
+      { title: '2. Check the buttons are grouped, not one long list', notes: 'A card with several buttons (like a stalled project) should show them in a few small groups with a thin line between each group, ending with "Not now" in the bottom-left corner and a red "Delete" in the bottom-right — not seven buttons in one plain column.' },
+      { title: '3. On a computer, the groups sit side by side', notes: 'On a wide window, each group\'s buttons should line up in a row instead of stacking — the same card should look noticeably more compact than on the phone.' },
+      { title: '4. Find a missed repeating habit or event, if one shows up', notes: 'Its "give up on this one" button should now say "Skipped", not "Let it go".' },
+      { title: '5. Tap the (i) info button at the top of the review', notes: 'It should explain only the ONE card you\'re looking at — not a wall of text about every kind of card at once.' }
     ]);
 
-    addGroupWithItems('✅ QA — The review’s Add button', [
-      { title: '6. Find a stalled project in the review', notes: 'If the tutorial’s "Sample stalled project" card is still around, open the review — it should show up there (it has no linked action). Tap "Add a next action".' },
-      { title: '7. Check the three buttons', notes: 'You should see a small muted "Full page →" on the left, "Cancel" in the middle, and a solid highlighted "Add" on the right. Type something and tap the button you mean to — it should now be hard to hit the wrong one by accident.' }
+    addGroupWithItems('✅ QA — Calendar changes', [
+      { title: '6. Open the calendar and set something to repeat', notes: 'Start adding an event, set it to repeat Daily or Weekly. A purple box should offer to make it a habit instead, with a small X on the end to dismiss it if you don\'t want it.' },
+      { title: '7. On a computer, open the calendar', notes: 'The whole calendar should fit on screen without needing to scroll, with the day squares wide and short (not tall) and the "Add" button always visible — not hidden below the fold.' },
+      { title: '8. Check the "More options" / "Advanced options" buttons', notes: 'Wherever you see one of these (a next action, a waiting action, a habit, or the calendar), it should now have a light grey fill so it stands out a bit, instead of blending into the background.' }
     ]);
     saveTasksLocal("next");
   }
@@ -12238,13 +12322,15 @@ function injectChunkMap(){
     fn();
   }
 
-  function reviewHeaderHtml(){
+  // hasCard: false on the all-clear/all-deferred end state, where there is
+  // nothing on the page for the ⓘ to explain (§3, review-surface-plan.md).
+  function reviewHeaderHtml(hasCard){
     return (
       '<div class="screen-header">' +
         '<span class="screen-chrome-btn" style="visibility:hidden">&#8592;</span>' +
         '<span class="screen-kind-badge">' + escapeHtml(t("review.badge")) + '</span>' +
         '<div class="screen-header-right">' +
-          '<button type="button" class="screen-chrome-btn" data-action="review-info" title="' + escapeHtml(t("chrome.info")) + '">&#9432;</button>' +
+          (hasCard ? '<button type="button" class="screen-chrome-btn" data-action="review-info" title="' + escapeHtml(t("chrome.info")) + '">&#9432;</button>' : '') +
           '<button type="button" class="screen-chrome-btn" data-action="review-close" title="' + escapeHtml(t("chrome.close")) + '">&#10005;</button>' +
         '</div>' +
       '</div>'
@@ -12261,10 +12347,19 @@ function injectChunkMap(){
       capture: t("info.review.capture")
     };
   }
-  function reviewInfoPanelHtml(){
-    return (
-      '<div class="review-info-panel" hidden>' +
-        '<div class="review-info-block"><b>' + escapeHtml(t("review.heading.sorting")) + '</b><br>' +
+  // Scoped to the revealed card's kind (§3, review-surface-plan.md) — the
+  // review shows exactly one card at a time, so "what's on the page" is
+  // unambiguous. `capture` is the only kind that needs the sorting block
+  // (sorting is what a capture card asks you to do); every other kind gets
+  // the single matching "deciding" paragraph, not all four. `open` persists
+  // across cards (state.screen.reviewInfoOpen) rather than closing on every
+  // decision, which is friendlier when working through several cards of the
+  // same kind in a row (builder's call, per review-surface-plan.md §3 trap).
+  function reviewInfoPanelHtml(kind, open){
+    if (!kind) return ""; // nothing on the page (all-clear / all-deferred) — no panel, no ⓘ
+    let body;
+    if (kind === "capture"){
+      body = '<div class="review-info-block"><b>' + escapeHtml(t("review.heading.sorting")) + '</b><br>' +
           '<b>' + escapeHtml(t("review.infoNextLabel")) + '</b> ' + escapeHtml(LANE_INFO.next) + '<br>' +
           '<b>' + escapeHtml(t("review.infoWaitingLabel")) + '</b> ' + escapeHtml(LANE_INFO.waiting) + '<br>' +
           '<b>' + escapeHtml(t("review.infoProjectLabel")) + '</b> ' + escapeHtml(LANE_INFO.current) + '<br>' +
@@ -12272,20 +12367,27 @@ function injectChunkMap(){
           '<b>' + escapeHtml(t("review.infoHabitLabel")) + '</b> ' + escapeHtml(LANE_INFO.habit) + '<br>' +
           '<b>' + escapeHtml(t("review.infoNoteLabel")) + '</b> ' + escapeHtml(LANE_INFO.notes) + '<br>' +
           '<b>' + escapeHtml(t("review.infoTwoMinLabel")) + '</b> ' + escapeHtml(t("review.infoTwoMinText")) +
-        '</div>' +
-        // ⚑ Was "Deciding on an open loop" / "Orphaned waiting" (user: "open
-        // loop is jargon from the book. It should be changed"). Both were terms
-        // you had to already know — one borrowed from GTD, one the app invented.
-        // The headings now describe the situation instead of naming it. "Stalled"
-        // survives because it is ordinary English, not a term of art.
-        '<div class="review-info-block"><b>' + escapeHtml(t("review.heading.deciding")) + '</b><br>' +
-          '<b>' + escapeHtml(t("review.infoPastDueLabel")) + '</b> ' + escapeHtml(reviewMenuInfo().pastdue) + '<br>' +
-          '<b>' + escapeHtml(t("review.infoStalledLabel")) + '</b> ' + escapeHtml(reviewMenuInfo().stalled) + '<br>' +
-          '<b>' + escapeHtml(t("review.infoOrphanedLabel")) + '</b> ' + escapeHtml(reviewMenuInfo().orphaned) + '<br>' +
-          '<b>' + escapeHtml(t("review.infoMissedLabel")) + '</b> ' + escapeHtml(reviewMenuInfo().missed) +
-        '</div>' +
-      '</div>'
-    );
+        '</div>';
+    } else {
+      // ⚑ Was "Deciding on an open loop" / "Orphaned waiting" (user: "open
+      // loop is jargon from the book. It should be changed"). Both were terms
+      // you had to already know — one borrowed from GTD, one the app invented.
+      // The headings now describe the situation instead of naming it. "Stalled"
+      // survives because it is ordinary English, not a term of art.
+      // pastdue's pseudo-action shape reuses the deadline wording rather than
+      // getting its own string (builder's call, review-surface-plan.md Q3) —
+      // simplest option where the doc left it open; revisit if it reads wrong.
+      const label = {
+        pastdue: t("review.infoPastDueLabel"),
+        stalled: t("review.infoStalledLabel"),
+        orphaned: t("review.infoOrphanedLabel"),
+        missed: t("review.infoMissedLabel")
+      }[kind];
+      body = '<div class="review-info-block"><b>' + escapeHtml(t("review.heading.deciding")) + '</b><br>' +
+          '<b>' + escapeHtml(label) + '</b> ' + escapeHtml(reviewMenuInfo()[kind]) +
+        '</div>';
+    }
+    return '<div class="review-info-panel"' + (open ? "" : " hidden") + '>' + body + '</div>';
   }
 
   // A redacted card: visible (you can see one more loop exists and count them)
@@ -12293,18 +12395,25 @@ function injectChunkMap(){
   // discipline decorative (§4.8b).
   function reviewRedactionHtml(){ return '<div class="review-redaction" aria-hidden="true"></div>'; }
 
-  function reviewMenuBtn(action, label, extra, danger){
-    return '<button type="button" class="review-menu-btn' + (danger ? " danger" : "") + '" data-action="' + action + '"' + (extra || "") + '>' + label + '</button>';
+  // Grey button, red text only (author ruling — the capture card's baseline,
+  // now shared by every delete control on the review surface; see
+  // review-delete-text below).
+  function reviewMenuBtn(action, label, extra, isDelete){
+    return '<button type="button" class="review-menu-btn' + (isDelete ? " review-delete-text" : "") + '" data-action="' + action + '"' + (extra || "") + '>' + label + '</button>';
   }
   function reviewNotNowBtn(key){
     return '<button type="button" class="review-menu-btn review-notnow" data-action="review-defer" data-key="' + key + '">' + escapeHtml(t("review.notNow")) + '</button>';
   }
-  // Grey button, red text only (author ruling — distinct from .danger, which
-  // also tints the border; captures is the pattern the other three decision
-  // menus will be brought in line with next, so this is the new baseline).
-  function reviewCaptureDeleteBtn(key){
-    return '<button type="button" class="review-menu-btn review-delete-text" data-action="review-delete-capture" data-key="' + key + '">' + escapeHtml(t("review.delete")) + '</button>';
-  }
+  // §5/§5a (review-surface-plan.md, RULED): the three-band structure for the
+  // four non-capture kinds — band 1 "move it forward", band 2 "take it off
+  // the list", band 3 (always .review-menu-row, the universal corner row —
+  // reused as-is from the capture card, which is where it originated). A kind
+  // with nothing for a band simply omits it (no empty div, so no stray
+  // divider from the adjacent-sibling CSS rule). One DOM, two arrangements:
+  // phone stacks each band's buttons, desktop lays them out horizontally
+  // (styles.css ≥1000px block) — same technique as .review-sort-chips,
+  // generalised past the capture card per the author's own framing.
+  function reviewBandHtml(html){ return html ? '<div class="review-band">' + html + '</div>' : ""; }
   // The active inline sub-form (Push date / Add next action / Free text) for
   // this card, if any. One at a time, held on the screen (draft-free — these
   // are review decisions, applied immediately, not armed edits).
@@ -12405,7 +12514,7 @@ function injectChunkMap(){
           reviewMenuBtn("review-sort", t("review.calendar"), ' data-target="calendar" data-key="' + l.key + '"') + // chunk 7 (§4.8b): the sixth chip
           reviewMenuBtn("review-quickdone", t("review.twoMin"), ' data-target="quickdone" data-key="' + l.key + '"') +
         '</div>' +
-        '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewCaptureDeleteBtn(l.key) + '</div>';
+        '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewMenuBtn("review-delete-capture", t("review.delete"), ' data-key="' + l.key + '"', true) + '</div>';
       return '<div class="review-card review-card-capture">' + bodyHtml + menuHtml + '</div>';
     }
     // A rolled-past repeating occurrence (user ruling). Handled before the shared
@@ -12423,11 +12532,18 @@ function injectChunkMap(){
           '<span class="review-card-title">' + escapeHtml(effTitle(l.ev, l.occ)) + '</span>' +
           '<span class="review-card-note">⚠ ' + escapeHtml(t("review.wentByOn")) + ' ' + escapeHtml(when) + ' ' + escapeHtml(t("review.withoutTicking")) + '</span>' +
         '</button>';
+      // No band 1 (move forward) — a missed occurrence has nothing to add,
+      // only a way to resolve it. Band 2 (take it off the list): both options
+      // resolve the miss, just with different honesty about what happened.
+      // No delete either — see reviewMissedClear's comment: this destroys
+      // nothing, so the universal corner row is Not now alone.
       menuHtml =
-        '<button type="button" class="review-menu-btn" data-action="review-missed-done" data-id="' + l.id + '">&#10003; ' + escapeHtml(t("review.iDidIt")) + '</button>' +
-        '<button type="button" class="review-menu-btn" data-action="review-missed-clear" data-id="' + l.id + '">' + escapeHtml(t("review.letItGo")) + '</button>' +
-        reviewNotNowBtn(l.key);
-      return '<div class="review-card">' + bodyHtml + menuHtml + '</div>';
+        reviewBandHtml(
+          '<button type="button" class="review-menu-btn" data-action="review-missed-done" data-id="' + l.id + '">&#10003; ' + escapeHtml(t("review.markDone")) + '</button>' +
+          '<button type="button" class="review-menu-btn" data-action="review-missed-clear" data-id="' + l.id + '">' + escapeHtml(t("review.skipped")) + '</button>'
+        ) +
+        '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + '</div>';
+      return '<div class="review-card">' + bodyHtml + '<div class="review-menu">' + menuHtml + '</div></div>';
     }
     // Derived kinds share a tap-through title (opens the real page) + a
     // context line, then a per-kind decision menu. A pseudo-action taps
@@ -12457,19 +12573,22 @@ function injectChunkMap(){
       // delete here, the only way to clear a dead past-due event was to record
       // it as an accomplishment. Routed through the event (not the lane row):
       // deleting the row alone leaves the event live and the sweep re-mints it.
+      // No band 1 — you cannot push an event's date from here (§2, above).
+      // Band 2 (take it off the list): Mark done.
       menuHtml =
-        '<button type="button" class="review-menu-btn" data-action="review-complete" data-lane="' + l.laneKind + '" data-id="' + l.id + '">&#10003; ' + escapeHtml(t("review.markDone")) + '</button>' +
-        '<button type="button" class="review-menu-btn danger" data-action="review-delete-event" data-id="' + l.id + '">&#128465; ' + escapeHtml(t("review.delete")) + '</button>' +
-        reviewNotNowBtn(l.key);
+        reviewBandHtml('<button type="button" class="review-menu-btn" data-action="review-complete" data-lane="' + l.laneKind + '" data-id="' + l.id + '">&#10003; ' + escapeHtml(t("review.markDone")) + '</button>') +
+        '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewMenuBtn("review-delete-event", "&#128465; " + escapeHtml(t("review.delete")), ' data-id="' + l.id + '"', true) + '</div>';
     } else if (l.kind === "pastdue"){
       if (form && form.type === "date"){
         menuHtml = reviewInlineFormHtml("", "date", "review-pushdate-save", t("review.save"), (l.task.deadline && l.task.deadline.date) || "", invalid);
       } else {
+        // Band 1 (move it forward): push the date — keeps it alive with a new
+        // target, same family as stalled's "give it a next step". Band 2
+        // (take it off the list): Complete it.
         menuHtml =
-          reviewMenuBtn("review-form-start", t("review.pushTheDate"), ' data-key="' + l.key + '" data-type="date"') +
-          reviewMenuBtn("review-complete", t("review.completeIt"), ' data-lane="' + l.laneKind + '" data-id="' + l.id + '"') +
-          reviewMenuBtn("review-delete", t("review.deleteIt"), ' data-lane="' + l.laneKind + '" data-id="' + l.id + '"', true) +
-          reviewNotNowBtn(l.key);
+          reviewBandHtml(reviewMenuBtn("review-form-start", t("review.pushTheDate"), ' data-key="' + l.key + '" data-type="date"')) +
+          reviewBandHtml(reviewMenuBtn("review-complete", t("review.completeIt"), ' data-lane="' + l.laneKind + '" data-id="' + l.id + '"')) +
+          '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewMenuBtn("review-delete", t("review.deleteIt"), ' data-lane="' + l.laneKind + '" data-id="' + l.id + '"', true) + '</div>';
       }
     } else if (l.kind === "stalled"){
       if (form && form.type === "text"){
@@ -12484,31 +12603,41 @@ function injectChunkMap(){
         // character is one decision, inline, without leaving.
         menuHtml = reviewWaitingFormHtml(s, l.key);
       } else {
+        // §5's own worked example (defect 5): band 1 (move it forward) is the
+        // three ways to give the project a next step; band 2 (take it off the
+        // list) is the two ways to remove it from play.
         menuHtml =
-          reviewMenuBtn("review-form-start", t("review.addNextAction"), ' data-key="' + l.key + '" data-type="text"') +
-          reviewMenuBtn("review-form-start", t("review.addWaitingAction"), ' data-key="' + l.key + '" data-type="waiting"') +
-          // ⚑ The third one the user asked for originally, parked until a project
-          // could see the calendar. It can now: this opens the calendar for this
-          // project, capped by its deadline, and returns HERE rather than to the
-          // project page -- the review pushed the stack, so closeScreen lands back
-          // in the queue where you left off.
-          reviewMenuBtn("review-add-event", t("review.addAnEvent"), ' data-id="' + l.id + '"') +
-          reviewMenuBtn("review-someday", t("review.moveToSomeday"), ' data-id="' + l.id + '"') +
-          reviewMenuBtn("review-complete", t("review.completeIt"), ' data-lane="current" data-id="' + l.id + '"') +
-          reviewMenuBtn("review-delete", t("review.deleteIt"), ' data-lane="current" data-id="' + l.id + '"', true) +
-          reviewNotNowBtn(l.key);
+          reviewBandHtml(
+            reviewMenuBtn("review-form-start", t("review.addNextAction"), ' data-key="' + l.key + '" data-type="text"') +
+            reviewMenuBtn("review-form-start", t("review.addWaitingAction"), ' data-key="' + l.key + '" data-type="waiting"') +
+            // ⚑ The third one the user asked for originally, parked until a project
+            // could see the calendar. It can now: this opens the calendar for this
+            // project, capped by its deadline, and returns HERE rather than to the
+            // project page -- the review pushed the stack, so closeScreen lands back
+            // in the queue where you left off.
+            reviewMenuBtn("review-add-event", t("review.addAnEvent"), ' data-id="' + l.id + '"')
+          ) +
+          reviewBandHtml(
+            reviewMenuBtn("review-someday", t("review.moveToSomeday"), ' data-id="' + l.id + '"') +
+            reviewMenuBtn("review-complete", t("review.completeIt"), ' data-lane="current" data-id="' + l.id + '"')
+          ) +
+          '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewMenuBtn("review-delete", t("review.deleteIt"), ' data-lane="current" data-id="' + l.id + '"', true) + '</div>';
       }
     } else if (l.kind === "orphaned"){
       if (form && form.type === "text"){
         menuHtml = reviewInlineFormHtml(t("review.waitingForDots"), "text", "review-freetext-save", t("review.save"), "", invalid);
       } else {
+        // Band 1 (move it forward): the three ways to give it a condition to
+        // wait on again, or act on it now. Band 2 (take it off the list):
+        // Complete.
         menuHtml =
-          reviewMenuBtn("review-open", t("review.repointCondition"), ' data-lane="waiting" data-id="' + l.id + '"') +
-          reviewMenuBtn("review-form-start", t("review.replaceWithFreeText"), ' data-key="' + l.key + '" data-type="text"') +
-          reviewMenuBtn("review-promote", t("review.promoteToNext"), ' data-id="' + l.id + '"') +
-          reviewMenuBtn("review-complete", t("review.complete"), ' data-lane="waiting" data-id="' + l.id + '"') +
-          reviewMenuBtn("review-delete", t("review.delete"), ' data-lane="waiting" data-id="' + l.id + '"', true) +
-          reviewNotNowBtn(l.key);
+          reviewBandHtml(
+            reviewMenuBtn("review-open", t("review.repointCondition"), ' data-lane="waiting" data-id="' + l.id + '"') +
+            reviewMenuBtn("review-form-start", t("review.replaceWithFreeText"), ' data-key="' + l.key + '" data-type="text"') +
+            reviewMenuBtn("review-promote", t("review.promoteToNext"), ' data-id="' + l.id + '"')
+          ) +
+          reviewBandHtml(reviewMenuBtn("review-complete", t("review.complete"), ' data-lane="waiting" data-id="' + l.id + '"')) +
+          '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewMenuBtn("review-delete", t("review.delete"), ' data-lane="waiting" data-id="' + l.id + '"', true) + '</div>';
       }
     }
     return '<div class="review-card review-card-' + l.kind + '">' + bodyHtml + '<div class="review-menu">' + menuHtml + '</div></div>';
@@ -12517,7 +12646,8 @@ function injectChunkMap(){
   function reviewBodyHtml(s){
     const active = reviewActiveLoops();
     const deferredCount = computeOpenLoops().length - active.length;
-    let html = '<div class="screen-body review-body">' + reviewInfoPanelHtml();
+    const revealedKind = active.length ? active[0].kind : null;
+    let html = '<div class="screen-body review-body">' + reviewInfoPanelHtml(revealedKind, !!(s && s.reviewInfoOpen));
     if (!active.length){
       html += (deferredCount > 0)
         ? '<div class="review-end review-end-deferred"><div class="review-end-big">' + deferredCount + escapeHtml(t("review.deferredSuffix")) + '</div>' +
@@ -12603,7 +12733,7 @@ function injectChunkMap(){
     createTask("waiting", { title: title, whenText: when, linkedProjectId: pid })
       .then(function(){ s.reviewForm = null; renderScreen(); });
   }
-  // "I did it" — you did the thing and forgot to tick it, which is the case the
+  // "Mark done" — you did the thing and forgot to tick it, which is the case the
   // user named. Records the completion against the occurrence's own date, so it
   // keeps its dimmed mark on the calendar for the day it actually happened
   // rather than today, and clears the miss.
@@ -12620,7 +12750,7 @@ function injectChunkMap(){
     if (state.screen) state.screen.reviewForm = null;
     renderScreen();
   }
-  // "Let it go" — it did not happen and that is fine. Clears the miss WITHOUT
+  // "Skipped" — it did not happen and that is fine. Clears the miss WITHOUT
   // recording a completion, so it never counts as something you achieved.
   // ⚑ No confirm dialog: this destroys nothing (the series is untouched and the
   // occurrence was already rolled past), so the standing rule about destructive
@@ -12694,7 +12824,7 @@ function injectChunkMap(){
   }
   // Complete arms nothing here — quickDoneView is not a drafting surface, it's
   // a two-button confirm (draft isolation §-exempt the same way the list
-  // checkbox and the missed card's "I did it" are: an immediate action, not an
+  // checkbox and the missed card's "Mark done" are: an immediate action, not an
   // armed one). Reuses createTask + completeTask so a quick-done item is, in
   // every way the app can tell, an ordinary completed Next Action.
   function quickDoneComplete(){
@@ -14148,6 +14278,10 @@ function openCalendarScreen(prefill){
     calTab: "month", calY: d.getFullYear(), calM: d.getMonth(), calSel: sel,
     calKind: "event", calName: (prefill && prefill.name) || "", calTime: "", calDesc: "",
     calRecur: "none", calInterval: 1, calDeadlineFor: "next", calTickler: false,
+    // §9 (review-surface-plan.md): the habit-bubble ✕. Per-draft, not stored —
+    // clears whenever recurrence changes (see the "recur" field handler below),
+    // so the bubble comes back next time daily/weekly is picked, per author ruling.
+    calHabitBubbleDismissed: false,
     calInvalid: false, calFromCaptureId: (prefill && prefill.fromCaptureId) || null,
     // Opened from a project page (user): the event that gets added is linked to
     // that project, the project's deadline caps the date, and adding returns
@@ -14478,10 +14612,27 @@ function calCreateRowHtml(s){
       '<button type="button" class="cal-seg-btn' + (isEvent ? " active" : "") + '" data-action="cal-kind" data-kind="event">' + escapeHtml(t("cal.event")) + '</button>' +
       '<button type="button" class="cal-seg-btn' + (!isEvent ? " active" : "") + '" data-action="cal-kind" data-kind="deadline">' + escapeHtml(t("cal.deadline")) + '</button>' +
     '</div>';
+  // §8 (review-surface-plan.md, RULED): moved off the bottom of the controls
+  // and paired with the Event/Deadline toggle instead — PHONE placement is to
+  // its right, above Add (DESKTOP placement — top of the left control column
+  // — is §10's two-column layout, built separately). Events only (§8.1): the
+  // Deadline side creates a task, which has its own drafting page already.
+  const advancedBtn = isEvent
+    ? '<button type="button" class="cal-advanced-btn" data-action="cal-advanced" ' +
+        'title="' + escapeHtml(t("cal.moreOptionsTooltip")) + '">' +
+        escapeHtml(t("cal.moreOptions")) + '</button>'
+    : "";
   let controls;
   if (isEvent){
-    const habitBubble = (s.calRecur === "daily" || s.calRecur === "weekly")
-      ? '<button type="button" class="cal-habit-bubble" data-action="cal-make-habit">' + escapeHtml(t("cal.makeHabitInstead")) + '</button>' : "";
+    // §9 (review-surface-plan.md, Q9 RESOLVED): dismissible, not removed — a
+    // sibling ✕ next to the bubble, same shape as .bundle-pill-wrap, so a tap
+    // near the edge clears it instead of triggering "Make this a habit instead".
+    const habitBubble = (s.calRecur === "daily" || s.calRecur === "weekly") && !s.calHabitBubbleDismissed
+      ? '<span class="cal-habit-bubble-wrap">' +
+          '<button type="button" class="cal-habit-bubble" data-action="cal-make-habit">' + escapeHtml(t("cal.makeHabitInstead")) + '</button>' +
+          '<button type="button" class="icon-btn cal-habit-bubble-clear" data-action="cal-dismiss-habit-bubble" title="' + escapeHtml(t("cal.dismissHabitBubble")) + '">&times;</button>' +
+        '</span>'
+      : "";
     controls =
       '<div class="cal-create-controls">' +
         '<div class="cal-boxed"><span class="field-icon">&#128337;</span>' +
@@ -14496,12 +14647,6 @@ function calCreateRowHtml(s){
         '</div>' +
         habitBubble +
         '<label class="cal-tickler-row"><input type="checkbox" data-calfield="tickler"' + (s.calTickler ? " checked" : "") + '> ' + escapeHtml(t("cal.hideUntilItHappens")) + '</label>' +
-        // ⚑ The way to a context and a project link (user). Events only: the
-        // Deadline side of this row creates a TASK, which has its own drafting
-        // page and its own route to those fields already.
-        '<button type="button" class="cal-advanced-btn" data-action="cal-advanced" ' +
-          'title="' + escapeHtml(t("cal.moreOptionsTooltip")) + '">' +
-          escapeHtml(t("cal.moreOptions")) + '</button>' +
       '</div>';
   } else {
     controls =
@@ -14524,7 +14669,7 @@ function calCreateRowHtml(s){
     '<div class="cal-create">' +
       forProject +
       errMsg +
-      seg +
+      '<div class="cal-seg-row">' + seg + advancedBtn + '</div>' +
       '<div class="cal-create-main">' +
         '<input type="text" class="cal-name' + (s.calInvalid ? " field-invalid" : "") + '" data-calfield="name" placeholder="' + escapeHtml(isEvent ? t("cal.eventOnPrefix") : t("cal.duePrefix")) + escapeHtml(selLabel) + '…" value="' + escapeHtml(s.calName || "") + '" autocomplete="off">' +
         '<button type="button" class="cal-add-btn" data-action="cal-add">' + escapeHtml(t("cal.add")) + '</button>' +
@@ -15010,6 +15155,7 @@ function eventsHandleClick(e){
     if (e.target.closest('[data-action="cal-add"]')){ calAdd(); return true; }
     if (e.target.closest('[data-action="cal-advanced"]')){ openEventCreateScreen(); return true; }
     if (e.target.closest('[data-action="cal-make-habit"]')){ calMakeHabit(); return true; }
+    if (e.target.closest('[data-action="cal-dismiss-habit-bubble"]')){ s.calHabitBubbleDismissed = true; renderScreen(); return true; }
     const openEvt = e.target.closest('[data-action="cal-open-event"]');
     if (openEvt){ state.screenStack.push(s); state.screen = null; openEventScreen(openEvt.getAttribute("data-id"), openEvt.getAttribute("data-date") || null); return true; }
     const openTask = e.target.closest('[data-action="cal-open-task"]');
@@ -15167,7 +15313,7 @@ function eventsHandleFieldInput(e){
     else if (f === "desc"){ s.calDesc = calEl.value; }
     else if (f === "time"){ s.calTime = calEl.value; }
     else if (f === "interval"){ s.calInterval = Math.max(1, Number(calEl.value) || 1); }
-    else if (f === "recur"){ s.calRecur = calEl.value; renderScreen(); }
+    else if (f === "recur"){ s.calRecur = calEl.value; s.calHabitBubbleDismissed = false; renderScreen(); }
     else if (f === "tickler"){ s.calTickler = calEl.checked; }
     return true;
   }

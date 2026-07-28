@@ -125,22 +125,22 @@ with serve(DIST) as url, sync_playwright() as p:
     }""")
     check(note and "12 June" in note, f"the card says which day went by ({note})")
 
-    # ---------- 'I did it' records it on the day it happened ----------
+    # ---------- 'Mark done' records it on the day it happened ----------
     pg.locator('[data-action="review-missed-done"]').first.click(); pg.wait_for_timeout(600)
     st = stored()
-    check(st["missed"] is None, f"'I did it' clears the miss ({st})")
+    check(st["missed"] is None, f"'Mark done' clears the miss ({st})")
     check("2026-06-12" in st["done"],
           f"and records the completion on the day it actually happened, not today ({st})")
     close_review()
     check(not find_in_review("ZZ standup"), "so it stops being asked about")
     close_review()
 
-    # ---------- 'Let it go' clears without claiming credit ----------
+    # ---------- 'Skipped' clears without claiming credit ----------
     seed(ev())
     check(find_in_review("ZZ standup"), "a fresh miss is back")
     pg.locator('[data-action="review-missed-clear"]').first.click(); pg.wait_for_timeout(600)
     st = stored()
-    check(st["missed"] is None, f"'Let it go' clears the miss ({st})")
+    check(st["missed"] is None, f"'Skipped' clears the miss ({st})")
     check(st["done"] == [],
           f"and does NOT record it as done — no credit for something you skipped ({st})")
     close_review()
