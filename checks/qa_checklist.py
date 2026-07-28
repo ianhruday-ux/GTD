@@ -70,7 +70,7 @@ RETIRED = ["Chunk 7", "Chunk 8", "Per-occurrence", "Recheck chunk 6b",
            # superseded by this round (review-surface-plan.md)
            "Chinese translation",
            "review's Add button"]
-CURRENT_FLAG = "gtd_qa_checklist_reviewsurface_v1"
+CURRENT_FLAG = "gtd_qa_checklist_reviewsurface_v2"
 SUPERSEDED_FLAGS = ["gtd_qa_checklist_chunk7_v1", "gtd_qa_checklist_override_v1",
                     "gtd_qa_checklist_override_v2", "gtd_qa_checklist_chunk8_v1",
                     "gtd_qa_checklist_postsprint_v1", "gtd_qa_checklist_postsprint_v2",
@@ -78,7 +78,7 @@ SUPERSEDED_FLAGS = ["gtd_qa_checklist_chunk7_v1", "gtd_qa_checklist_override_v1"
                     "gtd_qa_checklist_postsprint_v5", "gtd_qa_checklist_postsprint_v6",
                     "gtd_qa_checklist_postsprint_v7", "gtd_qa_checklist_desktop_v1",
                     "gtd_qa_checklist_desktop_v2", "gtd_qa_checklist_sw_v1",
-                    "gtd_qa_checklist_publicpolish_v1"]
+                    "gtd_qa_checklist_publicpolish_v1", "gtd_qa_checklist_reviewsurface_v1"]
 
 with serve(DIST) as url, sync_playwright() as p:
     b = p.chromium.launch()

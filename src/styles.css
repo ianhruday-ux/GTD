@@ -1217,15 +1217,20 @@ body.has-frame .tray-drawer::after{
    it off the list", then .review-menu-row (band 3, universal, unchanged).
    A thin divider marks the boundary between whichever bands a kind actually
    has — the adjacent-sibling selectors mean a kind that omits a band (e.g.
-   missed has no band 1) gets no stray empty gap or double divider. Phone:
-   stacked, full-width rows (unchanged from before banding). Desktop lays
-   each band's own buttons out horizontally — see the ≥1000px block. */
-.review-band{ display:flex; flex-direction:column; gap:7px; }
-/* ⚑ WIDENED (author QA: on the stacked/phone layout this read as "still one
+   missed has no band 1) gets no stray empty gap or double divider.
+   ⚑ REVISED (author, second QA round): modeled on the capture card's own
+   sort chips, not a stacked list — a wrapping row of auto-sized chips, more
+   fitting per row as the card gets wider. Deliberately the SAME layout on
+   phone and desktop (author: "keep similar layouts for both, easier than
+   introducing new concepts") rather than the earlier column-on-phone/
+   row-on-desktop split. */
+.review-band{ display:flex; flex-wrap:wrap; gap:7px; }
+/* ⚑ WIDENED (author QA: with the old stacked layout this read as "still one
    long list" — a 7px top-pad + a near-invisible 0.08-alpha line wasn't doing
-   enough against the buttons' own 7px within-band gap to register as a
+   enough against the buttons' own 7px within-chip gap to register as a
    group boundary via proximity. Doubled the gap and darkened the line
-   enough to read as a rule, not a rounding artifact. */
+   enough to read as a rule, not a rounding artifact. Kept through the move
+   to chips — the same boundary-marking job, now between chip rows. */
 .review-band + .review-band,
 .review-band + .review-menu-row{ margin-top:8px; padding-top:15px; border-top:1px solid rgba(255,255,255,0.22); }
 .review-menu-btn{ text-align:left; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.05);
@@ -1236,6 +1241,23 @@ body.has-frame .tray-drawer::after{
    ruling). Was capture-only; every review delete control now shares it
    (§5 defect 2). Same red as "Restore app to defaults" (settings-item.danger). */
 .review-menu-btn.review-delete-text{ color:var(--red); }
+/* Band chips: auto-sized to their own (short) label and centered, like the
+   capture card's Calendar/2-min chips — NOT the deterministic-thirds basis
+   those use for next/waiting/etc, because a band's chip count varies (1–3)
+   per kind rather than being a fixed set of 6. */
+.review-band .review-menu-btn{ flex:0 1 auto; text-align:center; padding:9px 14px; }
+/* Lane-colored chips (author, modeled on the capture card): a band button
+   that SENDS the item to a lane carries that lane's data-target purely for
+   this coloring — its click routing is untouched (data-action/data-key/
+   data-id, unchanged). A button that resolves or edits in place (Complete
+   it, Push the date, Re-point the condition…) carries no data-target and
+   stays the plain grey .review-menu-btn. Same tint formula as
+   .review-sort-chips (color-mix 34% over transparent), just without that
+   grid's `order` rules — a band's chip count and order need none of that. */
+.review-band .review-menu-btn[data-target="next"]{ border-color:var(--red); background:color-mix(in srgb, var(--red) 34%, transparent); color:#fff; }
+.review-band .review-menu-btn[data-target="waiting"]{ border-color:var(--yellow); background:color-mix(in srgb, var(--yellow) 34%, transparent); color:#fff; }
+.review-band .review-menu-btn[data-target="future"]{ border-color:var(--royal); background:color-mix(in srgb, var(--royal) 34%, transparent); color:#fff; }
+.review-band .review-menu-btn[data-target="calendar"]{ border-color:var(--brass); background:color-mix(in srgb, var(--brass) 34%, transparent); color:#fff; }
 /* Flex, with a deterministic percentage flex-basis rather than a content-based
    one: exactly 3 fit per row regardless of viewport width (the earlier
    flex-basis:96px version let content size decide how many fit, which
@@ -2178,13 +2200,9 @@ body.screen-open #tray-handle{ display:none; }
      top of the band divider's own 7px, a rhythm that was only ever tuned for
      capture's three chip-rows. */
   .review-card-capture .review-menu-row{ margin-top:6px; }
-  /* §5/§5a: bands lay their buttons out horizontally on desktop — the same
-     "one DOM, two arrangements" technique the capture chips already use,
-     generalised past capture per the author's own framing (§5). A
-     deterministic min-width (not percentage — band sizes vary 1–3 buttons
-     per kind, unlike capture's fixed 8) keeps wrapping predictable. */
-  .review-band{ flex-direction:row; flex-wrap:wrap; gap:8px; }
-  .review-band .review-menu-btn{ flex:1 1 160px; text-align:center; }
+  /* §5/§5a band chips are deliberately the SAME layout on desktop as phone
+     (author, second QA round) — see the base .review-band rules; no
+     desktop-only override needed here anymore. */
 }
 
 /* The frame's desktop geometry: pinned to the viewport, over the header, under

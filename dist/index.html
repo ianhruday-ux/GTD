@@ -1243,15 +1243,20 @@ body.has-frame .tray-drawer::after{
    it off the list", then .review-menu-row (band 3, universal, unchanged).
    A thin divider marks the boundary between whichever bands a kind actually
    has — the adjacent-sibling selectors mean a kind that omits a band (e.g.
-   missed has no band 1) gets no stray empty gap or double divider. Phone:
-   stacked, full-width rows (unchanged from before banding). Desktop lays
-   each band's own buttons out horizontally — see the ≥1000px block. */
-.review-band{ display:flex; flex-direction:column; gap:7px; }
-/* ⚑ WIDENED (author QA: on the stacked/phone layout this read as "still one
+   missed has no band 1) gets no stray empty gap or double divider.
+   ⚑ REVISED (author, second QA round): modeled on the capture card's own
+   sort chips, not a stacked list — a wrapping row of auto-sized chips, more
+   fitting per row as the card gets wider. Deliberately the SAME layout on
+   phone and desktop (author: "keep similar layouts for both, easier than
+   introducing new concepts") rather than the earlier column-on-phone/
+   row-on-desktop split. */
+.review-band{ display:flex; flex-wrap:wrap; gap:7px; }
+/* ⚑ WIDENED (author QA: with the old stacked layout this read as "still one
    long list" — a 7px top-pad + a near-invisible 0.08-alpha line wasn't doing
-   enough against the buttons' own 7px within-band gap to register as a
+   enough against the buttons' own 7px within-chip gap to register as a
    group boundary via proximity. Doubled the gap and darkened the line
-   enough to read as a rule, not a rounding artifact. */
+   enough to read as a rule, not a rounding artifact. Kept through the move
+   to chips — the same boundary-marking job, now between chip rows. */
 .review-band + .review-band,
 .review-band + .review-menu-row{ margin-top:8px; padding-top:15px; border-top:1px solid rgba(255,255,255,0.22); }
 .review-menu-btn{ text-align:left; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.05);
@@ -1262,6 +1267,23 @@ body.has-frame .tray-drawer::after{
    ruling). Was capture-only; every review delete control now shares it
    (§5 defect 2). Same red as "Restore app to defaults" (settings-item.danger). */
 .review-menu-btn.review-delete-text{ color:var(--red); }
+/* Band chips: auto-sized to their own (short) label and centered, like the
+   capture card's Calendar/2-min chips — NOT the deterministic-thirds basis
+   those use for next/waiting/etc, because a band's chip count varies (1–3)
+   per kind rather than being a fixed set of 6. */
+.review-band .review-menu-btn{ flex:0 1 auto; text-align:center; padding:9px 14px; }
+/* Lane-colored chips (author, modeled on the capture card): a band button
+   that SENDS the item to a lane carries that lane's data-target purely for
+   this coloring — its click routing is untouched (data-action/data-key/
+   data-id, unchanged). A button that resolves or edits in place (Complete
+   it, Push the date, Re-point the condition…) carries no data-target and
+   stays the plain grey .review-menu-btn. Same tint formula as
+   .review-sort-chips (color-mix 34% over transparent), just without that
+   grid's `order` rules — a band's chip count and order need none of that. */
+.review-band .review-menu-btn[data-target="next"]{ border-color:var(--red); background:color-mix(in srgb, var(--red) 34%, transparent); color:#fff; }
+.review-band .review-menu-btn[data-target="waiting"]{ border-color:var(--yellow); background:color-mix(in srgb, var(--yellow) 34%, transparent); color:#fff; }
+.review-band .review-menu-btn[data-target="future"]{ border-color:var(--royal); background:color-mix(in srgb, var(--royal) 34%, transparent); color:#fff; }
+.review-band .review-menu-btn[data-target="calendar"]{ border-color:var(--brass); background:color-mix(in srgb, var(--brass) 34%, transparent); color:#fff; }
 /* Flex, with a deterministic percentage flex-basis rather than a content-based
    one: exactly 3 fit per row regardless of viewport width (the earlier
    flex-basis:96px version let content size decide how many fit, which
@@ -2204,13 +2226,9 @@ body.screen-open #tray-handle{ display:none; }
      top of the band divider's own 7px, a rhythm that was only ever tuned for
      capture's three chip-rows. */
   .review-card-capture .review-menu-row{ margin-top:6px; }
-  /* §5/§5a: bands lay their buttons out horizontally on desktop — the same
-     "one DOM, two arrangements" technique the capture chips already use,
-     generalised past capture per the author's own framing (§5). A
-     deterministic min-width (not percentage — band sizes vary 1–3 buttons
-     per kind, unlike capture's fixed 8) keeps wrapping predictable. */
-  .review-band{ flex-direction:row; flex-wrap:wrap; gap:8px; }
-  .review-band .review-menu-btn{ flex:1 1 160px; text-align:center; }
+  /* §5/§5a band chips are deliberately the SAME layout on desktop as phone
+     (author, second QA round) — see the base .review-band rules; no
+     desktop-only override needed here anymore. */
 }
 
 /* The frame's desktop geometry: pinned to the viewport, over the header, under
@@ -2342,7 +2360,7 @@ body.screen-open #tray-handle{ display:none; }
 (function(){
 "use strict";
 
-const BUILD_STAMP = "27 Jul 20:43";  // replaced by build.py
+const BUILD_STAMP = "27 Jul 21:04";  // replaced by build.py
 
 // =========================================================
 // STORAGE ADAPTER (spec.md §3, known issue 4)
@@ -2937,16 +2955,16 @@ const STRINGS = {
   "review.deleteIt":         { en: "Delete it",                     "zh-Hans": "删除它" },
   "review.whatsNextAction":  { en: "What's the very next physical action?", "zh-Hans": "接下来最具体的下一步是什么？" },
   "review.add":              { en: "Add",                           "zh-Hans": "添加" },
-  "review.addNextAction":    { en: "Add a next action",             "zh-Hans": "添加一个下一步行动" },
-  "review.addWaitingAction": { en: "Add a waiting action",          "zh-Hans": "添加一个等待项" },
-  "review.addAnEvent":       { en: "Add an event",                  "zh-Hans": "添加一个事件" },
-  "review.moveToSomeday":    { en: "Move to Someday",               "zh-Hans": "移到将来" },
+  "review.addNextAction":    { en: "+Next",                         "zh-Hans": "+下一步" },
+  "review.addWaitingAction": { en: "+Waiting",                      "zh-Hans": "+等待" },
+  "review.addAnEvent":       { en: "+Event",                        "zh-Hans": "+事件" },
+  "review.moveToSomeday":    { en: "+Someday",                      "zh-Hans": "+将来" },
   "review.whatWaitingOn":    { en: "What are you waiting on?",      "zh-Hans": "你在等待什么？" },
   "review.untilWhatWhen":    { en: "Until what, or until when?",    "zh-Hans": "等到什么，或者等到什么时候？" },
   "review.waitingForDots":   { en: "Waiting for…",                  "zh-Hans": "在等待…" },
   "review.repointCondition": { en: "Re-point the condition →",      "zh-Hans": "重新指向条件 →" },
   "review.replaceWithFreeText": { en: "Replace with free text",     "zh-Hans": "换成自由文本" },
-  "review.promoteToNext":    { en: "Promote to Next",               "zh-Hans": "提升到下一步" },
+  "review.promoteToNext":    { en: "+Next",                         "zh-Hans": "+下一步" },
   "review.complete":         { en: "Complete",                      "zh-Hans": "完成" },
   "review.cancel":           { en: "Cancel",                        "zh-Hans": "取消" },
   "review.save":             { en: "Save",                          "zh-Hans": "保存" },
@@ -5692,12 +5710,12 @@ function initTimePickerFields(){
 // (this file + its boot() call) if the convention is ever retired.
 // =========================================================
 function injectChunkMap(){
-  const FLAG = "gtd_chunk_map_v11";
+  const FLAG = "gtd_chunk_map_v12";
   if (Storage.get(FLAG)) return;
   Storage.set(FLAG, "1");
   ["gtd_chunk_map_v1", "gtd_chunk_map_v2", "gtd_chunk_map_v3", "gtd_chunk_map_v4",
    "gtd_chunk_map_v5", "gtd_chunk_map_v6", "gtd_chunk_map_v7", "gtd_chunk_map_v8",
-   "gtd_chunk_map_v9", "gtd_chunk_map_v10"].forEach(Storage.remove);  // retire superseded flags
+   "gtd_chunk_map_v9", "gtd_chunk_map_v10", "gtd_chunk_map_v11"].forEach(Storage.remove);  // retire superseded flags
 
   // Replace, don't accumulate (8.2, mirroring 8.1): sweep any previous
   // chunk-map group (tagged via devContext, not a title match, since the
@@ -5753,7 +5771,7 @@ function injectChunkMap(){
     { title: "✓ Events on the project page", notes: "DONE. A project shows its linked events and can create them — including on the creation page, where the event is held as a draft and only becomes real when the project is saved. ‘Add an event’ in the daily review came with it." },
     { title: "✓ Linked notes on the project page", notes: "DONE. The link runs both ways now. A current project's Linked panel has an Actions side and a Notes side you toggle between, and a Someday project has a Linked notes section of its own — notes only, since a Someday project holds no actions by design." },
     { title: "Re-test backups against the new fields", notes: "TO DO. Export and import have not been exercised since deadlines gained a start date and a push counter, repeats gained a missed-day marker, and the backgrounds changed names. Backups are the one thing that has to survive real use." },
-    { title: "✓ The review surface, standardised", notes: "DONE. Fixed a live bug where the Chinese text for a missed repeat quoted buttons that no longer existed. The review's five card kinds (missed, past due, stalled, orphaned, and the sort-a-thought capture card) now share one delete style and one 'Not now' corner position instead of five different looks. The four decision cards (everything but capture) are now grouped into bands — 'ways to move it forward', 'ways to take it off the list', then Not now/Delete — stacked on the phone and laid out side by side on a computer, so a card that used to be seven buttons in a column now reads at a glance. The missed-repeat button 'Let it go' is renamed 'Skipped' (in both languages) so it can't be misread as the same action as 'Not now'. The review's (i) info button now explains only the one card on screen, not all five kinds at once, and stays open as you move to the next card." },
+    { title: "✓ The review surface, standardised", notes: "DONE. Fixed a live bug where the Chinese text for a missed repeat quoted buttons that no longer existed. The review's five card kinds (missed, past due, stalled, orphaned, and the sort-a-thought capture card) now share one delete style and one 'Not now' corner position instead of five different looks. The four decision cards (everything but capture) are now grouped into bands — 'ways to move it forward', 'ways to take it off the list', then Not now/Delete — separated by a divider line, same layout on phone and computer, so a card that used to be seven buttons in a column now reads at a glance. Buttons that send the item to a list are short and colored like that list's tab ('+Next', '+Waiting', '+Event', '+Someday'), modeled on the capture card's own colored buttons; buttons that resolve or edit in place stay plain. The missed-repeat button 'Let it go' is renamed 'Skipped' (in both languages) so it can't be misread as the same action as 'Not now'. The review's (i) info button now explains only the one card on screen, not all five kinds at once, and stays open as you move to the next card." },
     { title: "✓ The habit-bubble dismiss, and the Advanced buttons", notes: "DONE. The calendar's 'Make this a habit instead' suggestion (shown when you set something to repeat daily or weekly) now has a small X to dismiss it — it comes back next time you pick daily or weekly on a fresh item. Every 'Advanced options' / 'More options' button across the app got a light grey fill for contrast, and the calendar's copy moved up next to the Event/Deadline toggle instead of sitting at the bottom of the form, on both phone and computer." },
     { title: "✓ The desktop calendar, fixed", notes: "DONE. The computer calendar used to overflow the screen at every size tested, including 1920x1080 — the day squares were too tall and the Add button could sit below the fold. It's now two columns (the form on the left, wide short day-squares on the right), fits on screen at any reasonable window size, and the phone layout is untouched." },
     { title: "✓ 9 — Service worker + offline + install polish", notes: "DONE. The app now works with no internet — it saves a copy of itself the first time you open it online, so airplane mode after that still loads and works. When I ship a change while you have the app open, a small bar appears saying “New version available” with a Reload button; nothing ever updates or interrupts you without that tap. See the fresh QA checklist in Next Actions to try both." },
@@ -11851,7 +11869,7 @@ function injectChunkMap(){
     // REVIEW-SURFACE round (review-surface-plan.md). §8.1's
     // replace-don't-accumulate discipline: this is the ONLY injector, and the
     // public-app-polish round's groups below are swept out, not left dormant.
-    const FLAG = "gtd_qa_checklist_reviewsurface_v1";
+    const FLAG = "gtd_qa_checklist_reviewsurface_v2";
     if (Storage.get(FLAG)) return;
     Storage.set(FLAG, "1");
     // Retire the superseded flags so they can't resurrect their injectors, and
@@ -11863,7 +11881,7 @@ function injectChunkMap(){
      "gtd_qa_checklist_postsprint_v5", "gtd_qa_checklist_postsprint_v6",
      "gtd_qa_checklist_postsprint_v7", "gtd_qa_checklist_desktop_v1",
      "gtd_qa_checklist_desktop_v2", "gtd_qa_checklist_sw_v1",
-     "gtd_qa_checklist_publicpolish_v1"].forEach(Storage.remove);
+     "gtd_qa_checklist_publicpolish_v1", "gtd_qa_checklist_reviewsurface_v1"].forEach(Storage.remove);
 
     // Replace, don't accumulate (8.1) — and actually mean it this time.
     // Earlier rounds bumped the flag but left the previous rounds' groups
@@ -11895,7 +11913,7 @@ function injectChunkMap(){
     addGroupWithItems('✅ QA — The review’s new grouped buttons', [
       { title: '1. Open the daily review', notes: 'Open the intray (the handle on the left edge of the screen, or the left column on a computer) and tap Review. Look at whichever card shows up first.' },
       { title: '2. Check the buttons are grouped, not one long list', notes: 'A card with several buttons (like a stalled project) should show them in a few small groups with a thin line between each group, ending with "Not now" in the bottom-left corner and a red "Delete" in the bottom-right — not seven buttons in one plain column.' },
-      { title: '3. On a computer, the groups sit side by side', notes: 'On a wide window, each group\'s buttons should line up in a row instead of stacking — the same card should look noticeably more compact than on the phone.' },
+      { title: '3. Check the colored buttons', notes: 'Buttons that add something to a list — "+Next", "+Waiting", "+Event", "+Someday" — should be short and colored like that list\'s tab (red, yellow, brass, blue). Buttons that don\'t send it anywhere (like "Complete it") stay plain grey. Same on the phone and on a computer.' },
       { title: '4. Find a missed repeating habit or event, if one shows up', notes: 'Its "give up on this one" button should now say "Skipped", not "Let it go".' },
       { title: '5. Tap the (i) info button at the top of the review', notes: 'It should explain only the ONE card you\'re looking at — not a wall of text about every kind of card at once.' }
     ]);
@@ -12414,10 +12432,11 @@ function injectChunkMap(){
   // the list", band 3 (always .review-menu-row, the universal corner row —
   // reused as-is from the capture card, which is where it originated). A kind
   // with nothing for a band simply omits it (no empty div, so no stray
-  // divider from the adjacent-sibling CSS rule). One DOM, two arrangements:
-  // phone stacks each band's buttons, desktop lays them out horizontally
-  // (styles.css ≥1000px block) — same technique as .review-sort-chips,
-  // generalised past the capture card per the author's own framing.
+  // divider from the adjacent-sibling CSS rule). Each band renders as a
+  // wrapping row of chips — same technique as .review-sort-chips, modeled
+  // on the capture card per the author's own framing — and deliberately the
+  // SAME layout on phone and desktop (author, second QA round: "keep
+  // similar layouts for both, easier than introducing new concepts").
   function reviewBandHtml(html){ return html ? '<div class="review-band">' + html + '</div>' : ""; }
   // The active inline sub-form (Push date / Add next action / Free text) for
   // this card, if any. One at a time, held on the screen (draft-free — these
@@ -12611,19 +12630,24 @@ function injectChunkMap(){
         // §5's own worked example (defect 5): band 1 (move it forward) is the
         // three ways to give the project a next step; band 2 (take it off the
         // list) is the two ways to remove it from play.
+        // Lane-colored chips (author, modeled on the capture card's own
+        // sort chips): a band button that SENDS the item to a lane carries
+        // that lane's data-target purely for CSS coloring (styles.css) — its
+        // click routing is unchanged, still data-action/data-key/data-id.
+        // A button that resolves/edits in place (Complete it) stays plain.
         menuHtml =
           reviewBandHtml(
-            reviewMenuBtn("review-form-start", t("review.addNextAction"), ' data-key="' + l.key + '" data-type="text"') +
-            reviewMenuBtn("review-form-start", t("review.addWaitingAction"), ' data-key="' + l.key + '" data-type="waiting"') +
+            reviewMenuBtn("review-form-start", t("review.addNextAction"), ' data-key="' + l.key + '" data-type="text" data-target="next"') +
+            reviewMenuBtn("review-form-start", t("review.addWaitingAction"), ' data-key="' + l.key + '" data-type="waiting" data-target="waiting"') +
             // ⚑ The third one the user asked for originally, parked until a project
             // could see the calendar. It can now: this opens the calendar for this
             // project, capped by its deadline, and returns HERE rather than to the
             // project page -- the review pushed the stack, so closeScreen lands back
             // in the queue where you left off.
-            reviewMenuBtn("review-add-event", t("review.addAnEvent"), ' data-id="' + l.id + '"')
+            reviewMenuBtn("review-add-event", t("review.addAnEvent"), ' data-id="' + l.id + '" data-target="calendar"')
           ) +
           reviewBandHtml(
-            reviewMenuBtn("review-someday", t("review.moveToSomeday"), ' data-id="' + l.id + '"') +
+            reviewMenuBtn("review-someday", t("review.moveToSomeday"), ' data-id="' + l.id + '" data-target="future"') +
             reviewMenuBtn("review-complete", t("review.completeIt"), ' data-lane="current" data-id="' + l.id + '"')
           ) +
           '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewMenuBtn("review-delete", t("review.deleteIt"), ' data-lane="current" data-id="' + l.id + '"', true) + '</div>';
@@ -12639,7 +12663,7 @@ function injectChunkMap(){
           reviewBandHtml(
             reviewMenuBtn("review-open", t("review.repointCondition"), ' data-lane="waiting" data-id="' + l.id + '"') +
             reviewMenuBtn("review-form-start", t("review.replaceWithFreeText"), ' data-key="' + l.key + '" data-type="text"') +
-            reviewMenuBtn("review-promote", t("review.promoteToNext"), ' data-id="' + l.id + '"')
+            reviewMenuBtn("review-promote", t("review.promoteToNext"), ' data-id="' + l.id + '" data-target="next"')
           ) +
           reviewBandHtml(reviewMenuBtn("review-complete", t("review.complete"), ' data-lane="waiting" data-id="' + l.id + '"')) +
           '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewMenuBtn("review-delete", t("review.delete"), ' data-lane="waiting" data-id="' + l.id + '"', true) + '</div>';

@@ -6074,7 +6074,7 @@
     // REVIEW-SURFACE round (review-surface-plan.md). §8.1's
     // replace-don't-accumulate discipline: this is the ONLY injector, and the
     // public-app-polish round's groups below are swept out, not left dormant.
-    const FLAG = "gtd_qa_checklist_reviewsurface_v1";
+    const FLAG = "gtd_qa_checklist_reviewsurface_v2";
     if (Storage.get(FLAG)) return;
     Storage.set(FLAG, "1");
     // Retire the superseded flags so they can't resurrect their injectors, and
@@ -6086,7 +6086,7 @@
      "gtd_qa_checklist_postsprint_v5", "gtd_qa_checklist_postsprint_v6",
      "gtd_qa_checklist_postsprint_v7", "gtd_qa_checklist_desktop_v1",
      "gtd_qa_checklist_desktop_v2", "gtd_qa_checklist_sw_v1",
-     "gtd_qa_checklist_publicpolish_v1"].forEach(Storage.remove);
+     "gtd_qa_checklist_publicpolish_v1", "gtd_qa_checklist_reviewsurface_v1"].forEach(Storage.remove);
 
     // Replace, don't accumulate (8.1) — and actually mean it this time.
     // Earlier rounds bumped the flag but left the previous rounds' groups
@@ -6118,7 +6118,7 @@
     addGroupWithItems('✅ QA — The review’s new grouped buttons', [
       { title: '1. Open the daily review', notes: 'Open the intray (the handle on the left edge of the screen, or the left column on a computer) and tap Review. Look at whichever card shows up first.' },
       { title: '2. Check the buttons are grouped, not one long list', notes: 'A card with several buttons (like a stalled project) should show them in a few small groups with a thin line between each group, ending with "Not now" in the bottom-left corner and a red "Delete" in the bottom-right — not seven buttons in one plain column.' },
-      { title: '3. On a computer, the groups sit side by side', notes: 'On a wide window, each group\'s buttons should line up in a row instead of stacking — the same card should look noticeably more compact than on the phone.' },
+      { title: '3. Check the colored buttons', notes: 'Buttons that add something to a list — "+Next", "+Waiting", "+Event", "+Someday" — should be short and colored like that list\'s tab (red, yellow, brass, blue). Buttons that don\'t send it anywhere (like "Complete it") stay plain grey. Same on the phone and on a computer.' },
       { title: '4. Find a missed repeating habit or event, if one shows up', notes: 'Its "give up on this one" button should now say "Skipped", not "Let it go".' },
       { title: '5. Tap the (i) info button at the top of the review', notes: 'It should explain only the ONE card you\'re looking at — not a wall of text about every kind of card at once.' }
     ]);
@@ -6637,10 +6637,11 @@
   // the list", band 3 (always .review-menu-row, the universal corner row —
   // reused as-is from the capture card, which is where it originated). A kind
   // with nothing for a band simply omits it (no empty div, so no stray
-  // divider from the adjacent-sibling CSS rule). One DOM, two arrangements:
-  // phone stacks each band's buttons, desktop lays them out horizontally
-  // (styles.css ≥1000px block) — same technique as .review-sort-chips,
-  // generalised past the capture card per the author's own framing.
+  // divider from the adjacent-sibling CSS rule). Each band renders as a
+  // wrapping row of chips — same technique as .review-sort-chips, modeled
+  // on the capture card per the author's own framing — and deliberately the
+  // SAME layout on phone and desktop (author, second QA round: "keep
+  // similar layouts for both, easier than introducing new concepts").
   function reviewBandHtml(html){ return html ? '<div class="review-band">' + html + '</div>' : ""; }
   // The active inline sub-form (Push date / Add next action / Free text) for
   // this card, if any. One at a time, held on the screen (draft-free — these
@@ -6834,19 +6835,24 @@
         // §5's own worked example (defect 5): band 1 (move it forward) is the
         // three ways to give the project a next step; band 2 (take it off the
         // list) is the two ways to remove it from play.
+        // Lane-colored chips (author, modeled on the capture card's own
+        // sort chips): a band button that SENDS the item to a lane carries
+        // that lane's data-target purely for CSS coloring (styles.css) — its
+        // click routing is unchanged, still data-action/data-key/data-id.
+        // A button that resolves/edits in place (Complete it) stays plain.
         menuHtml =
           reviewBandHtml(
-            reviewMenuBtn("review-form-start", t("review.addNextAction"), ' data-key="' + l.key + '" data-type="text"') +
-            reviewMenuBtn("review-form-start", t("review.addWaitingAction"), ' data-key="' + l.key + '" data-type="waiting"') +
+            reviewMenuBtn("review-form-start", t("review.addNextAction"), ' data-key="' + l.key + '" data-type="text" data-target="next"') +
+            reviewMenuBtn("review-form-start", t("review.addWaitingAction"), ' data-key="' + l.key + '" data-type="waiting" data-target="waiting"') +
             // ⚑ The third one the user asked for originally, parked until a project
             // could see the calendar. It can now: this opens the calendar for this
             // project, capped by its deadline, and returns HERE rather than to the
             // project page -- the review pushed the stack, so closeScreen lands back
             // in the queue where you left off.
-            reviewMenuBtn("review-add-event", t("review.addAnEvent"), ' data-id="' + l.id + '"')
+            reviewMenuBtn("review-add-event", t("review.addAnEvent"), ' data-id="' + l.id + '" data-target="calendar"')
           ) +
           reviewBandHtml(
-            reviewMenuBtn("review-someday", t("review.moveToSomeday"), ' data-id="' + l.id + '"') +
+            reviewMenuBtn("review-someday", t("review.moveToSomeday"), ' data-id="' + l.id + '" data-target="future"') +
             reviewMenuBtn("review-complete", t("review.completeIt"), ' data-lane="current" data-id="' + l.id + '"')
           ) +
           '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewMenuBtn("review-delete", t("review.deleteIt"), ' data-lane="current" data-id="' + l.id + '"', true) + '</div>';
@@ -6862,7 +6868,7 @@
           reviewBandHtml(
             reviewMenuBtn("review-open", t("review.repointCondition"), ' data-lane="waiting" data-id="' + l.id + '"') +
             reviewMenuBtn("review-form-start", t("review.replaceWithFreeText"), ' data-key="' + l.key + '" data-type="text"') +
-            reviewMenuBtn("review-promote", t("review.promoteToNext"), ' data-id="' + l.id + '"')
+            reviewMenuBtn("review-promote", t("review.promoteToNext"), ' data-id="' + l.id + '" data-target="next"')
           ) +
           reviewBandHtml(reviewMenuBtn("review-complete", t("review.complete"), ' data-lane="waiting" data-id="' + l.id + '"')) +
           '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewMenuBtn("review-delete", t("review.delete"), ' data-lane="waiting" data-id="' + l.id + '"', true) + '</div>';
