@@ -597,6 +597,12 @@ body.has-frame #fab-create{
   display:flex; align-items:center; justify-content:center;
 }
 .promote-arrow:hover{ color:var(--text-primary); }
+/* Reused as-is inside the review's orphaned-waiting-action card (author
+   correction: "reuse the button on the waiting action page... red, left
+   pointing arrow" — not the drafting page's grey convert pill). Outside a
+   .lane[data-kind] ancestor --lane-accent isn't set, and this card only
+   ever promotes toward Next Actions, so it's pinned to --red directly. */
+.review-promote-arrow{ --lane-accent:var(--red); }
 
 /* --- Overlays on a card stay semi-transparent-white (tuned to the dark tone,
        §4.7b says keep these). Pills, project-jump, flags. (= carried over =) --- */

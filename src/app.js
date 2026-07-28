@@ -6924,11 +6924,13 @@
         // is substantially different from the other +Next buttons"). Every
         // other +Next creates a NEW item (stalled: a fresh linked action;
         // capture: files the thought as one); this one converts the SAME
-        // waiting action in place, no new item — exactly what the drafting
-        // page's own "Make Next Action" convert button does, so it reuses
-        // that button's label (outcome.makeNext) and plain, uncolored style
-        // instead of looking like the create-flavored chips.
-        reviewBandHtml(reviewMenuBtn("review-promote", t("outcome.makeNext"), ' data-id="' + l.id + '"')) +
+        // waiting action in place, no new item. Reuses the actual arrow
+        // button the waiting lane card itself shows in place of a checkbox
+        // (.promote-arrow, leafCardHtml) rather than the drafting page's
+        // "Make Next Action" pill — same class, same glyph, same immediate
+        // (non-draft) move semantics, just recolored red here since this
+        // card only ever promotes toward Next Actions.
+        reviewBandHtml('<button type="button" class="promote-arrow review-promote-arrow" data-action="review-promote" data-id="' + l.id + '" title="' + escapeHtml(t("lane.moveTo").replace("{lane}", LIST_TITLES["next"])) + '">&#8592;</button>') +
         reviewBandHtml(reviewMenuBtn("review-complete", t("review.completed"), ' data-lane="waiting" data-id="' + l.id + '"')) +
         '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewMenuBtn("review-delete", t("review.delete"), ' data-lane="waiting" data-id="' + l.id + '"', true) + '</div>';
     }
