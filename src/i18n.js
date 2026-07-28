@@ -535,7 +535,7 @@ const STRINGS = {
   "review.addNextAction":    { en: "+Next",                         "zh-Hans": "+下一步" },
   "review.addWaitingAction": { en: "+Waiting",                      "zh-Hans": "+等待" },
   "review.addAnEvent":       { en: "+Event",                        "zh-Hans": "+事件" },
-  "review.moveToSomeday":    { en: "+Someday",                      "zh-Hans": "+将来" },
+  "review.moveToSomeday":    { en: "Someday →",                     "zh-Hans": "将来 →" },
   "review.whatWaitingOn":    { en: "What are you waiting on?",      "zh-Hans": "你在等待什么？" },
   "review.untilWhatWhen":    { en: "Until what, or until when?",    "zh-Hans": "等到什么，或者等到什么时候？" },
   "review.waitingForDots":   { en: "Waiting for…",                  "zh-Hans": "在等待…" },

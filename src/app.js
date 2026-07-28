@@ -6074,7 +6074,7 @@
     // REVIEW-SURFACE round (review-surface-plan.md). §8.1's
     // replace-don't-accumulate discipline: this is the ONLY injector, and the
     // public-app-polish round's groups below are swept out, not left dormant.
-    const FLAG = "gtd_qa_checklist_reviewsurface_v2";
+    const FLAG = "gtd_qa_checklist_reviewsurface_v3";
     if (Storage.get(FLAG)) return;
     Storage.set(FLAG, "1");
     // Retire the superseded flags so they can't resurrect their injectors, and
@@ -6086,7 +6086,8 @@
      "gtd_qa_checklist_postsprint_v5", "gtd_qa_checklist_postsprint_v6",
      "gtd_qa_checklist_postsprint_v7", "gtd_qa_checklist_desktop_v1",
      "gtd_qa_checklist_desktop_v2", "gtd_qa_checklist_sw_v1",
-     "gtd_qa_checklist_publicpolish_v1", "gtd_qa_checklist_reviewsurface_v1"].forEach(Storage.remove);
+     "gtd_qa_checklist_publicpolish_v1", "gtd_qa_checklist_reviewsurface_v1",
+     "gtd_qa_checklist_reviewsurface_v2"].forEach(Storage.remove);
 
     // Replace, don't accumulate (8.1) — and actually mean it this time.
     // Earlier rounds bumped the flag but left the previous rounds' groups
@@ -6118,7 +6119,7 @@
     addGroupWithItems('✅ QA — The review’s new grouped buttons', [
       { title: '1. Open the daily review', notes: 'Open the intray (the handle on the left edge of the screen, or the left column on a computer) and tap Review. Look at whichever card shows up first.' },
       { title: '2. Check the buttons are grouped, not one long list', notes: 'A card with several buttons (like a stalled project) should show them in a few small groups with a thin line between each group, ending with "Not now" in the bottom-left corner and a red "Delete" in the bottom-right — not seven buttons in one plain column.' },
-      { title: '3. Check the colored buttons', notes: 'Buttons that add something to a list — "+Next", "+Waiting", "+Event", "+Someday" — should be short and colored like that list\'s tab (red, yellow, brass, blue). Buttons that don\'t send it anywhere (like "Complete it") stay plain grey. Same on the phone and on a computer.' },
+      { title: '3. Check the colored buttons', notes: 'Buttons that add something to a list — "+Next", "+Waiting", "+Event", "Someday →" — should be short and colored like that list\'s tab (red, yellow, brass, blue). Buttons that don\'t send it anywhere (like "Complete it") stay plain grey. Same on the phone and on a computer.' },
       { title: '4. Find a missed repeating habit or event, if one shows up', notes: 'Its "give up on this one" button should now say "Skipped", not "Let it go".' },
       { title: '5. Tap the (i) info button at the top of the review', notes: 'It should explain only the ONE card you\'re looking at — not a wall of text about every kind of card at once.' }
     ]);

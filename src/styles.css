@@ -1224,7 +1224,7 @@ body.has-frame .tray-drawer::after{
    phone and desktop (author: "keep similar layouts for both, easier than
    introducing new concepts") rather than the earlier column-on-phone/
    row-on-desktop split. */
-.review-band{ display:flex; flex-wrap:wrap; gap:7px; }
+.review-band{ display:flex; flex-wrap:wrap; justify-content:center; gap:7px; }
 /* ⚑ WIDENED (author QA: with the old stacked layout this read as "still one
    long list" — a 7px top-pad + a near-invisible 0.08-alpha line wasn't doing
    enough against the buttons' own 7px within-chip gap to register as a
@@ -2200,9 +2200,20 @@ body.screen-open #tray-handle{ display:none; }
      top of the band divider's own 7px, a rhythm that was only ever tuned for
      capture's three chip-rows. */
   .review-card-capture .review-menu-row{ margin-top:6px; }
-  /* §5/§5a band chips are deliberately the SAME layout on desktop as phone
-     (author, second QA round) — see the base .review-band rules; no
-     desktop-only override needed here anymore. */
+  /* §5/§5a band chips (author, third QA round): a little wider, a little more
+     room between them, and about half a chip-row of height between bands —
+     the same "half row" idea already used for the capture card's own three
+     rows (styles.css ~2145), scaled to THIS chip's height, not copied as a
+     literal px value. Structure/order is unchanged from the base rules —
+     centered, wrapping, same-layout-as-phone — only these three measurements
+     grow on the wider surface. */
+  .review-band{ gap:12px; }
+  .review-band .review-menu-btn{ padding:10px 22px; }
+  /* Half a chip row of total whitespace between bands (chips measure ~39px
+     tall here, so ~20px) — .review-menu's own 7px flex-gap is fixed/shared
+     with every other review card, so margin+padding make up the rest. */
+  .review-band + .review-band,
+  .review-band + .review-menu-row{ margin-top:5px; padding-top:8px; }
 }
 
 /* The frame's desktop geometry: pinned to the viewport, over the header, under

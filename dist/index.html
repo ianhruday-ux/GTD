@@ -1250,7 +1250,7 @@ body.has-frame .tray-drawer::after{
    phone and desktop (author: "keep similar layouts for both, easier than
    introducing new concepts") rather than the earlier column-on-phone/
    row-on-desktop split. */
-.review-band{ display:flex; flex-wrap:wrap; gap:7px; }
+.review-band{ display:flex; flex-wrap:wrap; justify-content:center; gap:7px; }
 /* ⚑ WIDENED (author QA: with the old stacked layout this read as "still one
    long list" — a 7px top-pad + a near-invisible 0.08-alpha line wasn't doing
    enough against the buttons' own 7px within-chip gap to register as a
@@ -2226,9 +2226,20 @@ body.screen-open #tray-handle{ display:none; }
      top of the band divider's own 7px, a rhythm that was only ever tuned for
      capture's three chip-rows. */
   .review-card-capture .review-menu-row{ margin-top:6px; }
-  /* §5/§5a band chips are deliberately the SAME layout on desktop as phone
-     (author, second QA round) — see the base .review-band rules; no
-     desktop-only override needed here anymore. */
+  /* §5/§5a band chips (author, third QA round): a little wider, a little more
+     room between them, and about half a chip-row of height between bands —
+     the same "half row" idea already used for the capture card's own three
+     rows (styles.css ~2145), scaled to THIS chip's height, not copied as a
+     literal px value. Structure/order is unchanged from the base rules —
+     centered, wrapping, same-layout-as-phone — only these three measurements
+     grow on the wider surface. */
+  .review-band{ gap:12px; }
+  .review-band .review-menu-btn{ padding:10px 22px; }
+  /* Half a chip row of total whitespace between bands (chips measure ~39px
+     tall here, so ~20px) — .review-menu's own 7px flex-gap is fixed/shared
+     with every other review card, so margin+padding make up the rest. */
+  .review-band + .review-band,
+  .review-band + .review-menu-row{ margin-top:5px; padding-top:8px; }
 }
 
 /* The frame's desktop geometry: pinned to the viewport, over the header, under
@@ -2360,7 +2371,7 @@ body.screen-open #tray-handle{ display:none; }
 (function(){
 "use strict";
 
-const BUILD_STAMP = "27 Jul 21:04";  // replaced by build.py
+const BUILD_STAMP = "27 Jul 21:25";  // replaced by build.py
 
 // =========================================================
 // STORAGE ADAPTER (spec.md §3, known issue 4)
@@ -2958,7 +2969,7 @@ const STRINGS = {
   "review.addNextAction":    { en: "+Next",                         "zh-Hans": "+下一步" },
   "review.addWaitingAction": { en: "+Waiting",                      "zh-Hans": "+等待" },
   "review.addAnEvent":       { en: "+Event",                        "zh-Hans": "+事件" },
-  "review.moveToSomeday":    { en: "+Someday",                      "zh-Hans": "+将来" },
+  "review.moveToSomeday":    { en: "Someday →",                     "zh-Hans": "将来 →" },
   "review.whatWaitingOn":    { en: "What are you waiting on?",      "zh-Hans": "你在等待什么？" },
   "review.untilWhatWhen":    { en: "Until what, or until when?",    "zh-Hans": "等到什么，或者等到什么时候？" },
   "review.waitingForDots":   { en: "Waiting for…",                  "zh-Hans": "在等待…" },
@@ -5710,12 +5721,13 @@ function initTimePickerFields(){
 // (this file + its boot() call) if the convention is ever retired.
 // =========================================================
 function injectChunkMap(){
-  const FLAG = "gtd_chunk_map_v12";
+  const FLAG = "gtd_chunk_map_v13";
   if (Storage.get(FLAG)) return;
   Storage.set(FLAG, "1");
   ["gtd_chunk_map_v1", "gtd_chunk_map_v2", "gtd_chunk_map_v3", "gtd_chunk_map_v4",
    "gtd_chunk_map_v5", "gtd_chunk_map_v6", "gtd_chunk_map_v7", "gtd_chunk_map_v8",
-   "gtd_chunk_map_v9", "gtd_chunk_map_v10", "gtd_chunk_map_v11"].forEach(Storage.remove);  // retire superseded flags
+   "gtd_chunk_map_v9", "gtd_chunk_map_v10", "gtd_chunk_map_v11",
+   "gtd_chunk_map_v12"].forEach(Storage.remove);  // retire superseded flags
 
   // Replace, don't accumulate (8.2, mirroring 8.1): sweep any previous
   // chunk-map group (tagged via devContext, not a title match, since the
@@ -5771,7 +5783,7 @@ function injectChunkMap(){
     { title: "✓ Events on the project page", notes: "DONE. A project shows its linked events and can create them — including on the creation page, where the event is held as a draft and only becomes real when the project is saved. ‘Add an event’ in the daily review came with it." },
     { title: "✓ Linked notes on the project page", notes: "DONE. The link runs both ways now. A current project's Linked panel has an Actions side and a Notes side you toggle between, and a Someday project has a Linked notes section of its own — notes only, since a Someday project holds no actions by design." },
     { title: "Re-test backups against the new fields", notes: "TO DO. Export and import have not been exercised since deadlines gained a start date and a push counter, repeats gained a missed-day marker, and the backgrounds changed names. Backups are the one thing that has to survive real use." },
-    { title: "✓ The review surface, standardised", notes: "DONE. Fixed a live bug where the Chinese text for a missed repeat quoted buttons that no longer existed. The review's five card kinds (missed, past due, stalled, orphaned, and the sort-a-thought capture card) now share one delete style and one 'Not now' corner position instead of five different looks. The four decision cards (everything but capture) are now grouped into bands — 'ways to move it forward', 'ways to take it off the list', then Not now/Delete — separated by a divider line, same layout on phone and computer, so a card that used to be seven buttons in a column now reads at a glance. Buttons that send the item to a list are short and colored like that list's tab ('+Next', '+Waiting', '+Event', '+Someday'), modeled on the capture card's own colored buttons; buttons that resolve or edit in place stay plain. The missed-repeat button 'Let it go' is renamed 'Skipped' (in both languages) so it can't be misread as the same action as 'Not now'. The review's (i) info button now explains only the one card on screen, not all five kinds at once, and stays open as you move to the next card." },
+    { title: "✓ The review surface, standardised", notes: "DONE. Fixed a live bug where the Chinese text for a missed repeat quoted buttons that no longer existed. The review's five card kinds (missed, past due, stalled, orphaned, and the sort-a-thought capture card) now share one delete style and one 'Not now' corner position instead of five different looks. The four decision cards (everything but capture) are now grouped into bands — 'ways to move it forward', 'ways to take it off the list', then Not now/Delete — separated by a divider line, same layout on phone and computer, so a card that used to be seven buttons in a column now reads at a glance. Buttons that send the item to a list are short and colored like that list's tab ('+Next', '+Waiting', '+Event', 'Someday →'), modeled on the capture card's own colored buttons; buttons that resolve or edit in place stay plain. The missed-repeat button 'Let it go' is renamed 'Skipped' (in both languages) so it can't be misread as the same action as 'Not now'. The review's (i) info button now explains only the one card on screen, not all five kinds at once, and stays open as you move to the next card." },
     { title: "✓ The habit-bubble dismiss, and the Advanced buttons", notes: "DONE. The calendar's 'Make this a habit instead' suggestion (shown when you set something to repeat daily or weekly) now has a small X to dismiss it — it comes back next time you pick daily or weekly on a fresh item. Every 'Advanced options' / 'More options' button across the app got a light grey fill for contrast, and the calendar's copy moved up next to the Event/Deadline toggle instead of sitting at the bottom of the form, on both phone and computer." },
     { title: "✓ The desktop calendar, fixed", notes: "DONE. The computer calendar used to overflow the screen at every size tested, including 1920x1080 — the day squares were too tall and the Add button could sit below the fold. It's now two columns (the form on the left, wide short day-squares on the right), fits on screen at any reasonable window size, and the phone layout is untouched." },
     { title: "✓ 9 — Service worker + offline + install polish", notes: "DONE. The app now works with no internet — it saves a copy of itself the first time you open it online, so airplane mode after that still loads and works. When I ship a change while you have the app open, a small bar appears saying “New version available” with a Reload button; nothing ever updates or interrupts you without that tap. See the fresh QA checklist in Next Actions to try both." },
@@ -11869,7 +11881,7 @@ function injectChunkMap(){
     // REVIEW-SURFACE round (review-surface-plan.md). §8.1's
     // replace-don't-accumulate discipline: this is the ONLY injector, and the
     // public-app-polish round's groups below are swept out, not left dormant.
-    const FLAG = "gtd_qa_checklist_reviewsurface_v2";
+    const FLAG = "gtd_qa_checklist_reviewsurface_v3";
     if (Storage.get(FLAG)) return;
     Storage.set(FLAG, "1");
     // Retire the superseded flags so they can't resurrect their injectors, and
@@ -11881,7 +11893,8 @@ function injectChunkMap(){
      "gtd_qa_checklist_postsprint_v5", "gtd_qa_checklist_postsprint_v6",
      "gtd_qa_checklist_postsprint_v7", "gtd_qa_checklist_desktop_v1",
      "gtd_qa_checklist_desktop_v2", "gtd_qa_checklist_sw_v1",
-     "gtd_qa_checklist_publicpolish_v1", "gtd_qa_checklist_reviewsurface_v1"].forEach(Storage.remove);
+     "gtd_qa_checklist_publicpolish_v1", "gtd_qa_checklist_reviewsurface_v1",
+     "gtd_qa_checklist_reviewsurface_v2"].forEach(Storage.remove);
 
     // Replace, don't accumulate (8.1) — and actually mean it this time.
     // Earlier rounds bumped the flag but left the previous rounds' groups
@@ -11913,7 +11926,7 @@ function injectChunkMap(){
     addGroupWithItems('✅ QA — The review’s new grouped buttons', [
       { title: '1. Open the daily review', notes: 'Open the intray (the handle on the left edge of the screen, or the left column on a computer) and tap Review. Look at whichever card shows up first.' },
       { title: '2. Check the buttons are grouped, not one long list', notes: 'A card with several buttons (like a stalled project) should show them in a few small groups with a thin line between each group, ending with "Not now" in the bottom-left corner and a red "Delete" in the bottom-right — not seven buttons in one plain column.' },
-      { title: '3. Check the colored buttons', notes: 'Buttons that add something to a list — "+Next", "+Waiting", "+Event", "+Someday" — should be short and colored like that list\'s tab (red, yellow, brass, blue). Buttons that don\'t send it anywhere (like "Complete it") stay plain grey. Same on the phone and on a computer.' },
+      { title: '3. Check the colored buttons', notes: 'Buttons that add something to a list — "+Next", "+Waiting", "+Event", "Someday →" — should be short and colored like that list\'s tab (red, yellow, brass, blue). Buttons that don\'t send it anywhere (like "Complete it") stay plain grey. Same on the phone and on a computer.' },
       { title: '4. Find a missed repeating habit or event, if one shows up', notes: 'Its "give up on this one" button should now say "Skipped", not "Let it go".' },
       { title: '5. Tap the (i) info button at the top of the review', notes: 'It should explain only the ONE card you\'re looking at — not a wall of text about every kind of card at once.' }
     ]);
