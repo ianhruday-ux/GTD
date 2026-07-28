@@ -1247,8 +1247,13 @@ body.has-frame .tray-drawer::after{
    stacked, full-width rows (unchanged from before banding). Desktop lays
    each band's own buttons out horizontally — see the ≥1000px block. */
 .review-band{ display:flex; flex-direction:column; gap:7px; }
+/* ⚑ WIDENED (author QA: on the stacked/phone layout this read as "still one
+   long list" — a 7px top-pad + a near-invisible 0.08-alpha line wasn't doing
+   enough against the buttons' own 7px within-band gap to register as a
+   group boundary via proximity. Doubled the gap and darkened the line
+   enough to read as a rule, not a rounding artifact. */
 .review-band + .review-band,
-.review-band + .review-menu-row{ padding-top:7px; border-top:1px solid rgba(255,255,255,0.08); }
+.review-band + .review-menu-row{ margin-top:8px; padding-top:15px; border-top:1px solid rgba(255,255,255,0.22); }
 .review-menu-btn{ text-align:left; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.05);
   color:var(--text-primary); border-radius:8px; padding:10px 12px; font-size:14px; cursor:pointer; }
 .review-menu-btn:hover{ background:rgba(255,255,255,0.1); }
@@ -2337,7 +2342,7 @@ body.screen-open #tray-handle{ display:none; }
 (function(){
 "use strict";
 
-const BUILD_STAMP = "27 Jul 20:24";  // replaced by build.py
+const BUILD_STAMP = "27 Jul 20:43";  // replaced by build.py
 
 // =========================================================
 // STORAGE ADAPTER (spec.md §3, known issue 4)
