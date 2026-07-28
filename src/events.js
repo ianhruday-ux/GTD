@@ -1363,10 +1363,23 @@ function removePseudoRow(eventId){
 }
 // "Skip this one" = advance to the next occurrence (§4.15b). Same task ID rolls
 // forward, so a dependent simply now waits on the next occurrence.
+// ⚑ BUG FIX (review-surface-plan.md follow-up, author report): a series can
+// hold BOTH a live occurrence (the row this function is skipping) AND an
+// older recorded miss at once — the single-slot design HIDES the older miss
+// behind the live row (computeOpenLoops shows only the live one; see
+// onPseudoActionCompleted's comment for the completed-side half of this same
+// story). Skipping the live row used to leave that older missedOcc
+// untouched, so the instant the live row disappeared the older miss was
+// revealed — from the review it read as "I hit Skipped and the same event
+// came right back," when it was actually a second, older question that had
+// been waiting the whole time. Completing already retired the miss it
+// supersedes (onPseudoActionCompleted); skipping now does the same.
 function skipOccurrence(ev){
+  const occ = ev.date; // the occurrence being skipped, captured before advancing
   const nd = nextOccurrenceDate(ev.date, ev.recurrence, ev.interval);
   if (nd){ ev.date = nd; }
   ev.completedAt = null; ev.completedFrom = null;
+  if (ev.missedOcc && ev.missedOcc <= occ) ev.missedOcc = null;
   pruneOverrides(ev);
   removePseudoRow(ev.id);
   saveEvents();

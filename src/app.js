@@ -6078,7 +6078,7 @@
     // REVIEW-SURFACE round (review-surface-plan.md). §8.1's
     // replace-don't-accumulate discipline: this is the ONLY injector, and the
     // public-app-polish round's groups below are swept out, not left dormant.
-    const FLAG = "gtd_qa_checklist_reviewsurface_v5";
+    const FLAG = "gtd_qa_checklist_reviewsurface_v6";
     if (Storage.get(FLAG)) return;
     Storage.set(FLAG, "1");
     // Retire the superseded flags so they can't resurrect their injectors, and
@@ -6092,7 +6092,7 @@
      "gtd_qa_checklist_desktop_v2", "gtd_qa_checklist_sw_v1",
      "gtd_qa_checklist_publicpolish_v1", "gtd_qa_checklist_reviewsurface_v1",
      "gtd_qa_checklist_reviewsurface_v2", "gtd_qa_checklist_reviewsurface_v3",
-     "gtd_qa_checklist_reviewsurface_v4"].forEach(Storage.remove);
+     "gtd_qa_checklist_reviewsurface_v4", "gtd_qa_checklist_reviewsurface_v5"].forEach(Storage.remove);
 
     // Replace, don't accumulate (8.1) — and actually mean it this time.
     // Earlier rounds bumped the flag but left the previous rounds' groups
@@ -6127,14 +6127,15 @@
       { title: '3. Check the colored buttons', notes: 'Buttons that add something to a list — "+Next", "+Waiting", "+Event", "Someday →" — should be short and colored like that list\'s tab (red, yellow, brass, blue). Buttons that don\'t send it anywhere (like "Completed") stay plain grey. Same on the phone and on a computer.' },
       { title: '4. Check the wording is the same everywhere', notes: 'Every card\'s "this got done" button should say "Completed" (not "Mark done" or "Complete it"), and every Delete button should just say "Delete" (not "Delete it").' },
       { title: '5. Find an overdue repeating habit or event, if one shows up', notes: 'Whether it\'s still showing today or already moved on to tomorrow, it should offer "Completed", "Skipped" (not "Let it go"), and "Delete" — the same three, looking and working exactly the same, on both.' },
-      { title: '6. Check Delete acts right away, no popup', notes: 'Tapping Delete on a review card should delete it immediately, with no "are you sure?" popup — except a repeating calendar event, which still asks whether you mean just this occurrence or the whole series (that one stays, since "delete" is genuinely unclear there).' },
-      { title: '7. Tap the (i) info button at the top of the review', notes: 'It should explain only the ONE card you\'re looking at — not a wall of text about every kind of card at once.' }
+      { title: '6. Tap Skipped just once', notes: 'It should resolve fully and move the review on to something else — not turn into another card for the same event that you then have to tap Skipped on again.' },
+      { title: '7. Check Delete acts right away, no popup', notes: 'Tapping Delete on a review card should delete it immediately, with no "are you sure?" popup — except a repeating calendar event, which still asks whether you mean just this occurrence or the whole series (that one stays, since "delete" is genuinely unclear there).' },
+      { title: '8. Tap the (i) info button at the top of the review', notes: 'It should explain only the ONE card you\'re looking at — not a wall of text about every kind of card at once.' }
     ]);
 
     addGroupWithItems('✅ QA — Calendar changes', [
-      { title: '8. Open the calendar and set something to repeat', notes: 'Start adding an event, set it to repeat Daily or Weekly. A purple box should offer to make it a habit instead, with a small X on the end to dismiss it if you don\'t want it.' },
-      { title: '9. On a computer, open the calendar', notes: 'The whole calendar should fit on screen without needing to scroll, with the day squares wide and short (not tall) and the "Add" button always visible — not hidden below the fold.' },
-      { title: '10. Check the "More options" / "Advanced options" buttons', notes: 'Wherever you see one of these (a next action, a waiting action, a habit, or the calendar), it should now have a light grey fill so it stands out a bit, instead of blending into the background.' }
+      { title: '9. Open the calendar and set something to repeat', notes: 'Start adding an event, set it to repeat Daily or Weekly. A purple box should offer to make it a habit instead, with a small X on the end to dismiss it if you don\'t want it.' },
+      { title: '10. On a computer, open the calendar', notes: 'The whole calendar should fit on screen without needing to scroll, with the day squares wide and short (not tall) and the "Add" button always visible — not hidden below the fold.' },
+      { title: '11. Check the "More options" / "Advanced options" buttons', notes: 'Wherever you see one of these (a next action, a waiting action, a habit, or the calendar), it should now have a light grey fill so it stands out a bit, instead of blending into the background.' }
     ]);
     saveTasksLocal("next");
   }
