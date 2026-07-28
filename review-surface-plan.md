@@ -428,14 +428,24 @@ which has its own drafting page and its own route to context/project. Leave that
 
 ## 8.2 What the author ruled
 
-1. **The calendar's `More options →` becomes `Advanced`.**
-2. **It moves to the TOP of the controls**, not the bottom. Current order inside
-   `.cal-create-controls` (events.js ~907–927) is: Time → Description → Recurrence (+ interval) →
-   [habit bubble, conditional] → Tickler checkbox → **More options** (last). It should become first.
-3. **Every other "Advanced options…" button becomes just `Advanced`.**
-4. **Give them a grey fill so they stand out** (author: "try" — so this is a proposal to evaluate on
-   screen, not a fixed value).
-5. **There should be one on almost every drafting page**, with **Notes a likely exception**.
+**⚑ AMENDED after the survey below was put to the author. The rename is WITHDRAWN.** Shown as
+first-pass → final so the reasoning survives:
+
+1. ~~The calendar's `More options →` becomes `Advanced`.~~ ~~Every other "Advanced options…" button
+   becomes just `Advanced`.~~ **WITHDRAWN (author):** *"That's fair that the buttons name two
+   separate things. Maybe the current label is fine."* Once it was clear that A opens a dialog and
+   returns you while B leaves the page for good (§8.1), the shared label stopped being an
+   improvement — the two names are carrying a real distinction. **Keep `Advanced options…` and
+   `More options →` as they are.** Do not "finish the job" by renaming them later.
+2. **STANDS — the calendar's button moves to the TOP of the controls**, not the bottom. Current
+   order inside `.cal-create-controls` (events.js ~907–927) is: Time → Description → Recurrence
+   (+ interval) → [habit bubble, conditional] → Tickler checkbox → **More options** (last). It
+   should become first.
+3. **STANDS — more contrast, on all of them.** The author's original wording was "a grey fill to
+   make them stand out"; with the rename withdrawn, **contrast is the whole of the remaining visual
+   ask.** Treat the grey fill as the proposed means, not the requirement — if something else reads
+   better on the wood, use it and say so.
+4. ~~There should be one on almost every drafting page.~~ **See §8.4 — resolved, no new buttons.**
 
 ## 8.3 Building it
 
@@ -476,18 +486,18 @@ Checked every drafting page:
 
 So the author's expectation is right, and the gap is exactly **the two project pages**.
 
-> ### ⚑ Q7 — BLOCKER for the project pages. Do not resolve this by inventing content.
+> ### ✅ Q7 — RESOLVED. Do not add an Advanced button to the project pages.
 >
-> The Advanced dialog has exactly **two tabs**: *Bundling* (next/waiting) and *Extra cues* (habits).
-> **There is nothing defined for a project.** Adding the button to Current/Future without deciding
-> what goes inside opens an empty dialog.
+> The question was: the Advanced dialog has exactly **two tabs** — *Bundling* (next/waiting) and
+> *Extra cues* (habits) — and **nothing is defined for a project**, so adding the button there would
+> open an empty dialog. Content would have to be invented, which CLAUDE.md forbids.
 >
-> This is a **feature question, not a styling one**, and CLAUDE.md's standing rule applies — judgment
-> calls inside a feature are the builder's, inventing a feature is not. **Ask the author what a
-> project's Advanced dialog contains** before adding the button there.
+> **RULED (author): leave it. "I don't have any features I need to add to that right now."**
 >
-> Everything else in §8 (rename, reposition, grey fill, on the three pages that already have one)
-> is unblocked and can ship without this.
+> So the button lives on exactly the three pages it lives on today (next / waiting / habit) plus the
+> calendar's own door, and the ❌ rows in the table above are all **correct as they stand, not gaps
+> to close.** Revisit only if a project ever grows a power feature that has nowhere else to go — the
+> button follows the content, not the other way round.
 
 ## 8.5 A third relative, for the author to rule on
 
@@ -501,14 +511,95 @@ destination rather than the depth. **Q8: confirm, or fold it into the `Advanced`
 
 ## 8.6 Verification
 
-- Each of next / waiting / habit: button reads `Advanced`, has the grey fill, still opens the
-  Advanced dialog, dialog still returns to the page with the draft intact.
-- Calendar, Event side: button reads `Advanced`, sits **first** in the controls, still carries
-  name/description/date/time/recurrence/interval/tickler/project through to the event page.
-- Calendar, Deadline side: **still has no such button** — that is correct, not a regression.
-- Both languages: `advanced.button` and `cal.moreOptions` are separate i18n keys and both need the
-  new label in EN **and** zh-Hans. `advanced.buttonDialog` is the *dialog's own title* and should
-  stay "Advanced options" — do not shorten that one by accident.
+**Scope after the amendments: reposition + contrast only. No renames, no new buttons.** That makes
+this a small, low-risk change — but the reposition touches a page whose control order was
+deliberate, so verify rather than assume.
+
+- Each of next / waiting / habit: label **unchanged** (`Advanced options…`), new contrast applied,
+  still opens the Advanced dialog, dialog still returns to the page with the draft intact.
+- Calendar, Event side: label **unchanged** (`More options →`), now sits **first** in the controls,
+  still carries name/description/date/time/recurrence/interval/tickler/project through to the event
+  page (events.js ~1079 — this is a lossless hand-off and must stay one).
+- Calendar, Deadline side: **still has no such button** — correct, not a regression.
+- Project pages: **still no button** — correct, not a regression (Q7).
+- **No i18n changes are needed at all** now the rename is withdrawn. If you find yourself editing
+  `advanced.button` or `cal.moreOptions`, you have gone beyond the ask.
 - Draft isolation (CLAUDE.md): unchanged by any of this, but the standing verification procedure
   still applies to any drafting page you re-render — enumerate every control the page renders,
   mutate, ✕, confirm nothing persisted.
+- **Re-check the habit bubble's prominence relative to the moved button** — see §9, which is about
+  that bubble and interacts directly with this change.
+
+---
+
+# 9. The "Make this a habit instead" bubble — findings, premise NOT yet confirmed
+
+Raised by the author (2026-07-27): *"That's a useful feature that got hidden when we changed the
+calendar. IIRC, when you selected repeat daily or weekly a little dismissible bubble would pop up
+over the recurrence field asking if you want to make it a habit instead. It intervened during the
+creation process. Currently, that bubble lives on the full page only, and you usually only see it
+after you've created the event."*
+
+**⚠ Do not build from that premise yet.** It is half-confirmed and half-contradicted by the build,
+and the difference decides what the work actually is. Findings below were produced by driving the
+real app, not by reading.
+
+## 9.1 What the build does today (verified)
+
+There are **two** instances of this control:
+
+| # | where | condition | so… |
+| --- | --- | --- | --- |
+| 1 | **calendar quick-add** (events.js ~905) | `calRecur` is `daily` or `weekly` | **appears DURING creation** |
+| 2 | **full event page** (events.js ~1133) | `!creating && recurrence` is daily/weekly | **edit-only — you see it only AFTER the event exists** |
+
+Instance 2 matches the author's description exactly. **Instance 1 contradicts the "lives on the full
+page only" half of it**: driven live at 1440px and 400px, with a name typed and recurrence set to
+`daily` and then `weekly`, the bubble is **present and visible in the calendar quick-add at both
+widths**, reading *"Recurring chore? Make this a habit instead →"*, sitting directly under the
+recurrence row. At `none` and `monthly` it is correctly absent.
+
+So the **function survived the calendar change. What did not survive is the FORM.**
+
+## 9.2 The gap between memory and build — this is the real question
+
+| author remembers | build has |
+| --- | --- |
+| a **bubble that pops up over** the recurrence field | an inline button in normal flow (`position: static`), *below* the recurrence row |
+| **dismissible** | **no dismiss control of any kind** |
+| **intervenes** in creation | sits as one row in a stack of six, easy to scroll straight past |
+
+It is styled to be noticed — dashed purple border, purple tint, the only coloured thing in that
+stack — but it is **a row in a list, not an interruption.** That is a plausible and complete
+explanation for "it got hidden": nothing was removed, the *interrupt* was flattened into an option.
+
+**Q9 for the author, before any build:** is the ask (a) restore the **popover form** — floating over
+the recurrence field, with a dismiss — because interrupting is the point; or (b) keep the inline
+button and just make it **louder / harder to scroll past**; or (c) something else, now that you have
+seen what is actually there? **Ask; do not choose.** The author explicitly framed this as restoring
+a remembered feature, and the remembered feature and the built one differ in exactly the property
+that made it worth restoring.
+
+## 9.3 If (a) — things a popover build must not break
+
+- **Draft isolation (CLAUDE.md).** `cal-make-habit` → `calMakeHabit()` converts what is being drafted
+  into a habit. A dismissible popover adds a new piece of *drafting-page* state; dismissal must not
+  persist anything, and ✕ on the calendar must discard it like every other control.
+- **Where does "dismissed" live, and how long?** Per-draft (comes back next time you pick daily) is
+  almost certainly right and is the simplest; anything longer needs a storage key and an answer for
+  what Reset does to it. Flag whatever you choose.
+- **Phone.** The quick-add sits in a narrow column with the keyboard possibly up; a popover over the
+  recurrence field must not cover the field you are about to use, and must not need a precise tap
+  to dismiss. (See the pending phone-UX notes about keyboard/viewport behaviour.)
+- **Do not touch instance 2.** The event page's edit-only offer is correct as it is — the comment at
+  events.js ~1131 explains why (`makeHabitFromEvent` needs a real event).
+
+## 9.4 Interaction with §8 — read both before building either
+
+§8 moves the calendar's `More options →` to the **top** of the same control stack and gives it more
+contrast. §9 may make the habit bubble louder in that same stack. The CSS comment at styles.css
+~1632 records the intended hierarchy — *the habit bubble makes a suggestion about what you are
+building; the advanced button just opens a door* — and **both changes push against it from opposite
+ends.** If §8 and §9 are built in separate sessions, the second one must re-check the first. If they
+are built together, get one screenshot of the finished stack with recurrence set to `daily` and put
+it in the handoff.
