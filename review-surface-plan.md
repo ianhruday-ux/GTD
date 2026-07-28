@@ -437,10 +437,21 @@ first-pass → final so the reasoning survives:
    returns you while B leaves the page for good (§8.1), the shared label stopped being an
    improvement — the two names are carrying a real distinction. **Keep `Advanced options…` and
    `More options →` as they are.** Do not "finish the job" by renaming them later.
-2. **STANDS — the calendar's button moves to the TOP of the controls**, not the bottom. Current
-   order inside `.cal-create-controls` (events.js ~907–927) is: Time → Description → Recurrence
-   (+ interval) → [habit bubble, conditional] → Tickler checkbox → **More options** (last). It
-   should become first.
+2. **STANDS — the calendar's button moves off the bottom of the controls.** Current order inside
+   `.cal-create-controls` (events.js ~907–927) is: Time → Description → Recurrence (+ interval) →
+   [habit bubble, conditional] → Tickler checkbox → **More options** (last).
+   - **PHONE — RULED (author):** put it **to the right of the Event/Deadline toggle, above the Add
+     button.** Note this is a different place from the original "top of the controls" instruction:
+     the toggle sits above `.cal-create-controls`, so the button leaves the control stack entirely
+     and pairs with the segmented control instead.
+   - **DESKTOP — open**, and bound up with the calendar-layout question in §10. The author has no
+     preferred location; whichever §10 layout is chosen should supply one. Do not place it on
+     desktop before §10 is settled.
+   - **⚑ RULED (author): keep the row of space it vacates.** *"When you move the More options
+     button, leave the extra row of space at the bottom of the page. The control panel should have a
+     bit of a margin on both the phone and computer."* So this is **not** a pure move — the control
+     panel keeps bottom breathing room on **both** platforms after the button leaves. Removing the
+     button and letting the panel close up is the wrong outcome.
 3. **STANDS — more contrast, on all of them.** The author's original wording was "a grey fill to
    make them stand out"; with the rename withdrawn, **contrast is the whole of the remaining visual
    ask.** Treat the grey fill as the proposed means, not the requirement — if something else reads
@@ -573,12 +584,15 @@ It is styled to be noticed — dashed purple border, purple tint, the only colou
 stack — but it is **a row in a list, not an interruption.** That is a plausible and complete
 explanation for "it got hidden": nothing was removed, the *interrupt* was flattened into an option.
 
-**Q9 for the author, before any build:** is the ask (a) restore the **popover form** — floating over
-the recurrence field, with a dismiss — because interrupting is the point; or (b) keep the inline
-button and just make it **louder / harder to scroll past**; or (c) something else, now that you have
-seen what is actually there? **Ask; do not choose.** The author explicitly framed this as restoring
-a remembered feature, and the remembered feature and the built one differ in exactly the property
-that made it worth restoring.
+### ✅ Q9 — RESOLVED. Keep it inline; add an ✕.
+
+**RULED (author): "just put an X on the end of it to dismiss it."**
+
+So this is **not** a popover rebuild. The bubble stays where it is, in the flow under the recurrence
+row, and gains a dismiss affordance on its trailing end. Everything in §9.3 below about floating
+positioning and phone-keyboard overlap is therefore **moot** — kept only so nobody re-proposes the
+popover. The draft-isolation and dismissal-scope items in §9.3 **still apply**, because they are
+about the ✕, not about the form.
 
 ## 9.3 If (a) — things a popover build must not break
 
@@ -594,12 +608,157 @@ that made it worth restoring.
 - **Do not touch instance 2.** The event page's edit-only offer is correct as it is — the comment at
   events.js ~1131 explains why (`makeHabitFromEvent` needs a real event).
 
-## 9.4 Interaction with §8 — read both before building either
+## 9.4 Interaction with §8 — ✅ resolved: there is no conflict
 
-§8 moves the calendar's `More options →` to the **top** of the same control stack and gives it more
-contrast. §9 may make the habit bubble louder in that same stack. The CSS comment at styles.css
-~1632 records the intended hierarchy — *the habit bubble makes a suggestion about what you are
-building; the advanced button just opens a door* — and **both changes push against it from opposite
-ends.** If §8 and §9 are built in separate sessions, the second one must re-check the first. If they
-are built together, get one screenshot of the finished stack with recurrence set to `daily` and put
-it in the handoff.
+I raised a worry that §8 (louder `More options`, moved to the top) and §9 (a more prominent habit
+bubble) were pushing against the recorded hierarchy from opposite ends. **The author dismissed it,
+and the reason is the useful part — record it, it is the cleanest statement of what these two
+controls are for:**
+
+> **`More options` lets you put pseudo-actions in contexts and link events to projects.**
+> **The habit bubble suggests the action might belong better in another lane.**
+> *"I want both changes for different reasons."*
+
+They are not competing for the same attention because they answer different questions — one is
+*"this event needs fields this row can't give it"*, the other is *"this might not be an event at
+all."* A user who needs one does not need the other. The styles.css ~1632 comment framing them as
+loud-vs-quiet siblings was the wrong model; **do not preserve that hierarchy at the cost of either
+change.**
+
+Still worth one screenshot of the finished stack with recurrence set to `daily` in the handoff —
+not to arbitrate a conflict, just to confirm the stack still reads well with both changes in.
+
+---
+
+# 10. The desktop calendar is broken — measurements and proposals
+
+Author (2026-07-27): *"It appears that the calendar height never got fixed. Those calendar squares
+are ridiculously tall. At the very least, the calendar should be able to fit on the page without
+scrolling. We should also be able to take advantage of the bigger computer screen for a more
+efficient layout for the controls."*
+
+Confirmed, and it is worse than "tall cells." Measured by driving the real build.
+
+## 10.1 Measurements
+
+Month view, at four viewports:
+
+| viewport | `.cal-body` needs | `.cal-body` gets | scrolls? |
+| --- | --- | --- | --- |
+| 1366 × 768 (common laptop) | 1073px | 644px | **yes — 429px over** |
+| 1440 × 900 | 1073px | 776px | **yes** |
+| 1920 × 1080 | 1073px | 956px | **yes** |
+| 400 × 860 (phone) | 806px | 806px | **no — phone is fine** |
+
+**The desktop calendar overflows at every size tested, including 1920 × 1080.** The phone does not.
+This is a desktop-only defect.
+
+Where the 1073px goes (measured at 1366 × 768):
+
+```
+   34px   .cal-monthnav
+  669px   .cal-swipe-viewport   ← the month grid
+  280px   .cal-create           ← name, kind toggle, time, description,
+                                   recurrence, tickler, More options, Add
+   ~90px  padding + gaps
+```
+
+**Cell size — the root cause:**
+
+| | desktop | phone |
+| --- | --- | --- |
+| cell | **92 × 105 px** | 49 × 56 px |
+| six rows | 539px of grid | 293px |
+
+Desktop cells are ~2× the phone's in each dimension — **3.5× the area** — and they are empty.
+
+**Why the previous fix did not work.** Capping the grid at 660px capped its *width*. But
+`.cal-cell` carries `aspect-ratio: 1/1.15`, so **height still follows width**: 660/7 ≈ 92px wide
+forces 105px tall, and six of those is 630px before gaps. The cap was applied to the wrong axis.
+The grid is **height**-constrained on desktop and the cap only ever addressed width.
+
+**And the width is simultaneously wasted:** the card is 900px, the grid is 660px — **240px of dead
+horizontal space** — while the controls sit stacked vertically below the fold.
+
+## 10.2 What this costs the user
+
+At 1366 × 768 the month grid fills the entire card top to bottom, and **`.cal-create` is entirely
+off-screen** — the name field, the Event/Deadline toggle, and the **Add button** are all below the
+fold. You cannot add anything to the calendar without scrolling first, on the most common laptop
+size there is. That is the real bug; the tall squares are how it happens.
+
+## 10.3 Proposals — put to the author
+
+Three, in the conversation. Whichever is chosen must also answer **where `More options` goes on
+desktop** (§8.2), which is why the two questions were put together.
+
+- **A — Two columns: grid left, controls right.** Card widens (~1040px); the create panel becomes a
+  right-hand column beside the grid instead of a stack beneath it; cells become wide rectangles
+  rather than near-squares. Fixes height and width at once, matches how every desktop calendar
+  looks, and gives `More options` an obvious home at the top of the control column. Biggest change.
+- **B — Minimal: size the cells from the available height.** Keep the single column; derive
+  `--cal-cell-w` from a viewport-height budget rather than a fixed 660px width cap, so six rows
+  always fit and the controls come back above the fold. Smallest change, closest to the phone —
+  but leaves the 240px of dead width unused and makes the grid *smaller* than the screen allows.
+- **C — Middle: wide-and-short cells, controls in a horizontal strip.** Single column still, but
+  cells become wide rectangles (grid ~440px tall) and the create controls lay out **horizontally**
+  across the card's full width in two rows instead of a vertical stack of six. Uses the width for
+  both grid and controls without restructuring into columns.
+
+**Whichever is chosen:** the phone must be left alone. It measures 806px into 806px and does not
+scroll; every change here belongs in the ≥1000px block.
+
+## 10.4 ⚑ RULED — Proposal A, with wide cells
+
+**RULED (author): Proposal A — two columns, grid left, create panel right. Cells become wide
+rectangles (~92 × 58), keeping the full width and cutting the height.**
+
+This also settles the open half of §8.2: **`More options` goes at the top of the right-hand control
+column on desktop.** Phone keeps its own answer (right of the Event/Deadline toggle, above Add).
+
+### Target geometry
+
+| | now | after |
+| --- | --- | --- |
+| calendar card width | 900px | ~1040px |
+| cell | 92 × 105 | **92 × 58** |
+| six rows of grid | 539px | **~363px** |
+| `.cal-create` | 280px stacked *below* the grid | a right column *beside* it |
+| worst case 1366 × 768 | **overflows by 429px** | must fit with room to spare |
+
+Left column ≈ 660px (the grid keeps its current width — it is only the height that was wrong),
+right column ≈ 340px, plus gap and the card's 26px side padding.
+
+### Build notes
+
+- **Everything lives in the ≥1000px block.** The phone measures 806px into 806px and does not
+  scroll; it is correct today and must not move. `--cal-cell-w`'s base definition stays as it is.
+- **The aspect ratio is the actual fix.** `.cal-cell{ aspect-ratio:1/1.15 }` is what makes height
+  follow width; the desktop override needs roughly `1/0.63`. Capping the width again will not work
+  — that is what was tried before and it is why this is still broken.
+- **`--cal-grid-h` hard-codes the old ratio** — `calc(6 * 1.15 * var(--cal-cell-w) + …)`. The `1.15`
+  must change with the cell, or every consumer of that variable reserves the wrong height.
+- **Check List and Day views.** `.cal-agenda, .cal-day-empty{ min-height:var(--cal-grid-h) }` — they
+  reserve the month grid's height so switching views doesn't jump. Shrinking the grid shrinks their
+  reserve too. Verify all three views at 1366 × 768 before calling it done.
+- **`.cal-swipe-viewport{ max-width:660px; margin:0 auto }`** (desktop, styles.css ~2003) must become
+  the left column instead of a centred 660px block. The viewport renders neighbouring months for the
+  swipe transition — confirm the transform still lands correctly at the new width.
+- **The Deadline side of the create panel is shorter than the Event side** (no recurrence, no
+  tickler, no habit bubble, no More options). The right column must look deliberate in both states,
+  not half-empty on one.
+- **Keep the control panel's bottom margin** (§8.2, author) — that ruling applies to the right
+  column's lower edge here, not just to the phone's stack.
+- **Do not shrink the card below what the grid needs.** 1040px is a starting figure, not a measured
+  one; measure the finished thing and adjust.
+
+### Verification
+
+Drive the real build at **1366 × 768** (the worst case, and the size that exposed this), plus
+1440 × 900 and 1920 × 1080, and assert for each:
+
+- `.cal-body` does **not** scroll (`scrollHeight <= clientHeight`);
+- the **Add button is inside the viewport** without scrolling — this is the actual user-facing bug;
+- Month, Day and List views all fit;
+- phone at 400 × 860 is byte-for-byte unchanged in layout terms (cells still 49 × 56, still no
+  scroll).
