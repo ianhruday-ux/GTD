@@ -298,17 +298,155 @@ reopens. So by the time the back button exists, there is nothing left for it to 
 
 ---
 
-## 7. What is not decided yet
+## 7. The chunks
 
-Deliberately not in this document, because both depend on the author's response to it:
+Seven, **W0–W6**. Each ends in something you can hold and judge, and each states how it behaves in a
+plain browser tab — because the public web app has to keep working (memory: pristine public web app
+*and* personal native+sync). A change that only makes sense inside the wrapper is a change that has
+to no-op cleanly outside it.
 
-- **Chunking** (author's step 4). Chunk boundaries depend on which flagged problems get fixed and in
-  what order — particularly whether B2 (fonts) ships ahead of the wrapper, and whether S1
-  (`modifiedAt` everywhere) is one chunk or is spread across the stores it touches.
-- **Testing procedures for phone and computer** (author's step 5). Written once the chunks exist, so
-  each chunk gets its own pass/fail list rather than one undifferentiated sweep.
+**Sequencing rule that shapes everything below:** the two goals are not equally risky. The drag fix
+is one line of shell config and is either right or wrong on day one. Sync is where data gets eaten.
+So the order front-loads the cheap certainty (W0) and then spends the bulk of the work getting the
+merge logic correct **before any network is involved at all** (W3 before W4).
 
-**Immediate open questions for the author:**
+---
+
+### W0 — The smoke shell (Android)
+
+Wrap the current `dist/index.html` in a bare Capacitor shell. **No app-code changes whatsoever.**
+
+Prove exactly three things:
+
+1. The WebView loads the app and it is usable.
+2. `localStorage` survives force-killing and reopening.
+3. **The long-press drag bug is gone** with `onActionModeStarted` / `onCreateActionMode` no-op'd.
+
+**Gate — and it is a real one.** Point 3 is the entire justification for goal #1, on a fix that has
+never been tried on this device. If it does not work, stop and re-plan rather than proceeding: the
+premise has changed and the remaining six chunks were costed against a premise that no longer holds.
+
+*In a browser:* nothing to degrade. No app code moved.
+
+---
+
+### W1 — Wrapper-safe behaviour (app code, ships to the web too)
+
+Three fixes that a resident app needs and a browser tab merely benefits from:
+
+- **B1 — the boundary sweep fires on resume**, not only at boot (`visibilitychange`, plus
+  Capacitor's `appStateChange`). Today a phone suspended overnight and opened at 9am never processes
+  the 4am boundary: habits, recurring events and every deadline bar stay on yesterday.
+- **B4 — the Android back button** maps to the existing Escape chain (`app.js:5501`), which already
+  implements §4.6's order exactly. Roughly a five-line listener calling a function that exists.
+- **B3 — the service worker no-ops inside the wrapper.** It currently registers on any non-`file:`
+  origin, and Capacitor serves from one — stacking a second cache on already-bundled assets, where
+  a stale entry can serve the old app on top of a new APK.
+
+*In a browser:* B1 is a straight improvement (a tab left open for days gets the same fix). B4 is
+inert — there is no hardware back. B3 changes nothing; the web build still wants its service worker.
+
+---
+
+### W2 — Record identity: `modifiedAt` and tombstones
+
+The prerequisite for everything after it, and the largest single piece of app surgery.
+
+- Every mutation stamps `modifiedAt` on the record it touched. Currently **zero** records carry one.
+- Deletes leave a tombstone. Currently they are bare `splice`s, so "deleted" is indistinguishable
+  from "not yet known about" — and a merge would helpfully restore it.
+
+*In a browser:* invisible, and mildly useful on its own — the export file gets richer.
+
+**⚑ Schema note.** CLAUDE.md still permits skipping migrations *until real use begins*. This chunk
+is the natural last moment to take that freedom. If real use has started by the time it is built,
+it ships with a migration; if not, Reset seeds the new shape and that is cheaper. Decide at build
+time, flag the choice.
+
+---
+
+### W3 — The sync engine, with no network at all
+
+Per-record diff and merge, newest-wins on a same-record collision, and the conflict report that
+makes it non-silent (§1). Two simulated devices in one browser — two storage namespaces — and a
+test suite that drives divergence deliberately: edit both sides, delete on one, sweep on a stale
+copy, reconcile, assert.
+
+**This is the chunk that matters.** All of the data-loss risk in the entire project lives here, and
+none of it needs Dropbox to reproduce. Building it against a real network would mean debugging merge
+logic through OAuth and latency, which is how the naive blob sync in `spec.md` §10 gets shipped by
+accident. Also implement §4.3's rule here: a device must pull before its sweep may persist
+accumulated state.
+
+*In a browser:* fully functional and fully testable. Nothing about the merge is native.
+
+---
+
+### W4 — Dropbox transport (wrapper only)
+
+OAuth through the system browser (the AppAuth pattern — available *because* the wrapper owns its
+auth flow), file read/write, compare-and-swap on the file revision, and the short lock around each
+write. Wire the W3 engine to it.
+
+*In a browser:* the transport simply is not offered. Export/Import stays the web build's answer,
+exactly as `spec.md` §10 says it should.
+
+---
+
+### W5 — Electron desktop
+
+The same `dist/index.html` in a plain Electron shell (**not** Capacitor's Electron target — it is
+community-maintained and flaky; two thin shells, one payload). The desktop reads the synced file
+straight off disk from the Dropbox folder, which is three lines of `fs` and is the actual reason
+this chunk exists.
+
+*In a browser:* desktop Chrome remains a first-class way to run the app, unwrapped.
+
+---
+
+### W6 — Distribution
+
+A sideloadable APK and an unsigned desktop build, plus the plain-language note on how to install
+each. Personal sideloading only — Play Store and Gatekeeper are recurring overhead and `spec.md` §2
+already rules them out for now.
+
+---
+
+### Deferred, with a reason
+
+**S3, the async storage adapter, is NOT in the chunk list** — and `spec.md` §2 lists it as a wrapper
+prerequisite, so this is a deliberate departure worth defending.
+
+It was a prerequisite for *native durable storage*. Neither of the two goals needs it: the drag fix
+is shell config, and the sync engine reads and writes the same stores whatever backs them.
+`localStorage` works in an Android WebView. And once W4 lands, the failure it protects against — a
+"Clear app data" wiping the phone — stops being catastrophic, because the cloud file is the
+recovery. Doing async storage first would mean touching every call site in the app to reduce a risk
+that the following chunk largely removes.
+
+`src/storage.js` is already the single choke point, so this stays cheap to add later if the phone
+turns out to evict storage in practice. **Flagged rather than dropped.**
+
+---
+
+### Two conventions, handled
+
+- **QA checklist injection: skipped**, per the author's ruling this round. It is dev scaffolding and
+  the author is testing in English.
+- **The in-app chunk map** (`src/chunkMap.js`, CLAUDE.md's replace-don't-accumulate rule) is
+  refreshed **when a wrapper chunk actually ships**, not now — it describes what a chunk *changed*,
+  and so far nothing has.
+
+---
+
+## 8. Testing procedures
+
+Written after W0, per the author: the smoke shell will say more about what needs testing than
+guessing now would. W0's own three gates are listed above and are the immediate test.
+
+---
+
+## 9. The record of what was decided, and what landed alongside
 
 1. ~~Fix B2 (fonts) now?~~ **Answered: yes. Done 2026-07-28.**
 2. ~~The lanes back-button ruling (§5).~~ **Answered: back exits, no guard. Recorded in §5.**
@@ -316,9 +454,16 @@ Deliberately not in this document, because both depend on the author's response 
    already uses, and its API is the simpler of the two. Drive's `appDataFolder` stays the documented
    fallback (§4.1) rather than a second target to build.
 
-**All three answered. The next step is chunking and the test procedures.**
-
 **Browser-build fixes landed alongside this plan** (author: "leave the web version in as good a state
-as possible before moving on to the wrapper"): the CDN fonts (B2); the discarded intray capture; the
-calendar creation row inheriting a repeat into the next entry; and an i18n miss where the capture
-placeholder was hard-coded English while `tray.capturePlaceholder` sat unused in `i18n.js`.
+as possible before moving on to the wrapper"):
+
+- the CDN fonts (B2) — the app now genuinely works with zero network
+- the intray discarding a half-typed capture on close, Escape or swipe
+- the calendar creation row inheriting a repeat into the next entry
+- **fifteen user-facing strings that bypassed i18n**, found by auditing outward from one hard-coded
+  placeholder; then the confirm dialogs, the background names and the last stray strings, which
+  needed whole-sentence One/Many pairs because English pluralisation had been concatenated inline
+- the calendar's missing ⓘ, and the review capture panel explaining six of its seven buttons
+- **completing a project from the lane checkbox skipped the confirm and the archiving**, leaving
+  linked waiting actions live and a linked recurring event minting a Next Action for ever. Found
+  while testing the dialog copy, not by looking for it.
