@@ -5900,9 +5900,25 @@
     document.addEventListener("visibilitychange", function(){ if (document.hidden) forceCancelTouchDrag("page-hidden"); });
     document.addEventListener("touchstart", function(e){
       if (e.touches.length !== 1) return;
-      const titleEl = e.target.closest(".card-title, .group-title");
+      // ⚑ THE WHOLE CARD DRAGS, not just its title (user, first device round:
+      // "the pills should probably be considered part of the card. Right now, I
+      // can tap and hold the 'After X action' pill, and it won't drag the
+      // card"). The old rule was literally ".card-title" — so the cue pill,
+      // the stalled flag and the deadline bar were all inert to press-and-hold,
+      // and a hold there did nothing at all rather than doing the obvious thing.
+      //
+      // The line is drawn at CONTROLS THAT GO SOMEWHERE ELSE, not at "is it a
+      // button". The cue pill IS a <button>, but its data-id is this same card
+      // and it opens this same page — it is a second tap target for the
+      // title, so it should be a second drag target too. What must keep its own
+      // gesture is the handful of controls that act on something else: the
+      // checkbox completes, the promote arrow moves lanes, the project jump
+      // navigates to a DIFFERENT item, the group header's icons add and delete.
+      const DRAG_EXEMPT = ".check, .promote-arrow, .project-jump, .icon-btn, .group-add";
+      if (e.target.closest(DRAG_EXEMPT)) return;
+      const titleEl = e.target.closest(".card, .group-header");
       if (dragLogOn && e.target.closest && e.target.closest(".card, .group")){
-        dlog("touchstart", dragDesc(e.target) + (titleEl ? "  [IS a drag title]" : "  [NOT a drag title — no drag]"));
+        dlog("touchstart", dragDesc(e.target) + (titleEl ? "  [drag surface]" : "  [exempt control — no drag]"));
       }
       if (!titleEl) return;
       const el = titleEl.closest("[data-drag-id]");

@@ -550,7 +550,18 @@ body.has-frame #fab-create{
   opacity:0.35; touch-action:none;
   -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
 }
-.card, .group{ -webkit-touch-callout:none; }
+/* ⚑ The whole card is a drag surface now (user), so the selection-blocking that
+   used to sit only on .card-title has to cover all of it — otherwise a hold on
+   a pill or the deadline bar starts our drag while the browser simultaneously
+   starts selecting, which is the collision the wrapper exists to end.
+   Deliberately card-scoped, NOT app-wide: CLAUDE.md records that broadening
+   user-select:none across the app made things worse. Drafting pages and the
+   note editor need real selection and are untouched. */
+.card, .group{
+  -webkit-touch-callout:none;
+  -webkit-user-select:none; user-select:none;
+  touch-action:pan-y;              /* the lane must still scroll under a finger */
+}
 
 /* ▲ CHUNK 2 — drag-time insertion indicator (§3 known issue 2).
    With card backgrounds gone, drop targets aren't legible on their own. JS adds

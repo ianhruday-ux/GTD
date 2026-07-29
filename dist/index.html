@@ -588,7 +588,18 @@ body.has-frame #fab-create{
   opacity:0.35; touch-action:none;
   -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
 }
-.card, .group{ -webkit-touch-callout:none; }
+/* ⚑ The whole card is a drag surface now (user), so the selection-blocking that
+   used to sit only on .card-title has to cover all of it — otherwise a hold on
+   a pill or the deadline bar starts our drag while the browser simultaneously
+   starts selecting, which is the collision the wrapper exists to end.
+   Deliberately card-scoped, NOT app-wide: CLAUDE.md records that broadening
+   user-select:none across the app made things worse. Drafting pages and the
+   note editor need real selection and are untouched. */
+.card, .group{
+  -webkit-touch-callout:none;
+  -webkit-user-select:none; user-select:none;
+  touch-action:pan-y;              /* the lane must still scroll under a finger */
+}
 
 /* ▲ CHUNK 2 — drag-time insertion indicator (§3 known issue 2).
    With card backgrounds gone, drop targets aren't legible on their own. JS adds
@@ -2489,7 +2500,7 @@ body.screen-open #tray-handle{ display:none; }
 (function(){
 "use strict";
 
-const BUILD_STAMP = "28 Jul 21:24";  // replaced by build.py
+const BUILD_STAMP = "28 Jul 23:39";  // replaced by build.py
 
 // =========================================================
 // STORAGE ADAPTER (spec.md §3, known issue 4)
@@ -11981,9 +11992,25 @@ function injectChunkMap(){
     document.addEventListener("visibilitychange", function(){ if (document.hidden) forceCancelTouchDrag("page-hidden"); });
     document.addEventListener("touchstart", function(e){
       if (e.touches.length !== 1) return;
-      const titleEl = e.target.closest(".card-title, .group-title");
+      // ⚑ THE WHOLE CARD DRAGS, not just its title (user, first device round:
+      // "the pills should probably be considered part of the card. Right now, I
+      // can tap and hold the 'After X action' pill, and it won't drag the
+      // card"). The old rule was literally ".card-title" — so the cue pill,
+      // the stalled flag and the deadline bar were all inert to press-and-hold,
+      // and a hold there did nothing at all rather than doing the obvious thing.
+      //
+      // The line is drawn at CONTROLS THAT GO SOMEWHERE ELSE, not at "is it a
+      // button". The cue pill IS a <button>, but its data-id is this same card
+      // and it opens this same page — it is a second tap target for the
+      // title, so it should be a second drag target too. What must keep its own
+      // gesture is the handful of controls that act on something else: the
+      // checkbox completes, the promote arrow moves lanes, the project jump
+      // navigates to a DIFFERENT item, the group header's icons add and delete.
+      const DRAG_EXEMPT = ".check, .promote-arrow, .project-jump, .icon-btn, .group-add";
+      if (e.target.closest(DRAG_EXEMPT)) return;
+      const titleEl = e.target.closest(".card, .group-header");
       if (dragLogOn && e.target.closest && e.target.closest(".card, .group")){
-        dlog("touchstart", dragDesc(e.target) + (titleEl ? "  [IS a drag title]" : "  [NOT a drag title — no drag]"));
+        dlog("touchstart", dragDesc(e.target) + (titleEl ? "  [drag surface]" : "  [exempt control — no drag]"));
       }
       if (!titleEl) return;
       const el = titleEl.closest("[data-drag-id]");
