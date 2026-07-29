@@ -306,13 +306,25 @@ before building the chunk it touches.
    error. `src/storage.js` must catch and surface this. Note also that `habitLapNumber` counts
    every "miss" ever written, so any future pruning of run history would silently corrupt lap
    numbers.
-5. **DuckDuckGo/Android long-press text selection** (deferred to the wrapper). A sustained
-   press-and-hold can trigger the browser's native selection UI, racing the app's long-press
-   drag detection; when the browser wins, the element can stick in a dimmed mid-drag state. CSS
-   and JS mitigations were tried and none reliably suppress it — and broadening `user-select:none`
-   app-wide made it *worse*. Title-scoped selection blocking + the idle watchdog stand as the
-   accepted mitigation. Testing happens on Chrome for Android. Fixed properly by the Android
-   wrapper.
+5. **~~DuckDuckGo/Android long-press text selection~~ — FIXED by the wrapper, 2026-07-28 (chunk
+   W0).** Recorded in full because the fix was not what this entry predicted. The diagnosis was
+   right: a sustained press-and-hold triggers the platform's native long-press, racing the app's
+   own, and when the platform wins the element sticks dimmed mid-drag. §2 guessed an owned WebView
+   would settle it "in one line." It took two, and the first one alone made the bug *better but not
+   gone* — which is the interesting part.
+   · `onActionModeStarted` / `onWindowStartingActionMode` blocks the selection **toolbar**.
+   · It does **not** block the long-press that generates it. The drag log, pulled off a real
+     device, showed the true sequence four identical times: our hold fires at 400ms, Android's
+     fires ~200ms later, `contextmenu` is prevented — and `touchcancel` arrives anyway, because
+     preventing that event does not stop the WebView cancelling the touch stream. By the time the
+     page hears anything it has already lost.
+   · The cure is `setLongClickable(false)` + an `onLongClick` returning true + haptics off, so the
+     WebView has no long-press to run. Haptics matter: the system buzz still fires at ~600ms
+     otherwise, a phantom second buzz that reads as failure even on drags that now succeed.
+   Verified: 26 holds, 26 committed moves, zero cancels. **The browser build is unchanged and still
+   carries the old mitigation** (title-scoped blocking + the idle watchdog), which remains the best
+   available there — this is a wrapper-only cure, and `wrapper/android/.../MainActivity.java` holds
+   the whole of it.
 6. **Boundary sweep is boot-only** (wrapper). Fine for browser tabs, wrong for an installed app.
    Must also fire on resume.
 

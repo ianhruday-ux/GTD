@@ -313,6 +313,30 @@ merge logic correct **before any network is involved at all** (W4 before W5).
 
 ---
 
+### W0 — The smoke shell (Android) ✅ DONE 2026-07-28
+
+**All three gates passed.** The app loads, `localStorage` survives a force-kill, and the drag bug is
+gone — verified by a device trace of 26 holds, 26 committed moves, zero `contextmenu` and zero
+`touchcancel`. The author could not reproduce it.
+
+**The gate nearly failed, and how it was saved is the reusable lesson.** The first build made the bug
+"significantly better" but not gone, and guesswork would have gone the wrong way: this document's
+own hypothesis — that presses were landing on unclaimed card padding — was **wrong**, and the drag
+log disproved it in one reproduction by logging `[IS a drag title]` on every failure. Two long-press
+timers were racing and the WebView's fired second. See `spec.md` §3 issue 5 for the full sequence.
+**The dev drag log earned its existence here**, and reading it over the WebView DevTools protocol
+(`adb forward` + `Runtime.evaluate`) meant no copy-paste and no guessing.
+
+Two things landed alongside, both from using it on a real device:
+
+- **The whole card is a drag surface now**, not just its title — the cue pill, the deadline bar and
+  the stalled flag were all inert to press-and-hold. App-code change, ships to the web build too.
+- **Contexts stay non-draggable (author, reaffirmed).** They live in the registry rather than the
+  lane array, so they could only ever reorder among themselves and would stop dead at the first
+  list. A drag that refuses half the time is worse than one that never starts.
+
+*Original plan for this chunk follows.*
+
 ### W0 — The smoke shell (Android)
 
 Wrap the current `dist/index.html` in a bare Capacitor shell. **No app-code changes whatsoever.**
