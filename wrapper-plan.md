@@ -312,7 +312,11 @@ Deliberately not in this document, because both depend on the author's response 
 
 1. ~~Fix B2 (fonts) now?~~ **Answered: yes. Done 2026-07-28.**
 2. ~~The lanes back-button ruling (§5).~~ **Answered: back exits, no guard. Recorded in §5.**
-3. Dropbox first, or Drive `appDataFolder` first? — **the only one still open.**
+3. ~~Dropbox first, or Drive `appDataFolder` first?~~ **Answered: Dropbox** — it is what the author
+   already uses, and its API is the simpler of the two. Drive's `appDataFolder` stays the documented
+   fallback (§4.1) rather than a second target to build.
+
+**All three answered. The next step is chunking and the test procedures.**
 
 **Browser-build fixes landed alongside this plan** (author: "leave the web version in as good a state
 as possible before moving on to the wrapper"): the CDN fonts (B2); the discarded intray capture; the
