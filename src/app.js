@@ -59,6 +59,17 @@
       const el = qs('.tab[data-kind="' + k + '"] .tab-name');
       if (el) el.textContent = t("tab." + k);
     });
+    // ⚑ The intray handle is static markup too, and its title/aria-label were
+    // hard-coded English while tray.handle / tray.handleOpen sat unused in
+    // i18n.js — so a zh-Hans user got an English tooltip on the one control
+    // that opens capture. Stamped here because this function is exactly what
+    // setLocale re-runs on a language switch; the drawer's own close handle
+    // was already translated, which is what made the omission easy to miss.
+    const handle = qs("#tray-handle");
+    if (handle){
+      handle.setAttribute("title", t("tray.handleOpen"));
+      handle.setAttribute("aria-label", t("tray.handle"));
+    }
   }
   // Task lanes (each backed by state.tasks[k]). Notes are a lane too but NOT a
   // task kind — they have their own store — so KINDS stays task-only and
@@ -1635,7 +1646,7 @@
   function deadlinePushChipHtml(deadline){
     const n = (deadline && deadline.pushCount) || 0;
     if (!n) return "";
-    return '<span class="deadline-push-chip" title="Deadline pushed ' + n + (n === 1 ? " time" : " times") + '">&#8635;' + n + '</span>';
+    return '<span class="deadline-push-chip" title="' + escapeHtml(n === 1 ? t("deadline.pushedOne") : t("deadline.pushedMany").replace("{n}", n)) + '">&#8635;' + n + '</span>';
   }
   function deadlineBarHtml(task){
     const s = deadlineBarState(task);
@@ -1663,7 +1674,7 @@
         const pKind = findProjectKind(task.linkedProjectId);
         const pTitle = findProjectTitle(task.linkedProjectId);
         if (pKind){
-          linkBlock = '<button class="project-jump" data-action="open-edit" data-kind="' + pKind + '" data-id="' + task.linkedProjectId + '" title="Open project: ' + escapeHtml(pTitle || "") + '">&#128279;</button>';
+          linkBlock = '<button class="project-jump" data-action="open-edit" data-kind="' + pKind + '" data-id="' + task.linkedProjectId + '" title="' + escapeHtml(t("project.openProject").replace("{title}", pTitle || "")) + '">&#128279;</button>';
         }
       } else {
         const title = findProjectTitle(task.linkedProjectId);
@@ -1772,7 +1783,7 @@
         '" data-action="toggle-habit" data-id="' + task.id +
         '" title="' + (pausedNow ? "Paused \u2014 unpause to complete" : "Mark done for today") + '">' + (done ? "&#10003;" : "") + '</button>';
     } else {
-      checkboxHtml = '<button class="check" data-action="complete" data-id="' + task.id + '" title="Mark complete"></button>';
+      checkboxHtml = '<button class="check" data-action="complete" data-id="' + task.id + '" title="' + escapeHtml(t("card.markComplete")) + '"></button>';
     }
     // \u00a74.7b: the list-view "\u00d7" delete is gone \u2014 items are deletable from
     // their own page only (screen-delete). Next/Current cards that carry a
@@ -1786,7 +1797,7 @@
     const titleOpen = isPseudo
       ? 'data-action="open-event" data-id="' + task.eventId + '" data-date="' + (task.occCanon || task.occDate || "") + '"'
       : 'data-action="open-edit" data-kind="' + kind + '" data-id="' + task.id + '"';
-    const titleHtml = '<div class="card-title' + (done ? " done" : "") + '" ' + titleOpen + ' title="Tap to open \u2014 press and hold to reorder">' + escapeHtml(task.title) + '</div>';
+    const titleHtml = '<div class="card-title' + (done ? " done" : "") + '" ' + titleOpen + ' title="' + escapeHtml(t("card.tapToOpenReorder")) + '">' + escapeHtml(task.title) + '</div>';
     const deadlineBarBlock = isPseudo ? pseudoBarHtml(task) : (kind === "next" || kind === "current") ? deadlineBarHtml(task) : "";
     const titleBlock = deadlineBarBlock ? ('<div style="flex:1">' + titleHtml + deadlineBarBlock + '</div>') : titleHtml;
     return (
@@ -1907,7 +1918,7 @@
           '<span class="count">' + members.length + '</span>' +
           '<button class="group-add" data-action="add-to-context" data-kind="' + kind + '" data-id="' + ctx.id + '" title="' + escapeHtml(t("group.addToContext")) + '">+</button>' +
           '<span class="group-actions">' +
-            '<button class="icon-btn" data-action="delete-context" data-id="' + ctx.id + '" title="Delete context">&times;</button>' +
+            '<button class="icon-btn" data-action="delete-context" data-id="' + ctx.id + '" title="' + escapeHtml(t("group.deleteContext")) + '">&times;</button>' +
           '</span>' +
         '</div>' +
         (collapsed ? "" :
@@ -2043,7 +2054,7 @@
           (LANE_INFO_EXTRA[k] ? '<span class="lane-info-more">' + escapeHtml(LANE_INFO_EXTRA[k]) + '</span>' : "") +
         '</div>' +
         (k === "habit"
-          ? '<div class="lane-tools-row"><button class="btn btn-ghost btn-small tidy-btn" data-action="tidy-habits" type="button" title="Suggest an order from your hooks (you can still rearrange freely afterward)">&#8645; Tidy order</button></div>'
+          ? '<div class="lane-tools-row"><button class="btn btn-ghost btn-small tidy-btn" data-action="tidy-habits" type="button" title="' + escapeHtml(t("habit.tidyOrderTooltip")) + '">&#8645; ' + escapeHtml(t("habit.tidyOrder")) + '</button></div>'
           : "") +
         laneCreateRowHtml(k) +
         '<div class="inline-slot" data-kind="' + k + '"></div>' +
@@ -3967,7 +3978,7 @@
     const showDelete = !!s.taskId;
     // Event pages read "Appointment" once a time is set (§4.14 — the time is
     // the only thing that distinguishes the two; they are not separate types).
-    const badge = s.eventView ? (s.draft && s.draft.time ? "Appointment" : "Event") : KIND_BADGE_LABEL[s.kind];
+    const badge = s.eventView ? (s.draft && s.draft.time ? t("badge.appointment") : t("badge.event")) : KIND_BADGE_LABEL[s.kind];
     // ▲ DESKTOP (ruling 4): ← and 🗑 move OUT of the header and into the card's
     // footer as "Done" and "Delete". They are not rendered in both places —
     // exactly one element carries data-action="screen-save" in either mode, so
@@ -6247,7 +6258,7 @@
     if (!revealed) return '<div class="tray-card tray-card-redacted"><span class="tray-card-redaction" aria-hidden="true"></span></div>';
     return '<div class="tray-card">' +
       '<span class="tray-card-text">' + escapeHtml(item.text) + '</span>' +
-      '<button type="button" class="icon-btn" data-action="tray-delete" data-id="' + item.id + '" title="Discard">&times;</button>' +
+      '<button type="button" class="icon-btn" data-action="tray-delete" data-id="' + item.id + '" title="' + escapeHtml(t("tray.discard")) + '">&times;</button>' +
     '</div>';
   }
   // The drawer's Review button (chunk 6b, §4.8b) — the entry point to the
@@ -6339,12 +6350,15 @@
       const cards = items.map(function(it){ return trayCardHtml(it, revealed); }).join("") +
         loops.map(function(l){ return trayLoopCardHtml(l, revealed); }).join("");
       const toggle = '<div class="tray-list-head">' +
-        '<button type="button" class="tray-reveal-btn" data-action="tray-reveal" title="' + (revealed ? "Hide" : "Reveal") + '">' +
-          eyeIconHtml(revealed) + '<span>' + (revealed ? "Hide" : "Reveal") + '</span>' +
+        '<button type="button" class="tray-reveal-btn" data-action="tray-reveal" title="' + escapeHtml(revealed ? t("tray.hide") : t("tray.reveal")) + '">' +
+          // ⚑ The VISIBLE label, not just the tooltip beside it. Missed on the
+          // first pass because the audit swept attributes; inline text between
+          // tags is the same bug wearing different clothes.
+          eyeIconHtml(revealed) + '<span>' + escapeHtml(revealed ? t("tray.hide") : t("tray.reveal")) + '</span>' +
         '</button></div>';
       list = toggle + '<div class="tray-list">' + cards + '</div>';
     } else {
-      list = '<div class="tray-empty">Empty for now — nothing slipping through the cracks.</div>';
+      list = '<div class="tray-empty">' + escapeHtml(t("tray.empty")) + '</div>';
     }
     return trayReviewBtnHtml() + list;
   }
@@ -7353,7 +7367,7 @@
       // "am I looking at the fix or at yesterday's copy?" is a real question
       // that has already cost a round trip. Now it is answerable on the device,
       // without a laptop.
-      '<div class="settings-build" title="Which build you are running">Build ' + escapeHtml(BUILD_STAMP) + '</div>'
+      '<div class="settings-build" title="' + escapeHtml(t("settings.buildTooltip")) + '">' + escapeHtml(t("settings.build")) + ' ' + escapeHtml(BUILD_STAMP) + '</div>'
     );
   }
   function devOnCount(){
@@ -7700,7 +7714,7 @@
     }
     const opts = noteFilterOptions();
     const btnLabel = activeName
-      ? '<span class="notes-filter-active">' + escapeHtml(activeName) + '</span><button type="button" class="chip-x" data-action="clear-notes-filter" title="Clear filter">&times;</button>'
+      ? '<span class="notes-filter-active">' + escapeHtml(activeName) + '</span><button type="button" class="chip-x" data-action="clear-notes-filter" title="' + escapeHtml(t("note.clearFilter")) + '">&times;</button>'
       : 'Filter';
     let menu = "";
     if (state.notesFilterMenuOpen){
@@ -7710,7 +7724,7 @@
       let items = ['<button type="button" class="notes-filter-item' + (state.notesFilter ? "" : " current") + '" data-action="notes-filter-pick" data-id="">' + escapeHtml(t("note.allNotes")) + '</button>'];
       if (opts.projects.length) items = items.concat('<div class="notes-filter-section">' + escapeHtml(t("note.filterProjects")) + '</div>', opts.projects.map(pickItem));
       if (opts.tags.length) items = items.concat('<div class="notes-filter-section">' + escapeHtml(t("note.filterTags")) + '</div>', opts.tags.map(pickItem));
-      if (!opts.projects.length && !opts.tags.length) items.push('<div class="notes-filter-empty">Nothing to filter by yet — link a note to a project or add a tag.</div>');
+      if (!opts.projects.length && !opts.tags.length) items.push('<div class="notes-filter-empty">' + escapeHtml(t("note.filterEmpty")) + '</div>');
       menu = '<div class="notes-filter-menu">' + items.join("") + '</div>';
     }
     return '<div class="notes-filter-bar">' +

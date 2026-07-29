@@ -465,6 +465,11 @@ const STRINGS = {
   "note.filterProjects":     { en: "Projects",                      "zh-Hans": "项目" },
   "note.filterTags":         { en: "Tags",                          "zh-Hans": "标签" },
   "note.clearFilter":        { en: "Clear filter",                  "zh-Hans": "清除筛选" },
+  // ⚑ NEW STRING, not a re-wiring: the notes filter's empty state was the one
+  // hard-coded line in the audit with no key waiting for it, so this zh-Hans is
+  // newly written rather than the author's own — revise freely.
+  "note.filterEmpty":        { en: "Nothing to filter by yet — link a note to a project or add a tag.",
+                               "zh-Hans": "还没有可筛选的内容——请把笔记关联到项目，或添加标签。" },
   "deadline.pushedOne":      { en: "Deadline pushed 1 time",         "zh-Hans": "期限已推迟 1 次" },
   "deadline.pushedMany":     { en: "Deadline pushed {n} times",      "zh-Hans": "期限已推迟 {n} 次" },
   "project.openProject":     { en: "Open project: {title}",          "zh-Hans": "打开项目：{title}" },
