@@ -1548,8 +1548,21 @@ function calAdd(){
   // whole errand, so go back where it started from.
   if (cameFromReview || forProject){ closeScreen(); return; }
   // Otherwise the calendar is where the user chose to be: reset the row for the
-  // next entry and stay put, keeping the toggles where they are.
+  // next entry and stay put.
+  //
+  // ⚑ CHANGED (user round): this used to clear only name/description/time and
+  // deliberately keep the toggles, on the theory that someone entering several
+  // weekly events would want "weekly" to stick. The author's ruling is the
+  // opposite — every FIELD clears, because a repeat or a hidden-until-its-day
+  // flag silently inherited by the next entry is a mistake you don't notice
+  // until it has already been made, and re-picking a repeat is cheap.
+  //
+  // ⚑ What deliberately does NOT reset, because neither is a field: the SELECTED
+  // DAY (you are usually filling in one day at a time) and the Event/Deadline
+  // toggle (that is which tool you are holding, not what you typed into it).
   s.calName = ""; s.calDesc = ""; s.calTime = ""; s.calInvalid = false;
+  s.calRecur = "none"; s.calInterval = 1; s.calTickler = false;
+  s.calHabitBubbleDismissed = false; // the bubble is per-draft; a cleared row is a new draft
   renderScreen();
 }
 // The single place a NEW event becomes real. Both creation routes go through it

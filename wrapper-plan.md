@@ -211,7 +211,7 @@ state that can be corrupted by two devices, and the only state that must sync.
 | `gtd_tray` | **Accumulated** | Capture. Append-only by nature, so it merges trivially |
 | Pseudo-actions minted on an event's day | **Derived** | Recomputable from `gtd_events` + today. Should not travel |
 | A recurring event's roll-forward | **Derived** | Pure function of (event, today) |
-| `gtd_collapsed`, `gtd_surface`, `gtd_locale` | **Device-local** ⚑ | Which lists are folded and which wood you like are properties of the device you are sitting at, not of the system. Recommend they never sync |
+| `gtd_collapsed`, `gtd_surface`, `gtd_locale`, `gtd_tray_draft` | **Device-local** ⚑ | Which lists are folded, which wood you like, and a half-typed line still under the cursor are properties of the device you are sitting at, not of the system. Recommend they never sync. `gtd_tray_draft` especially: syncing a live keystroke buffer between devices is a race with no upside |
 | `gtddev_*`, `gtd_qa_checklist_*`, `gtd_chunk_map_*` | **Never sync** | Dev scaffolding |
 
 ### 4.3 The sweep rule
@@ -263,11 +263,17 @@ Android back button is a Capacitor `App.addListener('backButton')` calling the e
 Child drafting pages returning to the project page falls out of `state.screenStack` (§3.1), which
 landed.
 
-**One open question the author flagged and did not settle:** in the lanes, back exits the app. That
-is conventional on Android, but it is one tap from discarding an uncommitted intray capture. Options:
-accept it; double-tap-to-exit; or treat an open capture as a page that back cancels first. ⚑ This
-document recommends the third — it is the only one consistent with "never invite an edit you intend
-to refuse" — but it is the author's call and is **not** decided.
+**Settled 2026-07-28: in the lanes, back exits the app, with no extra guard.** Standard Android
+behaviour, and the guard turned out to be unnecessary for a reason worth recording — the concern was
+that back would discard an uncommitted intray capture, but an open drawer never reaches "exit"
+anyway; the chain closes it first. *(This document originally recommended treating an open capture as
+a page that back cancels first. That recommendation was wrong: it solved a problem the resolution
+order already handles.)*
+
+The **real** risk sitting next door was that `closeTray()` discarded a half-typed capture outright —
+on Escape and swipe-to-dismiss, today, with no back button involved. **Fixed 2026-07-28** in the
+browser build: the capture persists to `gtd_tray_draft` as you type and is restored when the drawer
+reopens. So by the time the back button exists, there is nothing left for it to lose.
 
 ---
 
@@ -305,5 +311,10 @@ Deliberately not in this document, because both depend on the author's response 
 **Immediate open questions for the author:**
 
 1. ~~Fix B2 (fonts) now?~~ **Answered: yes. Done 2026-07-28.**
-2. The lanes back-button ruling (§5).
-3. Dropbox first, or Drive `appDataFolder` first?
+2. ~~The lanes back-button ruling (§5).~~ **Answered: back exits, no guard. Recorded in §5.**
+3. Dropbox first, or Drive `appDataFolder` first? — **the only one still open.**
+
+**Browser-build fixes landed alongside this plan** (author: "leave the web version in as good a state
+as possible before moving on to the wrapper"): the CDN fonts (B2); the discarded intray capture; the
+calendar creation row inheriting a repeat into the next entry; and an i18n miss where the capture
+placeholder was hard-coded English while `tray.capturePlaceholder` sat unused in `i18n.js`.

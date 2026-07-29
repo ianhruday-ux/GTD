@@ -6208,6 +6208,29 @@
   function trayInfoText(){ return t("info.tray"); }
   function loadTray(){ return Storage.getJSON("gtd_tray", []); }
   function saveTray(){ Storage.setJSON("gtd_tray", state.tray); }
+  // ⚑ THE UNCOMMITTED CAPTURE (user round). closeTray() wipes #tray-root, and
+  // trayAdd() only persists on an explicit Enter/+ — so a half-typed thought was
+  // silently destroyed by closing the drawer, by Escape, and by the
+  // swipe-to-dismiss. In an app whose first principle is frictionless capture
+  // that is the worst possible thing to drop on the floor, and it cost nothing
+  // to keep. Persisted rather than held in memory on purpose: the case that
+  // actually matters is a phone killing the app while the drawer is open.
+  //
+  // Device-local by nature — a half-typed line belongs to the keyboard you are
+  // sitting at, not to the system (wrapper-plan.md §4.2: never sync it).
+  function loadTrayDraft(){ return Storage.get("gtd_tray_draft") || ""; }
+  function saveTrayDraft(v){
+    if (v) Storage.set("gtd_tray_draft", v); else Storage.remove("gtd_tray_draft");
+  }
+  // Caret to the END, not wherever focus() lands it — you are resuming a
+  // sentence, not editing its first character.
+  function focusTrayInput(){
+    const input = qs("#tray-input");
+    if (!input) return;
+    input.focus();
+    const n = input.value.length;
+    try { input.setSelectionRange(n, n); } catch (e){ /* not all inputs allow it */ }
+  }
   // The eye toggle glyph (user follow-up). Crossed eye = captures are hidden
   // (tap to reveal); open eye = revealed (tap to hide). Inline SVG so the
   // "eye with a cross through it" renders identically everywhere — no emoji
@@ -6346,7 +6369,11 @@
         '</div>' +
         '<div class="tray-info-panel" hidden>' + escapeHtml(trayInfoText()) + '</div>' +
         '<div class="tray-capture">' +
-          '<input type="text" id="tray-input" placeholder="Capture a thought…" autocomplete="off">' +
+          // ⚑ The placeholder was hard-coded English while i18n.js has carried
+          // tray.capturePlaceholder unused all along — so the Chinese locale
+          // showed an English prompt on the app's most-used control. Fixed here
+          // because it is the same line the draft restore had to touch anyway.
+          '<input type="text" id="tray-input" placeholder="' + escapeHtml(t("tray.capturePlaceholder")) + '" autocomplete="off" value="' + escapeHtml(loadTrayDraft()) + '">' +
           '<button type="button" data-action="tray-add" title="' + escapeHtml(t("chrome.add")) + '">+</button>' +
         '</div>' +
         list +
@@ -6380,7 +6407,7 @@
     state.trayReveal = false; // captures start sealed every time the drawer opens (user follow-up)
     syncTrayHandle();
     renderTray();
-    const input = qs("#tray-input"); if (input) input.focus();
+    focusTrayInput();
   }
   function closeTray(){
     state.trayOpen = false;
@@ -6451,7 +6478,7 @@
         if (dx > threshold){                                               // commit open
           state.trayOpen = true; state.trayReveal = false; syncTrayHandle();
           dd.drawer.classList.add("open"); if (dd.backdrop) dd.backdrop.classList.add("open"); clearInline();
-          const inp = qs("#tray-input"); if (inp) setTimeout(function(){ inp.focus(); }, 60);
+          setTimeout(focusTrayInput, 60);
         } else { dd.drawer.classList.remove("open"); teardown(); }          // cancel open
       }
     }
@@ -6465,11 +6492,19 @@
     dd.drawer.style.transform = ""; if (dd.backdrop) dd.backdrop.style.opacity = "";
     if (dd.mode === "open"){ setTimeout(function(){ if (!state.trayOpen){ const r = qs("#tray-root"); if (r) r.innerHTML = ""; } }, 300); }
   }
+  // Keeps the half-typed line alive across a close, an Escape, a swipe-dismiss
+  // and an app kill. Written straight through rather than debounced: it is one
+  // short string, Storage.set is synchronous, and a debounce would lose exactly
+  // the last few characters in the app-kill case this exists for.
+  document.addEventListener("input", function(e){
+    if (e.target && e.target.id === "tray-input") saveTrayDraft(e.target.value);
+  });
   function trayAdd(text){
     text = (text || "").trim();
     if (!text) return;
     state.tray.unshift({ id: genId(), text: text, createdAt: nowMs() });
     saveTray();
+    saveTrayDraft("");                                      // committed — the draft has done its job
     const inp = qs("#tray-input"); if (inp) inp.value = ""; // clear the box in place — no full re-render/re-slide
     refreshTrayList();
     if (inp) inp.focus(); // stays focused for the next thought
