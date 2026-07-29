@@ -105,6 +105,15 @@ function fbm(noise, u, v, fx, fy, octaves){
 // table and falls back to the default, so anyone sitting on 'walnut' quietly
 // lands on Dark wood instead. That is the behaviour a migration would have had
 // to hand-write anyway.
+// \u2691 The picker used to render SURFACES[id].label raw, so the five background
+// names were the last English strings in the settings menu. The table keeps its
+// literal as a fallback; surfaceLabel() prefers the translation and is resolved
+// at call time, so a language switch is picked up like everything else.
+function surfaceLabel(id){
+  const key = "surface." + id;
+  const s = t(key);
+  return (s && s !== key) ? s : ((SURFACES[id] && SURFACES[id].label) || id);
+}
 const SURFACES = {
   slate:  { label: "Slate", desk: "#15161A", dark: "#0E0F13", mid: "#1A1C21", light: "#292C33",
             rings: 0, warp: 0.0,  ringDepth: 0.0,  fibre: 0.55, seed: 5 },  // rings:0 → stone, not wood

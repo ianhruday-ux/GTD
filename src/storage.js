@@ -50,10 +50,14 @@ const Storage = {
   // whatever it had in memory.
   _onWriteError: function(e){
     if (e && e.name === "QuotaExceededError"){
+      // ⚑ t() is safe here even though storage.js is concatenated BEFORE
+      // i18n.js: this only ever runs on a failed write, long after parse, and
+      // t() is a hoisted function declaration in the same IIFE (build.py's
+      // module-order note). Only i18n's `const STRINGS` is order-sensitive,
+      // and it is evaluated well before any user can trigger a quota error.
       openConfirmDialog(
-        "Storage is full — the last change couldn't be saved. Free up space " +
-        "(clear old completed items, or Reset local data) and try again.",
-        [{ label: "OK", style: "primary", action: function(){} }]
+        t("confirm.storageFull"),
+        [{ label: t("confirm.ok"), style: "primary", action: function(){} }]
       );
     }
   }

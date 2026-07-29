@@ -70,19 +70,44 @@ PATTERNS = [
     # different clothes. Entities (&times;) and single words that are usually
     # markup are excluded.
     ("inline text", re.compile(r'>([A-Z][a-z]+(?:\s+[A-Za-z’\',.—-]+){2,})<')),
-    # ? "Hide" : "Reveal"   — the two-state label, which is how that one hid
-    ("label ternary", re.compile(r'\?\s*"([A-Z][a-z]+)"\s*:\s*"[A-Z][a-z]+"')),
+    # ? "Hide" : "Reveal"   — the two-state label, which is how that one hid.
+    # ⚠ WIDENED after this pattern shipped as single-word-only and promptly let
+    # `(paused ? "Paused — unpause to complete" : "Mark done for today")` walk
+    # past it on the very next sweep. Both arms may now be whole phrases.
+    ("label ternary", re.compile(
+        r'\?\s*"([A-Z][a-z][^"]*)"\s*:\s*"[A-Z][a-z][^"]*"')),
+    # openConfirmDialog("Some sentence.", …) and { label: "Delete all" }
+    ("confirm body", re.compile(r'openConfirmDialog\(\s*"([A-Z][^"]{8,})"')),
+    # A DIALOG option, not any object with a `label:` field — the SURFACES table
+    # in surface.js uses `label:` for data, and its English literals are the
+    # deliberate fallback behind surfaceLabel(). Requiring style:/action: on the
+    # same line separates a button from a record.
+    ("dialog button", re.compile(r'\blabel:\s*"([A-Z][a-z][^"]*)"(?=[^\n]*\b(?:style|action):)')),
 ]
+
+# Debug scaffolding the author has ruled stays English (the dev toolbar and its
+# dialogs). Matched on content because these lines carry no gtddev_ marker of
+# their own — the keys live in the DEV_GROUPS table further up.
+DEV_TEXT = re.compile(r'snapshot|Snapshot|Drag log|Time jump|QA checklist|chunk map', re.I)
 offenders = []
 for name in ("app.js", "events.js", "pickers.js", "chunkMap.js", "surface.js"):
     path = os.path.join(SRC, name)
     if not os.path.exists(path):
         continue
+    dev_window = 0
     for i, line in enumerate(open(path, encoding="utf-8").read().splitlines(), 1):
         stripped = line.lstrip()
         if stripped.startswith("//") or stripped.startswith("*"):
             continue
-        if "gtddev_" in line or "dev-" in line:      # debug scaffolding stays English
+        # Debug scaffolding stays English. The marker often sits on the dialog's
+        # BODY line while the offending literal is on its button line a few rows
+        # down ("Restore" under "Restore the snapshot from …"), so a hit opens a
+        # short window rather than excusing only its own line.
+        if "gtddev_" in line or "dev-" in line or DEV_TEXT.search(line):
+            dev_window = 6
+            continue
+        if dev_window > 0:
+            dev_window -= 1
             continue
         for label, pat in PATTERNS:
             for text in pat.findall(line):

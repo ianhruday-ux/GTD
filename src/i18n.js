@@ -725,6 +725,90 @@ const STRINGS = {
   "event.repeatsPrompt":        { en: "This event repeats. What would you like to do?", "zh-Hans": "这个事件是重复的。你想怎么处理？" },
   "event.skipThisOne":          { en: "Skip this one",               "zh-Hans": "跳过这一次" },
   "event.deleteSeries":         { en: "Delete series",                "zh-Hans": "删除整个系列" },
+  // ---- confirm dialogs (i18n round 2). Whole-sentence One/Many pairs rather
+  // than concatenated fragments: English pluralises with -s and swaps
+  // them/it, Chinese does neither, so only a complete sentence can carry both.
+  "confirm.linkedWaitingOne":  { en: "1 linked waiting item",           "zh-Hans": "1 个关联的等待事项" },
+  "confirm.linkedWaitingMany": { en: "{n} linked waiting items",        "zh-Hans": "{n} 个关联的等待事项" },
+  "confirm.linkedEventOne":    { en: "1 linked calendar entry",         "zh-Hans": "1 个关联的日历条目" },
+  "confirm.linkedEventMany":   { en: "{n} linked calendar entries",     "zh-Hans": "{n} 个关联的日历条目" },
+  "confirm.joinAnd":           { en: " and ",                           "zh-Hans": "和" },
+  "confirm.joinOr":            { en: " or ",                            "zh-Hans": "或" },
+  "confirm.completeProjectOne": {
+    en: "This project has {what}. Completing it will put it aside — it will stop appearing, and it can be brought back if this was a mistake.",
+    "zh-Hans": "这个项目有{what}。完成它会把它收起来——它将不再出现；如果这是个误操作，也可以再把它恢复。"
+  },
+  "confirm.completeProjectMany": {
+    en: "This project has {what}. Completing it will put them aside — they will stop appearing, and they can be brought back if this was a mistake.",
+    "zh-Hans": "这个项目有{what}。完成它会把它们收起来——它们将不再出现；如果这是个误操作，也可以再把它们恢复。"
+  },
+  "confirm.completeProject":   { en: "Complete project",                "zh-Hans": "完成项目" },
+  "confirm.nounActions":       { en: "actions",                         "zh-Hans": "行动" },
+  "confirm.nounCalendarEntries": { en: "calendar entries",              "zh-Hans": "日历条目" },
+  "confirm.somedayCantHold": {
+    en: "Someday projects can't hold linked {what}. Unlink them, or delete them?",
+    "zh-Hans": "将来项目不能保留关联的{what}。要解除关联，还是删除它们？"
+  },
+  "confirm.notesKeptOne": {
+    en: " Linked notes are kept either way — the note will still be on the project.",
+    "zh-Hans": "无论选择哪一项，关联的笔记都会保留——这条笔记仍会留在项目里。"
+  },
+  "confirm.notesKeptMany": {
+    en: " Linked notes are kept either way — all {n} notes will still be on the project.",
+    "zh-Hans": "无论选择哪一项，关联的笔记都会保留——全部 {n} 条笔记仍会留在项目里。"
+  },
+  "confirm.unlink":            { en: "Unlink",                          "zh-Hans": "解除关联" },
+  "confirm.thisList":          { en: "this list",                       "zh-Hans": "这个列表" },
+  "confirm.thisContext":       { en: "this context",                    "zh-Hans": "这个情境" },
+  "confirm.deleteListEmpty":   { en: "Delete the “{name}” list?",       "zh-Hans": "删除“{name}”列表？" },
+  "confirm.deleteListOne": {
+    en: "Delete the “{name}” list? Its 1 item will stay — ungrouped, at the top of the lane.",
+    "zh-Hans": "删除“{name}”列表？其中的 1 个条目会保留下来——不再分组，移到该列表的顶部。"
+  },
+  "confirm.deleteListMany": {
+    en: "Delete the “{name}” list? Its {n} items will stay — ungrouped, at the top of the lane.",
+    "zh-Hans": "删除“{name}”列表？其中的 {n} 个条目会保留下来——不再分组，移到该列表的顶部。"
+  },
+  "confirm.deleteContextEmpty": { en: "Delete the “{name}” context?",   "zh-Hans": "删除“{name}”情境？" },
+  "confirm.deleteContextOne": {
+    en: "Delete the “{name}” context? Its 1 item will stay — ungrouped, at the top of the lane.",
+    "zh-Hans": "删除“{name}”情境？其中的 1 个条目会保留下来——不再分组，移到该列表的顶部。"
+  },
+  "confirm.deleteContextMany": {
+    en: "Delete the “{name}” context? Its {n} items will stay — ungrouped, at the top of the lane.",
+    "zh-Hans": "删除“{name}”情境？其中的 {n} 个条目会保留下来——不再分组，移到该列表的顶部。"
+  },
+  "confirm.deleteAllCompletedOne":  { en: "Delete 1 completed item? This can’t be undone.",
+                                      "zh-Hans": "删除 1 个已完成的条目？此操作无法撤销。" },
+  "confirm.deleteAllCompletedMany": { en: "Delete all {n} completed items? This can’t be undone.",
+                                      "zh-Hans": "删除全部 {n} 个已完成的条目？此操作无法撤销。" },
+  "confirm.deleteAll":         { en: "Delete all",                      "zh-Hans": "全部删除" },
+  "confirm.deleteCompletedItem": { en: "Delete this completed item? This can’t be undone.",
+                                   "zh-Hans": "删除这个已完成的条目？此操作无法撤销。" },
+  "confirm.storageFull": {
+    en: "Storage is full — the last change couldn't be saved. Free up space (clear old completed items, or Reset local data) and try again.",
+    "zh-Hans": "存储空间已满——最后一次更改没有保存成功。请先腾出空间（清除旧的已完成条目，或重置本地数据），然后再试一次。"
+  },
+  // ---- surfaces: the background picker renders SURFACES[id].label directly
+  "surface.slate":     { en: "Slate",         "zh-Hans": "石板灰" },
+  "surface.plain":     { en: "Plain",         "zh-Hans": "纯色" },
+  "surface.darkwood":  { en: "Dark wood",     "zh-Hans": "深色木纹" },
+  "surface.rosewood":  { en: "Rosewood",      "zh-Hans": "红木" },
+  "surface.lacquer":   { en: "Black lacquer", "zh-Hans": "黑漆" },
+  // ---- odds and ends
+  // The title a brand-new habit is born with when "Make it a habit" is used
+  // from an unnamed calendar row. Becomes DATA, like project.untitled.
+  // The inline naming row that creates a list or a context (§4.3e).
+  "placeholder.listName":    { en: "List name…",    "zh-Hans": "列表名称…" },
+  "placeholder.contextName": { en: "Context name…", "zh-Hans": "情境名称…" },
+  "habit.newHabitDefault": { en: "New habit",                     "zh-Hans": "新习惯" },
+  "habit.markDoneToday":  { en: "Mark done for today",           "zh-Hans": "标记为今天已完成" },
+  "habit.pausedUnpause":  { en: "Paused — unpause to complete",  "zh-Hans": "已暂停——恢复后才能完成" },
+  "group.deleteList":     { en: "Delete list",                   "zh-Hans": "删除列表" },
+  "note.emptyNoNotes":    { en: "No notes yet.",                 "zh-Hans": "还没有笔记。" },
+  "note.emptyForFilter":  { en: "No notes for this filter.",     "zh-Hans": "没有符合此筛选条件的笔记。" },
+  "cal.afterProjectDeadline": { en: "This is scheduled after the project deadline.",
+                                "zh-Hans": "这个安排晚于项目的截止日期。" },
   "confirm.deleteTitleQuestion": { en: "Delete “{title}”?",           "zh-Hans": "删除“{title}”吗？" },
 
   // ---- date & time pickers ----

@@ -107,7 +107,6 @@
   };
   // Retained for chunk 7 (recurrence is a property of EVENTS, §4.13); no
   // longer used by deadlines, whose recurrence <select> was removed in chunk 3.
-  const RECURRENCE_LABELS = { none: "Does not repeat", daily: "Daily", weekly: "Weekly", monthly: "Monthly", yearly: "Yearly" };
   const state = {
     tasks: {next: [], waiting: [], current: [], future: [], habit: []},
     completed: {next: [], waiting: [], current: [], future: []}, // permanent Completed archive per lane (habits use their own daily habitDone-based grouping instead — see habitCompletedTodayHtml)
@@ -1448,17 +1447,20 @@
     // that mentioned only the waiting items while also archiving the calendar
     // entries would be worse than the silent version it replaces.
     const parts = [];
-    if (waitingLinked.length) parts.push(waitingLinked.length + " linked waiting item" + (waitingLinked.length === 1 ? "" : "s"));
-    if (eventCount) parts.push(eventCount + " linked calendar " + (eventCount === 1 ? "entry" : "entries"));
+    if (waitingLinked.length) parts.push(waitingLinked.length === 1 ? t("confirm.linkedWaitingOne")
+      : t("confirm.linkedWaitingMany").replace("{n}", waitingLinked.length));
+    if (eventCount) parts.push(eventCount === 1 ? t("confirm.linkedEventOne")
+      : t("confirm.linkedEventMany").replace("{n}", eventCount));
     if (parts.length){
-      const what = parts.join(" and ");
+      const what = parts.join(t("confirm.joinAnd"));
       const many = (waitingLinked.length + eventCount) > 1;
+      // \u2691 One whole sentence per plurality rather than a concatenation with
+      // (many ? "them" : "it") spliced through it three times: Chinese has no
+      // them/it split to mirror, so only a complete sentence can be translated.
       openConfirmDialog(
-        "This project has " + what + ". Completing it will put " + (many ? "them" : "it") +
-        " aside \u2014 " + (many ? "they" : "it") + " will stop appearing, and " +
-        (many ? "they" : "it") + " can be brought back if this was a mistake.",
+        (many ? t("confirm.completeProjectMany") : t("confirm.completeProjectOne")).replace("{what}", what),
         [
-          { label: "Complete project", style: "primary", action: doComplete },
+          { label: t("confirm.completeProject"), style: "primary", action: doComplete },
           { label: t("chrome.cancel"), action: function(){} }
         ]
       );
@@ -1494,9 +1496,9 @@
       linkedEvents.forEach(function(ev){ deleteEventEntirely(ev); });
     }
     const nouns = [];
-    if (linked.length) nouns.push("actions");
-    if (linkedEvents.length) nouns.push("calendar entries");
-    const what = nouns.join(" or ");
+    if (linked.length) nouns.push(t("confirm.nounActions"));
+    if (linkedEvents.length) nouns.push(t("confirm.nounCalendarEntries"));
+    const what = nouns.join(t("confirm.joinOr"));
     // ⚑ SAY WHAT SURVIVES, not just what goes (user: "make sure that converting a
     // current project to a future project doesn't remove the notes. The dialogue
     // should reflect this if it doesn't already.")
@@ -1512,17 +1514,17 @@
       return (n.projectLinks || []).some(function(l){ return l.id === projectId; });
     }).length;
     const keeps = noteCount
-      ? " Linked notes are kept either way — " + (noteCount === 1 ? "the note" : "all " + noteCount + " notes") + " will still be on the project."
+      ? (noteCount === 1 ? t("confirm.notesKeptOne") : t("confirm.notesKeptMany").replace("{n}", noteCount))
       : "";
     openConfirmDialog(
-      "Someday projects can't hold linked " + what + ". Unlink them, or delete them?" + keeps,
+      t("confirm.somedayCantHold").replace("{what}", what) + keeps,
       [
-        { label: "Unlink", style: "primary", action: function(){
+        { label: t("confirm.unlink"), style: "primary", action: function(){
             linked.forEach(function(l){ setLink(l.kind, l.task.id, null); });
             unlinkEvents();
             changeKind("current", "future", projectId).then(function(){ if (state.screen) closeScreen(); });
           } },
-        { label: "Delete", style: "danger", action: function(){
+        { label: t("chrome.delete"), style: "danger", action: function(){
             linked.forEach(function(l){ deleteTask(l.kind, l.task.id); });
             deleteEvents();
             changeKind("current", "future", projectId).then(function(){ if (state.screen) closeScreen(); });
@@ -1781,7 +1783,7 @@
       const pausedNow = habitRun.paused;
       checkboxHtml = '<button class="check' + (done ? " checked" : "") + (pausedNow ? " check-paused" : "") +
         '" data-action="toggle-habit" data-id="' + task.id +
-        '" title="' + (pausedNow ? "Paused \u2014 unpause to complete" : "Mark done for today") + '">' + (done ? "&#10003;" : "") + '</button>';
+        '" title="' + escapeHtml(pausedNow ? t("habit.pausedUnpause") : t("habit.markDoneToday")) + '">' + (done ? "&#10003;" : "") + '</button>';
     } else {
       checkboxHtml = '<button class="check" data-action="complete" data-id="' + task.id + '" title="' + escapeHtml(t("card.markComplete")) + '"></button>';
     }
@@ -1870,7 +1872,7 @@
     // Deleting a list no longer requires emptying it first (user ruling): it
     // mirrors context deletion — the items survive, landing ungrouped at the
     // top of the lane, behind a confirm that says so. So the × is always live.
-    const deleteTitle = "Delete list";
+    const deleteTitle = t("group.deleteList");
     const childrenHtml = children.map(function(c){ return leafCardHtml(kind, c); }).join("") || dropHintHtml();
     // devContext is set only on the dev-injected QA-checklist / chunk-map
     // groups (injectQAChecklist / injectChunkMap) — a plain data attribute
@@ -4719,7 +4721,8 @@
     function openInlineNameRow(kind){
       const slot = qs('.inline-slot[data-kind="' + kind + '"]');
       if (!slot) return;
-      const placeholder = (kind === "current" || kind === "future") ? "List name\u2026" : "Context name\u2026";
+      const placeholder = (kind === "current" || kind === "future")
+        ? t("placeholder.listName") : t("placeholder.contextName");
       slot.innerHTML = '<div class="inline-name-row"><input type="text" placeholder="' + escapeHtml(placeholder) + '" /><button type="button" data-role="inline-name-confirm">+</button></div>';
       const input = slot.querySelector("input");
       // ⚑ QA (user): "the viewport force scrolls to the bottom and keeps you
@@ -5090,13 +5093,14 @@
         const kind = delGroupBtn.closest(".lane").getAttribute("data-kind");
         const groupId = delGroupBtn.getAttribute("data-id");
         const group = state.tasks[kind].find(function(t){ return t.id === groupId && t.isGroup; });
-        const name = group ? group.title : "this list";
+        const name = group ? group.title : t("confirm.thisList");
         const affected = state.tasks[kind].filter(function(t){ return t.parent === groupId && !t.isGroup; }).length;
-        const msg = affected
-          ? "Delete the “" + name + "” list? Its " + affected + " item" + (affected === 1 ? "" : "s") + " will stay — ungrouped, at the top of the lane."
-          : "Delete the “" + name + "” list?";
+        const msg = (affected
+          ? (affected === 1 ? t("confirm.deleteListOne")
+                            : t("confirm.deleteListMany").replace("{n}", affected))
+          : t("confirm.deleteListEmpty")).replace("{name}", name);
         openConfirmDialog(msg, [
-          { label: "Delete list", style: "danger", action: function(){
+          { label: t("group.deleteList"), style: "danger", action: function(){
               state.tasks[kind].forEach(function(t){ if (t.parent === groupId) t.parent = null; });
               deleteTask(kind, groupId);
             } },
@@ -5115,11 +5119,12 @@
         if (!ctx) return;
         const affected = state.tasks.next.filter(function(t){ return t.contextId === ctxId; }).length +
                          state.tasks.waiting.filter(function(t){ return t.contextId === ctxId; }).length;
-        const msg = affected
-          ? "Delete the “" + ctx.name + "” context? Its " + affected + " item" + (affected === 1 ? "" : "s") + " will stay — ungrouped, at the top of the lane."
-          : "Delete the “" + ctx.name + "” context?";
+        const msg = (affected
+          ? (affected === 1 ? t("confirm.deleteContextOne")
+                            : t("confirm.deleteContextMany").replace("{n}", affected))
+          : t("confirm.deleteContextEmpty")).replace("{name}", ctx.name);
         openConfirmDialog(msg, [
-          { label: "Delete context", style: "danger", action: function(){
+          { label: t("group.deleteContext"), style: "danger", action: function(){
             ["next", "waiting"].forEach(function(k){
               let changed = false;
               state.tasks[k].forEach(function(t){ if (t.contextId === ctxId){ t.contextId = null; changed = true; } });
@@ -5167,9 +5172,10 @@
         const n = (state.completed[kind] || []).length;
         if (!n) return;
         openConfirmDialog(
-          "Delete all " + n + " completed item" + (n === 1 ? "" : "s") + "? This can’t be undone.",
+          n === 1 ? t("confirm.deleteAllCompletedOne")
+                  : t("confirm.deleteAllCompletedMany").replace("{n}", n),
           [
-            { label: "Delete all", style: "danger", action: function(){ clearCompleted(kind); } },
+            { label: t("confirm.deleteAll"), style: "danger", action: function(){ clearCompleted(kind); } },
             { label: t("chrome.cancel"), action: function(){} }
           ]
         );
@@ -5313,8 +5319,8 @@
         const s = state.screen;
         if (!s || !s.completedView) return;
         const kind = s.kind, id = s.taskId;
-        openConfirmDialog("Delete this completed item? This can’t be undone.", [
-          { label: "Delete", style: "danger", action: function(){ deleteCompleted(kind, id); closeScreen(); } },
+        openConfirmDialog(t("confirm.deleteCompletedItem"), [
+          { label: t("chrome.delete"), style: "danger", action: function(){ deleteCompleted(kind, id); closeScreen(); } },
           { label: t("chrome.cancel"), action: function(){} }
         ]);
         return;
@@ -7410,7 +7416,7 @@
       out +=
         '<button type="button" class="settings-item" data-action="settings-pick-bg" data-bg="' + id + '">' +
           '<span class="settings-swatch" style="' + surfaceSwatchStyle(id) + '"></span>' +
-          '<span class="si-label">' + escapeHtml(SURFACES[id].label) + '</span>' +
+          '<span class="si-label">' + escapeHtml(surfaceLabel(id)) + '</span>' +
           (id === cur ? '<span class="settings-check">&#10003;</span>' : "") +
         '</button>';
     });
@@ -7760,7 +7766,7 @@
     const rootEl = laneEl.querySelector(".cards-root");
     rootEl.innerHTML = notesFilterBarHtml() + (notes.length
       ? notes.map(noteCardHtml).join("")
-      : '<div class="empty-note">' + (state.notesFilter ? "No notes for this filter." : "No notes yet.") + '</div>');
+      : '<div class="empty-note">' + escapeHtml(state.notesFilter ? t("note.emptyForFilter") : t("note.emptyNoNotes")) + '</div>');
   }
   function openNoteScreen(noteId, opts){
     let draft;

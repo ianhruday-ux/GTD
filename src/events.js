@@ -1539,7 +1539,7 @@ function calAdd(){
   // the ruling was that clutter can be dealt with by deleting the series, and
   // that an end date is its own feature rather than a rider on this one.
   if (forProject && s.calForProjectDeadline && s.calSel > s.calForProjectDeadline){
-    s.calError = "This is scheduled after the project deadline.";
+    s.calError = t("cal.afterProjectDeadline");
     s.calInvalid = true;
     renderScreen();
     return;
@@ -1639,7 +1639,7 @@ function showItMovedBanner(text){
 function calMakeHabit(){
   const s = state.screen;
   const name = (s.calName || "").trim();
-  const pseudoEv = { title: name || "New habit", date: s.calSel, recurrence: s.calRecur, interval: s.calInterval, id: null };
+  const pseudoEv = { title: name || t("habit.newHabitDefault"), date: s.calSel, recurrence: s.calRecur, interval: s.calInterval, id: null };
   const dow = dateStrToDate(s.calSel).getDay();
   const schedule = s.calRecur === "weekly" ? [dow] : [0, 1, 2, 3, 4, 5, 6];
   state.screenStack.push(s);

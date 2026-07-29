@@ -2489,7 +2489,7 @@ body.screen-open #tray-handle{ display:none; }
 (function(){
 "use strict";
 
-const BUILD_STAMP = "28 Jul 19:27";  // replaced by build.py
+const BUILD_STAMP = "28 Jul 19:51";  // replaced by build.py
 
 // =========================================================
 // STORAGE ADAPTER (spec.md §3, known issue 4)
@@ -2541,10 +2541,14 @@ const Storage = {
   // whatever it had in memory.
   _onWriteError: function(e){
     if (e && e.name === "QuotaExceededError"){
+      // ⚑ t() is safe here even though storage.js is concatenated BEFORE
+      // i18n.js: this only ever runs on a failed write, long after parse, and
+      // t() is a hoisted function declaration in the same IIFE (build.py's
+      // module-order note). Only i18n's `const STRINGS` is order-sensitive,
+      // and it is evaluated well before any user can trigger a quota error.
       openConfirmDialog(
-        "Storage is full — the last change couldn't be saved. Free up space " +
-        "(clear old completed items, or Reset local data) and try again.",
-        [{ label: "OK", style: "primary", action: function(){} }]
+        t("confirm.storageFull"),
+        [{ label: t("confirm.ok"), style: "primary", action: function(){} }]
       );
     }
   }
@@ -3277,6 +3281,90 @@ const STRINGS = {
   "event.repeatsPrompt":        { en: "This event repeats. What would you like to do?", "zh-Hans": "这个事件是重复的。你想怎么处理？" },
   "event.skipThisOne":          { en: "Skip this one",               "zh-Hans": "跳过这一次" },
   "event.deleteSeries":         { en: "Delete series",                "zh-Hans": "删除整个系列" },
+  // ---- confirm dialogs (i18n round 2). Whole-sentence One/Many pairs rather
+  // than concatenated fragments: English pluralises with -s and swaps
+  // them/it, Chinese does neither, so only a complete sentence can carry both.
+  "confirm.linkedWaitingOne":  { en: "1 linked waiting item",           "zh-Hans": "1 个关联的等待事项" },
+  "confirm.linkedWaitingMany": { en: "{n} linked waiting items",        "zh-Hans": "{n} 个关联的等待事项" },
+  "confirm.linkedEventOne":    { en: "1 linked calendar entry",         "zh-Hans": "1 个关联的日历条目" },
+  "confirm.linkedEventMany":   { en: "{n} linked calendar entries",     "zh-Hans": "{n} 个关联的日历条目" },
+  "confirm.joinAnd":           { en: " and ",                           "zh-Hans": "和" },
+  "confirm.joinOr":            { en: " or ",                            "zh-Hans": "或" },
+  "confirm.completeProjectOne": {
+    en: "This project has {what}. Completing it will put it aside — it will stop appearing, and it can be brought back if this was a mistake.",
+    "zh-Hans": "这个项目有{what}。完成它会把它收起来——它将不再出现；如果这是个误操作，也可以再把它恢复。"
+  },
+  "confirm.completeProjectMany": {
+    en: "This project has {what}. Completing it will put them aside — they will stop appearing, and they can be brought back if this was a mistake.",
+    "zh-Hans": "这个项目有{what}。完成它会把它们收起来——它们将不再出现；如果这是个误操作，也可以再把它们恢复。"
+  },
+  "confirm.completeProject":   { en: "Complete project",                "zh-Hans": "完成项目" },
+  "confirm.nounActions":       { en: "actions",                         "zh-Hans": "行动" },
+  "confirm.nounCalendarEntries": { en: "calendar entries",              "zh-Hans": "日历条目" },
+  "confirm.somedayCantHold": {
+    en: "Someday projects can't hold linked {what}. Unlink them, or delete them?",
+    "zh-Hans": "将来项目不能保留关联的{what}。要解除关联，还是删除它们？"
+  },
+  "confirm.notesKeptOne": {
+    en: " Linked notes are kept either way — the note will still be on the project.",
+    "zh-Hans": "无论选择哪一项，关联的笔记都会保留——这条笔记仍会留在项目里。"
+  },
+  "confirm.notesKeptMany": {
+    en: " Linked notes are kept either way — all {n} notes will still be on the project.",
+    "zh-Hans": "无论选择哪一项，关联的笔记都会保留——全部 {n} 条笔记仍会留在项目里。"
+  },
+  "confirm.unlink":            { en: "Unlink",                          "zh-Hans": "解除关联" },
+  "confirm.thisList":          { en: "this list",                       "zh-Hans": "这个列表" },
+  "confirm.thisContext":       { en: "this context",                    "zh-Hans": "这个情境" },
+  "confirm.deleteListEmpty":   { en: "Delete the “{name}” list?",       "zh-Hans": "删除“{name}”列表？" },
+  "confirm.deleteListOne": {
+    en: "Delete the “{name}” list? Its 1 item will stay — ungrouped, at the top of the lane.",
+    "zh-Hans": "删除“{name}”列表？其中的 1 个条目会保留下来——不再分组，移到该列表的顶部。"
+  },
+  "confirm.deleteListMany": {
+    en: "Delete the “{name}” list? Its {n} items will stay — ungrouped, at the top of the lane.",
+    "zh-Hans": "删除“{name}”列表？其中的 {n} 个条目会保留下来——不再分组，移到该列表的顶部。"
+  },
+  "confirm.deleteContextEmpty": { en: "Delete the “{name}” context?",   "zh-Hans": "删除“{name}”情境？" },
+  "confirm.deleteContextOne": {
+    en: "Delete the “{name}” context? Its 1 item will stay — ungrouped, at the top of the lane.",
+    "zh-Hans": "删除“{name}”情境？其中的 1 个条目会保留下来——不再分组，移到该列表的顶部。"
+  },
+  "confirm.deleteContextMany": {
+    en: "Delete the “{name}” context? Its {n} items will stay — ungrouped, at the top of the lane.",
+    "zh-Hans": "删除“{name}”情境？其中的 {n} 个条目会保留下来——不再分组，移到该列表的顶部。"
+  },
+  "confirm.deleteAllCompletedOne":  { en: "Delete 1 completed item? This can’t be undone.",
+                                      "zh-Hans": "删除 1 个已完成的条目？此操作无法撤销。" },
+  "confirm.deleteAllCompletedMany": { en: "Delete all {n} completed items? This can’t be undone.",
+                                      "zh-Hans": "删除全部 {n} 个已完成的条目？此操作无法撤销。" },
+  "confirm.deleteAll":         { en: "Delete all",                      "zh-Hans": "全部删除" },
+  "confirm.deleteCompletedItem": { en: "Delete this completed item? This can’t be undone.",
+                                   "zh-Hans": "删除这个已完成的条目？此操作无法撤销。" },
+  "confirm.storageFull": {
+    en: "Storage is full — the last change couldn't be saved. Free up space (clear old completed items, or Reset local data) and try again.",
+    "zh-Hans": "存储空间已满——最后一次更改没有保存成功。请先腾出空间（清除旧的已完成条目，或重置本地数据），然后再试一次。"
+  },
+  // ---- surfaces: the background picker renders SURFACES[id].label directly
+  "surface.slate":     { en: "Slate",         "zh-Hans": "石板灰" },
+  "surface.plain":     { en: "Plain",         "zh-Hans": "纯色" },
+  "surface.darkwood":  { en: "Dark wood",     "zh-Hans": "深色木纹" },
+  "surface.rosewood":  { en: "Rosewood",      "zh-Hans": "红木" },
+  "surface.lacquer":   { en: "Black lacquer", "zh-Hans": "黑漆" },
+  // ---- odds and ends
+  // The title a brand-new habit is born with when "Make it a habit" is used
+  // from an unnamed calendar row. Becomes DATA, like project.untitled.
+  // The inline naming row that creates a list or a context (§4.3e).
+  "placeholder.listName":    { en: "List name…",    "zh-Hans": "列表名称…" },
+  "placeholder.contextName": { en: "Context name…", "zh-Hans": "情境名称…" },
+  "habit.newHabitDefault": { en: "New habit",                     "zh-Hans": "新习惯" },
+  "habit.markDoneToday":  { en: "Mark done for today",           "zh-Hans": "标记为今天已完成" },
+  "habit.pausedUnpause":  { en: "Paused — unpause to complete",  "zh-Hans": "已暂停——恢复后才能完成" },
+  "group.deleteList":     { en: "Delete list",                   "zh-Hans": "删除列表" },
+  "note.emptyNoNotes":    { en: "No notes yet.",                 "zh-Hans": "还没有笔记。" },
+  "note.emptyForFilter":  { en: "No notes for this filter.",     "zh-Hans": "没有符合此筛选条件的笔记。" },
+  "cal.afterProjectDeadline": { en: "This is scheduled after the project deadline.",
+                                "zh-Hans": "这个安排晚于项目的截止日期。" },
   "confirm.deleteTitleQuestion": { en: "Delete “{title}”?",           "zh-Hans": "删除“{title}”吗？" },
 
   // ---- date & time pickers ----
@@ -4207,6 +4295,15 @@ function fbm(noise, u, v, fx, fy, octaves){
 // table and falls back to the default, so anyone sitting on 'walnut' quietly
 // lands on Dark wood instead. That is the behaviour a migration would have had
 // to hand-write anyway.
+// \u2691 The picker used to render SURFACES[id].label raw, so the five background
+// names were the last English strings in the settings menu. The table keeps its
+// literal as a fallback; surfaceLabel() prefers the translation and is resolved
+// at call time, so a language switch is picked up like everything else.
+function surfaceLabel(id){
+  const key = "surface." + id;
+  const s = t(key);
+  return (s && s !== key) ? s : ((SURFACES[id] && SURFACES[id].label) || id);
+}
 const SURFACES = {
   slate:  { label: "Slate", desk: "#15161A", dark: "#0E0F13", mid: "#1A1C21", light: "#292C33",
             rings: 0, warp: 0.0,  ringDepth: 0.0,  fibre: 0.55, seed: 5 },  // rings:0 → stone, not wood
@@ -6091,7 +6188,6 @@ function injectChunkMap(){
   };
   // Retained for chunk 7 (recurrence is a property of EVENTS, §4.13); no
   // longer used by deadlines, whose recurrence <select> was removed in chunk 3.
-  const RECURRENCE_LABELS = { none: "Does not repeat", daily: "Daily", weekly: "Weekly", monthly: "Monthly", yearly: "Yearly" };
   const state = {
     tasks: {next: [], waiting: [], current: [], future: [], habit: []},
     completed: {next: [], waiting: [], current: [], future: []}, // permanent Completed archive per lane (habits use their own daily habitDone-based grouping instead — see habitCompletedTodayHtml)
@@ -7432,17 +7528,20 @@ function injectChunkMap(){
     // that mentioned only the waiting items while also archiving the calendar
     // entries would be worse than the silent version it replaces.
     const parts = [];
-    if (waitingLinked.length) parts.push(waitingLinked.length + " linked waiting item" + (waitingLinked.length === 1 ? "" : "s"));
-    if (eventCount) parts.push(eventCount + " linked calendar " + (eventCount === 1 ? "entry" : "entries"));
+    if (waitingLinked.length) parts.push(waitingLinked.length === 1 ? t("confirm.linkedWaitingOne")
+      : t("confirm.linkedWaitingMany").replace("{n}", waitingLinked.length));
+    if (eventCount) parts.push(eventCount === 1 ? t("confirm.linkedEventOne")
+      : t("confirm.linkedEventMany").replace("{n}", eventCount));
     if (parts.length){
-      const what = parts.join(" and ");
+      const what = parts.join(t("confirm.joinAnd"));
       const many = (waitingLinked.length + eventCount) > 1;
+      // \u2691 One whole sentence per plurality rather than a concatenation with
+      // (many ? "them" : "it") spliced through it three times: Chinese has no
+      // them/it split to mirror, so only a complete sentence can be translated.
       openConfirmDialog(
-        "This project has " + what + ". Completing it will put " + (many ? "them" : "it") +
-        " aside \u2014 " + (many ? "they" : "it") + " will stop appearing, and " +
-        (many ? "they" : "it") + " can be brought back if this was a mistake.",
+        (many ? t("confirm.completeProjectMany") : t("confirm.completeProjectOne")).replace("{what}", what),
         [
-          { label: "Complete project", style: "primary", action: doComplete },
+          { label: t("confirm.completeProject"), style: "primary", action: doComplete },
           { label: t("chrome.cancel"), action: function(){} }
         ]
       );
@@ -7478,9 +7577,9 @@ function injectChunkMap(){
       linkedEvents.forEach(function(ev){ deleteEventEntirely(ev); });
     }
     const nouns = [];
-    if (linked.length) nouns.push("actions");
-    if (linkedEvents.length) nouns.push("calendar entries");
-    const what = nouns.join(" or ");
+    if (linked.length) nouns.push(t("confirm.nounActions"));
+    if (linkedEvents.length) nouns.push(t("confirm.nounCalendarEntries"));
+    const what = nouns.join(t("confirm.joinOr"));
     // ⚑ SAY WHAT SURVIVES, not just what goes (user: "make sure that converting a
     // current project to a future project doesn't remove the notes. The dialogue
     // should reflect this if it doesn't already.")
@@ -7496,17 +7595,17 @@ function injectChunkMap(){
       return (n.projectLinks || []).some(function(l){ return l.id === projectId; });
     }).length;
     const keeps = noteCount
-      ? " Linked notes are kept either way — " + (noteCount === 1 ? "the note" : "all " + noteCount + " notes") + " will still be on the project."
+      ? (noteCount === 1 ? t("confirm.notesKeptOne") : t("confirm.notesKeptMany").replace("{n}", noteCount))
       : "";
     openConfirmDialog(
-      "Someday projects can't hold linked " + what + ". Unlink them, or delete them?" + keeps,
+      t("confirm.somedayCantHold").replace("{what}", what) + keeps,
       [
-        { label: "Unlink", style: "primary", action: function(){
+        { label: t("confirm.unlink"), style: "primary", action: function(){
             linked.forEach(function(l){ setLink(l.kind, l.task.id, null); });
             unlinkEvents();
             changeKind("current", "future", projectId).then(function(){ if (state.screen) closeScreen(); });
           } },
-        { label: "Delete", style: "danger", action: function(){
+        { label: t("chrome.delete"), style: "danger", action: function(){
             linked.forEach(function(l){ deleteTask(l.kind, l.task.id); });
             deleteEvents();
             changeKind("current", "future", projectId).then(function(){ if (state.screen) closeScreen(); });
@@ -7765,7 +7864,7 @@ function injectChunkMap(){
       const pausedNow = habitRun.paused;
       checkboxHtml = '<button class="check' + (done ? " checked" : "") + (pausedNow ? " check-paused" : "") +
         '" data-action="toggle-habit" data-id="' + task.id +
-        '" title="' + (pausedNow ? "Paused \u2014 unpause to complete" : "Mark done for today") + '">' + (done ? "&#10003;" : "") + '</button>';
+        '" title="' + escapeHtml(pausedNow ? t("habit.pausedUnpause") : t("habit.markDoneToday")) + '">' + (done ? "&#10003;" : "") + '</button>';
     } else {
       checkboxHtml = '<button class="check" data-action="complete" data-id="' + task.id + '" title="' + escapeHtml(t("card.markComplete")) + '"></button>';
     }
@@ -7854,7 +7953,7 @@ function injectChunkMap(){
     // Deleting a list no longer requires emptying it first (user ruling): it
     // mirrors context deletion — the items survive, landing ungrouped at the
     // top of the lane, behind a confirm that says so. So the × is always live.
-    const deleteTitle = "Delete list";
+    const deleteTitle = t("group.deleteList");
     const childrenHtml = children.map(function(c){ return leafCardHtml(kind, c); }).join("") || dropHintHtml();
     // devContext is set only on the dev-injected QA-checklist / chunk-map
     // groups (injectQAChecklist / injectChunkMap) — a plain data attribute
@@ -10703,7 +10802,8 @@ function injectChunkMap(){
     function openInlineNameRow(kind){
       const slot = qs('.inline-slot[data-kind="' + kind + '"]');
       if (!slot) return;
-      const placeholder = (kind === "current" || kind === "future") ? "List name\u2026" : "Context name\u2026";
+      const placeholder = (kind === "current" || kind === "future")
+        ? t("placeholder.listName") : t("placeholder.contextName");
       slot.innerHTML = '<div class="inline-name-row"><input type="text" placeholder="' + escapeHtml(placeholder) + '" /><button type="button" data-role="inline-name-confirm">+</button></div>';
       const input = slot.querySelector("input");
       // ⚑ QA (user): "the viewport force scrolls to the bottom and keeps you
@@ -11074,13 +11174,14 @@ function injectChunkMap(){
         const kind = delGroupBtn.closest(".lane").getAttribute("data-kind");
         const groupId = delGroupBtn.getAttribute("data-id");
         const group = state.tasks[kind].find(function(t){ return t.id === groupId && t.isGroup; });
-        const name = group ? group.title : "this list";
+        const name = group ? group.title : t("confirm.thisList");
         const affected = state.tasks[kind].filter(function(t){ return t.parent === groupId && !t.isGroup; }).length;
-        const msg = affected
-          ? "Delete the “" + name + "” list? Its " + affected + " item" + (affected === 1 ? "" : "s") + " will stay — ungrouped, at the top of the lane."
-          : "Delete the “" + name + "” list?";
+        const msg = (affected
+          ? (affected === 1 ? t("confirm.deleteListOne")
+                            : t("confirm.deleteListMany").replace("{n}", affected))
+          : t("confirm.deleteListEmpty")).replace("{name}", name);
         openConfirmDialog(msg, [
-          { label: "Delete list", style: "danger", action: function(){
+          { label: t("group.deleteList"), style: "danger", action: function(){
               state.tasks[kind].forEach(function(t){ if (t.parent === groupId) t.parent = null; });
               deleteTask(kind, groupId);
             } },
@@ -11099,11 +11200,12 @@ function injectChunkMap(){
         if (!ctx) return;
         const affected = state.tasks.next.filter(function(t){ return t.contextId === ctxId; }).length +
                          state.tasks.waiting.filter(function(t){ return t.contextId === ctxId; }).length;
-        const msg = affected
-          ? "Delete the “" + ctx.name + "” context? Its " + affected + " item" + (affected === 1 ? "" : "s") + " will stay — ungrouped, at the top of the lane."
-          : "Delete the “" + ctx.name + "” context?";
+        const msg = (affected
+          ? (affected === 1 ? t("confirm.deleteContextOne")
+                            : t("confirm.deleteContextMany").replace("{n}", affected))
+          : t("confirm.deleteContextEmpty")).replace("{name}", ctx.name);
         openConfirmDialog(msg, [
-          { label: "Delete context", style: "danger", action: function(){
+          { label: t("group.deleteContext"), style: "danger", action: function(){
             ["next", "waiting"].forEach(function(k){
               let changed = false;
               state.tasks[k].forEach(function(t){ if (t.contextId === ctxId){ t.contextId = null; changed = true; } });
@@ -11151,9 +11253,10 @@ function injectChunkMap(){
         const n = (state.completed[kind] || []).length;
         if (!n) return;
         openConfirmDialog(
-          "Delete all " + n + " completed item" + (n === 1 ? "" : "s") + "? This can’t be undone.",
+          n === 1 ? t("confirm.deleteAllCompletedOne")
+                  : t("confirm.deleteAllCompletedMany").replace("{n}", n),
           [
-            { label: "Delete all", style: "danger", action: function(){ clearCompleted(kind); } },
+            { label: t("confirm.deleteAll"), style: "danger", action: function(){ clearCompleted(kind); } },
             { label: t("chrome.cancel"), action: function(){} }
           ]
         );
@@ -11297,8 +11400,8 @@ function injectChunkMap(){
         const s = state.screen;
         if (!s || !s.completedView) return;
         const kind = s.kind, id = s.taskId;
-        openConfirmDialog("Delete this completed item? This can’t be undone.", [
-          { label: "Delete", style: "danger", action: function(){ deleteCompleted(kind, id); closeScreen(); } },
+        openConfirmDialog(t("confirm.deleteCompletedItem"), [
+          { label: t("chrome.delete"), style: "danger", action: function(){ deleteCompleted(kind, id); closeScreen(); } },
           { label: t("chrome.cancel"), action: function(){} }
         ]);
         return;
@@ -13394,7 +13497,7 @@ function injectChunkMap(){
       out +=
         '<button type="button" class="settings-item" data-action="settings-pick-bg" data-bg="' + id + '">' +
           '<span class="settings-swatch" style="' + surfaceSwatchStyle(id) + '"></span>' +
-          '<span class="si-label">' + escapeHtml(SURFACES[id].label) + '</span>' +
+          '<span class="si-label">' + escapeHtml(surfaceLabel(id)) + '</span>' +
           (id === cur ? '<span class="settings-check">&#10003;</span>' : "") +
         '</button>';
     });
@@ -13744,7 +13847,7 @@ function injectChunkMap(){
     const rootEl = laneEl.querySelector(".cards-root");
     rootEl.innerHTML = notesFilterBarHtml() + (notes.length
       ? notes.map(noteCardHtml).join("")
-      : '<div class="empty-note">' + (state.notesFilter ? "No notes for this filter." : "No notes yet.") + '</div>');
+      : '<div class="empty-note">' + escapeHtml(state.notesFilter ? t("note.emptyForFilter") : t("note.emptyNoNotes")) + '</div>');
   }
   function openNoteScreen(noteId, opts){
     let draft;
@@ -15689,7 +15792,7 @@ function calAdd(){
   // the ruling was that clutter can be dealt with by deleting the series, and
   // that an end date is its own feature rather than a rider on this one.
   if (forProject && s.calForProjectDeadline && s.calSel > s.calForProjectDeadline){
-    s.calError = "This is scheduled after the project deadline.";
+    s.calError = t("cal.afterProjectDeadline");
     s.calInvalid = true;
     renderScreen();
     return;
@@ -15789,7 +15892,7 @@ function showItMovedBanner(text){
 function calMakeHabit(){
   const s = state.screen;
   const name = (s.calName || "").trim();
-  const pseudoEv = { title: name || "New habit", date: s.calSel, recurrence: s.calRecur, interval: s.calInterval, id: null };
+  const pseudoEv = { title: name || t("habit.newHabitDefault"), date: s.calSel, recurrence: s.calRecur, interval: s.calInterval, id: null };
   const dow = dateStrToDate(s.calSel).getDay();
   const schedule = s.calRecur === "weekly" ? [dow] : [0, 1, 2, 3, 4, 5, 6];
   state.screenStack.push(s);
