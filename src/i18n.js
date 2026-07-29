@@ -129,6 +129,24 @@ const STRINGS = {
   },
 
   // ---- the intray ----
+  // ⚑ The author's own copy, transcribed verbatim (2026-07-28). Split on the
+  // established `.more` convention: the first sentence is what the REVIEW's
+  // capture card shows beside its Calendar button; the rest is withheld until
+  // you open the calendar's own ⓘ — exactly how info.lane.next(.more) works.
+  //
+  // ⚠ Every specific claim in `.more` was verified against the code before it
+  // shipped: the month grid skips ticklers (events.js, calMonthGridHtml), the
+  // day agenda and the list view both show them (and tag them "hidden"), and
+  // nothing in the pseudo-action path filters them, so a hidden event does
+  // still reach Next Actions on its day.
+  "info.calendar": {
+    en: "The calendar can be used to schedule appointments and deadlines.",
+    "zh-Hans": "日历可以用来安排约会和截止日期。"
+  },
+  "info.calendar.more": {
+    en: "It's also a powerful tool that allows you to see your schedule at a glance. When creating an event you don't need to see, select the \"hide\" checkbox to prevent it from showing up in month view. This will help you declutter your calendar, keeping it readable. You'll still be able to see it on the day and list views, and it will still appear in your action list the day of the event.",
+    "zh-Hans": "它也是一个强大的工具，让你一眼就能看到自己的日程安排。创建一个你不需要看到的事件时，可以勾选“隐藏”复选框，让它不出现在月视图中。这有助于让日历保持整洁、易读。你仍然可以在日视图和列表视图中看到它，并且在事件当天，它依然会出现在你的行动清单中。"
+  },
   "info.tray": {
     en: "The intray is a tray that holds everything that needs dealing with. Stalled projects, overdue deadlines, and waiting actions which have lost their waiting condition, all belong here. You can use the text box to quickly add thoughts or reminders if you don't have time to add them to the proper list. You can sort through and process everything using the tray's review feature.",
     "zh-Hans": "收件箱用于集中存放所有需要处理的事项。停滞的项目、已过截止日期的事项，以及失去等待条件的等待行动，都会出现在这里。如果一时来不及把想法或提醒整理到合适的列表，可以先用输入框快速记下来。之后再通过收件箱的“回顾”功能，逐项整理并处理。"
@@ -542,6 +560,9 @@ const STRINGS = {
   "review.infoFutureLabel":  { en: "Future:",                       "zh-Hans": "将来：" },
   "review.infoHabitLabel":   { en: "Habit:",                        "zh-Hans": "习惯：" },
   "review.infoNoteLabel":    { en: "Note:",                         "zh-Hans": "笔记：" },
+  // ⚑ The capture card has offered a Calendar button since chunk 7; the info
+  // panel beside it explained the other six destinations and not this one.
+  "review.infoCalendarLabel": { en: "Calendar:",                   "zh-Hans": "日历：" },
   "review.infoTwoMinLabel":  { en: "2 min:",                        "zh-Hans": "2分钟：" },
   "review.infoTwoMinText":   { en: "If you can get something done in 2 minutes, you should do it right away instead of recording it.", "zh-Hans": "如果一件事两分钟内就能做完，直接去做就好，不用特地记下来。" },
   "review.infoPastDueLabel": { en: "Past its date:",                "zh-Hans": "已过期：" },

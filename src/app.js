@@ -4420,7 +4420,7 @@
       : s.reviewView
         ? reviewHeaderHtml(reviewActiveLoops().length > 0) + reviewBodyHtml(s)
         : s.calendarView
-          ? calendarHeaderHtml(s) + calendarBodyHtml(s)
+          ? calendarHeaderHtml(s) + calendarInfoPanelHtml(!!s.calInfoOpen) + calendarBodyHtml(s)
           : s.quickDoneView
             ? quickDoneBodyHtml(s)
             : screenHeaderHtml(s) + screenBodyHtml(s) + screenFooterHtml(s, "edit");
@@ -6714,6 +6714,14 @@
           '<b>' + escapeHtml(t("review.infoFutureLabel")) + '</b> ' + escapeHtml(LANE_INFO.future) + '<br>' +
           '<b>' + escapeHtml(t("review.infoHabitLabel")) + '</b> ' + escapeHtml(LANE_INFO.habit) + '<br>' +
           '<b>' + escapeHtml(t("review.infoNoteLabel")) + '</b> ' + escapeHtml(LANE_INFO.notes) + '<br>' +
+          // ⚑ ADDED (author, this round). The capture card has rendered a
+          // Calendar button since chunk 7 and this panel explained the other six
+          // destinations, so it described six of the seven buttons directly
+          // beneath it. Sits after Note and before 2 min, matching the button
+          // order on the card. Not from LANE_INFO — the calendar is a screen,
+          // not a lane — and only the FIRST sentence, per the .more convention:
+          // the rest is withheld until you open the calendar's own ⓘ.
+          '<b>' + escapeHtml(t("review.infoCalendarLabel")) + '</b> ' + escapeHtml(t("info.calendar")) + '<br>' +
           '<b>' + escapeHtml(t("review.infoTwoMinLabel")) + '</b> ' + escapeHtml(t("review.infoTwoMinText")) +
         '</div>';
     } else {

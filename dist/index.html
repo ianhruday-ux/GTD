@@ -1453,6 +1453,15 @@ body.has-frame .tray-drawer::after{
 .review-info-panel{ font-size:12.5px; color:var(--text-soft); background:rgba(255,255,255,0.05); border-radius:8px; padding:11px 13px; line-height:1.5; display:flex; flex-direction:column; gap:10px; }
 .review-info-panel[hidden]{ display:none; } /* the attribute must win over display:flex */
 .review-info-block b{ color:var(--text-primary); }
+/* The calendar's ⓘ panel — same treatment as the review's, with a margin the
+   review's doesn't need (that one is already inside a padded body; this sits
+   directly between the header and the month grid). `display:block` rather than
+   flex because `.lane-info-more` supplies its own paragraph break. */
+.cal-info-panel{
+  font-size:12.5px; color:var(--text-soft); background:rgba(255,255,255,0.05);
+  border-radius:8px; padding:11px 13px; line-height:1.5; margin:10px 14px 0 14px;
+}
+.cal-info-panel[hidden]{ display:none; }
 .review-end{ text-align:center; padding:48px 16px; display:flex; flex-direction:column; gap:8px; }
 .review-end-big{ font-family:var(--font-display); font-weight:700; font-size:22px; color:var(--text-primary); }
 .review-end-sub{ font-size:13.5px; color:var(--text-soft); line-height:1.5; }
@@ -2480,7 +2489,7 @@ body.screen-open #tray-handle{ display:none; }
 (function(){
 "use strict";
 
-const BUILD_STAMP = "28 Jul 18:56";  // replaced by build.py
+const BUILD_STAMP = "28 Jul 19:27";  // replaced by build.py
 
 // =========================================================
 // STORAGE ADAPTER (spec.md §3, known issue 4)
@@ -2672,6 +2681,24 @@ const STRINGS = {
   },
 
   // ---- the intray ----
+  // ⚑ The author's own copy, transcribed verbatim (2026-07-28). Split on the
+  // established `.more` convention: the first sentence is what the REVIEW's
+  // capture card shows beside its Calendar button; the rest is withheld until
+  // you open the calendar's own ⓘ — exactly how info.lane.next(.more) works.
+  //
+  // ⚠ Every specific claim in `.more` was verified against the code before it
+  // shipped: the month grid skips ticklers (events.js, calMonthGridHtml), the
+  // day agenda and the list view both show them (and tag them "hidden"), and
+  // nothing in the pseudo-action path filters them, so a hidden event does
+  // still reach Next Actions on its day.
+  "info.calendar": {
+    en: "The calendar can be used to schedule appointments and deadlines.",
+    "zh-Hans": "日历可以用来安排约会和截止日期。"
+  },
+  "info.calendar.more": {
+    en: "It's also a powerful tool that allows you to see your schedule at a glance. When creating an event you don't need to see, select the \"hide\" checkbox to prevent it from showing up in month view. This will help you declutter your calendar, keeping it readable. You'll still be able to see it on the day and list views, and it will still appear in your action list the day of the event.",
+    "zh-Hans": "它也是一个强大的工具，让你一眼就能看到自己的日程安排。创建一个你不需要看到的事件时，可以勾选“隐藏”复选框，让它不出现在月视图中。这有助于让日历保持整洁、易读。你仍然可以在日视图和列表视图中看到它，并且在事件当天，它依然会出现在你的行动清单中。"
+  },
   "info.tray": {
     en: "The intray is a tray that holds everything that needs dealing with. Stalled projects, overdue deadlines, and waiting actions which have lost their waiting condition, all belong here. You can use the text box to quickly add thoughts or reminders if you don't have time to add them to the proper list. You can sort through and process everything using the tray's review feature.",
     "zh-Hans": "收件箱用于集中存放所有需要处理的事项。停滞的项目、已过截止日期的事项，以及失去等待条件的等待行动，都会出现在这里。如果一时来不及把想法或提醒整理到合适的列表，可以先用输入框快速记下来。之后再通过收件箱的“回顾”功能，逐项整理并处理。"
@@ -3085,6 +3112,9 @@ const STRINGS = {
   "review.infoFutureLabel":  { en: "Future:",                       "zh-Hans": "将来：" },
   "review.infoHabitLabel":   { en: "Habit:",                        "zh-Hans": "习惯：" },
   "review.infoNoteLabel":    { en: "Note:",                         "zh-Hans": "笔记：" },
+  // ⚑ The capture card has offered a Calendar button since chunk 7; the info
+  // panel beside it explained the other six destinations and not this one.
+  "review.infoCalendarLabel": { en: "Calendar:",                   "zh-Hans": "日历：" },
   "review.infoTwoMinLabel":  { en: "2 min:",                        "zh-Hans": "2分钟：" },
   "review.infoTwoMinText":   { en: "If you can get something done in 2 minutes, you should do it right away instead of recording it.", "zh-Hans": "如果一件事两分钟内就能做完，直接去做就好，不用特地记下来。" },
   "review.infoPastDueLabel": { en: "Past its date:",                "zh-Hans": "已过期：" },
@@ -10374,7 +10404,7 @@ function injectChunkMap(){
       : s.reviewView
         ? reviewHeaderHtml(reviewActiveLoops().length > 0) + reviewBodyHtml(s)
         : s.calendarView
-          ? calendarHeaderHtml(s) + calendarBodyHtml(s)
+          ? calendarHeaderHtml(s) + calendarInfoPanelHtml(!!s.calInfoOpen) + calendarBodyHtml(s)
           : s.quickDoneView
             ? quickDoneBodyHtml(s)
             : screenHeaderHtml(s) + screenBodyHtml(s) + screenFooterHtml(s, "edit");
@@ -12668,6 +12698,14 @@ function injectChunkMap(){
           '<b>' + escapeHtml(t("review.infoFutureLabel")) + '</b> ' + escapeHtml(LANE_INFO.future) + '<br>' +
           '<b>' + escapeHtml(t("review.infoHabitLabel")) + '</b> ' + escapeHtml(LANE_INFO.habit) + '<br>' +
           '<b>' + escapeHtml(t("review.infoNoteLabel")) + '</b> ' + escapeHtml(LANE_INFO.notes) + '<br>' +
+          // ⚑ ADDED (author, this round). The capture card has rendered a
+          // Calendar button since chunk 7 and this panel explained the other six
+          // destinations, so it described six of the seven buttons directly
+          // beneath it. Sits after Note and before 2 min, matching the button
+          // order on the card. Not from LANE_INFO — the calendar is a screen,
+          // not a lane — and only the FIRST sentence, per the .more convention:
+          // the rest is withheld until you open the calendar's own ⓘ.
+          '<b>' + escapeHtml(t("review.infoCalendarLabel")) + '</b> ' + escapeHtml(t("info.calendar")) + '<br>' +
           '<b>' + escapeHtml(t("review.infoTwoMinLabel")) + '</b> ' + escapeHtml(t("review.infoTwoMinText")) +
         '</div>';
     } else {
@@ -15097,10 +15135,25 @@ function calendarHeaderHtml(s){
         '<button type="button" class="cal-tab' + (s.calTab === "list" ? " active" : "") + '" data-action="cal-tab" data-tab="list">' + escapeHtml(t("cal.list")) + '</button>' +
       '</div>' +
       '<div class="screen-header-right">' +
-        '<span class="screen-chrome-btn" style="visibility:hidden">&#8592;</span>' +
+        // ⚑ ADDED (author, this round): the calendar was the one major
+        // surface with no ⓘ at all. The six lane tabs and the intray have
+        // always had one, and the review — also a screen, not a lane — shows
+        // there is precedent for a screen carrying one. This replaces an
+        // invisible spacer that existed only to balance the header.
+        '<button type="button" class="screen-chrome-btn" data-action="cal-info" title="' + escapeHtml(t("chrome.info")) + '">&#9432;</button>' +
       '</div>' +
     '</div>'
   );
+}
+// The calendar's ⓘ panel. Held open across re-renders (s.calInfoOpen) the
+// same way the review's is, so switching month/day/list does not shut it.
+// Shows the full text: first sentence plus the `.more` paragraph the review
+// deliberately withholds (info.lane.next(.more) sets the precedent).
+function calendarInfoPanelHtml(open){
+  return '<div class="cal-info-panel"' + (open ? "" : " hidden") + '>' +
+      escapeHtml(t("info.calendar")) +
+      '<span class="lane-info-more">' + escapeHtml(t("info.calendar.more")) + '</span>' +
+    '</div>';
 }
 function calendarBodyHtml(s){
   let body;
@@ -15550,6 +15603,15 @@ function eventsHandleClick(e){
   if (s.calendarView){
     const tab = e.target.closest('[data-action="cal-tab"]');
     if (tab){ s.calTab = tab.getAttribute("data-tab"); renderScreen(); return true; }
+    if (e.target.closest('[data-action="cal-info"]')){
+      // Toggled in place rather than via renderScreen(): the creation row
+      // holds unsaved field state, and a full re-render for an info panel
+      // would be a draft-isolation hazard for no benefit.
+      s.calInfoOpen = !s.calInfoOpen;
+      const panel = qs(".cal-info-panel");
+      if (panel) panel.hidden = !s.calInfoOpen;
+      return true;
+    }
     if (e.target.closest('[data-action="cal-close"]')){ closeScreen(); return true; }
     const mv = e.target.closest('[data-action="cal-month"]');
     if (mv){ shiftMonth(Number(mv.getAttribute("data-dir"))); return true; }

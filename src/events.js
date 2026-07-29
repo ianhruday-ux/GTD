@@ -985,10 +985,25 @@ function calendarHeaderHtml(s){
         '<button type="button" class="cal-tab' + (s.calTab === "list" ? " active" : "") + '" data-action="cal-tab" data-tab="list">' + escapeHtml(t("cal.list")) + '</button>' +
       '</div>' +
       '<div class="screen-header-right">' +
-        '<span class="screen-chrome-btn" style="visibility:hidden">&#8592;</span>' +
+        // ⚑ ADDED (author, this round): the calendar was the one major
+        // surface with no ⓘ at all. The six lane tabs and the intray have
+        // always had one, and the review — also a screen, not a lane — shows
+        // there is precedent for a screen carrying one. This replaces an
+        // invisible spacer that existed only to balance the header.
+        '<button type="button" class="screen-chrome-btn" data-action="cal-info" title="' + escapeHtml(t("chrome.info")) + '">&#9432;</button>' +
       '</div>' +
     '</div>'
   );
+}
+// The calendar's ⓘ panel. Held open across re-renders (s.calInfoOpen) the
+// same way the review's is, so switching month/day/list does not shut it.
+// Shows the full text: first sentence plus the `.more` paragraph the review
+// deliberately withholds (info.lane.next(.more) sets the precedent).
+function calendarInfoPanelHtml(open){
+  return '<div class="cal-info-panel"' + (open ? "" : " hidden") + '>' +
+      escapeHtml(t("info.calendar")) +
+      '<span class="lane-info-more">' + escapeHtml(t("info.calendar.more")) + '</span>' +
+    '</div>';
 }
 function calendarBodyHtml(s){
   let body;
@@ -1438,6 +1453,15 @@ function eventsHandleClick(e){
   if (s.calendarView){
     const tab = e.target.closest('[data-action="cal-tab"]');
     if (tab){ s.calTab = tab.getAttribute("data-tab"); renderScreen(); return true; }
+    if (e.target.closest('[data-action="cal-info"]')){
+      // Toggled in place rather than via renderScreen(): the creation row
+      // holds unsaved field state, and a full re-render for an info panel
+      // would be a draft-isolation hazard for no benefit.
+      s.calInfoOpen = !s.calInfoOpen;
+      const panel = qs(".cal-info-panel");
+      if (panel) panel.hidden = !s.calInfoOpen;
+      return true;
+    }
     if (e.target.closest('[data-action="cal-close"]')){ closeScreen(); return true; }
     const mv = e.target.closest('[data-action="cal-month"]');
     if (mv){ shiftMonth(Number(mv.getAttribute("data-dir"))); return true; }

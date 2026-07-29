@@ -1415,6 +1415,15 @@ body.has-frame .tray-drawer::after{
 .review-info-panel{ font-size:12.5px; color:var(--text-soft); background:rgba(255,255,255,0.05); border-radius:8px; padding:11px 13px; line-height:1.5; display:flex; flex-direction:column; gap:10px; }
 .review-info-panel[hidden]{ display:none; } /* the attribute must win over display:flex */
 .review-info-block b{ color:var(--text-primary); }
+/* The calendar's ⓘ panel — same treatment as the review's, with a margin the
+   review's doesn't need (that one is already inside a padded body; this sits
+   directly between the header and the month grid). `display:block` rather than
+   flex because `.lane-info-more` supplies its own paragraph break. */
+.cal-info-panel{
+  font-size:12.5px; color:var(--text-soft); background:rgba(255,255,255,0.05);
+  border-radius:8px; padding:11px 13px; line-height:1.5; margin:10px 14px 0 14px;
+}
+.cal-info-panel[hidden]{ display:none; }
 .review-end{ text-align:center; padding:48px 16px; display:flex; flex-direction:column; gap:8px; }
 .review-end-big{ font-family:var(--font-display); font-weight:700; font-size:22px; color:var(--text-primary); }
 .review-end-sub{ font-size:13.5px; color:var(--text-soft); line-height:1.5; }
