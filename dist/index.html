@@ -2489,7 +2489,7 @@ body.screen-open #tray-handle{ display:none; }
 (function(){
 "use strict";
 
-const BUILD_STAMP = "28 Jul 21:10";  // replaced by build.py
+const BUILD_STAMP = "28 Jul 21:24";  // replaced by build.py
 
 // =========================================================
 // STORAGE ADAPTER (spec.md §3, known issue 4)
@@ -7504,7 +7504,14 @@ function injectChunkMap(){
   // silently; linked Waiting actions are temporarily archived instead of
   // completed (in case the project completion was a mistake), with a
   // confirmation prompt naming that up front.
-  function completeProject(kind, projectId){
+  // ⚑ `onConfirmed` (user): a hook that runs the moment completion is
+  // actually going ahead — after the confirm is accepted, or straight away
+  // when there is nothing to confirm. It receives the real finisher and must
+  // call it. The lane checkbox uses it to play its tick BEFORE the card leaves,
+  // so a project keeps the pop of satisfaction every other item gets; the
+  // complication is exactly why the tick had to move rather than disappear.
+  // Callers that pass nothing behave as before.
+  function completeProject(kind, projectId, onConfirmed){
     const linked = linkedActionsForProject(projectId);
     const waitingLinked = linked.filter(function(l){ return l.kind === "waiting"; });
     const nextLinked = linked.filter(function(l){ return l.kind === "next"; });
@@ -7541,12 +7548,15 @@ function injectChunkMap(){
       openConfirmDialog(
         (many ? t("confirm.completeProjectMany") : t("confirm.completeProjectOne")).replace("{what}", what),
         [
-          { label: t("confirm.completeProject"), style: "primary", action: doComplete },
+          { label: t("confirm.completeProject"), style: "primary", action: goAhead },
           { label: t("chrome.cancel"), action: function(){} }
         ]
       );
     } else {
-      doComplete();
+      goAhead();
+    }
+    function goAhead(){
+      if (onConfirmed) onConfirmed(doComplete); else doComplete();
     }
   }
 
@@ -11235,12 +11245,22 @@ function injectChunkMap(){
         // failure the comment on archiveEventsForProject describes as fixed;
         // the fix had only ever landed on the other path.
         //
-        // No tick animation for a project, deliberately: completeProject can
-        // put up a confirm, and a checkbox that filled in first would be
-        // claiming a completion the user may still cancel. The dialog is the
-        // feedback; when there is nothing to warn about, the card simply
-        // leaves for the Completed section, which is feedback too.
-        if (isProjectKind(k)){ completeProject(k, id); return; }
+        // The tick still plays — it just waits until completion is actually
+        // going ahead (user: "we don't want to deny the pop of satisfaction
+        // just because there's a complication"). So: confirm first, THEN tick,
+        // then complete. Cancelling never reaches the tick at all.
+        if (isProjectKind(k)){
+          completeProject(k, id, function(finish){
+            // The lane is not re-rendered while a dialog is open, so the button
+            // is normally still on screen here — but if anything did detach it,
+            // animating a node nobody can see must not also stall the finish.
+            if (completeBtn.classList.contains("checked") || !completeBtn.isConnected){ finish(); return; }
+            completeBtn.classList.add("checked", "check-anim");
+            completeBtn.innerHTML = "&#10003;";
+            setTimeout(finish, 260);
+          });
+          return;
+        }
         // Show the check-mark pop first, then complete — completing
         // removes the card, so the animation has to run on the still-live
         // element (overnight notes).

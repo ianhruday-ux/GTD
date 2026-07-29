@@ -239,6 +239,35 @@ with serve(DIST) as url, sync_playwright() as p:
             return !!b && !b.classList.contains('checked'); }"""),
           "and the checkbox is not left looking ticked")
 
+    # ⚑ THE TICK, on the other hand, must still happen once you say yes (user:
+    # "we don't want to deny the pop of satisfaction just because there's a
+    # complication"). Confirm, then read the checkbox DURING the 260ms the
+    # animation runs, before the card leaves for the Completed section.
+    clean()
+    pg.evaluate(PROJ_LINKED)
+    pg.reload(); pg.wait_for_timeout(1200); clean()
+    pg.evaluate("""() => { const t = [...document.querySelectorAll('.lane[data-kind="current"] .card')]
+          .find(c => c.textContent.includes('ZZ project'));
+        t.querySelector('[data-action="complete"]').click(); }""")
+    pg.wait_for_timeout(600)
+    ticked = pg.evaluate("""() => {
+      const btns = [...document.querySelectorAll('.choice-dialog-backdrop button')];
+      const go = btns.find(x => /Complete project/.test(x.textContent));
+      if (go) go.click();
+      const t = [...document.querySelectorAll('.lane[data-kind="current"] .card')]
+        .find(c => c.textContent.includes('ZZ project'));
+      const b = t && t.querySelector('[data-action="complete"]');
+      return { checked: !!b && b.classList.contains('checked'),
+               animating: !!b && b.classList.contains('check-anim'),
+               glyph: b ? b.textContent.trim() : null };
+    }""")
+    check(ticked["checked"] and ticked["animating"],
+          f"confirming plays the tick animation before the card leaves ({ticked})")
+    check(ticked["glyph"] == "✓", f"and the check mark is drawn ({ticked['glyph']!r})")
+    pg.wait_for_timeout(900)
+    check(pg.evaluate("""() => JSON.parse(localStorage.getItem('gtd_completed_current') || '[]').length""") == 1,
+          "and the completion still lands after the animation")
+
     # A project with nothing linked has nothing to warn about: it should just
     # complete, with no dialog in the way.
     clean()
@@ -254,6 +283,12 @@ with serve(DIST) as url, sync_playwright() as p:
     pg.evaluate("""() => { const t = [...document.querySelectorAll('.lane[data-kind="current"] .card')]
           .find(c => c.textContent.includes('ZZ lonely'));
         t.querySelector('[data-action="complete"]').click(); }""")
+    # Read the tick DURING the animation, before the 260ms finisher fires.
+    early = pg.evaluate("""() => { const t = [...document.querySelectorAll('.lane[data-kind="current"] .card')]
+          .find(c => c.textContent.includes('ZZ lonely'));
+        const b = t && t.querySelector('[data-action="complete"]');
+        return !!b && b.classList.contains('check-anim'); }""")
+    check(early, "an unlinked project gets the tick too, with no dialog involved")
     pg.wait_for_timeout(700)
     check(dialog_text() is None, "an unlinked project completes with no dialog in the way")
     check(pg.evaluate("""() => JSON.parse(localStorage.getItem('gtd_completed_current') || '[]').length""") == 1,
