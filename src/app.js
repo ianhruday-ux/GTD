@@ -5145,6 +5145,21 @@
       if (completeBtn){
         const k = completeBtn.closest(".lane").getAttribute("data-kind");
         const id = completeBtn.getAttribute("data-id");
+        // ⚑ A PROJECT completes through completeProject(), exactly as its own
+        // page and the review already do (user ruling: both routes behave the
+        // same). This checkbox used to call completeTask() straight through,
+        // which skipped the confirm AND the archiving — so ticking a project
+        // here left its linked waiting actions live and its linked events
+        // still minting a Next Action every week, for ever. That is the very
+        // failure the comment on archiveEventsForProject describes as fixed;
+        // the fix had only ever landed on the other path.
+        //
+        // No tick animation for a project, deliberately: completeProject can
+        // put up a confirm, and a checkbox that filled in first would be
+        // claiming a completion the user may still cancel. The dialog is the
+        // feedback; when there is nothing to warn about, the card simply
+        // leaves for the Completed section, which is feedback too.
+        if (isProjectKind(k)){ completeProject(k, id); return; }
         // Show the check-mark pop first, then complete — completing
         // removes the card, so the animation has to run on the still-live
         // element (overnight notes).

@@ -135,10 +135,8 @@ with serve(DIST) as url, sync_playwright() as p:
         clean()
         pg.evaluate(PROJ, n)
         pg.reload(); pg.wait_for_timeout(1200); clean()
-        # ⚠ NOT the lane checkbox. That calls completeTask() directly and never
-        # reaches completeProject(), so the dialog does not exist on that path
-        # (see the note in the handoff). The real route is the project's own
-        # page: arm Complete, then Save.
+        # The project's own page: arm Complete, then Save. The lane checkbox
+        # reaches the same dialog now (see the parity section at the end).
         pg.evaluate("""() => document.querySelector('[data-action="open-edit"][data-id="zzp"]').click()""")
         pg.wait_for_timeout(450)
         pg.evaluate("""() => document.querySelector('[data-action="screen-complete"]').click()""")
@@ -153,6 +151,113 @@ with serve(DIST) as url, sync_playwright() as p:
               f"complete project (n={n}): picks the right pronoun (“{pron.strip()}”)")
         check("Complete project" in (txt or ""), f"complete project (n={n}): the button is there")
         pg.keyboard.press("Escape"); pg.wait_for_timeout(300); clean()
+
+    # ---------------- both completion routes behave identically -------------
+    # ⚑ USER RULING: "the behaviour should be the same for both." The lane
+    # checkbox used to call completeTask() straight through, so ticking a
+    # project there skipped the confirm AND the archiving -- its linked waiting
+    # actions stayed live and its linked recurring event went on minting a Next
+    # Action every week for ever. Asserted as PARITY rather than as "the
+    # checkbox shows a dialog", because parity is the actual ruling and it
+    # keeps holding if the dialog's wording or contents change later.
+    PROJ_LINKED = """() => {
+      localStorage.setItem('gtd_tasks_current', JSON.stringify(
+        [{ id: 'zzp', title: 'ZZ project', notesClean: '', isGroup: false, parent: null }]));
+      localStorage.setItem('gtd_tasks_waiting', JSON.stringify(
+        [{ id: 'zzw', title: 'ZZ waiting on Bob', notesClean: '', parent: null,
+           linkedProjectId: 'zzp' }]));
+      localStorage.setItem('gtd_tasks_next', '[]');
+      localStorage.setItem('gtd_completed_current', '[]');
+      localStorage.setItem('gtd_events', JSON.stringify(
+        [{ id: 'zze', taskId: 'zzet', title: 'ZZ standup', date: '2026-08-20', time: '09:00',
+           notesClean: '', recurrence: 'weekly', interval: 1, paused: false, contextId: null,
+           linkedProjectId: 'zzp', seriesId: 'zzs', tickler: false, completedOccs: [] }]));
+      localStorage.setItem('gtd_archived_waiting', '{}');
+    }"""
+    OUTCOME = """() => ({
+      waitingLive: JSON.parse(localStorage.getItem('gtd_tasks_waiting') || '[]').length,
+      waitingArchived: Object.keys(JSON.parse(
+        localStorage.getItem('gtd_archived_waiting') || '{}')).length,
+      eventsLive: JSON.parse(localStorage.getItem('gtd_events') || '[]').length,
+      projectDone: JSON.parse(localStorage.getItem('gtd_completed_current') || '[]').length
+    })"""
+
+    outcomes = {}
+    for route in ("checkbox", "page"):
+        clean()
+        pg.evaluate(PROJ_LINKED)
+        pg.reload(); pg.wait_for_timeout(1200); clean()
+        if route == "checkbox":
+            pg.evaluate("""() => { const t = [...document.querySelectorAll('.lane[data-kind="current"] .card')]
+                  .find(c => c.textContent.includes('ZZ project'));
+                t.querySelector('[data-action="complete"]').click(); }""")
+        else:
+            pg.evaluate("""() => document.querySelector('[data-action="open-edit"][data-id="zzp"]').click()""")
+            pg.wait_for_timeout(450)
+            pg.evaluate("""() => document.querySelector('[data-action="screen-complete"]').click()""")
+            pg.wait_for_timeout(300)
+            pg.evaluate("""() => document.querySelector('[data-action="screen-save"]').click()""")
+        pg.wait_for_timeout(700)
+        txt = dialog_text() or ""
+        check("linked waiting item" in txt,
+              f"{route}: the confirm names the linked items ({txt[:56]!r})")
+        pg.evaluate("""() => { const btns = [...document.querySelectorAll('.choice-dialog-backdrop button')];
+            const go = btns.find(x => /Complete project/.test(x.textContent)); if (go) go.click(); }""")
+        pg.wait_for_timeout(900)
+        outcomes[route] = pg.evaluate(OUTCOME)
+        clean()
+
+    check(outcomes["checkbox"] == outcomes["page"],
+          f"both routes leave the data in the SAME state "
+          f"(checkbox {outcomes['checkbox']} vs page {outcomes['page']})")
+    check(outcomes["checkbox"]["projectDone"] == 1, "the project really was completed")
+    check(outcomes["checkbox"]["waitingLive"] == 0 and outcomes["checkbox"]["waitingArchived"] == 1,
+          f"its linked waiting action was archived, not left running ({outcomes['checkbox']})")
+    check(outcomes["checkbox"]["eventsLive"] == 0,
+          f"and its linked event was retired, so it stops minting actions ({outcomes['checkbox']})")
+
+    # Cancelling from the checkbox must leave NOTHING changed -- including the
+    # checkbox itself. This is why a project gets no tick animation: the old
+    # code filled the box in 260ms BEFORE completing, which on this path would
+    # have shown a completed-looking project the user had just declined.
+    clean()
+    pg.evaluate(PROJ_LINKED)
+    pg.reload(); pg.wait_for_timeout(1200); clean()
+    pg.evaluate("""() => { const t = [...document.querySelectorAll('.lane[data-kind="current"] .card')]
+          .find(c => c.textContent.includes('ZZ project'));
+        t.querySelector('[data-action="complete"]').click(); }""")
+    pg.wait_for_timeout(600)
+    pg.evaluate("""() => { const btns = [...document.querySelectorAll('.choice-dialog-backdrop button')];
+        const no = btns.find(x => /Cancel|取消/.test(x.textContent)); if (no) no.click(); }""")
+    pg.wait_for_timeout(600)
+    after = pg.evaluate(OUTCOME)
+    check(after["projectDone"] == 0 and after["waitingLive"] == 1 and after["eventsLive"] == 1,
+          f"cancelling from the checkbox changes nothing at all ({after})")
+    check(pg.evaluate("""() => { const t = [...document.querySelectorAll('.lane[data-kind="current"] .card')]
+              .find(c => c.textContent.includes('ZZ project'));
+            const b = t && t.querySelector('[data-action="complete"]');
+            return !!b && !b.classList.contains('checked'); }"""),
+          "and the checkbox is not left looking ticked")
+
+    # A project with nothing linked has nothing to warn about: it should just
+    # complete, with no dialog in the way.
+    clean()
+    pg.evaluate("""() => {
+      localStorage.setItem('gtd_tasks_current', JSON.stringify(
+        [{ id: 'zzq', title: 'ZZ lonely project', notesClean: '', isGroup: false, parent: null }]));
+      localStorage.setItem('gtd_tasks_waiting', '[]');
+      localStorage.setItem('gtd_tasks_next', '[]');
+      localStorage.setItem('gtd_events', '[]');
+      localStorage.setItem('gtd_completed_current', '[]');
+    }""")
+    pg.reload(); pg.wait_for_timeout(1200); clean()
+    pg.evaluate("""() => { const t = [...document.querySelectorAll('.lane[data-kind="current"] .card')]
+          .find(c => c.textContent.includes('ZZ lonely'));
+        t.querySelector('[data-action="complete"]').click(); }""")
+    pg.wait_for_timeout(700)
+    check(dialog_text() is None, "an unlinked project completes with no dialog in the way")
+    check(pg.evaluate("""() => JSON.parse(localStorage.getItem('gtd_completed_current') || '[]').length""") == 1,
+          "and really is completed")
 
     # ---------------- and the whole set survives in Chinese ----------------
     pg.evaluate("""() => document.querySelector('[data-action="open-overflow"]').click()""")
