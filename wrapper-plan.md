@@ -34,6 +34,7 @@ Ruled in conversation:
 | Sync topology | **Per-record**, not whole-blob. A short lock around each write; what travels under the lock is the touched records, not the world |
 | Long-lived "baton" | **Rejected** (proposed and dropped in the same conversation). It solved a possession problem the author doesn't have, and taught "you are locked out" constantly |
 | Conflict on the same record | **Keep the newest** |
+| Durable local storage | **In, as W2** (author, overruling this document). `localStorage` in a WebView is a cache the OS may reclaim; mirror every write to native storage so the local copy survives a wipe **without** Dropbox being the safety net. Mirror-on-write, not a full async adapter |
 | Offline | Not an edge case. Local-first is non-negotiable (CLAUDE.md), so divergence is guaranteed by design and must be reconciled, never prevented |
 
 ### Why per-record and not the obvious thing
@@ -300,7 +301,7 @@ reopens. So by the time the back button exists, there is nothing left for it to 
 
 ## 7. The chunks
 
-Seven, **W0–W6**. Each ends in something you can hold and judge, and each states how it behaves in a
+Eight, **W0–W7**. Each ends in something you can hold and judge, and each states how it behaves in a
 plain browser tab — because the public web app has to keep working (memory: pristine public web app
 *and* personal native+sync). A change that only makes sense inside the wrapper is a change that has
 to no-op cleanly outside it.
@@ -308,7 +309,7 @@ to no-op cleanly outside it.
 **Sequencing rule that shapes everything below:** the two goals are not equally risky. The drag fix
 is one line of shell config and is either right or wrong on day one. Sync is where data gets eaten.
 So the order front-loads the cheap certainty (W0) and then spends the bulk of the work getting the
-merge logic correct **before any network is involved at all** (W3 before W4).
+merge logic correct **before any network is involved at all** (W4 before W5).
 
 ---
 
@@ -348,9 +349,56 @@ inert — there is no hardware back. B3 changes nothing; the web build still wan
 
 ---
 
-### W2 — Record identity: `modifiedAt` and tombstones
+### W2 — Durable local storage (mirror-on-write)
 
-The prerequisite for everything after it, and the largest single piece of app surgery.
+**Author's ruling, overturning this document's own recommendation.** The reasoning is recorded
+because the flaw it corrects is easy to slip back into.
+
+This document originally deferred native storage on the grounds that *"once sync lands, a wiped
+local copy stops being catastrophic, because the cloud file is the recovery."* That argument is
+wrong in a specific way: it makes **Dropbox the safety net for local data**, which inverts the
+premise the whole app is built on. Local-first means the local copy is the system and everything
+else is a convenience — not the other way round. Author: *"If I lose access to that Dropbox, the app
+will become less usable."*
+
+**What it is protecting against, precisely.** The app is already fully local and already works with
+zero network; that is not what is at stake. What is at stake is Android **wiping** the local copy —
+"Clear storage" in the app's settings, or WebView storage evicted under disk pressure. `localStorage`
+in a WebView is a cache the OS believes it may reclaim. Durable native storage is not.
+
+**The mechanism — mirror-on-write, NOT a full async adapter.** The alternative in `spec.md` §2 is to
+make `Storage` asynchronous throughout, and it is the largest single piece of surgery in the plan:
+the app assumes synchronous persistence *everywhere*, including inside render paths, so every call
+site would have to learn about promises. This buys the same protection for a fraction of that:
+
+- `localStorage` stays the **working store** — synchronous, unchanged, every existing call site
+  untouched. No promises anywhere near a render path.
+- Every write additionally **mirrors** to durable native storage (Capacitor Preferences for the
+  small keys; Filesystem for anything that outgrows its limits). Write-behind, not batched.
+- On boot, if `localStorage` is empty **and** the mirror holds data, restore from the mirror. That
+  single branch is the entire recovery path, and it is also the wrapper's answer to the
+  "a WebView starts with empty localStorage" problem `spec.md` §2 raises about the first install.
+
+**⚑ The honest trade-off:** a crash in the gap between the `localStorage` write and the mirror write
+loses that one change. The window is a few milliseconds and the loss is bounded at a single edit,
+against a full-async rewrite that would risk correctness bugs across the entire app. Flagged so the
+choice is visible rather than discovered.
+
+**Ordering.** This sits *before* the sync chunks, deliberately. Putting it after Dropbox would leave
+a window in which the cloud is the only protection — precisely the arrangement the ruling rejects.
+It also comes before W3 because both are storage-layer work: doing the durability layer first means
+record identity is written against the final shape instead of being written twice.
+
+*In a browser:* there is no native store to mirror to, so the mirror is a no-op and behaviour is
+byte-for-byte what it is today. The restore branch never fires because the mirror is always empty.
+`src/storage.js` is already the single choke point every write goes through, which is what makes
+this cheap — the mirror hooks in at one place.
+
+---
+
+### W3 — Record identity: `modifiedAt` and tombstones
+
+The prerequisite for the sync engine.
 
 - Every mutation stamps `modifiedAt` on the record it touched. Currently **zero** records carry one.
 - Deletes leave a tombstone. Currently they are bare `splice`s, so "deleted" is indistinguishable
@@ -365,7 +413,7 @@ time, flag the choice.
 
 ---
 
-### W3 — The sync engine, with no network at all
+### W4 — The sync engine, with no network at all
 
 Per-record diff and merge, newest-wins on a same-record collision, and the conflict report that
 makes it non-silent (§1). Two simulated devices in one browser — two storage namespaces — and a
@@ -382,18 +430,18 @@ accumulated state.
 
 ---
 
-### W4 — Dropbox transport (wrapper only)
+### W5 — Dropbox transport (wrapper only)
 
 OAuth through the system browser (the AppAuth pattern — available *because* the wrapper owns its
 auth flow), file read/write, compare-and-swap on the file revision, and the short lock around each
-write. Wire the W3 engine to it.
+write. Wire the W4 engine to it.
 
 *In a browser:* the transport simply is not offered. Export/Import stays the web build's answer,
 exactly as `spec.md` §10 says it should.
 
 ---
 
-### W5 — Electron desktop
+### W6 — Electron desktop
 
 The same `dist/index.html` in a plain Electron shell (**not** Capacitor's Electron target — it is
 community-maintained and flaky; two thin shells, one payload). The desktop reads the synced file
@@ -404,7 +452,7 @@ this chunk exists.
 
 ---
 
-### W6 — Distribution
+### W7 — Distribution
 
 A sideloadable APK and an unsigned desktop build, plus the plain-language note on how to install
 each. Personal sideloading only — Play Store and Gatekeeper are recurring overhead and `spec.md` §2
@@ -412,20 +460,12 @@ already rules them out for now.
 
 ---
 
-### Deferred, with a reason
+### Nothing is deferred any more
 
-**S3, the async storage adapter, is NOT in the chunk list** — and `spec.md` §2 lists it as a wrapper
-prerequisite, so this is a deliberate departure worth defending.
-
-It was a prerequisite for *native durable storage*. Neither of the two goals needs it: the drag fix
-is shell config, and the sync engine reads and writes the same stores whatever backs them.
-`localStorage` works in an Android WebView. And once W4 lands, the failure it protects against — a
-"Clear app data" wiping the phone — stops being catastrophic, because the cloud file is the
-recovery. Doing async storage first would mean touching every call site in the app to reduce a risk
-that the following chunk largely removes.
-
-`src/storage.js` is already the single choke point, so this stays cheap to add later if the phone
-turns out to evict storage in practice. **Flagged rather than dropped.**
+An earlier draft of this section deferred native storage and argued for it at length. That argument
+is struck — see W2. The full **async** storage adapter of `spec.md` §2 remains unbuilt, but that is
+now a choice of *mechanism* rather than a deferral of the *protection*: mirror-on-write delivers the
+durability, and going fully async stays available later if the mirror proves insufficient.
 
 ---
 
