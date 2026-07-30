@@ -13,11 +13,24 @@
 // hostname sniffing — which matters because a hostname-based localhost no-op
 // would also have silently disabled the SW for these checks/*.py Playwright
 // suites, which serve dist/ over http://127.0.0.1 to drive the real thing.
+//
+// B3 (wrapper-plan.md §3.2): also skipped inside the Capacitor wrapper.
+// Capacitor serves the app from https://localhost (Android) — a real,
+// registerable origin, not file: — so without this check the SW would
+// install a second cache layer on top of assets that are already bundled
+// into the WebView. Inside a wrapper, app updates arrive as a new APK; a
+// stale SW cache could then serve the OLD app on top of the NEW binary,
+// exactly the bricking scenario service-worker-plan.md exists to prevent,
+// with the kill switch harder to deliver to an installed app than to a web
+// page. window.Capacitor is injected by the native shell itself (present
+// the moment the bridge attaches, before any app code runs), so this needs
+// no build-time flag and no change to how the plain web build is served.
 // =========================================================
 let swPendingWorker = null; // the current waiting worker the Reload button targets
 
 function initServiceWorker(){
   if (!("serviceWorker" in navigator) || location.protocol === "file:") return;
+  if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) return;
 
   let refreshing = false;
   navigator.serviceWorker.addEventListener("controllerchange", function(){

@@ -2714,7 +2714,18 @@
     // ⚑ Only reached when the project page's own warning did NOT fire — the two
     // must never stack (trap T6a). That warning IS this confirm for projects;
     // it just says more, because a project page can be holding staged children.
-    if (screenDirty(s)){
+    //
+    // DESKTOP ONLY (author's correction, 2026-07-29 — desktop-redesign-plan.md
+    // §5 originally read as universal and was built that way by mistake). The
+    // reason this exists at all is desktop-specific: Done sits bottom-right and
+    // ✕ sits top-right on the desktop card, close enough that an accidental
+    // click needs a second chance. On the phone, ✕ and the drafting page it
+    // closes are already opposed enough (a corner control acting against the
+    // whole screen behind it) that the extra confirm is friction, not safety —
+    // draft isolation's own invariant (✕ always discards, nothing ever commits
+    // early) already makes an accidental tap harmless to *undo the undo of*,
+    // there was just never anything saved to lose.
+    if (state.desktop && screenDirty(s)){
       openConfirmDialog(t("discard.message"), [
         { label: t("discard.yes"), style: "danger", action: function(){ closeScreen(); } },
         { label: t("discard.no"), action: function(){} }
@@ -2723,6 +2734,25 @@
     }
     closeScreen();
   }
+  // §4.6 Back/Escape resolution order: dialog → drawer → page → exit. Shared
+  // by the Escape key (below, browser + Electron) and the Android hardware
+  // back button (wrapper's MainActivity.onBackPressed calls
+  // window.__oelaHandleBack — wrapper-plan.md §5) so the two triggers can
+  // never drift apart. Returns whether something was closed/cancelled;
+  // false means "nothing left to intercept" — Escape does nothing further,
+  // and Android falls through to its own default (exit the lanes, per the
+  // author's ruling that back in the lanes needs no extra guard).
+  function handleBackOrEscape(){
+    // ▲ DESKTOP (trap T17): a header dropdown slots in FRONT of all of it. A
+    // back/Escape aimed at a stray open menu must never travel through to
+    // the half-edited page behind it.
+    if (closeHeaderDrops()) return true;
+    if (qs(".choice-dialog-backdrop")){ closeDialog(); return true; }
+    if (state.trayOpen){ closeTray(); return true; }
+    if (state.screen){ attemptCancelScreen(); return true; } // §12.1: project ✕-warning on every exit route
+    return false;
+  }
+  window.__oelaHandleBack = handleBackOrEscape; // wrapper-only hook; unused and harmless in a browser tab
   // Blocked saves mark the offending field with a dashed outline
   // (s.invalidField, cleared on the next input) instead of a popup —
   // popups are also unreliable in embedded/sandboxed contexts.
@@ -5552,14 +5582,7 @@
 
     document.addEventListener("keydown", function(e){
       if (e.key !== "Escape") return;
-      // §4.6 Back/Escape resolution order: dialog → drawer → page → exit.
-      // ▲ DESKTOP (trap T17): a header dropdown slots in FRONT of all of it. An
-      // Escape aimed at a stray open menu must never travel through to the
-      // half-edited page behind it.
-      if (closeHeaderDrops()) return;
-      if (qs(".choice-dialog-backdrop")){ closeDialog(); return; }
-      if (state.trayOpen){ closeTray(); return; }
-      if (state.screen){ attemptCancelScreen(); } // §12.1: project ✕-warning on every exit route
+      handleBackOrEscape();
     });
 
     // Live-snap reordering (overnight notes): during dragover the dragged
@@ -8218,5 +8241,29 @@
     renderSwUpdateBannerLabels(); // chunk 9: static markup, translated like tab labels
     initServiceWorker(); // chunk 9: offline cache + the update-ready banner
   }
+
+  // B1 (wrapper-plan.md §3.2): the boundary sweep used to run at boot only.
+  // A resident app can sit backgrounded for days without a cold start, so
+  // habits, recurring events and every deadline bar would silently stay on
+  // whatever day the app last launched. Keyed off visibilitychange rather
+  // than a Capacitor-only lifecycle event -- an Android WebView's document
+  // goes hidden/visible across a background/foreground cycle the same way a
+  // browser tab does, so one listener covers the wrapper AND a browser tab
+  // left open overnight, with nothing wrapper-specific to wire up.
+  function resweepBoundariesOnResume(){
+    processHabitBoundaries();
+    processEventBoundaries();
+    KINDS.forEach(renderLane);
+    updateLaneVisibility();
+    updateHabitBadge();
+    updateQaTimeReadout();
+    // Same split as applyQaTimeJump: a read-only screen computed from "now"
+    // (calendar, review) needs telling the day moved; a drafting page must
+    // not be re-rendered, or it tears down the input under the cursor.
+    if (state.screen && (state.screen.calendarView || state.screen.reviewView)) renderScreen();
+  }
+  document.addEventListener("visibilitychange", function(){
+    if (!document.hidden) resweepBoundariesOnResume();
+  });
 
   document.addEventListener("DOMContentLoaded", boot);

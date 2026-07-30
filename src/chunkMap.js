@@ -20,14 +20,15 @@
 // (this file + its boot() call) if the convention is ever retired.
 // =========================================================
 function injectChunkMap(){
-  const FLAG = "gtd_chunk_map_v18";
+  const FLAG = "gtd_chunk_map_v19";
   if (Storage.get(FLAG)) return;
   Storage.set(FLAG, "1");
   ["gtd_chunk_map_v1", "gtd_chunk_map_v2", "gtd_chunk_map_v3", "gtd_chunk_map_v4",
    "gtd_chunk_map_v5", "gtd_chunk_map_v6", "gtd_chunk_map_v7", "gtd_chunk_map_v8",
    "gtd_chunk_map_v9", "gtd_chunk_map_v10", "gtd_chunk_map_v11",
    "gtd_chunk_map_v12", "gtd_chunk_map_v13", "gtd_chunk_map_v14",
-   "gtd_chunk_map_v15", "gtd_chunk_map_v16", "gtd_chunk_map_v17"].forEach(Storage.remove);  // retire superseded flags
+   "gtd_chunk_map_v15", "gtd_chunk_map_v16", "gtd_chunk_map_v17",
+   "gtd_chunk_map_v18"].forEach(Storage.remove);  // retire superseded flags
 
   // Replace, don't accumulate (8.2, mirroring 8.1): sweep any previous
   // chunk-map group (tagged via devContext, not a title match, since the
@@ -87,7 +88,9 @@ function injectChunkMap(){
     { title: "✓ The habit-bubble dismiss, and the Advanced buttons", notes: "DONE. The calendar's 'Make this a habit instead' suggestion (shown when you set something to repeat daily or weekly) now has a small X to dismiss it — it comes back next time you pick daily or weekly on a fresh item. Every 'Advanced options' / 'More options' button across the app got a light grey fill for contrast, and the calendar's copy moved up next to the Event/Deadline toggle instead of sitting at the bottom of the form, on both phone and computer." },
     { title: "✓ The desktop calendar, fixed", notes: "DONE. The computer calendar used to overflow the screen at every size tested, including 1920x1080 — the day squares were too tall and the Add button could sit below the fold. It's now two columns (the form on the left, wide short day-squares on the right), fits on screen at any reasonable window size, and the phone layout is untouched." },
     { title: "✓ 9 — Service worker + offline + install polish", notes: "DONE. The app now works with no internet — it saves a copy of itself the first time you open it online, so airplane mode after that still loads and works. When I ship a change while you have the app open, a small bar appears saying “New version available” with a Reload button; nothing ever updates or interrupts you without that tap. See the fresh QA checklist in Next Actions to try both." },
-    { title: "A drawing tool for Notes — only if there is time", notes: "MAYBE. The first thing to cut if the month runs out." }
+    { title: "A drawing tool for Notes — only if there is time", notes: "MAYBE. The first thing to cut if the month runs out." },
+    { title: "✓ Wrapper W0 — the Android smoke shell", notes: "DONE, verified on a real device. The Android long-press drag bug (known issue 5) is fixed — a device trace showed 26 holds, 26 committed moves, zero contextmenu, zero touchcancel — by owning the WebView rather than rewriting drag code (there was none to rewrite). localStorage survives a force-kill and reopen. Two things landed alongside for every build, phone and computer: the whole card is now a drag surface, not just its title, and contexts stay non-draggable on purpose." },
+    { title: "Wrapper W1 — resume sweep, back button, service worker", notes: "BUILT, not yet tried on the phone. Habits and calendar deadlines now catch up the moment the app is reopened, not only on a cold start — the app used to sit on whatever day it last launched until closed and reopened. The Android back button now goes through the same cancel-and-warn chain as the ✕ button and the Escape key, instead of just quitting outright. And the offline-update banner (chunk 9) no longer tries to install a second copy of itself inside the app on your phone, where it could end up serving an old version on top of a new one." }
   ];
 
   const groupId = genId();

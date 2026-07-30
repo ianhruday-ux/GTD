@@ -3,7 +3,9 @@ package com.ianhruday.oela;
 import android.os.Bundle;
 import android.view.ActionMode;
 import android.view.View;
+import android.webkit.ValueCallback;
 import android.webkit.WebView;
+import androidx.activity.OnBackPressedCallback;
 import com.getcapacitor.BridgeActivity;
 
 /**
@@ -81,6 +83,64 @@ public class MainActivity extends BridgeActivity {
             @Override
             public boolean onLongClick(View v) {
                 return true; // consumed — do not fall through to selection
+            }
+        });
+
+        /**
+         * B4 (wrapper-plan.md §5): BACK = CANCEL (✕), never Save, with the
+         * resolution order dialog -> drawer -> page -> exit. That chain
+         * already exists in app code as the Escape-key handler (app.js,
+         * handleBackOrEscape, exposed here as window.__oelaHandleBack) --
+         * this callback's only job is to ask the page whether it handled the
+         * press before letting Android's own default happen.
+         *
+         * NOT Activity.onBackPressed(). This app targets SDK 36 (Android
+         * 16), where predictive back is ON BY DEFAULT unless the manifest
+         * opts out -- and once it's on, the system stops delivering the
+         * classic back-key event to onBackPressed() at all; it calls a
+         * registered OnBackInvokedCallback instead. An onBackPressed()
+         * override here would simply never run, on this device or any other
+         * shipping with predictive back on by default, which is exactly what
+         * the first build of this chunk did wrong (device test: every back
+         * press just closed the app, silently skipping the whole override).
+         * OnBackPressedCallback is the AndroidX shim that speaks BOTH
+         * dispatch mechanisms depending on OS version, so this is correct
+         * going forward rather than a same-bug-different-Android-version
+         * fix -- and it keeps the system's predictive-back preview animation
+         * working for the app instead of turning it off wholesale.
+         *
+         * evaluateJavascript is async, so the decision can't be made inside
+         * this single callback invocation. The callback disables itself and
+         * re-asks the dispatcher, which — with this callback out of the way —
+         * falls through to BridgeActivity's own default (no @capacitor/app
+         * listener is registered, so that means WebView-back-history, else
+         * finish the activity). Settled 2026-07-28: in the lanes, back exits
+         * the app with no extra guard, which is exactly what that fallback
+         * already does once nothing is left for the chain to intercept.
+         */
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                WebView wv = (getBridge() != null) ? getBridge().getWebView() : null;
+                if (wv == null) {
+                    fallThrough();
+                    return;
+                }
+                wv.evaluateJavascript(
+                    "(window.__oelaHandleBack ? !!window.__oelaHandleBack() : false)",
+                    new ValueCallback<String>() {
+                        @Override
+                        public void onReceiveValue(String value) {
+                            if (!"true".equals(value)) fallThrough();
+                        }
+                    }
+                );
+            }
+
+            private void fallThrough() {
+                setEnabled(false);
+                getOnBackPressedDispatcher().onBackPressed();
+                setEnabled(true);
             }
         });
     }

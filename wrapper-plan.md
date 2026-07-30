@@ -355,6 +355,68 @@ premise has changed and the remaining six chunks were costed against a premise t
 
 ---
 
+### W1 — Wrapper-safe behaviour (app code, ships to the web too) — BUILT 2026-07-29, awaiting device test
+
+All three fixes landed. `node --check`, the full `checks/*.py` suite, and a `gradlew assembleDebug`
+all pass; **not yet run on the phone** — that's the next step.
+
+- **B1.** `resweepBoundariesOnResume()` (`app.js`) runs `processHabitBoundaries` /
+  `processEventBoundaries` and re-renders on `visibilitychange` going non-hidden, mirroring
+  `applyQaTimeJump`'s existing re-render shape (every lane, the habit badge, and an open
+  calendar/review screen — never a drafting page mid-edit). ⚑ **Builder's call:** implemented with
+  `visibilitychange` alone, *not* also Capacitor's `App` plugin `appStateChange` as the plan
+  sketched. An Android WebView's `document.hidden` already flips across a background/foreground
+  cycle the same as a browser tab's, so a second, native-only signal looked like redundant surface
+  for no evidence it's needed yet. If the device test shows resume is missed (e.g. the WebView
+  doesn't fire `visibilitychange` on `onResume`), add the `@capacitor/app` listener as a second
+  trigger into the same function — nothing else about it would change.
+- **B4.** The Escape-key handler's cancel chain was extracted verbatim into `handleBackOrEscape()`
+  and exposed as `window.__oelaHandleBack`. `MainActivity.onBackPressed()` asks it via
+  `evaluateJavascript` and only falls through to `super.onBackPressed()` (BridgeActivity's own
+  default — no `@capacitor/app` plugin installed, so that means WebView-back-history-else-finish)
+  when the page reports it did nothing. Matches §5's ruling exactly: back in the lanes still exits,
+  because that IS what "nothing left to intercept" falls through to.
+- **B3.** `initServiceWorker()` now also returns early when `window.Capacitor.isNativePlatform()` is
+  true. That global is injected by the native shell itself the moment the bridge attaches — no
+  build-time flag, no change to how the plain web build is served or tested.
+
+The chunk map (`src/chunkMap.js`) picked up rows for W0 and W1 (bumped to `gtd_chunk_map_v19`) —
+W0 was built and verified but never recorded there.
+
+*In a browser, confirmed via `checks/*.py`:* B1 is a straight improvement (`boundary_4am.py` still
+23/23 via the untouched QA-jump path). B4 is inert — `capture_draft_and_cal_reset.py`'s "Escape
+keeps it too" still passes, confirming the extraction changed nothing about the Escape path itself.
+B3 is unaffected — `service_worker.py` still registers and updates normally over `http://127.0.0.1`,
+where `window.Capacitor` does not exist.
+
+**Two things found on the first real device pass, both fixed same round:**
+
+- **B4 didn't work at all on first install.** This app targets SDK 36 (Android 16), where
+  predictive back is **on by default** — once it is, the OS stops delivering the classic
+  `KEYCODE_BACK` event that `Activity.onBackPressed()` depends on and calls a registered
+  `OnBackInvokedCallback` instead. The override was correct in logic and dead in practice: every
+  back press fell straight through to Android's own default (exit), skipping the JS chain
+  entirely. Read via `adb logcat` rather than guessed — the same discipline that found the two
+  long-press timers in W0. Fixed by moving to `androidx.activity.OnBackPressedCallback`
+  (`getOnBackPressedDispatcher().addCallback`), the AndroidX shim that speaks both the classic and
+  predictive dispatch depending on OS version, registered in `MainActivity.onCreate`. This is the
+  forward-compatible fix, not an opt-out: setting `enableOnBackInvokedCallback="false"` would have
+  worked too but silently turns off the system's predictive-back preview animation for the whole
+  app to paper over one activity's plumbing.
+- **The generic "Discard your changes?" confirm was live on phone and shouldn't have been —
+  design correction, not a bug.** `attemptCancelScreen` (`app.js`) has always had two confirms: the
+  project page's own (staged children, trap T6a) and a generic one added in the desktop redesign
+  (`desktop-redesign-plan.md` §5) for every other drafting page. §5 read as universal and was built
+  that way; the author's actual intent was desktop-only — Done and ✕ sit close together on the
+  desktop card without enough contrast to trust a single tap, which is the entire reason the
+  confirm exists, and that problem doesn't exist on the phone, where ✕ is already visually opposed
+  enough to the page it closes. Found because B4 made the Android back button route through this
+  same confirm for the first time, and the author didn't recognize it as something asked for.
+  Scoped to `state.desktop` at the call site; the project page's richer warning is untouched and
+  still fires on every layout.
+
+*Original plan for this chunk follows.*
+
 ### W1 — Wrapper-safe behaviour (app code, ships to the web too)
 
 Three fixes that a resident app needs and a browser tab merely benefits from:

@@ -45,6 +45,17 @@ The two questions CLAUDE.md requires before a redesign were answered in conversa
    **nothing**. ✕ (and Escape) asks "Discard your changes?" — but **only when the draft
    actually differs** from the saved state; an untouched page closes instantly. This is a
    *softening added on top of* draft isolation, not a change to it: ✕ still never commits.
+   **Corrected 2026-07-29: desktop only.** This read as universal and was built that way,
+   which was wrong — the author's actual intent was narrower: Done (bottom-right) and ✕
+   (top-right) sit close together on the desktop card, not enough contrast to trust a single
+   tap, which is the entire reason this confirm exists. On the phone, ✕ is already opposed
+   enough to the page it closes that the confirm is pure friction with nothing extra to
+   protect — draft isolation itself already guarantees nothing was committed to lose. Found
+   because the wrapper's Android back button (wrapper-plan.md §5) started routing through
+   this same confirm and the author didn't recognize it as something they'd asked for on
+   phone. Scoped in code via `state.desktop` at the `attemptCancelScreen` call site
+   (`src/app.js`) — the project page's own richer warning (staged children, trap T6a) is
+   unaffected and still fires on every layout, phone included.
 6. **Calendar: visually a popup, structurally the same screen.** It stays a screen-stack
    citizen (`openCalendarScreen` in `src/events.js`), restyled on desktop as a large centered
    card (~900px) so the month grid finally gets room. No new popup system. All threaded flows
