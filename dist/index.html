@@ -2511,7 +2511,7 @@ body.screen-open #tray-handle{ display:none; }
 (function(){
 "use strict";
 
-const BUILD_STAMP = "31 Jul 03:05";  // replaced by build.py
+const BUILD_STAMP = "31 Jul 03:40";  // replaced by build.py
 
 // =========================================================
 // STORAGE ADAPTER (spec.md §3, known issue 4)
@@ -7206,7 +7206,7 @@ function initTimePickerFields(){
 // (this file + its boot() call) if the convention is ever retired.
 // =========================================================
 function injectChunkMap(){
-  const FLAG = "gtd_chunk_map_v25";
+  const FLAG = "gtd_chunk_map_v26";
   if (Storage.get(FLAG)) return;
   Storage.set(FLAG, "1");
   ["gtd_chunk_map_v1", "gtd_chunk_map_v2", "gtd_chunk_map_v3", "gtd_chunk_map_v4",
@@ -7216,7 +7216,7 @@ function injectChunkMap(){
    "gtd_chunk_map_v15", "gtd_chunk_map_v16", "gtd_chunk_map_v17",
    "gtd_chunk_map_v18", "gtd_chunk_map_v19", "gtd_chunk_map_v20",
    "gtd_chunk_map_v21", "gtd_chunk_map_v22", "gtd_chunk_map_v23",
-   "gtd_chunk_map_v24"].forEach(Storage.remove);  // retire superseded flags
+   "gtd_chunk_map_v24", "gtd_chunk_map_v25"].forEach(Storage.remove);  // retire superseded flags
 
   // Replace, don't accumulate (8.2, mirroring 8.1): sweep any previous
   // chunk-map group (tagged via devContext, not a title match, since the
@@ -7283,6 +7283,9 @@ function injectChunkMap(){
     { title: "✓ Wrapper W3 — every record remembers when it changed", notes: "DONE, invisible in the app itself — groundwork for syncing between devices later. Every action, event, note, tag, list, and capture now quietly carries a timestamp of its last real change, and a deleted one leaves a small record that it existed rather than vanishing without a trace. Neither of those exist yet for habits specifically — that one needs its own careful handling later, tied to how habit streaks get compared between two devices." },
     { title: "✓ Wrapper W4 — the part that actually merges two devices' changes", notes: "DONE, invisible in the app itself — the rulebook two devices follow when they sync: whoever changed something more recently wins, a genuine same-item disagreement gets flagged rather than one side silently vanishing, and a brand-new or long-away phone never mistakes 'I haven't seen this yet' for 'this was deleted.' Tested by actually running two copies of the app side by side and forcing them to disagree on purpose, 39 separate ways, before ever touching a network." },
     { title: "✓ Wrapper W5 — actually connecting to Dropbox", notes: "DONE, verified on the phone with a real Dropbox account: connected, synced, and the file actually showed up in Dropbox. There's a row at the top of the ⋯ menu: tap Connect Dropbox, sign in once, and from then on your phone and computer quietly stay in sync — when you open the app, when you come back to it, and even a best-effort try right before you switch away. A Sync now button is there too, for whenever you want to be sure right now. If two devices ever changed the exact same thing before they could sync, nothing gets silently thrown away — you'll see 'items changed on both devices' right there in the menu, with plain words about what was kept and what wasn't." },
+    { title: "✓ Wrapper W6 — the computer app, and the night sync nearly ate something", notes: "DONE. The app now runs as a real program on the computer, and finds your Dropbox folder by itself. Testing it against the phone turned up a serious problem and several smaller ones, all fixed: changes arriving from the other device were being saved but never shown until you restarted — and worse, the next thing you saved would mistake them for deletions and destroy them on both devices. One item was genuinely lost that way before it was caught. Also fixed: a repeating event could tell the other device to delete its own live row, every day; a sync that never answered would quietly switch syncing off until you restarted; and saving something now pushes it out on its own instead of waiting for you to reopen the app." },
+    { title: "✓ Wrapper A — nothing can vanish or lock you out", notes: "DONE. Three protections. An action whose list was deleted on your other device now shows up loose in its lane instead of disappearing silently. Anything nonsensical arriving from the cloud file is thrown away before the app tries to draw it — which matters because the app syncs the moment it opens, so one bad item could otherwise stop it opening at all, and reinstalling wouldn't help. And completing a project on one device then changing your mind on the other now brings its linked actions and events back, which it quietly didn't before." },
+    { title: "✓ Wrapper B — habits sync, and edits stop overwriting each other", notes: "DONE. Habit progress — your streak, your history, whether it's paused — didn't sync at all before, so two devices kept separate scores for the same habit. Now it syncs, and the rule when they disagree about a day is simple: if either device says you did it, you did it. A completion is something you actually did; a 'miss' is only the app guessing from silence, and a guess never overrules you. Streaks are recalculated from the combined history rather than picked between, so the two devices can't disagree about a personal best. Also: editing an item's notes on one device and its temptation bundle on the other used to throw one of them away — now both survive." },
     { title: "✓ Wrapper W6 — the computer app", notes: "BUILT and fully tested against a fake disk; not yet run against a real installed copy or a real Dropbox folder on this computer — that's the next real-world check, the same way W0/W2/W5 each needed one on the phone. Wraps the exact same app in a plain program window for Windows, with no browser chrome around it. The same 'Connect Dropbox' row from the phone now works on the computer too, but simpler: instead of signing in, it just finds your Dropbox folder on this computer by itself (or lets you point to it, if it can't) and reads/writes the same synced file directly off disk — no internet round-trip needed for the computer's half of syncing. Everything else about it — Sync now, 'changed on both devices' warnings, Disconnect — is the exact same code and the exact same menu row as the phone, not a second thing to maintain." }
   ];
 
