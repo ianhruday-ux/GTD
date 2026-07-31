@@ -228,7 +228,19 @@ function stampAndTombstone(key, arr){
       rec.deviceId = getDeviceId();
     }
   });
-  const removedIds = Object.keys(prevById).filter(function(id){ return !seen[id]; });
+  // DERIVED ROWS NEVER TOMBSTONE (author's question, 2026-07-30: "events
+  // don't show up in the lanes until the day of either, and we don't want
+  // those generating tombstones" -- exactly right, and they were).
+  //
+  // A pseudo-action leaves gtd_tasks_next every time its occurrence passes
+  // (events.js removePseudoRow), which is an EXPIRY, not a deletion. Its id is
+  // the event's stable taskId, re-minted on the next occurrence, so publishing
+  // "this id was deleted" told every other device to delete a row it was
+  // legitimately displaying -- and a daily series would have done it daily.
+  // See sync.js isDerivedRecord for the other half (they never travel either).
+  const removedIds = Object.keys(prevById).filter(function(id){
+    return !seen[id] && !isDerivedRecord(key, prevById[id]);
+  });
   if (removedIds.length) appendTombstones(key, removedIds, now);
 }
 
@@ -247,6 +259,11 @@ const Storage = {
     try {
       window.localStorage.setItem(key, value);
       mirrorWrite(key, value);
+      // Sync-on-save (author ruling 2026-07-30). This is the single choke
+      // point every write in the app goes through, which is what makes one
+      // line here enough -- no call site has to remember to publish.
+      // sync.js filters to synced stores and ignores its own imports.
+      noteSyncedWrite(key);
       return true;
     } catch (e){
       Storage._onWriteError(e);

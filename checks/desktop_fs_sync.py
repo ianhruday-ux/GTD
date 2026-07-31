@@ -47,6 +47,7 @@ FAKE_DESKTOP_BRIDGE = """
 window.__testDetectedFolder = "C:/FakeDropbox";
 window.__testPickedFolder = null;
 window.__testWriteHangs = false;
+window.__testWriteFails = false;
 window.__testChangeCallback = null;
 window.__testWatchCalls = 0;
 window.__oelaDesktopBridge = {
@@ -61,7 +62,17 @@ window.__oelaDesktopBridge = {
   watchSyncFile: async function(root){ window.__testWatchCalls++; return true; },
   onSyncFileChanged: function(cb){ window.__testChangeCallback = cb; },
   writeSyncFile: async function(root, content){
-    if (window.__testWriteHangs) return new Promise(function(){}); // never resolves -- simulates the process dying mid-write
+    // Two DIFFERENT failures, deliberately not conflated:
+    //   Hangs  -- never settles. Models the process being killed mid-write
+    //             (group 2). Nothing ever answers, because nothing is alive.
+    //   Fails  -- rejects. Models being OFFLINE, which is a request that
+    //             comes back refused, not one that never comes back.
+    // The offline test used to use the hang, which wedged runDropboxSync()'s
+    // "syncing" latch for the rest of the session and quietly broke every
+    // later check in this file. That turned out to be a REAL app bug, now
+    // fixed with a timeout -- see SYNC_ATTEMPT_TIMEOUT_MS in app.js.
+    if (window.__testWriteHangs) return new Promise(function(){});
+    if (window.__testWriteFails) throw new Error("simulated offline: write refused");
     return await window.__fsWrite(root, content);
   }
 };
@@ -301,6 +312,45 @@ with serve(DIST) as url, sync_playwright() as p:
     check("delivered by dropbox while nobody clicked anything" in local_tray_texts(pg3),
           "the externally-delivered record landed locally with NO manual sync click and NO open/resume/backgrounding trigger")
 
+    # ---- SYNC ON SAVE (author ruling 2026-07-30, trigger 5 of 5), and the
+    # guarantee attached to it: "if I save several items while offline, the
+    # next sync will include those items regardless of whether the sync was
+    # caused by the save of another item." ----
+    saved_before = len(disk3.files[disk3._path("C:/FakeDropbox")]["content"])
+    pg3.click('[data-action="open-tray"]'); pg3.wait_for_timeout(300)
+    pg3.wait_for_selector("#tray-input", timeout=5000)
+    pg3.fill("#tray-input", "saved, never touched a sync button")
+    pg3.press("#tray-input", "Enter")
+    # Debounce is 2s; wait past it and give the write time to land.
+    pg3.wait_for_timeout(3500)
+    cloud_now = json.loads(disk3.files[disk3._path("C:/FakeDropbox")]["content"])
+    check(any(r.get("text") == "saved, never touched a sync button" for r in cloud_now["stores"]["gtd_tray"]),
+          "saving an item publishes it on its own -- no button, no backgrounding, no resume")
+
+    # Now the offline case, which is the actual guarantee. Make the disk throw
+    # (the transport's writes fail exactly as they would with no network),
+    # save THREE items, then restore the disk and let ONE sync run.
+    pg3.evaluate("() => { window.__testWriteFails = true; }")
+    for n in ("offline one", "offline two", "offline three"):
+        pg3.fill("#tray-input", n); pg3.press("#tray-input", "Enter"); pg3.wait_for_timeout(250)
+    pg3.wait_for_timeout(3000)  # let the debounced attempts fire and hang
+    cloud_mid = json.loads(disk3.files[disk3._path("C:/FakeDropbox")]["content"])
+    offline_in_cloud = [r.get("text") for r in cloud_mid["stores"]["gtd_tray"] if str(r.get("text", "")).startswith("offline")]
+    check(offline_in_cloud == [],
+          f"fixture: while 'offline', none of the three saves reached the cloud ({offline_in_cloud})")
+    check(all(t in local_tray_texts(pg3) for t in ["offline one", "offline two", "offline three"]),
+          "and all three are safely local -- an unreachable cloud never costs you the save")
+
+    # Back online. ONE sync, triggered by something unrelated to those saves.
+    pg3.evaluate("() => { window.__testWriteFails = false; }")
+    pg3.evaluate("() => document.dispatchEvent(new Event('visibilitychange'))")
+    pg3.wait_for_timeout(1500)
+    cloud_after = json.loads(disk3.files[disk3._path("C:/FakeDropbox")]["content"])
+    landed = [r.get("text") for r in cloud_after["stores"]["gtd_tray"] if str(r.get("text", "")).startswith("offline")]
+    check(sorted(landed) == ["offline one", "offline three", "offline two"],
+          f"THE GUARANTEE: one later sync publishes ALL the offline saves at once, whatever triggered it ({landed})")
+    pg3.click('button.icon-btn[data-action="close-tray"]'); pg3.wait_for_timeout(300)
+
     # ---- staleness bucketing, same generic key/label as Dropbox's own UI test ----
     ninety_min_ago = int(time.time() * 1000) - 90 * 60 * 1000
     pg3.evaluate("(t) => localStorage.setItem('gtd_dropbox_last_sync', String(t))", ninety_min_ago)
@@ -315,11 +365,24 @@ with serve(DIST) as url, sync_playwright() as p:
     pg3.wait_for_selector("#tray-input", timeout=5000)
     pg3.fill("#tray-input", "the shared baseline text"); pg3.press("#tray-input", "Enter")
     pg3.wait_for_timeout(300)
-    local_capture_id = pg3.evaluate("() => JSON.parse(localStorage.getItem('gtd_tray'))[0].id")
+    # By TEXT, not [0]: the sync-on-save checks above leave several other
+    # captures in the tray, and indexing blindly silently targeted one of those
+    # instead -- which made the conflict never happen and the panel never
+    # appear. Found by this file failing, which is the system working.
+    local_capture_id = pg3.evaluate(
+        "() => JSON.parse(localStorage.getItem('gtd_tray')).find(r => r.text === 'the shared baseline text').id")
     pg3.click('button.icon-btn[data-action="close-tray"]'); pg3.wait_for_timeout(300)
 
+    # Let sync-on-save's 2s debounce FIRE AND FINISH before diverging the two
+    # sides. Without this wait the pending auto-sync lands in the middle of the
+    # setup below and pushes the local edit to the cloud, which makes it part
+    # of the shared baseline -- so the "conflict" becomes an ordinary one-sided
+    # update and never reaches the log. That is correct engine behaviour and a
+    # wrong fixture: the same class of mistake this suite's own header already
+    # warns about, caught this time by adding trigger 5.
+    pg3.wait_for_timeout(3500)
     pg3.evaluate("() => document.dispatchEvent(new Event('visibilitychange'))")  # the real resume trigger, not the raw transport call
-    pg3.wait_for_timeout(600)
+    pg3.wait_for_timeout(800)
 
     pg3.evaluate("""(id) => {
         const arr = JSON.parse(localStorage.getItem('gtd_tray'));

@@ -81,9 +81,36 @@ function loadRoster(){ return Storage.getJSON(SYNC_ROSTER_KEY, {}); }
 function loadBaseline(){ return Storage.getJSON(SYNC_BASELINE_KEY, null); }
 function saveBaseline(bundle){ Storage.setJSON(SYNC_BASELINE_KEY, bundle); }
 
+// DERIVED STATE MUST NOT TRAVEL (wrapper-plan.md §4.2, and trap #4: "Syncing
+// derived state doubles the conflict surface for no benefit and makes every
+// pseudo-action a potential collision"). The rule was ruled; the code did not
+// implement it until the author asked how tombstones were generated.
+//
+// A pseudo-action is the row an event mints into Next Actions on its day. It
+// lives in gtd_tasks_next -- a synced store -- but is a pure function of
+// (gtd_events, today), which every device recomputes for itself in
+// processEventBoundaries(). It is identified by carrying an eventId.
+//
+// Two separate harms, both real:
+//   1. It travelled, so two devices could collide over a row neither of them
+//      authored.
+//   2. Worse, its REMOVAL wrote a tombstone. events.js's removePseudoRow()
+//      drops the row and saves the lane, which reads as a deletion. But the
+//      id is ev.taskId -- STABLE per series, re-minted every occurrence. So
+//      one device rolling past an occurrence published "record T is deleted"
+//      for an id the other device was legitimately displaying, and the merge
+//      would honour it. A recurring event could delete its own live row on
+//      the other device, every single day.
+function isDerivedRecord(key, r){
+  return key === "gtd_tasks_next" && !!(r && r.eventId);
+}
+function stripDerived(key, arr){
+  return (arr || []).filter(function(r){ return !isDerivedRecord(key, r); });
+}
+
 function exportBundle(){
   const stores = {};
-  SYNC_STORE_KEYS.forEach(function(k){ stores[k] = Storage.getJSON(k, []); });
+  SYNC_STORE_KEYS.forEach(function(k){ stores[k] = stripDerived(k, Storage.getJSON(k, [])); });
   return {
     roster: loadRoster(),
     tombstones: Storage.getJSON(SYNC_TOMBSTONE_KEY, []),
@@ -99,11 +126,60 @@ function exportBundle(){
 // applies never mints a second, redundant local tombstone for a deletion
 // that already has one from whoever actually deleted it.
 function importBundle(bundle){
-  Storage.set(SYNC_ROSTER_KEY, JSON.stringify(bundle.roster));
-  Storage.set(SYNC_TOMBSTONE_KEY, JSON.stringify(bundle.tombstones));
-  SYNC_STORE_KEYS.forEach(function(k){
-    Storage.set(k, JSON.stringify(bundle.stores[k] || []));
-  });
+  // suppressLocalChange, not a subtlety: without it every merge would look
+  // like fourteen local edits and schedule another sync, which would import
+  // again, forever. A sync's own writes are never "a local change."
+  suppressLocalChange = true;
+  try {
+    Storage.set(SYNC_ROSTER_KEY, JSON.stringify(bundle.roster));
+    Storage.set(SYNC_TOMBSTONE_KEY, JSON.stringify(bundle.tombstones));
+    SYNC_STORE_KEYS.forEach(function(k){
+      // Derived rows never left this device, so the merged bundle has none --
+      // writing it verbatim would wipe THIS device's live pseudo-actions until
+      // the next sweep re-minted them (a visible flicker at best). Carry the
+      // local ones across untouched. stripDerived on the incoming side too, so
+      // a bundle written by an older build that DID publish them gets cleaned
+      // rather than reintroducing the collision.
+      const localDerived = (Storage.getJSON(k, []) || []).filter(function(r){ return isDerivedRecord(k, r); });
+      const incoming = stripDerived(k, bundle.stores[k] || []);
+      Storage.set(k, JSON.stringify(localDerived.concat(incoming)));
+    });
+  } finally {
+    suppressLocalChange = false;
+  }
+}
+
+// ---------------------------------------------------------------------
+// SYNC ON SAVE (author ruling, 2026-07-30, reversing the earlier "four
+// triggers only" decision -- open/resume/backgrounding/manual). Without
+// this, a record created on one device sits unpublished until the app
+// happens to be backgrounded or the button is pressed, which is exactly
+// how a real cross-device test lost half an hour to "I synced on the other
+// device and nothing came through" -- the ORIGIN device had never pushed.
+//
+// THE GUARANTEE THE AUTHOR ASKED FOR -- "if I save several items while
+// offline, the next sync will include those items regardless of whether
+// the sync was caused by the save of another item" -- holds structurally,
+// not by bookkeeping: a sync always pushes exportBundle(), the WHOLE local
+// state, never a per-item queue or delta. There is no list of pending
+// changes that could miss an entry, so any successful sync, whatever
+// triggered it, publishes every unsynced save at once. Failed syncs
+// (offline) leave local storage untouched and need no retry queue for the
+// same reason.
+// ---------------------------------------------------------------------
+let suppressLocalChange = false;
+let localChangeHook = null;
+function setOnLocalChange(fn){ localChangeHook = fn; }
+
+// Called by storage.js on every successful write (it is the single choke
+// point every write in the app already goes through -- CLAUDE.md). Filters
+// to the stores that actually sync: device-local keys (gtd_collapsed,
+// gtd_surface, gtd_locale, gtd_tray_draft) and dev scaffolding must never
+// schedule network work.
+function noteSyncedWrite(key){
+  if (suppressLocalChange) return;
+  if (key !== SYNC_TOMBSTONE_KEY && SYNC_STORE_KEYS.indexOf(key) === -1) return;
+  if (localChangeHook) localChangeHook();
 }
 
 function byId(arr){
@@ -376,8 +452,9 @@ const Sync = {
   mergeBundles: mergeBundles,
   reconcile: reconcile,
   canSweepAccumulated: canSweepAccumulated,
-  setAfterImport: setAfterImport, // app.js registers its "reload memory from storage" here
-  setApplyGate: setApplyGate,     // app.js registers "is a drafting page open?" here
+  setAfterImport: setAfterImport,   // app.js registers its "reload memory from storage" here
+  setApplyGate: setApplyGate,       // app.js registers "is a drafting page open?" here
+  setOnLocalChange: setOnLocalChange, // app.js registers its debounced "push after a save" here
   storeKeys: SYNC_STORE_KEYS // read-only reference W5's transport needs to build an empty/first-sync bundle without duplicating this list
 };
 window.__oelaSync = Sync; // W5's hook, and this chunk's own test harness -- not a user-facing feature

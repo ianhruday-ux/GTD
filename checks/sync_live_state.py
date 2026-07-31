@@ -288,6 +288,68 @@ with serve(DIST) as url, sync_playwright() as p:
 
     check(not errs4, f"no JS errors in group 4 ({errs4[:3]})")
 
+    # ============================================================
+    # Group 5 -- DERIVED STATE NEVER TRAVELS AND NEVER TOMBSTONES
+    # (wrapper-plan.md §4.2 + trap #4; raised by the author asking how
+    # tombstones were generated, which is how the bug was found)
+    #
+    # An event mints a "pseudo-action" into gtd_tasks_next on its day. That
+    # row is derived -- every device recomputes it from gtd_events + today --
+    # but it lived in a SYNCED store, and events.js's removePseudoRow() drops
+    # it and saves the lane, which read as a deletion. Its id is the event's
+    # stable taskId, re-minted every occurrence, so one device rolling past an
+    # occurrence published "delete T" for a row the other device was correctly
+    # showing. A daily series would have done that daily.
+    # ============================================================
+    ctx6 = b.new_context(viewport={"width": 420, "height": 900})
+    pg6 = ctx6.new_page()
+    errs6 = []
+    pg6.on("pageerror", lambda e: errs6.append(str(e)))
+    pg6.goto(url); pg6.wait_for_timeout(700)
+    pg6.click('button.icon-btn[data-action="close-tray"]'); pg6.wait_for_timeout(300)
+
+    # Create a real event dated today, through the real calendar UI, so it
+    # mints a real pseudo-action rather than a hand-built imitation of one.
+    pg6.click('[data-action="open-calendar"]'); pg6.wait_for_timeout(500)
+    pg6.fill('[data-calfield="name"]', "SYNC-DERIVED-EVENT")
+    pg6.click('[data-action="cal-add"]'); pg6.wait_for_timeout(500)
+    pg6.click('[data-action="cal-close"]'); pg6.wait_for_timeout(500)
+
+    pseudo = pg6.evaluate("""() => JSON.parse(localStorage.getItem('gtd_tasks_next')||'[]')
+        .find(t => t.eventId)""")
+    check(pseudo is not None, f"fixture: the event really minted a pseudo-action into gtd_tasks_next ({pseudo})")
+
+    if pseudo:
+        bundle = pg6.evaluate("() => window.__oelaSync.exportBundle()")
+        published = [t.get("id") for t in bundle["stores"]["gtd_tasks_next"]]
+        check(pseudo["id"] not in published,
+              f"the pseudo-action is NOT published -- derived state does not travel (§4.2) ({published})")
+        check(any(e.get("title") == "SYNC-DERIVED-EVENT" for e in bundle["stores"]["gtd_events"]),
+              "but the EVENT itself does travel -- it is the accumulated thing the other device recomputes from")
+
+        # Now make the row leave the lane the way it really does -- through the
+        # app's own completion path, clicked on the real card. (No test-only
+        # global: production code should not grow a hook just so a check can
+        # reach it.)
+        before = set(tombstoned_ids(pg6))
+        removed_ok = pg6.evaluate("""(title) => {
+            const card = [...document.querySelectorAll('.card')].find(c => c.textContent.includes(title));
+            if (!card) return false;
+            const btn = card.querySelector('[data-action="complete"]');
+            if (!btn) return false;
+            btn.click();
+            return true;
+        }""", "SYNC-DERIVED-EVENT")
+        pg6.wait_for_timeout(600)
+        check(removed_ok, "fixture: clicked the real pseudo-action checkbox")
+        check(pg6.evaluate("""() => !JSON.parse(localStorage.getItem('gtd_tasks_next')||'[]').some(t => t.eventId)"""),
+              "fixture: and the derived row really did leave the lane, so a save definitely ran")
+        after = set(tombstoned_ids(pg6))
+        check(pseudo["id"] not in (after - before),
+              f"and its removal writes NO tombstone -- an occurrence passing is an expiry, not a deletion ({sorted(after - before)})")
+
+    check(not errs6, f"no JS errors in group 5 ({errs6[:3]})")
+
     b.close()
 
 for line in notes + fails:

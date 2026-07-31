@@ -8396,6 +8396,10 @@
   const DROPBOX_LAST_SYNC_KEY = "gtd_dropbox_last_sync";
   const DROPBOX_CONFLICT_LOG_KEY = "gtd_dropbox_conflict_log";
   const DROPBOX_CONFLICT_LOG_CAP = 20; // a personal log, not an audit trail -- old entries just age out
+  // Long enough that a slow phone on a slow connection finishes honestly,
+  // short enough that a wedged attempt cannot hold the "syncing" latch for a
+  // whole session. Nothing waits on a sync, so this only bounds the latch.
+  const SYNC_ATTEMPT_TIMEOUT_MS = 30000;
 
   function dropboxLastSyncAt(){
     const raw = Storage.get(DROPBOX_LAST_SYNC_KEY);
@@ -8466,11 +8470,35 @@
     // calls it right after Sync.setConnected(true), before isEnabled()
     // would differ from isAvailable() in practice).
     if (!Sync.isEnabled()) return;
-    if (state.sync.syncing) return; // already running -- the caller's trigger just missed it, not an error
+    if (state.sync.syncing){
+      // A trigger arrived mid-flight. Do NOT just drop it: with sync-on-save
+      // that trigger is "the user saved something", and the in-flight sync
+      // may already have read storage before that save landed. Remember to
+      // run once more when this one finishes -- the trailing edge that makes
+      // "every save eventually reaches the cloud" true rather than likely.
+      state.sync.rerunWhenDone = true;
+      return;
+    }
     state.sync.syncing = true;
     if (isSettingsMenuOpen()) renderSettingsMenu();
     try {
-      const result = await activeSyncTransport().syncNow();
+      // Bounded, because "syncing" is a latch and a hung request would jam it
+      // shut forever. Found by checks/desktop_fs_sync.py's offline simulation
+      // (2026-07-30): its write never settled, runDropboxSync()'s await never
+      // returned, its finally never ran, and every later sync in that session
+      // bailed on the still-true flag -- sync silently dead until relaunch.
+      // Not a test artifact: a request that never answers is exactly what a
+      // flaky connection or a wedged IPC reply does in the real app.
+      //
+      // The abandoned attempt may still land afterwards; that is safe, since
+      // both transports write under CAS/mtime checks and a late write either
+      // wins cleanly or loses and retries.
+      const result = await Promise.race([
+        activeSyncTransport().syncNow(),
+        new Promise(function(_, reject){
+          setTimeout(function(){ reject(new Error("Sync timed out — will try again")); }, SYNC_ATTEMPT_TIMEOUT_MS);
+        })
+      ]);
       Storage.set(DROPBOX_LAST_SYNC_KEY, String(Date.now()));
       state.sync.lastError = null;
       appendDropboxConflicts(result.conflicts);
@@ -8503,6 +8531,10 @@
     } finally {
       state.sync.syncing = false;
       if (isSettingsMenuOpen()) renderSettingsMenu();
+      if (state.sync.rerunWhenDone){
+        state.sync.rerunWhenDone = false;
+        runDropboxSync(); // the trailing edge above; cannot loop, since a sync's own writes never re-trigger (sync.js suppresses them)
+      }
     }
   }
 
@@ -8562,6 +8594,30 @@
     return false;
   }
   Sync.setApplyGate(syncApplyGateOpen);
+
+  // Sync-on-save, trigger 5 of 5 (author ruling 2026-07-30, reversing the
+  // earlier four-trigger decision). Debounced rather than immediate: saving a
+  // project page writes several stores in a row, and completing a few items in
+  // a burst is normal, so a short settle collapses those into one push instead
+  // of one per write. Two seconds is long enough to coalesce a burst and short
+  // enough that the other device sees the change while you are still thinking
+  // about it.
+  //
+  // Note this deliberately fires even while a drafting page is open: the merge
+  // will defer (syncApplyGateOpen) but the PUSH still happens, which is the
+  // whole point of the amendment to option 1 -- saving must publish, whether
+  // or not it is safe to pull right now.
+  const SYNC_AFTER_CHANGE_MS = 2000;
+  let syncAfterChangeTimer = null;
+  function scheduleSyncAfterChange(){
+    if (!Sync.isEnabled()) return; // no transport, or not connected: nothing to schedule
+    if (syncAfterChangeTimer) clearTimeout(syncAfterChangeTimer);
+    syncAfterChangeTimer = setTimeout(function(){
+      syncAfterChangeTimer = null;
+      runDropboxSync();
+    }, SYNC_AFTER_CHANGE_MS);
+  }
+  Sync.setOnLocalChange(scheduleSyncAfterChange);
 
   // B1 (wrapper-plan.md §3.2): the boundary sweep used to run at boot only.
   // A resident app can sit backgrounded for days without a cold start, so
