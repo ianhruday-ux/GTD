@@ -363,6 +363,14 @@ reopens. So by the time the back button exists, there is nothing left for it to 
    `dist/index.html` was rebuilt since the last one. A build can succeed, install cleanly, and launch
    fine while silently running app code from hours earlier. `cap sync android` before *every*
    `assembleDebug`, not just the first one in a session.
+10. **Assuming the Dropbox App Folder's on-disk name matches its display name.** Found live, W6 desktop
+    test session: it's registered separately in the Dropbox App Console and can differ (here,
+    `OELA_sync_ianhruday`, not `OELA`). W5's API-based transport never needed to know this — an App
+    Folder access token scopes to its own root transparently. A filesystem-based transport (W6) does
+    need to know it, and getting it wrong is **silent**: each device would read and write a different
+    file, merge happily with itself, and never see the other's data, with nothing anywhere to error.
+    Verify against the real, signed-in account before trusting this document's own prose about the
+    folder name — it was never load-bearing before W6 and went unverified for that reason.
 
 ---
 
@@ -942,10 +950,20 @@ application menu (`Menu.setApplicationMenu(null)`) — a native File/Edit/View/W
 nothing this app uses; the app has always had its own ⋯ menu and header chrome.
 
 **`src/desktopTransport.js`, new module — the fs-based sibling to `dropboxTransport.js`.** No OAuth, no
-network call: `desktopSyncNow()` reads/writes `<folder>/Apps/OELA/oela-sync.json` directly on disk —
-**the exact same path** W5's Dropbox API already writes to (confirmed against `dropboxTransport.js`'s
-own `DROPBOX_SYNC_PATH` and W5's device-verified note that the file lands in `Apps/OELA`) — which is
-what makes this genuinely the *same* sync, not a second, incompatible one. `<folder>` is resolved by
+network call: `desktopSyncNow()` reads/writes `<folder>/Apps/<registered folder name>/oela-sync.json`
+directly on disk — **the exact same file** W5's Dropbox API already writes to, since that's the whole
+point of a file-based sync existing at all. ⚠ **A real bug, found live during the desktop test session
+(2026-07-30), not by code review:** the app-folder name is *not* `OELA`. `dropboxTransport.js`'s own
+`DROPBOX_SYNC_PATH` (`/oela-sync.json`) never had to know this — Dropbox's API scopes an App Folder
+token to its own root transparently, so the literal on-disk folder name was never load-bearing for W5.
+This document's own W5 entry above says the file "lands in `Apps/OELA`," which was an informal
+description that happened to go unverified because nothing depended on it being exact. It wasn't
+exact: checked directly against the real, signed-in account, the registered folder is
+`Apps/OELA_sync_ianhruday`. Getting this wrong in `wrapper/electron/main.js`'s
+`DROPBOX_APP_SUBPATH` would have been **silent and dangerous** — the desktop transport would read and
+write a different file than the phone, each side merging happily with itself, seeing the other
+device's data never, with no error anywhere to notice by. Fixed before any real test ran; added to §6
+as its own trap. `<folder>` is resolved by
 `desktopConnect()`: try `detectDropboxFolder()` first (the main process reads Dropbox's own
 `info.json` — `%APPDATA%\Dropbox\info.json` on Windows, the ruled first target; macOS/Linux's
 well-documented equivalent locations are included since they cost nothing, but untested here), and
