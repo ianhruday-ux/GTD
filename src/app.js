@@ -7436,12 +7436,26 @@
   // desk and dismisses on any outside tap. Nested panels (Background) push into
   // the same dropdown rather than opening a second layer.
   let settingsPanel = "root";
+  // W6: resolves to whichever transport THIS build actually offers --
+  // DropboxTransport (Capacitor/Android, W5) or DesktopTransport (Electron,
+  // W6) -- never both; a plain browser tab has neither. Every call site below
+  // keeps saying "Dropbox" throughout (function names, storage keys, i18n
+  // strings) on purpose: both transports read and write the exact same
+  // Dropbox-synced file, just by different mechanisms (HTTP API + OAuth vs.
+  // reading the local disk copy), so the existing copy ("Connect Dropbox")
+  // stays accurate as written rather than forking into two near-identical
+  // settings rows and duplicating this whole orchestration block.
+  function activeSyncTransport(){
+    if (DropboxTransport.isAvailable()) return DropboxTransport;
+    if (DesktopTransport.isAvailable()) return DesktopTransport;
+    return null;
+  }
   // W5: hidden entirely outside the wrapper -- "In a browser, the transport
   // simply is not offered" (wrapper-plan.md). At the TOP of the menu (author's
   // placement, this round), above export/import, since it's the row most
   // likely to need a deliberate tap right before switching devices.
   function settingsDropboxRowHtml(){
-    if (!DropboxTransport.isAvailable()) return "";
+    if (!activeSyncTransport()) return "";
     if (!Sync.isEnabled()){
       return '<button type="button" class="settings-item" data-action="dropbox-connect">' +
         '<span>&#9729;</span><span class="si-label">' + escapeHtml(t("sync.connect")) + '</span></button>' +
@@ -7615,10 +7629,13 @@
       if (action === "settings-debug"){ settingsPanel = "debug"; renderSettingsMenu(); return; }
       if (action === "settings-dropbox-conflicts"){ settingsPanel = "dropbox-conflicts"; renderSettingsMenu(); return; }
       if (action === "dropbox-connect"){
-        // Hands off to the system browser (AppAuth) and back -- nothing to
-        // show mid-flight beyond what Android itself shows. On return, sync
-        // once immediately so "Connect" doesn't sit there looking unconnected.
-        DropboxTransport.connect().then(function(){ renderSettingsMenu(); runDropboxSync(); })
+        // Android: hands off to the system browser (AppAuth) and back.
+        // Electron (W6): auto-detects the local Dropbox folder or opens a
+        // native picker (desktopTransport.js) -- same shape, nothing to show
+        // mid-flight beyond what the platform itself shows either way. On
+        // return, sync once immediately so "Connect" doesn't sit there
+        // looking unconnected.
+        activeSyncTransport().connect().then(function(){ renderSettingsMenu(); runDropboxSync(); })
           .catch(function(e){ state.sync.lastError = (e && e.message) || String(e); renderSettingsMenu(); });
         return;
       }
@@ -7629,7 +7646,7 @@
         // data) -- same "applies immediately" tier as the background/
         // language rows right below it, not the restore-defaults tier below
         // THAT. ⚑ Builder's call, flagged rather than silently assumed.
-        DropboxTransport.disconnect().then(function(){
+        activeSyncTransport().disconnect().then(function(){
           Storage.remove(DROPBOX_LAST_SYNC_KEY);
           Storage.remove(DROPBOX_CONFLICT_LOG_KEY);
           state.sync.lastError = null;
@@ -8435,8 +8452,8 @@
     // would silently attempt work an unauthorized DropboxAuthPlugin call is
     // only going to reject anyway. isEnabled() already means "native AND
     // this device has connected" (sync.js), which is the correct gate here.
-    // DropboxTransport.syncNow() itself still only checks isAvailable() --
-    // it stays callable directly (the manual button's own connect flow
+    // Each transport's own syncNow() still only checks its own isAvailable()
+    // -- it stays callable directly (the manual button's own connect flow
     // calls it right after Sync.setConnected(true), before isEnabled()
     // would differ from isAvailable() in practice).
     if (!Sync.isEnabled()) return;
@@ -8444,7 +8461,7 @@
     state.sync.syncing = true;
     if (isSettingsMenuOpen()) renderSettingsMenu();
     try {
-      const result = await DropboxTransport.syncNow();
+      const result = await activeSyncTransport().syncNow();
       Storage.set(DROPBOX_LAST_SYNC_KEY, String(Date.now()));
       state.sync.lastError = null;
       appendDropboxConflicts(result.conflicts);

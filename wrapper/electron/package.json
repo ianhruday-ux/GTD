@@ -1,0 +1,13 @@
+{
+  "name": "oela-electron",
+  "version": "1.0.0",
+  "description": "W6 (wrapper-plan.md) — plain Electron shell around ../../dist/index.html. Not Capacitor's Electron target (community-maintained, flaky) — a second, independent thin shell around the same self-contained build.",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^43.2.0"
+  }
+}

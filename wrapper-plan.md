@@ -927,6 +927,85 @@ exactly as `spec.md` §10 says it should.
 
 ---
 
+### W6 — Electron desktop — BUILT AND TESTED 2026-07-30
+
+**`wrapper/electron/`, a second, independent shell.** `main.js` creates one `BrowserWindow`
+(`contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`) and loads `../../dist/index.html`
+via `loadFile` — same file, same origin type (`file:`) a browser opening it directly would use, which
+means **swClient.js's existing `location.protocol === "file:"` check already keeps the service worker
+out with no Electron-specific code at all** — B3 (§3.2) turned out to already be solved by W1, for
+free, the moment this chunk chose `loadFile` over serving from a local HTTP port. `preload.js` exposes
+exactly four methods on `window.__oelaDesktopBridge` via `contextBridge` (`detectDropboxFolder`,
+`pickFolder`, `readSyncFile`, `writeSyncFile`) — no `nodeIntegration`, mirroring how Capacitor exposes
+`window.Capacitor.Plugins.*` to the WebView rather than raw native access. ⚑ **Builder's call:** no
+application menu (`Menu.setApplicationMenu(null)`) — a native File/Edit/View/Window/Help bar adds
+nothing this app uses; the app has always had its own ⋯ menu and header chrome.
+
+**`src/desktopTransport.js`, new module — the fs-based sibling to `dropboxTransport.js`.** No OAuth, no
+network call: `desktopSyncNow()` reads/writes `<folder>/Apps/OELA/oela-sync.json` directly on disk —
+**the exact same path** W5's Dropbox API already writes to (confirmed against `dropboxTransport.js`'s
+own `DROPBOX_SYNC_PATH` and W5's device-verified note that the file lands in `Apps/OELA`) — which is
+what makes this genuinely the *same* sync, not a second, incompatible one. `<folder>` is resolved by
+`desktopConnect()`: try `detectDropboxFolder()` first (the main process reads Dropbox's own
+`info.json` — `%APPDATA%\Dropbox\info.json` on Windows, the ruled first target; macOS/Linux's
+well-documented equivalent locations are included since they cost nothing, but untested here), and
+fall back to `pickFolder()` (a native folder dialog) the moment that comes back empty. The folder path
+itself is **device-local** (`gtd_desktop_sync_folder`, wrapper-plan.md §4.2) — never synced, since a
+path only means anything on the machine that resolved it.
+
+**The CAS-on-revision question, answered for a transport with no server to ask.** §4.4's lock question
+was resolved for Dropbox's API by a revision string; there is no equivalent here, only the filesystem's
+own mtime. `desktopSyncNow()` re-reads the file's mtime immediately before writing and retries the
+whole read-merge-write cycle (capped at `DESKTOP_MAX_WRITE_RETRIES = 3`, mirroring
+`DROPBOX_MAX_CAS_RETRIES`'s own reasoning) if it moved — the realistic case being the Dropbox desktop
+client itself syncing a remote change to disk in that exact window, not another instance of this app.
+
+**`activeSyncTransport()` (`app.js`), not a second settings surface.** The two transports are mutually
+exclusive at runtime (Capacitor-native vs. Electron-native; a plain browser tab has neither), and both
+are, in truth, "connect to Dropbox" — just by different mechanisms. Rather than forking
+`settingsDropboxRowHtml()` / `runDropboxSync()` / the conflict-log panel into Dropbox and Desktop
+copies, one small resolver (`DropboxTransport.isAvailable() ? DropboxTransport : DesktopTransport`)
+is threaded through the existing W5 orchestration, which is otherwise **completely untouched** — same
+function names, same storage keys (`gtd_dropbox_last_sync`, `gtd_dropbox_conflict_log`), same
+`data-action` strings, same i18n copy ("Connect Dropbox" reads correctly for the folder-picker flow
+too). ⚑ **Builder's call, flagged rather than silently assumed:** this trades a small amount of
+naming accuracy (a desktop-only settings row still says "Dropbox" in code, not "Desktop sync") for
+zero risk to W5's already-shipped, already-tested 35 checks — all 35 pass unmodified. `sync.js`'s
+`syncIsEnabled()` gained one small generalization (`isNativeWrapper()`, recognizing either
+`window.Capacitor` or `window.__oelaDesktopBridge`) to make this possible; nothing else in the merge
+engine changed.
+
+**Tested, not guessed — `checks/desktop_fs_sync.py`, new, 41 checks, three groups** (mirroring
+`dropbox_transport.py`'s own split, adapted for a transport with no network): the engine directly
+(first-ever sync; a genuine mtime race — something else writes the file between this device's read and
+its write — resolving in exactly one retry); the same kill-mid-write question W5's author asked,
+asked again of this transport (a hung write, confirmed the local merge already landed and the disk was
+untouched by the killed attempt, then a simulated relaunch that recovers and completes the write); and
+the settings UI end to end (connect via auto-detect, connect via the picker fallback, staleness
+bucketing, a genuine conflict surfaced through the real resume trigger, disconnect clearing both the
+generic sync state *and* the desktop-only saved folder). The fake "disk" is Python-side state
+(`FakeDisk`) shared across browser contexts via `context.expose_function`, playing the same role
+`dropbox_transport.py`'s `FakeCloud` plays for the network transport — a filesystem is external to any
+one page's JS context the same way a real cloud file is external to any one browser tab.
+
+Full `checks/*.py` suite re-run clean after this chunk, zero regressions — `activeSyncTransport()`'s
+generalization of the W5 orchestration code is exercised by both `dropbox_transport.py`/
+`dropbox_settings_ui.py` (Capacitor branch) and `desktop_fs_sync.py` (Electron branch), which is the
+whole point of resolving it in one place rather than two.
+
+**Not yet device-verified.** Every prior wrapper chunk that touched a real environment (W0, W2, W5) 
+found something the plan or the code didn't anticipate — a racing long-press timer, a mirror-on-write
+gap, a CORS/header trap, a stale APK, a missing USB driver. This chunk has not yet been run as an
+installed Electron app against a real Dropbox folder on the author's own computer; treat it as
+tested-but-unverified until that pass happens, the same caveat W1 carried between being built and being
+run on the phone.
+
+*In a browser:* desktop Chrome remains a first-class way to run the app, unwrapped — `window.__oelaDesktopBridge`
+does not exist there, so `DesktopTransport.isAvailable()` is false and `activeSyncTransport()` falls
+through to `null`, exactly like it always has for `DropboxTransport` alone.
+
+*Original plan for this chunk follows.*
+
 ### W6 — Electron desktop
 
 The same `dist/index.html` in a plain Electron shell (**not** Capacitor's Electron target — it is

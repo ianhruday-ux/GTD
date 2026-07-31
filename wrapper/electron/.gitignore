@@ -1,0 +1,4 @@
+# Mirrors wrapper/.gitignore's own reasoning: reproducible from `npm install`,
+# and versioning it would bury the two files that actually matter (main.js,
+# preload.js) under an Electron download.
+node_modules/

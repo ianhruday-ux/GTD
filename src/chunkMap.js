@@ -20,7 +20,7 @@
 // (this file + its boot() call) if the convention is ever retired.
 // =========================================================
 function injectChunkMap(){
-  const FLAG = "gtd_chunk_map_v24";
+  const FLAG = "gtd_chunk_map_v25";
   if (Storage.get(FLAG)) return;
   Storage.set(FLAG, "1");
   ["gtd_chunk_map_v1", "gtd_chunk_map_v2", "gtd_chunk_map_v3", "gtd_chunk_map_v4",
@@ -29,7 +29,8 @@ function injectChunkMap(){
    "gtd_chunk_map_v12", "gtd_chunk_map_v13", "gtd_chunk_map_v14",
    "gtd_chunk_map_v15", "gtd_chunk_map_v16", "gtd_chunk_map_v17",
    "gtd_chunk_map_v18", "gtd_chunk_map_v19", "gtd_chunk_map_v20",
-   "gtd_chunk_map_v21", "gtd_chunk_map_v22", "gtd_chunk_map_v23"].forEach(Storage.remove);  // retire superseded flags
+   "gtd_chunk_map_v21", "gtd_chunk_map_v22", "gtd_chunk_map_v23",
+   "gtd_chunk_map_v24"].forEach(Storage.remove);  // retire superseded flags
 
   // Replace, don't accumulate (8.2, mirroring 8.1): sweep any previous
   // chunk-map group (tagged via devContext, not a title match, since the
@@ -95,7 +96,8 @@ function injectChunkMap(){
     { title: "✓ Wrapper W2 — durable local storage", notes: "DONE, verified on the phone with a real wipe: cleared the app's storage, force-killed it, reopened it, and everything came back exactly as it was — nothing reset to sample data. Every save now quietly backs itself up to a second, sturdier storage spot on your phone that survives things regular app storage doesn't (like Android clearing space under pressure). Invisible in day-to-day use; it only matters the day something would otherwise have been lost." },
     { title: "✓ Wrapper W3 — every record remembers when it changed", notes: "DONE, invisible in the app itself — groundwork for syncing between devices later. Every action, event, note, tag, list, and capture now quietly carries a timestamp of its last real change, and a deleted one leaves a small record that it existed rather than vanishing without a trace. Neither of those exist yet for habits specifically — that one needs its own careful handling later, tied to how habit streaks get compared between two devices." },
     { title: "✓ Wrapper W4 — the part that actually merges two devices' changes", notes: "DONE, invisible in the app itself — the rulebook two devices follow when they sync: whoever changed something more recently wins, a genuine same-item disagreement gets flagged rather than one side silently vanishing, and a brand-new or long-away phone never mistakes 'I haven't seen this yet' for 'this was deleted.' Tested by actually running two copies of the app side by side and forcing them to disagree on purpose, 39 separate ways, before ever touching a network." },
-    { title: "✓ Wrapper W5 — actually connecting to Dropbox", notes: "DONE, verified on the phone with a real Dropbox account: connected, synced, and the file actually showed up in Dropbox. There's a row at the top of the ⋯ menu: tap Connect Dropbox, sign in once, and from then on your phone and computer quietly stay in sync — when you open the app, when you come back to it, and even a best-effort try right before you switch away. A Sync now button is there too, for whenever you want to be sure right now. If two devices ever changed the exact same thing before they could sync, nothing gets silently thrown away — you'll see 'items changed on both devices' right there in the menu, with plain words about what was kept and what wasn't." }
+    { title: "✓ Wrapper W5 — actually connecting to Dropbox", notes: "DONE, verified on the phone with a real Dropbox account: connected, synced, and the file actually showed up in Dropbox. There's a row at the top of the ⋯ menu: tap Connect Dropbox, sign in once, and from then on your phone and computer quietly stay in sync — when you open the app, when you come back to it, and even a best-effort try right before you switch away. A Sync now button is there too, for whenever you want to be sure right now. If two devices ever changed the exact same thing before they could sync, nothing gets silently thrown away — you'll see 'items changed on both devices' right there in the menu, with plain words about what was kept and what wasn't." },
+    { title: "✓ Wrapper W6 — the computer app", notes: "BUILT and fully tested against a fake disk; not yet run against a real installed copy or a real Dropbox folder on this computer — that's the next real-world check, the same way W0/W2/W5 each needed one on the phone. Wraps the exact same app in a plain program window for Windows, with no browser chrome around it. The same 'Connect Dropbox' row from the phone now works on the computer too, but simpler: instead of signing in, it just finds your Dropbox folder on this computer by itself (or lets you point to it, if it can't) and reads/writes the same synced file directly off disk — no internet round-trip needed for the computer's half of syncing. Everything else about it — Sync now, 'changed on both devices' warnings, Disconnect — is the exact same code and the exact same menu row as the phone, not a second thing to maintain." }
   ];
 
   const groupId = genId();

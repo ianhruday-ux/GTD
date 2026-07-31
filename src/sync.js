@@ -61,10 +61,19 @@ function getDeviceId(){
 // boot() itself -- exactly the kind of large, risky surgery W2 rejected for
 // storage. dropboxTransport.js sets this the moment OAuth succeeds and
 // clears it on sign-out; this function just reads what was last true.
+// Two wrappers can make this true: Capacitor (Android, W5) or the Electron
+// desktop bridge (W6, window.__oelaDesktopBridge — preload.js's contextBridge
+// surface, checked directly rather than via desktopTransport.js to keep this
+// file dependency-order-agnostic like it already was for Capacitor). Never
+// both in the same running instance -- a browser tab has neither.
+function isNativeWrapper(){
+  if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) return true;
+  if (window.__oelaDesktopBridge && window.__oelaDesktopBridge.isElectron) return true;
+  return false;
+}
 function syncIsEnabled(){
   if (window.__oelaSyncForceEnabled === true) return true;
-  return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform())
-    && Storage.get(SYNC_CONNECTED_KEY) === "1";
+  return isNativeWrapper() && Storage.get(SYNC_CONNECTED_KEY) === "1";
 }
 function setSyncConnected(on){ Storage.set(SYNC_CONNECTED_KEY, on ? "1" : "0"); }
 

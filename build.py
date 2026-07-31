@@ -38,7 +38,7 @@ DIST = REPO / "dist"
 # ⚠ i18n.js sits right after storage.js and must STAY early: its STRINGS/LOCALES
 # are `const`, so they are in the temporal dead zone until this file is
 # evaluated. Function declarations hoist and do not care about order; consts do.
-JS_MODULES = ["storage.js", "sync.js", "dropboxTransport.js", "i18n.js", "textures.js", "surface.js", "runner.js", "pickers.js", "chunkMap.js", "app.js", "events.js", "swClient.js"]
+JS_MODULES = ["storage.js", "sync.js", "dropboxTransport.js", "desktopTransport.js", "i18n.js", "textures.js", "surface.js", "runner.js", "pickers.js", "chunkMap.js", "app.js", "events.js", "swClient.js"]
 
 ASSET_FILES = ["manifest.webmanifest", "icon.svg", "icon-192.png", "icon-512.png"]
 
