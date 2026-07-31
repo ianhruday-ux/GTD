@@ -2511,7 +2511,7 @@ body.screen-open #tray-handle{ display:none; }
 (function(){
 "use strict";
 
-const BUILD_STAMP = "30 Jul 23:51";  // replaced by build.py
+const BUILD_STAMP = "31 Jul 02:31";  // replaced by build.py
 
 // =========================================================
 // STORAGE ADAPTER (spec.md §3, known issue 4)
@@ -2845,7 +2845,11 @@ const SYNC_STORE_KEYS = [
   "gtd_tasks_next", "gtd_tasks_waiting", "gtd_tasks_current", "gtd_tasks_future", "gtd_tasks_habit",
   "gtd_events", "gtd_notes", "gtd_tags", "gtd_contexts",
   "gtd_completed_next", "gtd_completed_waiting", "gtd_completed_current", "gtd_completed_future",
-  "gtd_tray"
+  "gtd_tray",
+  // Chunk A (sync-audit.md §2b): what a completed project took down with it,
+  // and what un-completing restores from. Reshaped in app.js from keyed
+  // objects to record arrays purely so they can live here.
+  "gtd_archived_waiting", "gtd_archived_events"
 ];
 const SYNC_TOMBSTONE_KEY = "gtd_tombstones";
 const SYNC_ROSTER_KEY = "gtd_sync_roster";
@@ -3221,9 +3225,55 @@ function stripSeededRecords(bundle){
 // Nothing is stashed -- the pushed bundle is already in the cloud, so simply
 // syncing again later re-derives and applies it. Deferring is strictly safe
 // precisely BECAUSE it leaves memory and storage in agreement.
+// VALIDATE AT THE TRUST BOUNDARY (sync-audit.md §4c, chunk A). Everything
+// below this line treats the remote bundle as foreign input, because it is:
+// it was written by another device that may be running a different build of
+// the app, and it arrives via a file anything on the machine can edit.
+//
+// The failure this prevents is the nastiest one available, and the author
+// named it: the app syncs at STARTUP, so a record that breaks rendering
+// breaks every launch, and reinstalling does not help because the cause is in
+// the cloud file and is re-pulled the moment you reconnect. A data bug
+// becomes an app you cannot open, on a phone, with no console.
+//
+// Deliberately minimal: this drops what is structurally unusable (not an
+// object, no string id, a store that is not an array), and does NOT try to
+// validate meaning. Enforcing app rules here — MAX_HOOKS, a schedule of
+// exactly 7 days, a valid recurrence — would be a second rulebook to keep in
+// step with the first, and getting it wrong would silently discard real data.
+// Rendering defensively (app.js buildTree, and the nets contextId and habit
+// hooks already have) is what makes odd-but-structurally-sound data safe.
+function sanitizeRecordArray(arr){
+  if (!Array.isArray(arr)) return [];
+  return arr.filter(function(r){ return r && typeof r === "object" && !Array.isArray(r) && typeof r.id === "string"; });
+}
+function sanitizeBundle(b){
+  const src = (b && typeof b === "object") ? b : {};
+  const stores = {};
+  SYNC_STORE_KEYS.forEach(function(k){
+    stores[k] = sanitizeRecordArray(src.stores && src.stores[k]);
+  });
+  const roster = {};
+  const rawRoster = (src.roster && typeof src.roster === "object") ? src.roster : {};
+  Object.keys(rawRoster).forEach(function(id){
+    const e = rawRoster[id];
+    if (e && typeof e === "object") roster[id] = { lastPull: typeof e.lastPull === "number" ? e.lastPull : null };
+  });
+  return {
+    roster: roster,
+    // A tombstone needs its own fields to mean anything; one without them
+    // cannot delete the right thing, so it is worse than useless.
+    tombstones: sanitizeRecordArray(src.tombstones).filter(function(t){
+      return typeof t.store === "string" && typeof t.recordId === "string" && typeof t.deletedAt === "number";
+    }),
+    stores: stores
+  };
+}
+
 function reconcile(remoteBundle){
   const deviceId = getDeviceId();
   const baseline = loadBaseline();
+  remoteBundle = sanitizeBundle(remoteBundle);
   let local = exportBundle();
   // Joining an existing system: drop this device's own seeded content first.
   if (!baseline && bundleHasAnyRecord(remoteBundle)) local = stripSeededRecords(local);
@@ -8503,10 +8553,39 @@ function injectChunkMap(){
   // archived in case the completion was a mistake"). Always local — this
   // is app-level bookkeeping on top of whatever backend holds the live
   // lists, same as collapsed-state or habit-done tracking.
-  function loadArchivedWaiting(){
-    return Storage.getJSON("gtd_archived_waiting", {});
+  // SYNCED AS OF CHUNK A (sync-audit.md §2b). These two maps hold full COPIES
+  // of the records a completed project took down with it, and they are what
+  // un-completing restores from. They used to be keyed objects
+  // ({projectId: [records]}), which is not a shape the merge engine can read,
+  // so they were left out of sync entirely — and that silently defeated
+  // un-complete across devices: complete a project on the phone (the linked
+  // actions and events are archived and removed, and that removal correctly
+  // syncs), then un-complete it on the computer, whose map is empty, and
+  // nothing came back. Both halves are ordinary use and the second is the
+  // app's own remedy for an easy mistake, so it failed wrapper-plan.md §1's
+  // standard outright.
+  //
+  // Fixed by changing only the STORED shape to a record array
+  // ([{id: projectId, items: [...]}]), which stampAndTombstone and the merge
+  // already understand. The in-memory shape every caller uses is unchanged —
+  // still a plain {projectId: [records]} object — which is why this fix
+  // touches no call site. Reading tolerates the old keyed-object shape so an
+  // existing install keeps working without a migration.
+  function archiveMapFromStored(raw){
+    if (Array.isArray(raw)){
+      const out = {};
+      raw.forEach(function(r){ if (r && typeof r.id === "string") out[r.id] = r.items || []; });
+      return out;
+    }
+    return raw && typeof raw === "object" ? raw : {}; // pre-chunk-A keyed object, read as-is
   }
-  function saveArchivedWaiting(obj){ Storage.setJSON("gtd_archived_waiting", obj); }
+  function archiveMapToStored(obj){
+    return Object.keys(obj || {}).map(function(id){ return { id: id, items: obj[id] || [] }; });
+  }
+  function loadArchivedWaiting(){
+    return archiveMapFromStored(Storage.getJSON("gtd_archived_waiting", []));
+  }
+  function saveArchivedWaiting(obj){ Storage.setJSON("gtd_archived_waiting", archiveMapToStored(obj)); }
   function archiveWaitingForProject(projectId, tasks){
     const archived = loadArchivedWaiting();
     archived[projectId] = (archived[projectId] || []).concat(tasks.map(function(t){ return Object.assign({}, t); }));
@@ -8518,8 +8597,8 @@ function injectChunkMap(){
   // finished project kept minting a Next Action every week, for ever. Archived
   // rather than deleted for exactly the reason the waiting items are: completing
   // a project is easy to do by mistake, and a deleted series cannot be got back.
-  function loadArchivedEvents(){ return Storage.getJSON("gtd_archived_events", {}); }
-  function saveArchivedEvents(obj){ Storage.setJSON("gtd_archived_events", obj); }
+  function loadArchivedEvents(){ return archiveMapFromStored(Storage.getJSON("gtd_archived_events", [])); }
+  function saveArchivedEvents(obj){ Storage.setJSON("gtd_archived_events", archiveMapToStored(obj)); }
   function archiveEventsForProject(projectId){
     const linked = (state.events || []).filter(function(ev){ return ev.linkedProjectId === projectId; });
     if (!linked.length) return 0;
@@ -8746,10 +8825,31 @@ function injectChunkMap(){
     }
     return html;
   }
+  // DEFENSIVE RENDERING (sync-audit.md §4c, chunk A). A card is bucketed by
+  // its parent list, and renderLane only ever draws byParent[""] plus the
+  // children of lists it actually found. So a card whose parent names a list
+  // that ISN'T HERE lands in a bucket nothing draws: present in storage,
+  // synced to both devices, and visible on neither.
+  //
+  // Before sync that could not happen — deleting a list through the UI clears
+  // its children's parent first (see the delete-group handler), and the app
+  // was the only writer, so it could keep its own promises. A merge can now
+  // produce combinations no single device ever created: your copy of a card
+  // plus the other device's deletion of the list it lived in. Sync turned this
+  // app's own data into foreign input, and rendering has to stop trusting it.
+  //
+  // The fallback is not invented here — contextId has had exactly this net all
+  // along ("loose / orphaned", renderLane), and dead habit hooks and orphaned
+  // waiting conditions have their own. `parent` was the one reference with
+  // none. An unresolvable parent now means "loose", which is where you would
+  // look for it anyway.
   function buildTree(kind, list){
+    const arr = list || state.tasks[kind];
+    const groupIds = {};
+    arr.forEach(function(t){ if (t.isGroup) groupIds[t.id] = true; });
     const byParent = {};
-    (list || state.tasks[kind]).forEach(function(t){
-      const key = t.parent || "";
+    arr.forEach(function(t){
+      const key = (t.parent && groupIds[t.parent]) ? t.parent : "";
       if (!byParent[key]) byParent[key] = [];
       byParent[key].push(t);
     });
@@ -16024,6 +16124,29 @@ function insertPseudoAtTop(row){
 function processEventBoundaries(){
   const today = todayStr();
   let changed = false;
+
+  // DEFENSIVE SWEEP (sync-audit.md §4c, chunk A). A pseudo-action is derived
+  // from an event; if that event is gone, the row is not derivable from
+  // anything and must not survive. Reachable through ordinary use as soon as
+  // there are two devices: delete a recurring event on the phone, and the
+  // merge removes it from gtd_events here -- but the row lives in
+  // gtd_tasks_next, is deliberately NOT synced (derived state does not
+  // travel), and nothing else would ever clear it. The result is a live Next
+  // Action for an event that no longer exists, which cannot be completed or
+  // opened sensibly.
+  //
+  // ⚑ Note this is the OPPOSITE fallback to buildTree's orphaned `parent`,
+  // and deliberately so. The rule is not "always keep it visible" -- it is:
+  //   · data the USER authored must never vanish -> fall back to visible
+  //   · DERIVED data must vanish when its source does -> fall back to gone
+  // Keeping a derived orphan visible would leave a phantom row that acts on
+  // nothing, which is a worse lie than removing it.
+  const liveEventIds = {};
+  (state.events || []).forEach(function(ev){ if (ev && ev.id) liveEventIds[ev.id] = true; });
+  const beforeSweep = state.tasks.next.length;
+  state.tasks.next = state.tasks.next.filter(function(t){ return !t.eventId || liveEventIds[t.eventId]; });
+  if (state.tasks.next.length !== beforeSweep) saveTasksLocal("next");
+
   (state.events || []).forEach(function(ev){
     // A completed NON-recurring occurrence keeps its (dimmed) calendar mark
     // but has no live pseudo-action — nothing to sweep. A completed RECURRING

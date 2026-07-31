@@ -86,12 +86,22 @@ with serve(DIST) as url, sync_playwright() as p:
     def state():
         return pg.evaluate("""() => {
           const evs = JSON.parse(localStorage.getItem('gtd_events') || '[]');
-          const arch = JSON.parse(localStorage.getItem('gtd_archived_events') || '{}');
+          // Chunk A reshaped the STORED form of this map from a keyed object
+          // ({projectId: [...]}) to a record array ([{id, items}]) so it could
+          // sync at all; app-level behaviour is unchanged, since
+          // loadArchivedEvents() converts. Read both, because this check
+          // reaches into storage directly -- which is exactly why a
+          // behaviour-neutral shape change broke it, and a reminder that
+          // protocol 1 (assert on what RENDERS) exists for a reason.
+          const rawArch = JSON.parse(localStorage.getItem('gtd_archived_events') || '[]');
+          const archFor = (pid) => Array.isArray(rawArch)
+            ? ((rawArch.find(r => r && r.id === pid) || {}).items || [])
+            : (rawArch[pid] || []);
           const nxt = JSON.parse(localStorage.getItem('gtd_tasks_next') || '[]');
           const cur = JSON.parse(localStorage.getItem('gtd_tasks_current') || '[]');
           return { live: evs.length,
                    link: evs.length ? evs[0].linkedProjectId : null,
-                   archived: (arch['zz-proj'] || []).length,
+                   archived: archFor('zz-proj').length,
                    pseudoRows: nxt.filter(t => t.eventId === 'zz-ev').length,
                    projectStillCurrent: cur.some(t => t.id === 'zz-proj') };
         }""")

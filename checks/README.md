@@ -51,6 +51,23 @@ was **correct** — while the bug made merged records invisible on screen and th
 None of those checks *could* have caught it. See `checks/sync_live_state.py`, which asserts on
 rendered cards for exactly this reason.
 
+⚠ **Necessary, but since chunk A no longer sufficient — wherever a defensive fallback exists**
+(author's observation, 2026-07-31). Defensive rendering (`sync-audit.md` §4c) deliberately decouples
+what you see from what the data says: an orphaned card renders as loose even though its data still
+names a list that is gone. That is the point — it protects the user — but it means a render
+assertion can pass *because the safety net caught a real corruption*, which is indistinguishable
+from nothing having gone wrong.
+
+So know which of two claims a check is making:
+
+- **"The user can see it"** — a render assertion. Still exactly right, and still the claim that
+  catches the class of bug this protocol was written for.
+- **"The data is what it should be"** — needs its own assertion, precisely because the fallback
+  severed the link between the two.
+
+Where a fallback could mask the difference, assert both. This is the ordinary cost of graceful
+degradation: robustness is bought with diagnosability.
+
 **2. A new check must be proven to FAIL against the unfixed build.**
 Rebuild the previous commit's `dist/index.html` somewhere and point the check at it. If it passes
 there, it is testing nothing.

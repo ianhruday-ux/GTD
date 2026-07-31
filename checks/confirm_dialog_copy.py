@@ -176,8 +176,15 @@ with serve(DIST) as url, sync_playwright() as p:
     }"""
     OUTCOME = """() => ({
       waitingLive: JSON.parse(localStorage.getItem('gtd_tasks_waiting') || '[]').length,
-      waitingArchived: Object.keys(JSON.parse(
-        localStorage.getItem('gtd_archived_waiting') || '{}')).length,
+      // Chunk A reshaped the stored form to a record array ([{id, items}]);
+      // app behaviour is unchanged (loadArchivedWaiting converts). Counted
+      // explicitly for both shapes: Object.keys() on the new ARRAY returns
+      // indices, so the old line kept passing by coincidence rather than
+      // because it was still measuring the right thing.
+      waitingArchived: (() => {
+        const raw = JSON.parse(localStorage.getItem('gtd_archived_waiting') || '[]');
+        return Array.isArray(raw) ? raw.length : Object.keys(raw).length;
+      })(),
       eventsLive: JSON.parse(localStorage.getItem('gtd_events') || '[]').length,
       projectDone: JSON.parse(localStorage.getItem('gtd_completed_current') || '[]').length
     })"""

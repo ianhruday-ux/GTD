@@ -209,6 +209,29 @@ function insertPseudoAtTop(row){
 function processEventBoundaries(){
   const today = todayStr();
   let changed = false;
+
+  // DEFENSIVE SWEEP (sync-audit.md §4c, chunk A). A pseudo-action is derived
+  // from an event; if that event is gone, the row is not derivable from
+  // anything and must not survive. Reachable through ordinary use as soon as
+  // there are two devices: delete a recurring event on the phone, and the
+  // merge removes it from gtd_events here -- but the row lives in
+  // gtd_tasks_next, is deliberately NOT synced (derived state does not
+  // travel), and nothing else would ever clear it. The result is a live Next
+  // Action for an event that no longer exists, which cannot be completed or
+  // opened sensibly.
+  //
+  // ⚑ Note this is the OPPOSITE fallback to buildTree's orphaned `parent`,
+  // and deliberately so. The rule is not "always keep it visible" -- it is:
+  //   · data the USER authored must never vanish -> fall back to visible
+  //   · DERIVED data must vanish when its source does -> fall back to gone
+  // Keeping a derived orphan visible would leave a phantom row that acts on
+  // nothing, which is a worse lie than removing it.
+  const liveEventIds = {};
+  (state.events || []).forEach(function(ev){ if (ev && ev.id) liveEventIds[ev.id] = true; });
+  const beforeSweep = state.tasks.next.length;
+  state.tasks.next = state.tasks.next.filter(function(t){ return !t.eventId || liveEventIds[t.eventId]; });
+  if (state.tasks.next.length !== beforeSweep) saveTasksLocal("next");
+
   (state.events || []).forEach(function(ev){
     // A completed NON-recurring occurrence keeps its (dimmed) calendar mark
     // but has no live pseudo-action — nothing to sweep. A completed RECURRING

@@ -913,3 +913,34 @@ Keep it. But **363px of reserve for a one-row day is still mostly empty**, and n
 *beside* a control column rather than above one. If it looks wrong once built, the fix is to reduce
 the reserve rather than remove it — removing it reintroduces the jump it exists to prevent.
 Builder's call; flag what you chose.
+
+---
+
+## ⚖ What belongs in the review surface, and what does not (author's ruling, 2026-07-31)
+
+> **The review surface is for decisions about real life. It is not for interface bookkeeping.**
+
+Asked whether an action whose *list* was deleted on another device should surface for repair, the way
+an orphaned waiting action already does. **Ruled: no**, and the reasoning generalises well past the
+case that prompted it:
+
+- An **orphaned waiting action** or a **stalled project** asks you something about the world — what
+  is this actually waiting on now, what is the next real step. That decision cannot be made for you,
+  which is exactly why it earns a card.
+- A **lost list or context** asks you nothing. Lists and contexts exist to organise items *within the
+  interface*; losing one changes no fact about the item or about your life. There is nothing to
+  decide.
+- Some of it repairs itself anyway once the devices finish syncing.
+- And: **if the user would not otherwise notice, do not draw their attention to an inconsistency they
+  cannot act on.** Surfacing it manufactures a chore out of a non-event.
+
+**Checked while ruling, and worth recording because it removes the follow-up entirely:** there is no
+consequence visible anywhere to suppress. A drafting page has no list picker at all (a card's list is
+set by creating it inside that list — `data-field` covers title, notes, context, linked project,
+waiting-for text, cues and tags, never `parent`), and the context picker builds its options from live
+contexts only, so a dead `contextId` matches nothing and the select shows "No context" rather than a
+stale name. Colouring a stale value red was floated and is moot: nothing stale is displayed.
+
+⚑ One known non-issue, flagged rather than fixed: the select shows "No context" while the record
+still carries the dead id, so opening and saving without touching the field preserves it invisibly.
+No effect — both states render identically and ids are never reused — so it is not worth code.

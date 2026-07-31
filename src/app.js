@@ -1354,10 +1354,39 @@
   // archived in case the completion was a mistake"). Always local — this
   // is app-level bookkeeping on top of whatever backend holds the live
   // lists, same as collapsed-state or habit-done tracking.
-  function loadArchivedWaiting(){
-    return Storage.getJSON("gtd_archived_waiting", {});
+  // SYNCED AS OF CHUNK A (sync-audit.md §2b). These two maps hold full COPIES
+  // of the records a completed project took down with it, and they are what
+  // un-completing restores from. They used to be keyed objects
+  // ({projectId: [records]}), which is not a shape the merge engine can read,
+  // so they were left out of sync entirely — and that silently defeated
+  // un-complete across devices: complete a project on the phone (the linked
+  // actions and events are archived and removed, and that removal correctly
+  // syncs), then un-complete it on the computer, whose map is empty, and
+  // nothing came back. Both halves are ordinary use and the second is the
+  // app's own remedy for an easy mistake, so it failed wrapper-plan.md §1's
+  // standard outright.
+  //
+  // Fixed by changing only the STORED shape to a record array
+  // ([{id: projectId, items: [...]}]), which stampAndTombstone and the merge
+  // already understand. The in-memory shape every caller uses is unchanged —
+  // still a plain {projectId: [records]} object — which is why this fix
+  // touches no call site. Reading tolerates the old keyed-object shape so an
+  // existing install keeps working without a migration.
+  function archiveMapFromStored(raw){
+    if (Array.isArray(raw)){
+      const out = {};
+      raw.forEach(function(r){ if (r && typeof r.id === "string") out[r.id] = r.items || []; });
+      return out;
+    }
+    return raw && typeof raw === "object" ? raw : {}; // pre-chunk-A keyed object, read as-is
   }
-  function saveArchivedWaiting(obj){ Storage.setJSON("gtd_archived_waiting", obj); }
+  function archiveMapToStored(obj){
+    return Object.keys(obj || {}).map(function(id){ return { id: id, items: obj[id] || [] }; });
+  }
+  function loadArchivedWaiting(){
+    return archiveMapFromStored(Storage.getJSON("gtd_archived_waiting", []));
+  }
+  function saveArchivedWaiting(obj){ Storage.setJSON("gtd_archived_waiting", archiveMapToStored(obj)); }
   function archiveWaitingForProject(projectId, tasks){
     const archived = loadArchivedWaiting();
     archived[projectId] = (archived[projectId] || []).concat(tasks.map(function(t){ return Object.assign({}, t); }));
@@ -1369,8 +1398,8 @@
   // finished project kept minting a Next Action every week, for ever. Archived
   // rather than deleted for exactly the reason the waiting items are: completing
   // a project is easy to do by mistake, and a deleted series cannot be got back.
-  function loadArchivedEvents(){ return Storage.getJSON("gtd_archived_events", {}); }
-  function saveArchivedEvents(obj){ Storage.setJSON("gtd_archived_events", obj); }
+  function loadArchivedEvents(){ return archiveMapFromStored(Storage.getJSON("gtd_archived_events", [])); }
+  function saveArchivedEvents(obj){ Storage.setJSON("gtd_archived_events", archiveMapToStored(obj)); }
   function archiveEventsForProject(projectId){
     const linked = (state.events || []).filter(function(ev){ return ev.linkedProjectId === projectId; });
     if (!linked.length) return 0;
@@ -1597,10 +1626,31 @@
     }
     return html;
   }
+  // DEFENSIVE RENDERING (sync-audit.md §4c, chunk A). A card is bucketed by
+  // its parent list, and renderLane only ever draws byParent[""] plus the
+  // children of lists it actually found. So a card whose parent names a list
+  // that ISN'T HERE lands in a bucket nothing draws: present in storage,
+  // synced to both devices, and visible on neither.
+  //
+  // Before sync that could not happen — deleting a list through the UI clears
+  // its children's parent first (see the delete-group handler), and the app
+  // was the only writer, so it could keep its own promises. A merge can now
+  // produce combinations no single device ever created: your copy of a card
+  // plus the other device's deletion of the list it lived in. Sync turned this
+  // app's own data into foreign input, and rendering has to stop trusting it.
+  //
+  // The fallback is not invented here — contextId has had exactly this net all
+  // along ("loose / orphaned", renderLane), and dead habit hooks and orphaned
+  // waiting conditions have their own. `parent` was the one reference with
+  // none. An unresolvable parent now means "loose", which is where you would
+  // look for it anyway.
   function buildTree(kind, list){
+    const arr = list || state.tasks[kind];
+    const groupIds = {};
+    arr.forEach(function(t){ if (t.isGroup) groupIds[t.id] = true; });
     const byParent = {};
-    (list || state.tasks[kind]).forEach(function(t){
-      const key = t.parent || "";
+    arr.forEach(function(t){
+      const key = (t.parent && groupIds[t.parent]) ? t.parent : "";
       if (!byParent[key]) byParent[key] = [];
       byParent[key].push(t);
     });

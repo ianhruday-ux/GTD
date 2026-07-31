@@ -28,7 +28,11 @@ const SYNC_STORE_KEYS = [
   "gtd_tasks_next", "gtd_tasks_waiting", "gtd_tasks_current", "gtd_tasks_future", "gtd_tasks_habit",
   "gtd_events", "gtd_notes", "gtd_tags", "gtd_contexts",
   "gtd_completed_next", "gtd_completed_waiting", "gtd_completed_current", "gtd_completed_future",
-  "gtd_tray"
+  "gtd_tray",
+  // Chunk A (sync-audit.md §2b): what a completed project took down with it,
+  // and what un-completing restores from. Reshaped in app.js from keyed
+  // objects to record arrays purely so they can live here.
+  "gtd_archived_waiting", "gtd_archived_events"
 ];
 const SYNC_TOMBSTONE_KEY = "gtd_tombstones";
 const SYNC_ROSTER_KEY = "gtd_sync_roster";
@@ -404,9 +408,55 @@ function stripSeededRecords(bundle){
 // Nothing is stashed -- the pushed bundle is already in the cloud, so simply
 // syncing again later re-derives and applies it. Deferring is strictly safe
 // precisely BECAUSE it leaves memory and storage in agreement.
+// VALIDATE AT THE TRUST BOUNDARY (sync-audit.md §4c, chunk A). Everything
+// below this line treats the remote bundle as foreign input, because it is:
+// it was written by another device that may be running a different build of
+// the app, and it arrives via a file anything on the machine can edit.
+//
+// The failure this prevents is the nastiest one available, and the author
+// named it: the app syncs at STARTUP, so a record that breaks rendering
+// breaks every launch, and reinstalling does not help because the cause is in
+// the cloud file and is re-pulled the moment you reconnect. A data bug
+// becomes an app you cannot open, on a phone, with no console.
+//
+// Deliberately minimal: this drops what is structurally unusable (not an
+// object, no string id, a store that is not an array), and does NOT try to
+// validate meaning. Enforcing app rules here — MAX_HOOKS, a schedule of
+// exactly 7 days, a valid recurrence — would be a second rulebook to keep in
+// step with the first, and getting it wrong would silently discard real data.
+// Rendering defensively (app.js buildTree, and the nets contextId and habit
+// hooks already have) is what makes odd-but-structurally-sound data safe.
+function sanitizeRecordArray(arr){
+  if (!Array.isArray(arr)) return [];
+  return arr.filter(function(r){ return r && typeof r === "object" && !Array.isArray(r) && typeof r.id === "string"; });
+}
+function sanitizeBundle(b){
+  const src = (b && typeof b === "object") ? b : {};
+  const stores = {};
+  SYNC_STORE_KEYS.forEach(function(k){
+    stores[k] = sanitizeRecordArray(src.stores && src.stores[k]);
+  });
+  const roster = {};
+  const rawRoster = (src.roster && typeof src.roster === "object") ? src.roster : {};
+  Object.keys(rawRoster).forEach(function(id){
+    const e = rawRoster[id];
+    if (e && typeof e === "object") roster[id] = { lastPull: typeof e.lastPull === "number" ? e.lastPull : null };
+  });
+  return {
+    roster: roster,
+    // A tombstone needs its own fields to mean anything; one without them
+    // cannot delete the right thing, so it is worse than useless.
+    tombstones: sanitizeRecordArray(src.tombstones).filter(function(t){
+      return typeof t.store === "string" && typeof t.recordId === "string" && typeof t.deletedAt === "number";
+    }),
+    stores: stores
+  };
+}
+
 function reconcile(remoteBundle){
   const deviceId = getDeviceId();
   const baseline = loadBaseline();
+  remoteBundle = sanitizeBundle(remoteBundle);
   let local = exportBundle();
   // Joining an existing system: drop this device's own seeded content first.
   if (!baseline && bundleHasAnyRecord(remoteBundle)) local = stripSeededRecords(local);

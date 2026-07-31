@@ -76,7 +76,17 @@ out — explicitly and in writing, but left out.
 Worse, each device runs its own sweep and writes its own miss/done history, so the two diverge
 permanently and silently. This is the single largest correctness gap in sync today.
 
-### 2b. Genuinely missing — two archive side-maps, and they fail the standard
+### 2b. ~~Genuinely missing~~ — two archive side-maps ✅ **FIXED, chunk A (2026-07-31)**
+
+Both now sync. The stored shape changed from a keyed object to a record array
+(`[{id: projectId, items: [...]}]`) purely so the merge engine can read it; the in-memory shape every
+caller uses is unchanged, so the fix touched no call site, and reading still tolerates the old shape.
+Verified across two devices through the real UI: complete a project on one, un-complete on the other,
+and its linked waiting action comes back. It fails against the pre-fix build, per protocol 2.
+
+*The original finding follows, since it is what the fix was for.*
+
+### 2b (original). Genuinely missing — two archive side-maps, and they fail the standard
 
 | Key | Shape | Used by |
 |---|---|---|
@@ -290,16 +300,36 @@ Two distinct failure shapes, and today only one of them is even loud:
   to be harmless, because the cap is enforced only in the drafting UI (which targets it offers,
   whether Add is enabled) and nothing downstream depends on it. That is luck, not design.
 
-**Recommended, not built — three layers, cheapest first:**
+**Three layers, cheapest first — 1 and 2 shipped in chunk A:**
 
-1. **Render defensively.** Treat merged data as untrusted: every dangling reference falls back to
-   something *visible*, the way `contextId` already does. One general rule covers every impossible
-   state at once, and it fails toward "you can see it and fix it" rather than "it is gone."
-2. **Validate on import.** Before writing a merged bundle, drop anything that is not an object with a
-   string `id`. Cheap, and it is the "stop the cloud file getting into that state" half of the
-   author's suggestion for the cases that can actually be defined.
-3. **A recovery path that does not need a console.** Boot's render wrapped so a throw cannot leave a
-   blank app, with a plain-language way out: use local data only, or start a fresh sync file.
+1. ✅ **Render defensively (BUILT, chunk A).** `buildTree` now treats a `parent` that names no
+   existing list as "loose", so an orphaned card renders where you would look for it instead of
+   vanishing. This is the one reference that had no net; `contextId`, habit hooks and waiting
+   conditions already had theirs.
+
+   **The rule is NOT "always keep it visible", and getting that wrong would have been its own bug.**
+   Writing the recurrence lifecycle test (protocol 4) turned up a second orphan of the opposite kind:
+   delete a recurring event on one device, and the merge removes it from `gtd_events` on the other —
+   but its pseudo-action lives in `gtd_tasks_next`, is deliberately never synced (derived state does
+   not travel, §2f), and nothing cleaned it up. The result was a live Next Action for an event that
+   no longer exists, which cannot be completed or opened sensibly. Applying the visible-fallback rule
+   there would have preserved a phantom row that acts on nothing — a worse lie than removing it.
+
+   So the rule has two halves, split by who authored the data:
+
+   > **Data the user authored must never vanish** → fall back to *visible*.
+   > **Derived data must vanish when its source does** → fall back to *gone*.
+
+   Both are now built: the orphaned-`parent` fallback in `buildTree`, and a sweep in
+   `processEventBoundaries()` that drops any pseudo-action whose event is no longer there.
+2. ✅ **Validate on import (BUILT, chunk A).** `sanitizeBundle()` in `sync.js` drops anything
+   structurally unusable before it can be written or rendered. Deliberately structural only — it does
+   **not** enforce app rules like `MAX_HOOKS`, because that would be a second rulebook to keep in step
+   with the first, and getting it wrong would silently discard real data. Layer 1 is what makes
+   odd-but-well-formed data safe.
+3. **A recovery path that does not need a console** — *not built.* Boot's render wrapped so a throw
+   cannot leave a blank app, with a plain-language way out: use local data only, or start a fresh sync
+   file. Worth building only if 1 and 2 prove insufficient.
 
 ⚑ On the author's "or delete it and start a new one": it must be **offered, never automatic.**
 Silently deleting the shared file is destructive and irreversible, and CLAUDE.md's standing ruling is
@@ -311,22 +341,30 @@ confirm, phrased so it is clear the other device's copy is what will be replaced
 Ordered by `wrapper-plan.md` §1's standard: **accidental loss during normal use first, deliberate
 collisions last.**
 
-1. **Render defensively + validate on import** (§4c, layers 1 and 2). Cheapest item on this list, and
-   it is the one that stands between a data bug and an app that cannot be opened. The orphaned-parent
-   case is already live and already loses items silently.
-2. **`gtd_habit_runs` + `gtd_habit_done`**, with the assertions-beat-inferences rule (§3). Loses data
+**✅ CHUNK A — shipped 2026-07-31.** Render defensively, validate on import (§4c layers 1–2), and the
+two archive maps (§2b). The safety net went first deliberately: it is what limits the damage while
+the merge engine itself is being operated on.
+
+**CHUNK B — next, not started:**
+
+1. **`gtd_habit_runs` + `gtd_habit_done`**, with the assertions-beat-inferences rule (§3). Loses data
    from the single most ordinary act in the app — ticking a checkbox.
-3. **Per-field merge** (§4b, ruled). Fixes every cross-field collision — description versus
+2. **Per-field merge** (§4b, ruled). Fixes every cross-field collision — description versus
    temptation bundle, hooks versus text cues — which are ordinary edits today silently eating each
    other.
-4. **`gtd_archived_waiting` + `gtd_archived_events`** (§2b). Small and mechanical, but it silently
-   defeats un-complete, which is the app's own safety net for an easy mistake.
-5. **The boot recovery path** (§4c, layer 3). Only worth building once 1 has proven insufficient —
-   but worth knowing the shape in advance.
-6. **Lane moves** (§4). Requires a deliberate collision — moving an item on one device while editing
-   or deleting it on another — so by the standard it is genuinely lower priority. Worth fixing when
-   convenient; not worth contorting the design for.
-7. **Leave 2c, 2d, 2e and 2f alone.** They are correct as they are, and 2f is correct *because* it
+
+These two are one chunk because habit sync's design already assumes fields merge independently;
+building it on today's whole-record merge would mean writing habit-specific logic that per-field
+would then partly obsolete. Both also change stored shapes, so together they cost one Reset instead
+of two — **and that freedom expires the day real use begins** (CLAUDE.md), which is worth deciding
+deliberately rather than discovering.
+
+**Later, or never:**
+
+3. **The boot recovery path** (§4c, layer 3). Only if chunk A proves insufficient.
+4. **Lane moves** (§4). Requires a deliberate collision, so by the standard it is genuinely lower
+   priority. Worth fixing when convenient; not worth contorting the design for.
+5. **Leave 2c, 2d, 2e and 2f alone.** They are correct as they are, and 2f is correct *because* it
    was wrong once.
 
 **Ruled out and not on this list:** element-level array merge (§4b level 3). Two devices editing the
