@@ -20,7 +20,13 @@ two archive side-maps used by projects and events. Everything else that doesn't 
 shouldn't (device preferences, sync's own bookkeeping, dev scaffolding) or *must not* (state derived
 from other state, which caused a real bug).
 
-The gap that matters is habits. Everything else on the not-synced list is either correct or small.
+Three problems are not about *which stores* sync at all, and were found later — they are in §4b and
+§4c: **the merge unit is the whole record**, so two edits to different fields of the same item eat
+each other; **a task orphaned by a list deleted elsewhere is never rendered**, so it vanishes
+silently; and **nothing protects the app from merged data it cannot render**, which on a
+sync-at-startup app means a crash on every launch that reinstalling does not fix.
+
+If you read only one section, read §4c.
 
 ---
 
@@ -218,19 +224,105 @@ lane is data *about* the item, currently expressed as *which file it's filed in*
 
 ---
 
+## 4b. Merge granularity: today the whole record wins, and that loses ordinary edits
+
+Found 2026-07-31, answering the author's questions about descriptions, temptation bundles and habit
+cues. It is not specific to those fields — it applies to every record in the app.
+
+**The merge unit is one whole record.** Newest-wins picks one entire object and discards the other
+completely. So two edits to the *same item* collide even when they touch completely different fields.
+
+Worked example. A habit "Floss" has one hook (A) and one text cue ("After breakfast"). On the phone
+you add hook B. On the computer you add the cue "After dinner". They sync:
+
+- computer's record newer → hooks `[A]`, cues `["After breakfast", "After dinner"]` — **hook B is
+  gone**
+- phone's record newer → hooks `[A, B]`, cues `["After breakfast"]` — **"After dinner" is gone**
+
+Nothing warns you, and the two edits never touched the same field. By §1's standard this is squarely
+accidental loss in normal use: editing an item's description on one device and its temptation bundle
+on the other is ordinary, and the mechanism that eats one of them is invisible.
+
+**⚖ Author's ruling, 2026-07-31: merging should be per field, not per record.**
+
+Three levels, so the ruling's reach is clear:
+
+1. **Record-level** — what ships today. Any two edits to the same item collide.
+2. **Field-level** — the ruling. Each field resolves independently, so the example above keeps both
+   the hook and the cue. Fixes every *cross-field* collision.
+3. **Element-level** — not ruled on. Field-level still loses one when both devices edit *the same*
+   field: two devices each adding a different hook are both writing `hooks`. Fixing that means
+   merging the array's elements individually. It is feasible — each hook carries the target's id, and
+   text cues are bare strings that could union by value — but it is strictly more work and adds a
+   second kind of merge rule, which §1's corollary warns about.
+
+**Cost of field-level:** moderate, and mostly mechanical. `mergeRecordArray` currently picks a winner
+object; it would instead build one by choosing each field. That needs per-field timestamps — a record
+would carry something like `modifiedFields: {title: <ms>, hooks: <ms>}` alongside `modifiedAt`, which
+`stampAndTombstone` already has the before/after comparison to produce. Every stamped record grows,
+and the conflict report becomes per-field (which is an improvement — "your description was replaced"
+beats "this item was replaced").
+
+## 4c. When merged data cannot be rendered — the crash-loop the author raised
+
+The author's concern, and it is the right one: **the app syncs on startup.** If merged data crashes
+the render, the app crashes every launch. Reinstalling does not help, because the cause is in the
+cloud file, and it is re-pulled the moment the user reconnects. That turns a data bug into an
+unusable app with no obvious way out — on a phone, with no console.
+
+Two distinct failure shapes, and today only one of them is even loud:
+
+- **Disappearing.** `buildTree` buckets tasks by `parent`; rendering walks the roots and each
+  surviving group's children. A task whose `parent` names a list deleted on the other device lands in
+  a bucket nothing ever renders. It is in storage, it syncs, and **no lane shows it.** Notably,
+  `contextId` already has exactly this safety net — a member whose context no longer resolves falls
+  back to a loose card, and the code calls it "the unlink safety net" — while `parent` has none. It
+  has never bitten because deleting a list *through the UI* clears its children's parent first; only
+  a merge can produce the orphan.
+- **Crashing.** Nothing validates a merged record's shape before it is written and rendered. The
+  author's example — a habit given more than `MAX_HOOKS` cues by merging two 7-hook habits — happens
+  to be harmless, because the cap is enforced only in the drafting UI (which targets it offers,
+  whether Add is enabled) and nothing downstream depends on it. That is luck, not design.
+
+**Recommended, not built — three layers, cheapest first:**
+
+1. **Render defensively.** Treat merged data as untrusted: every dangling reference falls back to
+   something *visible*, the way `contextId` already does. One general rule covers every impossible
+   state at once, and it fails toward "you can see it and fix it" rather than "it is gone."
+2. **Validate on import.** Before writing a merged bundle, drop anything that is not an object with a
+   string `id`. Cheap, and it is the "stop the cloud file getting into that state" half of the
+   author's suggestion for the cases that can actually be defined.
+3. **A recovery path that does not need a console.** Boot's render wrapped so a throw cannot leave a
+   blank app, with a plain-language way out: use local data only, or start a fresh sync file.
+
+⚑ On the author's "or delete it and start a new one": it must be **offered, never automatic.**
+Silently deleting the shared file is destructive and irreversible, and CLAUDE.md's standing ruling is
+that data destruction is possible but never accidental. The escape hatch belongs behind an explicit
+confirm, phrased so it is clear the other device's copy is what will be replaced.
+
 ## 5. Summary — the recommended order
 
 Ordered by `wrapper-plan.md` §1's standard: **accidental loss during normal use first, deliberate
 collisions last.**
 
-1. **`gtd_habit_runs` + `gtd_habit_done`**, with the assertions-beat-inferences rule. Loses data from
-   the single most ordinary act in the app — ticking a checkbox.
-2. **`gtd_archived_waiting` + `gtd_archived_events`.** Small and mechanical, but it silently defeats
-   un-complete, which is the app's own safety net for an easy mistake (§2b). Fails the standard.
-3. **Lane moves** (§4). Requires a deliberate collision — moving an item on one device while editing
+1. **Render defensively + validate on import** (§4c, layers 1 and 2). Cheapest item on this list, and
+   it is the one that stands between a data bug and an app that cannot be opened. The orphaned-parent
+   case is already live and already loses items silently.
+2. **`gtd_habit_runs` + `gtd_habit_done`**, with the assertions-beat-inferences rule (§3). Loses data
+   from the single most ordinary act in the app — ticking a checkbox.
+3. **Per-field merge** (§4b, ruled). Fixes every cross-field collision — description versus
+   temptation bundle, hooks versus text cues — which are ordinary edits today silently eating each
+   other.
+4. **`gtd_archived_waiting` + `gtd_archived_events`** (§2b). Small and mechanical, but it silently
+   defeats un-complete, which is the app's own safety net for an easy mistake.
+5. **The boot recovery path** (§4c, layer 3). Only worth building once 1 has proven insufficient —
+   but worth knowing the shape in advance.
+6. **Lane moves** (§4). Requires a deliberate collision — moving an item on one device while editing
    or deleting it on another — so by the standard it is genuinely lower priority. Worth fixing when
    convenient; not worth contorting the design for.
-4. **Leave 2c, 2d, 2e and 2f alone.** They are correct as they are, and 2f is correct *because* it
+7. **Element-level array merge** (§4b level 3). Not ruled on. Only after field-level ships and the
+   remaining same-field collisions prove to matter in practice.
+8. **Leave 2c, 2d, 2e and 2f alone.** They are correct as they are, and 2f is correct *because* it
    was wrong once.
 
 After 1 and 2, "everything that is yours syncs" is a true statement, and the only things left out are
