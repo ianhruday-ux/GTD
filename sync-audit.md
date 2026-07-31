@@ -250,11 +250,17 @@ Three levels, so the ruling's reach is clear:
 1. **Record-level** — what ships today. Any two edits to the same item collide.
 2. **Field-level** — the ruling. Each field resolves independently, so the example above keeps both
    the hook and the cue. Fixes every *cross-field* collision.
-3. **Element-level** — not ruled on. Field-level still loses one when both devices edit *the same*
-   field: two devices each adding a different hook are both writing `hooks`. Fixing that means
-   merging the array's elements individually. It is feasible — each hook carries the target's id, and
-   text cues are bare strings that could union by value — but it is strictly more work and adds a
-   second kind of merge rule, which §1's corollary warns about.
+3. **Element-level** — **⚖ ruled out, 2026-07-31. Not doing this.** Field-level still loses one when
+   both devices edit *the same* field: two devices each adding a different hook are both writing
+   `hooks`. Merging the array's elements individually would fix it and is feasible (each hook carries
+   the target's id; text cues are bare strings that could union by value) — but the author's ruling
+   is that it isn't worth it: the loss is a single cue you can retype, and it needs both devices to
+   edit the same field of the same habit before syncing, which is not normal use. A correct
+   application of §1's standard, and it also avoids adding a second kind of merge rule, which §1's
+   own corollary warns against.
+
+   **What is knowingly accepted:** add one hook on the phone and a different hook on the computer
+   before they sync, and one of them is gone. Field-level merge does not cover it and nothing will.
 
 **Cost of field-level:** moderate, and mostly mechanical. `mergeRecordArray` currently picks a winner
 object; it would instead build one by choosing each field. That needs per-field timestamps — a record
@@ -320,10 +326,11 @@ collisions last.**
 6. **Lane moves** (§4). Requires a deliberate collision — moving an item on one device while editing
    or deleting it on another — so by the standard it is genuinely lower priority. Worth fixing when
    convenient; not worth contorting the design for.
-7. **Element-level array merge** (§4b level 3). Not ruled on. Only after field-level ships and the
-   remaining same-field collisions prove to matter in practice.
-8. **Leave 2c, 2d, 2e and 2f alone.** They are correct as they are, and 2f is correct *because* it
+7. **Leave 2c, 2d, 2e and 2f alone.** They are correct as they are, and 2f is correct *because* it
    was wrong once.
+
+**Ruled out and not on this list:** element-level array merge (§4b level 3). Two devices editing the
+same field of the same habit is not normal use, and the loss is one retypeable cue.
 
 After 1 and 2, "everything that is yours syncs" is a true statement, and the only things left out are
 this-device facts (which desk you like, where your Dropbox folder is) and scaffolding.
