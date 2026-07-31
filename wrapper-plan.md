@@ -68,6 +68,38 @@ enough that your brain stops holding the contents; a sync that occasionally eats
 *worse than no sync*, because it destroys the one property the app exists to provide. Convenience is
 not the goal — preserved trust is.
 
+### ⚖ THE STANDARD (author's ruling, 2026-07-31) — read this before designing any merge rule
+
+> **The goal is to prevent accidental data loss over the course of normal use. It is not to prevent
+> all data loss under all circumstances.**
+
+This is a **decision procedure**, not a sentiment, and it is what makes otherwise-endless "but what
+if two devices…" questions answerable. Apply it by asking one thing: **would a person doing ordinary
+work, with no intent to stress the system, be surprised by this loss?**
+
+- *Ticking a habit on your phone and having the computer's sweep record that day as a miss* — the
+  user did one ordinary thing, the app destroyed it, and nothing in the interface hinted it could.
+  **Must be prevented.** (This is why `sync-audit.md` §3's rule is "a done beats a miss": a
+  completion is an assertion, a miss is only an inference from absence.)
+- *Completing a project on one device and un-completing it on the other, and its linked actions do
+  not come back* — both halves are ordinary, and the second is the app's own designed remedy for the
+  first. **Must be prevented.** (`sync-audit.md` §2b.)
+- *Deleting an action on one device while deliberately editing that same action on another* —
+  whoever does that is testing the system's limits and knows it. **Accepted.** Resolve it by a
+  consistent, explainable rule and report it; do not contort the design around it.
+
+The corollary that does the real work: **the danger is not rarity, it is surprise.** A loss that
+follows from something the user obviously did is tolerable and often self-correcting. A loss that
+arrives from a mechanism the user cannot see — a sweep on stale data, a tombstone for a row that only
+expired, a timestamp race between two identical-looking taps — is the kind that destroys trust,
+because there is nothing to learn from it and no way to avoid it next time.
+
+⚑ Corollary for *inconsistent* rules across data types, which the author raised in the same breath:
+differing rules are acceptable **only** where the data genuinely differs in kind. Habit history earns
+its own rule because a day's outcome is an assertion-or-inference question that no other store has.
+Inventing per-store special cases for anything else is how a merge engine becomes unexplainable, and
+an unexplainable merge cannot be trusted either.
+
 **2. What must the UI teach?**
 
 The failure mode first, because this is the question that slips. A heavy-handed sync teaches **"this

@@ -82,6 +82,25 @@ buggiest area of the app historically. Pieces are covered — `missed_repeats.py
 `recurrence_projection.py`, `review_skip_*.py`, `boundary_4am.py` — but **nothing crossed recurrence
 with sync**, which is exactly where the pseudo-action tombstone bug lived.
 
+**5. Sync work must also exercise a PROJECT end to end** — a project with linked actions, linked
+events and linked notes, through completion, un-completion and deletion.
+
+*Why:* a project is the most connected object in the app. It owns actions across two lanes, events,
+and notes; its children can be *staged* (drafts until the project saves, chunk 5); and completing it
+archives its linked waiting actions and events into two side-maps so the act can be undone. Those
+two maps **do not sync**, which means un-completing on the other device restores nothing — a real,
+normal-use loss (`sync-audit.md` §2b). Projects are where cross-record invariants and sync meet, and
+cross-record invariants are exactly what a per-record merge does not protect.
+
+---
+
+### The standard these are all serving
+
+`wrapper-plan.md` §1 carries the ruling: **prevent accidental data loss over the course of normal
+use — not all data loss under all circumstances.** When writing a check, that tells you what to
+assert *hardest*: the ordinary sequence a real person performs without thinking, not the adversarial
+one. A test that only proves the app survives deliberate abuse is testing the wrong thing.
+
 ## Two notes for whoever edits these
 
 - **A faked clock freezes CSS transitions.** The intray auto-opens at boot and its slide never

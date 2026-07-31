@@ -70,16 +70,29 @@ out — explicitly and in writing, but left out.
 Worse, each device runs its own sweep and writes its own miss/done history, so the two diverge
 permanently and silently. This is the single largest correctness gap in sync today.
 
-### 2b. Genuinely missing, and smaller — two archive side-maps
+### 2b. Genuinely missing — two archive side-maps, and they fail the standard
 
 | Key | Shape | Used by |
 |---|---|---|
-| `gtd_archived_waiting` | keyed object | Waiting actions archived when their project was completed, so completing a project can be undone |
-| `gtd_archived_events` | keyed object | Same, for events linked to a completed project |
+| `gtd_archived_waiting` | keyed object of **full record copies** | Waiting actions archived when their project was completed, so completing a project can be undone |
+| `gtd_archived_events` | keyed object of **full record copies** | Same, for events linked to a completed project |
 
-Same reason as above (keyed objects). Consequence: complete a project on one device and un-complete
-it on the other, and the linked waiting actions/events don't come back on the second device.
-Narrower than habits, but the same class.
+Same reason as above (keyed objects, not record arrays). But the consequence is worse than "narrower
+than habits", and it fails `wrapper-plan.md` §1's standard outright:
+
+> Complete a project on your phone. Its linked waiting actions and recurring events are archived
+> (`archiveWaitingForProject` / `archiveEventsForProject`, `app.js:1361`/`1375`) and removed from the
+> live stores. That removal *does* sync, so they disappear on the computer too — correctly. Now
+> change your mind and un-complete the project **on the computer**: its archive map is empty, because
+> the map never synced. **Nothing is restored. The actions and the recurring event are gone.**
+
+Both halves are ordinary use, and the second is the app's own designed remedy for the first — the
+code comment at `app.js:1370` says completing a project "is easy to do by mistake, and a deleted
+series cannot be got back", which is precisely why it archives instead of deleting. Sync currently
+defeats that protection.
+
+**This raises 2b's priority: it is a correctness bug, not a nice-to-have.** The work itself is still
+small (§3).
 
 ### 2c. Correctly device-local (ruled in `wrapper-plan.md` §4.2 — recommend keeping)
 
@@ -207,11 +220,16 @@ lane is data *about* the item, currently expressed as *which file it's filed in*
 
 ## 5. Summary — the recommended order
 
-1. **`gtd_habit_runs` + `gtd_habit_done`**, with the assertions-beat-inferences rule. This is the
-   only gap that loses data during *ordinary use*, and it's the one you named.
-2. **`gtd_archived_waiting` + `gtd_archived_events`.** Small, mechanical, closes the last accidental
-   gap.
-3. **Lane moves** (§4), if and when the duplicate-across-lanes case stops being theoretical.
+Ordered by `wrapper-plan.md` §1's standard: **accidental loss during normal use first, deliberate
+collisions last.**
+
+1. **`gtd_habit_runs` + `gtd_habit_done`**, with the assertions-beat-inferences rule. Loses data from
+   the single most ordinary act in the app — ticking a checkbox.
+2. **`gtd_archived_waiting` + `gtd_archived_events`.** Small and mechanical, but it silently defeats
+   un-complete, which is the app's own safety net for an easy mistake (§2b). Fails the standard.
+3. **Lane moves** (§4). Requires a deliberate collision — moving an item on one device while editing
+   or deleting it on another — so by the standard it is genuinely lower priority. Worth fixing when
+   convenient; not worth contorting the design for.
 4. **Leave 2c, 2d, 2e and 2f alone.** They are correct as they are, and 2f is correct *because* it
    was wrong once.
 
