@@ -25,7 +25,18 @@ Three groups, mirroring dropbox_transport.py's own split:
      transport-agnostic -- driven here by the desktop bridge instead of a
      mocked Dropbox API, through the exact same app.js code path. Also covers
      the one thing only this transport has: auto-detect failing and falling
-     back to the folder picker.
+     back to the folder picker, AND the freshness-watch fix (a change to the
+     file with no manual click and no open/resume/backgrounding trigger still
+     lands locally) -- found missing in a real cross-device test before this
+     file's own first version shipped, and added here the same day.
+
+HONEST LIMIT, not glossed over: window.__testChangeCallback is invoked
+directly by the test, standing in for main.js's real fs.watch -- there is no
+real filesystem to watch from a fake bridge. The self-write dedup logic that
+keeps that watcher from re-triggering on this app's OWN writes (main.js's
+lastWrittenMtimeMs comparison) lives entirely in the main process and is not
+exercised here; it needs a real Electron run to verify, the same honest
+limit W5's own tests carried for real OAuth/CapacitorHttp.
 """
 import os, functools, http.server, socket, socketserver, threading, contextlib, json, sys, time
 from playwright.sync_api import sync_playwright
@@ -36,11 +47,19 @@ FAKE_DESKTOP_BRIDGE = """
 window.__testDetectedFolder = "C:/FakeDropbox";
 window.__testPickedFolder = null;
 window.__testWriteHangs = false;
+window.__testChangeCallback = null;
+window.__testWatchCalls = 0;
 window.__oelaDesktopBridge = {
   isElectron: true,
   detectDropboxFolder: async function(){ return window.__testDetectedFolder; },
   pickFolder: async function(){ return window.__testPickedFolder; },
   readSyncFile: async function(root){ return await window.__fsRead(root); },
+  // Test stand-in for main.js's real fs.watch: records the callback so the
+  // test can simulate "Dropbox delivered something" by invoking it directly
+  // (there is no real filesystem watcher to exercise from a fake bridge —
+  // same honest limit as W5's own tests never exercising real OAuth).
+  watchSyncFile: async function(root){ window.__testWatchCalls++; return true; },
+  onSyncFileChanged: function(cb){ window.__testChangeCallback = cb; },
   writeSyncFile: async function(root, content){
     if (window.__testWriteHangs) return new Promise(function(){}); // never resolves -- simulates the process dying mid-write
     return await window.__fsWrite(root, content);
@@ -261,6 +280,26 @@ with serve(DIST) as url, sync_playwright() as p:
 
     status_text = pg3.locator('[data-action="dropbox-sync-now"] .si-note').inner_text()
     check("just now" in status_text.lower() or "刚刚" in status_text, f"status label reads as fresh right after syncing ({status_text!r})")
+
+    # ---- the freshness fix: an EXTERNAL change (Dropbox delivering the
+    # phone's write, simulated here since there is no real fs.watch to
+    # exercise against a fake bridge) triggers a real sync with NO manual
+    # click and NO app-driven trigger (open/resume/backgrounding) at all --
+    # found missing live, in a real cross-device test, before this existed. ----
+    check(pg3.evaluate("() => window.__testWatchCalls") > 0, "connecting armed the freshness watch (watchSyncFile was actually called)")
+    path3 = disk3._path("C:/FakeDropbox")
+    externally_delivered = json.loads(disk3.files[path3]["content"])
+    externally_delivered = dict(externally_delivered)
+    externally_delivered["stores"] = dict(externally_delivered["stores"])
+    externally_delivered["stores"]["gtd_tray"] = list(externally_delivered["stores"]["gtd_tray"]) + [
+        {"id": "phone-delivered-1", "text": "delivered by dropbox while nobody clicked anything",
+         "createdAt": 1, "modifiedAt": int(time.time() * 1000), "deviceId": "the-phone"}
+    ]
+    disk3.files[path3] = {"content": json.dumps(externally_delivered), "mtimeMs": time.time() * 1000 + 1}
+    pg3.evaluate("() => { if (window.__testChangeCallback) window.__testChangeCallback(); }")  # simulates main.js's fs.watch firing
+    pg3.wait_for_timeout(600)
+    check("delivered by dropbox while nobody clicked anything" in local_tray_texts(pg3),
+          "the externally-delivered record landed locally with NO manual sync click and NO open/resume/backgrounding trigger")
 
     # ---- staleness bucketing, same generic key/label as Dropbox's own UI test ----
     ninety_min_ago = int(time.time() * 1000) - 90 * 60 * 1000

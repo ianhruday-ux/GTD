@@ -258,25 +258,102 @@ function mergeBundles(localBundle, remoteBundle, deviceId, baselineBundle){
   };
 }
 
+// ---------------------------------------------------------------------
+// THE INVARIANT THIS FILE EXISTS TO PROTECT, learned the expensive way
+// (2026-07-30, first real two-device test):
+//
+//   in-memory state and localStorage must NEVER disagree about a synced
+//   store -- either both are updated, or neither is.
+//
+// The original reconcile() wrote the merge to localStorage and stopped
+// there. app.js keeps every lane in memory (state.tasks[...] et al),
+// loaded once at boot, and BOTH renders and SAVES from it. So a merge
+// produced two silent failures at once:
+//   1. Invisible. Lanes redrew from the stale in-memory copy, so pulled
+//      records simply never appeared until the app was restarted.
+//   2. DATA LOSS. saveTasksLocal() writes the whole in-memory array, and
+//      storage.js's stampAndTombstone() diffs it against what is in
+//      localStorage -- which was now the MERGED array. Every record the
+//      merge had just pulled in was absent from stale memory, so it read
+//      as a deletion and got a tombstone. The next sync then propagated
+//      those tombstones and deleted the other device's records everywhere.
+// One record created on a desktop ("Party") was destroyed exactly this way
+// before anyone had typed a line of real data into the app.
+//
+// afterImport is how app.js reloads memory from storage; the apply gate is
+// how a caller refuses the whole application (see setApplyGate).
+// ---------------------------------------------------------------------
+let afterImportHook = null;
+function setAfterImport(fn){ afterImportHook = fn; }
+
+// DRAFT ISOLATION x sync (author ruling, 2026-07-30, option 1 of three).
+// A merge landing while a drafting page is open would change data out from
+// under an edit in progress; CLAUDE.md's standing ruling says nothing
+// commits until Save, and that has to hold against a remote write too.
+// Defaults to "always allowed" so sync.js stays usable (and testable)
+// without app.js having set anything.
+let applyGate = function(){ return true; };
+function setApplyGate(fn){ applyGate = fn; }
+
+// Author ruling (2026-07-30): "If someone goes through the tutorial on one
+// device before setting up cloud storage, we can pretty much assume they
+// don't need the tutorial on the other device. The same will be true of the
+// rest of the default data." A device JOINING an existing system adopts what
+// is already there and contributes none of its own seeded content -- without
+// this, both devices' independently-seeded tutorials merge into two of
+// everything, which is exactly what happened on the first real desktop run.
+// Seeded records are self-identifying: seedKey (habits, contexts) or
+// tutorialKey (the tutorial chain and its sample project).
+// ⚑ Accepted cost, flagged: a seed card the user had already EDITED on the
+// joining device is dropped too. The ruling above treats that as fine.
+function isSeededRecord(r){ return !!(r && (r.seedKey || r.tutorialKey)); }
+function bundleHasAnyRecord(b){
+  return SYNC_STORE_KEYS.some(function(k){ return ((b.stores && b.stores[k]) || []).length > 0; });
+}
+function stripSeededRecords(bundle){
+  const stores = {};
+  SYNC_STORE_KEYS.forEach(function(k){
+    stores[k] = (bundle.stores[k] || []).filter(function(r){ return !isSeededRecord(r); });
+  });
+  return { roster: bundle.roster, tombstones: bundle.tombstones, stores: stores };
+}
+
 // The app-facing entry point (stateful; everything above is pure). Takes
-// "what the cloud currently holds" and returns the conflicts found, having
-// already written the merged result back locally and advanced this
-// device's own baseline and roster entry. W5 calls this after every
-// successful pull; the two-device test suite calls it directly, in place
-// of a transport that does not exist yet.
+// "what the cloud currently holds", returns the merged bundle to publish and
+// the conflicts found. W5/W6's transports call this after every successful
+// pull; the test suites call it directly.
+//
+// Returns `applied`: false means the merge was computed and is safe to PUSH,
+// but was deliberately not applied to this device (a drafting page is open).
+// Nothing is stashed -- the pushed bundle is already in the cloud, so simply
+// syncing again later re-derives and applies it. Deferring is strictly safe
+// precisely BECAUSE it leaves memory and storage in agreement.
 function reconcile(remoteBundle){
   const deviceId = getDeviceId();
   const baseline = loadBaseline();
-  const local = exportBundle();
+  let local = exportBundle();
+  // Joining an existing system: drop this device's own seeded content first.
+  if (!baseline && bundleHasAnyRecord(remoteBundle)) local = stripSeededRecords(local);
   const result = mergeBundles(local, remoteBundle, deviceId, baseline);
   result.merged.roster[deviceId] = { lastPull: Date.now() };
   const gc = gcTombstonesAndRoster(result.merged.tombstones, result.merged.roster);
   result.merged.tombstones = gc.tombstones;
   result.merged.roster = gc.roster;
+
+  const apply = applyGate();
+  if (!apply){
+    // Report nothing yet: these conflicts have not been shown to the user or
+    // applied here, and the later sync that DOES apply this bundle will
+    // re-derive and report them then. Reported once, late -- never lost.
+    return { conflicts: [], bundle: result.merged, applied: false };
+  }
   importBundle(result.merged);
   saveBaseline(result.merged);
+  // Memory follows storage, always, in the same breath. Everything above is
+  // pointless if this is skipped -- see the invariant comment.
+  if (afterImportHook) afterImportHook();
   if (state.sync) state.sync.pulledThisSession = true;
-  return { conflicts: result.conflicts, bundle: result.merged };
+  return { conflicts: result.conflicts, bundle: result.merged, applied: true };
 }
 
 // wrapper-plan.md §4.3: "a device must pull before its sweep may persist
@@ -299,6 +376,8 @@ const Sync = {
   mergeBundles: mergeBundles,
   reconcile: reconcile,
   canSweepAccumulated: canSweepAccumulated,
+  setAfterImport: setAfterImport, // app.js registers its "reload memory from storage" here
+  setApplyGate: setApplyGate,     // app.js registers "is a drafting page open?" here
   storeKeys: SYNC_STORE_KEYS // read-only reference W5's transport needs to build an empty/first-sync bundle without duplicating this list
 };
 window.__oelaSync = Sync; // W5's hook, and this chunk's own test harness -- not a user-facing feature

@@ -14,5 +14,11 @@ contextBridge.exposeInMainWorld("__oelaDesktopBridge", {
   detectDropboxFolder: () => ipcRenderer.invoke("desktop-detect-dropbox"),
   pickFolder: () => ipcRenderer.invoke("desktop-pick-folder"),
   readSyncFile: (root) => ipcRenderer.invoke("desktop-read-sync-file", root),
-  writeSyncFile: (root, content) => ipcRenderer.invoke("desktop-write-sync-file", root, content)
+  writeSyncFile: (root, content) => ipcRenderer.invoke("desktop-write-sync-file", root, content),
+  // The freshness fix: watchSyncFile arms a main-process fs.watch on the
+  // synced file's folder; onSyncFileChanged is how the renderer learns
+  // Dropbox delivered something without this app's own triggers (open,
+  // resume, backgrounding, the manual button) ever firing.
+  watchSyncFile: (root) => ipcRenderer.invoke("desktop-watch-sync-file", root),
+  onSyncFileChanged: (callback) => ipcRenderer.on("desktop-sync-file-changed", () => callback())
 });

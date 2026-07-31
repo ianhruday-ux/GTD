@@ -133,7 +133,7 @@
     // attempt work" is a property of right now, not something Reset needs to
     // touch. lastSyncAt (staleness, §1) and the conflict log ARE persisted,
     // in Storage under gtd_dropbox_*, not here — see runDropboxSync().
-    sync: { pulledThisSession: false, syncing: false, lastError: null },
+    sync: { pulledThisSession: false, syncing: false, lastError: null, deferredApply: false },
     audioCtx: null,
     screen: null, // { kind, taskId (null = new), draft: {...} }
     // chunk 1 (spec.md §3 known issue 1): a real stack, not a single slot.
@@ -2335,6 +2335,15 @@
     state.screen = null;
     lockBodyScroll(false);
     qs("#screen-root").innerHTML = "";
+    // The drafting page is gone, so a merge deferred while it was open
+    // (syncApplyGateOpen) can land now. Nothing was stashed to replay: the
+    // merged bundle is already in the cloud, so an ordinary sync re-derives
+    // and applies it. Cheap and self-limiting -- runDropboxSync() returns
+    // immediately unless sync is actually connected.
+    if (state.sync && state.sync.deferredApply){
+      state.sync.deferredApply = false;
+      runDropboxSync();
+    }
   }
   // The completed-item page (§4.12b, §12.2 step 5): a READ-ONLY view of an
   // archived item. No draft — the page never edits anything; it only offers
@@ -8465,12 +8474,29 @@
       Storage.set(DROPBOX_LAST_SYNC_KEY, String(Date.now()));
       state.sync.lastError = null;
       appendDropboxConflicts(result.conflicts);
+      if (result.applied === false){
+        // Merged and PUSHED, but deliberately not applied here: a drafting
+        // page is open (syncApplyGateOpen). Remember to come back for it when
+        // that page closes -- otherwise this device sits stale until the next
+        // resume/background/manual trigger happens to fire.
+        state.sync.deferredApply = true;
+        return;
+      }
       // A pull may have changed anything -- same render shape as B1's resume
       // sweep just below (resweepBoundariesOnResume), never a drafting page
-      // mid-edit.
+      // mid-edit. The tray is included because captures sync too (§4.2) and
+      // it is a drawer rather than a lane, so renderLane never touches it.
       ALL_LANES.forEach(renderLane);
       updateLaneVisibility();
       updateHabitBadge();
+      // refreshTrayList(), NOT renderTray(): renderTray rebuilds the whole
+      // drawer, which would drop the .open class out from under an open
+      // drawer AND rebuild #tray-input, destroying the cursor in a capture
+      // being typed right now. refreshTrayList swaps only the card list --
+      // it is the function that exists for exactly this (see its own note
+      // about the drawer "jump"). Guarded so it can never fall through to a
+      // full renderTray() that would slide the drawer open unbidden.
+      if (qs(".tray-scroll")) refreshTrayList();
       if (state.screen && (state.screen.calendarView || state.screen.reviewView)) renderScreen();
     } catch (e) {
       state.sync.lastError = (e && e.message) || String(e);
@@ -8479,6 +8505,63 @@
       if (isSettingsMenuOpen()) renderSettingsMenu();
     }
   }
+
+  // =========================================================
+  // THE OTHER HALF OF sync.js's INVARIANT (see its reconcile() header).
+  // A merge writes localStorage; every lane in this file is served from an
+  // in-memory copy loaded once in boot(). Without this, pulled records are
+  // invisible until a restart AND the next save mistakes them for deletions,
+  // destroying them on both devices. Found on the first real two-device test
+  // (2026-07-30), not by any check -- every sync test asserted on
+  // localStorage, which was the one place that WAS correct.
+  //
+  // Deliberately NOT initLocalData(): that seeds sample data when a store is
+  // missing, which is exactly wrong here -- a merge that legitimately empties
+  // a lane must not re-seed it.
+  // =========================================================
+  function reloadSyncedStateFromStorage(){
+    KINDS.forEach(function(k){
+      const loaded = loadTasksLocal(k);
+      if (loaded) state.tasks[k] = loaded;
+    });
+    // Same migration-free read initLocalData() does: a pre-cue-row habit's
+    // single whenText becomes a one-entry list. A record arriving from an
+    // older build on the other device needs it just as much as a stored one.
+    state.tasks.habit.forEach(function(h){
+      if (h.isGroup) return;
+      if (!h.whenTexts) h.whenTexts = h.whenText ? [h.whenText] : [];
+    });
+    const loadedCtx = loadContexts();
+    if (loadedCtx) state.contexts = loadedCtx;
+    initCompletedData();
+    state.tray = loadTray();
+    state.notes = loadNotes();
+    state.tags = loadTags();
+    const loadedEvents = loadEvents();
+    if (loadedEvents) state.events = loadedEvents;
+  }
+  Sync.setAfterImport(reloadSyncedStateFromStorage);
+
+  // DRAFT ISOLATION x sync, author ruling 2026-07-30 (option 1 of three
+  // offered): a merge may not land while a drafting page is open. The other
+  // two options were rejected for concrete failures -- applying underneath an
+  // open page makes Save silently overwrite the other device's edit (or break
+  // outright if that record was deleted remotely), and redrawing the page
+  // destroys what you were typing, which is DRAFT ISOLATION's whole subject.
+  //
+  // Read-only screens (calendar, review) do NOT defer: they are computed from
+  // "now" and are already re-rendered by every other date-moving path here.
+  // The intray drawer does NOT defer either, and that distinction is
+  // load-bearing rather than incidental -- openTray() runs in boot() on every
+  // launch, so counting an open drawer as "drafting" would disable sync
+  // permanently, on every device, silently. The drawer is not a screen;
+  // state.screen stays null while it is open, which is what makes this safe.
+  function syncApplyGateOpen(){
+    if (!state.screen) return true;
+    if (state.screen.calendarView || state.screen.reviewView) return true;
+    return false;
+  }
+  Sync.setApplyGate(syncApplyGateOpen);
 
   // B1 (wrapper-plan.md §3.2): the boundary sweep used to run at boot only.
   // A resident app can sit backgrounded for days without a cold start, so

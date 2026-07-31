@@ -148,10 +148,16 @@ async function dropboxSyncNow(){
   for (let attempt = 0; attempt < DROPBOX_MAX_CAS_RETRIES; attempt++){
     const download = await dropboxDownload(token);
     const remoteBundle = download.exists ? download.bundle : dropboxEmptyBundle();
-    const result = Sync.reconcile(remoteBundle); // writes the merge back locally + advances this device's baseline/roster entry (W4)
+    const result = Sync.reconcile(remoteBundle); // merges; applies locally unless a drafting page is open (result.applied)
     allConflicts = allConflicts.concat(result.conflicts);
     const mode = download.exists ? { ".tag": "update", update: download.rev } : { ".tag": "add" };
-    const upload = await dropboxUpload(token, Sync.exportBundle(), mode);
+    // result.bundle, NOT Sync.exportBundle(). These are identical whenever the
+    // merge was applied, but when it was DEFERRED (drafting page open, author
+    // ruling 2026-07-30) local storage deliberately still holds the pre-merge
+    // state -- re-exporting it would publish this device's view as if the other
+    // device's records had been deleted, which the far end would then honour.
+    // Pushing the merged bundle keeps "defer locally, still publish" safe.
+    const upload = await dropboxUpload(token, result.bundle, mode);
     if (!upload.conflict) return { conflicts: allConflicts };
     // Someone else wrote between our download and our upload. Loop: the
     // next dropboxDownload() sees their write, and reconcile() is safe to

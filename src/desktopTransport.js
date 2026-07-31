@@ -1,13 +1,16 @@
 // =========================================================
 // DESKTOP TRANSPORT (W6, wrapper-plan.md) — the fs-based sibling to
-// dropboxTransport.js (W5). Same shared file — Apps/OELA/oela-sync.json,
-// the exact path dropboxTransport.js's DROPBOX_SYNC_PATH already writes
-// via Dropbox's HTTP API — reached here by reading/writing the local disk
-// copy the Dropbox desktop client already keeps in sync, instead of the
-// API. No OAuth, no network call: "three lines of fs" is the whole reason
-// this chunk exists (wrapper-plan.md §7 W6). wrapper/electron/main.js's
-// DROPBOX_APP_SUBPATH must agree with this file's layout; that agreement,
-// not a shared constant, is what makes one file readable by both shells.
+// dropboxTransport.js (W5). Same shared file — the exact one
+// dropboxTransport.js's DROPBOX_SYNC_PATH already writes via Dropbox's HTTP
+// API — reached here by reading/writing the local disk copy the Dropbox
+// desktop client already keeps in sync, instead of the API. No OAuth, no
+// network call: "three lines of fs" is the whole reason this chunk exists
+// (wrapper-plan.md §7 W6). wrapper/electron/main.js's DROPBOX_APP_SUBPATH
+// must agree with this file's layout; that agreement, not a shared
+// constant, is what makes one file readable by both shells. ⚠ The Dropbox
+// App Folder's real on-disk name is NOT assumed to be "OELA" — see
+// wrapper-plan.md §6 trap 10, found live: it's whatever the Dropbox App
+// Console actually has registered, verified against the real account.
 //
 // In a browser (no window.__oelaDesktopBridge — GitHub Pages, a plain
 // desktop Chrome tab): every exported function is unreachable, matching
@@ -72,17 +75,27 @@ async function desktopSyncNow(){
   if (!bridge) throw new Error("Dropbox sync is only available in the installed app");
   const folder = desktopFolder();
   if (!folder) throw new Error("No Dropbox folder connected");
+  // Re-arm the freshness watch on every attempt -- idempotent in main.js if
+  // already watching this folder, and this is also what re-arms it after a
+  // brand-new folder's very first sync just created the directory the watch
+  // couldn't attach to yet. Best-effort: a watch failure must never break
+  // the sync itself, which is why this isn't awaited into the retry logic.
+  if (bridge.watchSyncFile) bridge.watchSyncFile(folder).catch(function(){});
   let allConflicts = [];
   for (let attempt = 0; attempt < DESKTOP_MAX_WRITE_RETRIES; attempt++){
     const read = await bridge.readSyncFile(folder);
     const remoteBundle = read.exists ? JSON.parse(read.content) : desktopEmptyBundle();
-    const result = Sync.reconcile(remoteBundle); // writes the merge back locally + advances this device's baseline/roster entry (W4)
+    const result = Sync.reconcile(remoteBundle); // merges; applies locally unless a drafting page is open (result.applied)
     allConflicts = allConflicts.concat(result.conflicts);
     const recheck = await bridge.readSyncFile(folder);
     if (recheck.exists !== read.exists || recheck.mtimeMs !== read.mtimeMs){
       continue; // something else (most likely the Dropbox daemon syncing a remote change to disk) wrote in between -- loop and merge again against what's actually there now
     }
-    await bridge.writeSyncFile(folder, JSON.stringify(Sync.exportBundle()));
+    // result.bundle, NOT Sync.exportBundle() -- see the same note in
+    // dropboxTransport.js: when the merge is deferred (drafting page open),
+    // local storage still holds the pre-merge state on purpose, and
+    // re-exporting it would publish the other device's records as deleted.
+    await bridge.writeSyncFile(folder, JSON.stringify(result.bundle));
     return { conflicts: allConflicts };
   }
   throw new Error("Dropbox sync: the file kept changing underneath this sync — try again shortly");
@@ -95,3 +108,17 @@ const DesktopTransport = {
   syncNow: desktopSyncNow
 };
 window.__oelaDesktop = DesktopTransport; // parallels window.__oelaDropbox -- the UI's hook and this chunk's own test harness
+
+// The freshness fix's other half (main.js's fs.watch is the first half):
+// whenever the watched file changes for a reason that wasn't this app's own
+// write, run a real sync through the SAME orchestration every other trigger
+// uses (runDropboxSync, defined in app.js -- safe to reference here despite
+// load order, since this only ever actually runs asynchronously, long after
+// the whole script has finished evaluating and every function has hoisted).
+// Registered once at script load, guarded so a plain browser (no bridge) and
+// the Capacitor/Android build (bridge simply doesn't exist) are both no-ops.
+if (window.__oelaDesktopBridge && window.__oelaDesktopBridge.isElectron && window.__oelaDesktopBridge.onSyncFileChanged){
+  window.__oelaDesktopBridge.onSyncFileChanged(function(){
+    runDropboxSync();
+  });
+}

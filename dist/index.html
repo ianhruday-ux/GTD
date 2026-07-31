@@ -2511,7 +2511,7 @@ body.screen-open #tray-handle{ display:none; }
 (function(){
 "use strict";
 
-const BUILD_STAMP = "30 Jul 21:12";  // replaced by build.py
+const BUILD_STAMP = "30 Jul 22:55";  // replaced by build.py
 
 // =========================================================
 // STORAGE ADAPTER (spec.md §3, known issue 4)
@@ -3058,25 +3058,102 @@ function mergeBundles(localBundle, remoteBundle, deviceId, baselineBundle){
   };
 }
 
+// ---------------------------------------------------------------------
+// THE INVARIANT THIS FILE EXISTS TO PROTECT, learned the expensive way
+// (2026-07-30, first real two-device test):
+//
+//   in-memory state and localStorage must NEVER disagree about a synced
+//   store -- either both are updated, or neither is.
+//
+// The original reconcile() wrote the merge to localStorage and stopped
+// there. app.js keeps every lane in memory (state.tasks[...] et al),
+// loaded once at boot, and BOTH renders and SAVES from it. So a merge
+// produced two silent failures at once:
+//   1. Invisible. Lanes redrew from the stale in-memory copy, so pulled
+//      records simply never appeared until the app was restarted.
+//   2. DATA LOSS. saveTasksLocal() writes the whole in-memory array, and
+//      storage.js's stampAndTombstone() diffs it against what is in
+//      localStorage -- which was now the MERGED array. Every record the
+//      merge had just pulled in was absent from stale memory, so it read
+//      as a deletion and got a tombstone. The next sync then propagated
+//      those tombstones and deleted the other device's records everywhere.
+// One record created on a desktop ("Party") was destroyed exactly this way
+// before anyone had typed a line of real data into the app.
+//
+// afterImport is how app.js reloads memory from storage; the apply gate is
+// how a caller refuses the whole application (see setApplyGate).
+// ---------------------------------------------------------------------
+let afterImportHook = null;
+function setAfterImport(fn){ afterImportHook = fn; }
+
+// DRAFT ISOLATION x sync (author ruling, 2026-07-30, option 1 of three).
+// A merge landing while a drafting page is open would change data out from
+// under an edit in progress; CLAUDE.md's standing ruling says nothing
+// commits until Save, and that has to hold against a remote write too.
+// Defaults to "always allowed" so sync.js stays usable (and testable)
+// without app.js having set anything.
+let applyGate = function(){ return true; };
+function setApplyGate(fn){ applyGate = fn; }
+
+// Author ruling (2026-07-30): "If someone goes through the tutorial on one
+// device before setting up cloud storage, we can pretty much assume they
+// don't need the tutorial on the other device. The same will be true of the
+// rest of the default data." A device JOINING an existing system adopts what
+// is already there and contributes none of its own seeded content -- without
+// this, both devices' independently-seeded tutorials merge into two of
+// everything, which is exactly what happened on the first real desktop run.
+// Seeded records are self-identifying: seedKey (habits, contexts) or
+// tutorialKey (the tutorial chain and its sample project).
+// ⚑ Accepted cost, flagged: a seed card the user had already EDITED on the
+// joining device is dropped too. The ruling above treats that as fine.
+function isSeededRecord(r){ return !!(r && (r.seedKey || r.tutorialKey)); }
+function bundleHasAnyRecord(b){
+  return SYNC_STORE_KEYS.some(function(k){ return ((b.stores && b.stores[k]) || []).length > 0; });
+}
+function stripSeededRecords(bundle){
+  const stores = {};
+  SYNC_STORE_KEYS.forEach(function(k){
+    stores[k] = (bundle.stores[k] || []).filter(function(r){ return !isSeededRecord(r); });
+  });
+  return { roster: bundle.roster, tombstones: bundle.tombstones, stores: stores };
+}
+
 // The app-facing entry point (stateful; everything above is pure). Takes
-// "what the cloud currently holds" and returns the conflicts found, having
-// already written the merged result back locally and advanced this
-// device's own baseline and roster entry. W5 calls this after every
-// successful pull; the two-device test suite calls it directly, in place
-// of a transport that does not exist yet.
+// "what the cloud currently holds", returns the merged bundle to publish and
+// the conflicts found. W5/W6's transports call this after every successful
+// pull; the test suites call it directly.
+//
+// Returns `applied`: false means the merge was computed and is safe to PUSH,
+// but was deliberately not applied to this device (a drafting page is open).
+// Nothing is stashed -- the pushed bundle is already in the cloud, so simply
+// syncing again later re-derives and applies it. Deferring is strictly safe
+// precisely BECAUSE it leaves memory and storage in agreement.
 function reconcile(remoteBundle){
   const deviceId = getDeviceId();
   const baseline = loadBaseline();
-  const local = exportBundle();
+  let local = exportBundle();
+  // Joining an existing system: drop this device's own seeded content first.
+  if (!baseline && bundleHasAnyRecord(remoteBundle)) local = stripSeededRecords(local);
   const result = mergeBundles(local, remoteBundle, deviceId, baseline);
   result.merged.roster[deviceId] = { lastPull: Date.now() };
   const gc = gcTombstonesAndRoster(result.merged.tombstones, result.merged.roster);
   result.merged.tombstones = gc.tombstones;
   result.merged.roster = gc.roster;
+
+  const apply = applyGate();
+  if (!apply){
+    // Report nothing yet: these conflicts have not been shown to the user or
+    // applied here, and the later sync that DOES apply this bundle will
+    // re-derive and report them then. Reported once, late -- never lost.
+    return { conflicts: [], bundle: result.merged, applied: false };
+  }
   importBundle(result.merged);
   saveBaseline(result.merged);
+  // Memory follows storage, always, in the same breath. Everything above is
+  // pointless if this is skipped -- see the invariant comment.
+  if (afterImportHook) afterImportHook();
   if (state.sync) state.sync.pulledThisSession = true;
-  return { conflicts: result.conflicts, bundle: result.merged };
+  return { conflicts: result.conflicts, bundle: result.merged, applied: true };
 }
 
 // wrapper-plan.md §4.3: "a device must pull before its sweep may persist
@@ -3099,6 +3176,8 @@ const Sync = {
   mergeBundles: mergeBundles,
   reconcile: reconcile,
   canSweepAccumulated: canSweepAccumulated,
+  setAfterImport: setAfterImport, // app.js registers its "reload memory from storage" here
+  setApplyGate: setApplyGate,     // app.js registers "is a drafting page open?" here
   storeKeys: SYNC_STORE_KEYS // read-only reference W5's transport needs to build an empty/first-sync bundle without duplicating this list
 };
 window.__oelaSync = Sync; // W5's hook, and this chunk's own test harness -- not a user-facing feature
@@ -3253,10 +3332,16 @@ async function dropboxSyncNow(){
   for (let attempt = 0; attempt < DROPBOX_MAX_CAS_RETRIES; attempt++){
     const download = await dropboxDownload(token);
     const remoteBundle = download.exists ? download.bundle : dropboxEmptyBundle();
-    const result = Sync.reconcile(remoteBundle); // writes the merge back locally + advances this device's baseline/roster entry (W4)
+    const result = Sync.reconcile(remoteBundle); // merges; applies locally unless a drafting page is open (result.applied)
     allConflicts = allConflicts.concat(result.conflicts);
     const mode = download.exists ? { ".tag": "update", update: download.rev } : { ".tag": "add" };
-    const upload = await dropboxUpload(token, Sync.exportBundle(), mode);
+    // result.bundle, NOT Sync.exportBundle(). These are identical whenever the
+    // merge was applied, but when it was DEFERRED (drafting page open, author
+    // ruling 2026-07-30) local storage deliberately still holds the pre-merge
+    // state -- re-exporting it would publish this device's view as if the other
+    // device's records had been deleted, which the far end would then honour.
+    // Pushing the merged bundle keeps "defer locally, still publish" safe.
+    const upload = await dropboxUpload(token, result.bundle, mode);
     if (!upload.conflict) return { conflicts: allConflicts };
     // Someone else wrote between our download and our upload. Loop: the
     // next dropboxDownload() sees their write, and reconcile() is safe to
@@ -3277,14 +3362,17 @@ window.__oelaDropbox = DropboxTransport; // parallels window.__oelaSync — the 
 
 // =========================================================
 // DESKTOP TRANSPORT (W6, wrapper-plan.md) — the fs-based sibling to
-// dropboxTransport.js (W5). Same shared file — Apps/OELA/oela-sync.json,
-// the exact path dropboxTransport.js's DROPBOX_SYNC_PATH already writes
-// via Dropbox's HTTP API — reached here by reading/writing the local disk
-// copy the Dropbox desktop client already keeps in sync, instead of the
-// API. No OAuth, no network call: "three lines of fs" is the whole reason
-// this chunk exists (wrapper-plan.md §7 W6). wrapper/electron/main.js's
-// DROPBOX_APP_SUBPATH must agree with this file's layout; that agreement,
-// not a shared constant, is what makes one file readable by both shells.
+// dropboxTransport.js (W5). Same shared file — the exact one
+// dropboxTransport.js's DROPBOX_SYNC_PATH already writes via Dropbox's HTTP
+// API — reached here by reading/writing the local disk copy the Dropbox
+// desktop client already keeps in sync, instead of the API. No OAuth, no
+// network call: "three lines of fs" is the whole reason this chunk exists
+// (wrapper-plan.md §7 W6). wrapper/electron/main.js's DROPBOX_APP_SUBPATH
+// must agree with this file's layout; that agreement, not a shared
+// constant, is what makes one file readable by both shells. ⚠ The Dropbox
+// App Folder's real on-disk name is NOT assumed to be "OELA" — see
+// wrapper-plan.md §6 trap 10, found live: it's whatever the Dropbox App
+// Console actually has registered, verified against the real account.
 //
 // In a browser (no window.__oelaDesktopBridge — GitHub Pages, a plain
 // desktop Chrome tab): every exported function is unreachable, matching
@@ -3349,17 +3437,27 @@ async function desktopSyncNow(){
   if (!bridge) throw new Error("Dropbox sync is only available in the installed app");
   const folder = desktopFolder();
   if (!folder) throw new Error("No Dropbox folder connected");
+  // Re-arm the freshness watch on every attempt -- idempotent in main.js if
+  // already watching this folder, and this is also what re-arms it after a
+  // brand-new folder's very first sync just created the directory the watch
+  // couldn't attach to yet. Best-effort: a watch failure must never break
+  // the sync itself, which is why this isn't awaited into the retry logic.
+  if (bridge.watchSyncFile) bridge.watchSyncFile(folder).catch(function(){});
   let allConflicts = [];
   for (let attempt = 0; attempt < DESKTOP_MAX_WRITE_RETRIES; attempt++){
     const read = await bridge.readSyncFile(folder);
     const remoteBundle = read.exists ? JSON.parse(read.content) : desktopEmptyBundle();
-    const result = Sync.reconcile(remoteBundle); // writes the merge back locally + advances this device's baseline/roster entry (W4)
+    const result = Sync.reconcile(remoteBundle); // merges; applies locally unless a drafting page is open (result.applied)
     allConflicts = allConflicts.concat(result.conflicts);
     const recheck = await bridge.readSyncFile(folder);
     if (recheck.exists !== read.exists || recheck.mtimeMs !== read.mtimeMs){
       continue; // something else (most likely the Dropbox daemon syncing a remote change to disk) wrote in between -- loop and merge again against what's actually there now
     }
-    await bridge.writeSyncFile(folder, JSON.stringify(Sync.exportBundle()));
+    // result.bundle, NOT Sync.exportBundle() -- see the same note in
+    // dropboxTransport.js: when the merge is deferred (drafting page open),
+    // local storage still holds the pre-merge state on purpose, and
+    // re-exporting it would publish the other device's records as deleted.
+    await bridge.writeSyncFile(folder, JSON.stringify(result.bundle));
     return { conflicts: allConflicts };
   }
   throw new Error("Dropbox sync: the file kept changing underneath this sync — try again shortly");
@@ -3372,6 +3470,20 @@ const DesktopTransport = {
   syncNow: desktopSyncNow
 };
 window.__oelaDesktop = DesktopTransport; // parallels window.__oelaDropbox -- the UI's hook and this chunk's own test harness
+
+// The freshness fix's other half (main.js's fs.watch is the first half):
+// whenever the watched file changes for a reason that wasn't this app's own
+// write, run a real sync through the SAME orchestration every other trigger
+// uses (runDropboxSync, defined in app.js -- safe to reference here despite
+// load order, since this only ever actually runs asynchronously, long after
+// the whole script has finished evaluating and every function has hoisted).
+// Registered once at script load, guarded so a plain browser (no bridge) and
+// the Capacitor/Android build (bridge simply doesn't exist) are both no-ops.
+if (window.__oelaDesktopBridge && window.__oelaDesktopBridge.isElectron && window.__oelaDesktopBridge.onSyncFileChanged){
+  window.__oelaDesktopBridge.onSyncFileChanged(function(){
+    runDropboxSync();
+  });
+}
 
 // =========================================================
 // i18n — the string table and the lookup (Chinese translation round).
@@ -7076,7 +7188,7 @@ function injectChunkMap(){
     // attempt work" is a property of right now, not something Reset needs to
     // touch. lastSyncAt (staleness, §1) and the conflict log ARE persisted,
     // in Storage under gtd_dropbox_*, not here — see runDropboxSync().
-    sync: { pulledThisSession: false, syncing: false, lastError: null },
+    sync: { pulledThisSession: false, syncing: false, lastError: null, deferredApply: false },
     audioCtx: null,
     screen: null, // { kind, taskId (null = new), draft: {...} }
     // chunk 1 (spec.md §3 known issue 1): a real stack, not a single slot.
@@ -9278,6 +9390,15 @@ function injectChunkMap(){
     state.screen = null;
     lockBodyScroll(false);
     qs("#screen-root").innerHTML = "";
+    // The drafting page is gone, so a merge deferred while it was open
+    // (syncApplyGateOpen) can land now. Nothing was stashed to replay: the
+    // merged bundle is already in the cloud, so an ordinary sync re-derives
+    // and applies it. Cheap and self-limiting -- runDropboxSync() returns
+    // immediately unless sync is actually connected.
+    if (state.sync && state.sync.deferredApply){
+      state.sync.deferredApply = false;
+      runDropboxSync();
+    }
   }
   // The completed-item page (§4.12b, §12.2 step 5): a READ-ONLY view of an
   // archived item. No draft — the page never edits anything; it only offers
@@ -15408,12 +15529,29 @@ function injectChunkMap(){
       Storage.set(DROPBOX_LAST_SYNC_KEY, String(Date.now()));
       state.sync.lastError = null;
       appendDropboxConflicts(result.conflicts);
+      if (result.applied === false){
+        // Merged and PUSHED, but deliberately not applied here: a drafting
+        // page is open (syncApplyGateOpen). Remember to come back for it when
+        // that page closes -- otherwise this device sits stale until the next
+        // resume/background/manual trigger happens to fire.
+        state.sync.deferredApply = true;
+        return;
+      }
       // A pull may have changed anything -- same render shape as B1's resume
       // sweep just below (resweepBoundariesOnResume), never a drafting page
-      // mid-edit.
+      // mid-edit. The tray is included because captures sync too (§4.2) and
+      // it is a drawer rather than a lane, so renderLane never touches it.
       ALL_LANES.forEach(renderLane);
       updateLaneVisibility();
       updateHabitBadge();
+      // refreshTrayList(), NOT renderTray(): renderTray rebuilds the whole
+      // drawer, which would drop the .open class out from under an open
+      // drawer AND rebuild #tray-input, destroying the cursor in a capture
+      // being typed right now. refreshTrayList swaps only the card list --
+      // it is the function that exists for exactly this (see its own note
+      // about the drawer "jump"). Guarded so it can never fall through to a
+      // full renderTray() that would slide the drawer open unbidden.
+      if (qs(".tray-scroll")) refreshTrayList();
       if (state.screen && (state.screen.calendarView || state.screen.reviewView)) renderScreen();
     } catch (e) {
       state.sync.lastError = (e && e.message) || String(e);
@@ -15422,6 +15560,63 @@ function injectChunkMap(){
       if (isSettingsMenuOpen()) renderSettingsMenu();
     }
   }
+
+  // =========================================================
+  // THE OTHER HALF OF sync.js's INVARIANT (see its reconcile() header).
+  // A merge writes localStorage; every lane in this file is served from an
+  // in-memory copy loaded once in boot(). Without this, pulled records are
+  // invisible until a restart AND the next save mistakes them for deletions,
+  // destroying them on both devices. Found on the first real two-device test
+  // (2026-07-30), not by any check -- every sync test asserted on
+  // localStorage, which was the one place that WAS correct.
+  //
+  // Deliberately NOT initLocalData(): that seeds sample data when a store is
+  // missing, which is exactly wrong here -- a merge that legitimately empties
+  // a lane must not re-seed it.
+  // =========================================================
+  function reloadSyncedStateFromStorage(){
+    KINDS.forEach(function(k){
+      const loaded = loadTasksLocal(k);
+      if (loaded) state.tasks[k] = loaded;
+    });
+    // Same migration-free read initLocalData() does: a pre-cue-row habit's
+    // single whenText becomes a one-entry list. A record arriving from an
+    // older build on the other device needs it just as much as a stored one.
+    state.tasks.habit.forEach(function(h){
+      if (h.isGroup) return;
+      if (!h.whenTexts) h.whenTexts = h.whenText ? [h.whenText] : [];
+    });
+    const loadedCtx = loadContexts();
+    if (loadedCtx) state.contexts = loadedCtx;
+    initCompletedData();
+    state.tray = loadTray();
+    state.notes = loadNotes();
+    state.tags = loadTags();
+    const loadedEvents = loadEvents();
+    if (loadedEvents) state.events = loadedEvents;
+  }
+  Sync.setAfterImport(reloadSyncedStateFromStorage);
+
+  // DRAFT ISOLATION x sync, author ruling 2026-07-30 (option 1 of three
+  // offered): a merge may not land while a drafting page is open. The other
+  // two options were rejected for concrete failures -- applying underneath an
+  // open page makes Save silently overwrite the other device's edit (or break
+  // outright if that record was deleted remotely), and redrawing the page
+  // destroys what you were typing, which is DRAFT ISOLATION's whole subject.
+  //
+  // Read-only screens (calendar, review) do NOT defer: they are computed from
+  // "now" and are already re-rendered by every other date-moving path here.
+  // The intray drawer does NOT defer either, and that distinction is
+  // load-bearing rather than incidental -- openTray() runs in boot() on every
+  // launch, so counting an open drawer as "drafting" would disable sync
+  // permanently, on every device, silently. The drawer is not a screen;
+  // state.screen stays null while it is open, which is what makes this safe.
+  function syncApplyGateOpen(){
+    if (!state.screen) return true;
+    if (state.screen.calendarView || state.screen.reviewView) return true;
+    return false;
+  }
+  Sync.setApplyGate(syncApplyGateOpen);
 
   // B1 (wrapper-plan.md §3.2): the boundary sweep used to run at boot only.
   // A resident app can sit backgrounded for days without a cold start, so

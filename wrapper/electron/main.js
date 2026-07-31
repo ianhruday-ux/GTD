@@ -10,6 +10,7 @@
 
 const { app, BrowserWindow, ipcMain, dialog, Menu } = require("electron");
 const fs = require("fs/promises");
+const fsWatch = require("fs").watch;
 const path = require("path");
 const os = require("os");
 
@@ -17,14 +18,19 @@ const DIST_INDEX = path.join(__dirname, "..", "..", "dist", "index.html");
 const ICON_PATH = path.join(__dirname, "..", "..", "dist", "icon-512.png");
 
 // The App-Folder-scoped path W5's Dropbox API already writes to (see
-// dropboxTransport.js's DROPBOX_SYNC_PATH and its own "Apps/OELA" note) —
-// this MUST match exactly, since the whole point of file-based sync is that
-// every device's transport reads and writes the one shared file. A local
-// Dropbox client mirrors an API-scoped app folder at
-// "<Dropbox root>/Apps/<app name>/", where <app name> is whatever the
-// Dropbox app console has it registered as — "OELA" here, matching W5's
-// device-verified path.
-const DROPBOX_APP_SUBPATH = ["Apps", "OELA", "oela-sync.json"];
+// dropboxTransport.js's DROPBOX_SYNC_PATH). This MUST match exactly, since
+// the whole point of file-based sync is that every device's transport reads
+// and writes the one shared file. A local Dropbox client mirrors an
+// API-scoped app folder at "<Dropbox root>/Apps/<app name>/", where
+// <app name> is whatever the Dropbox App Console has it registered as —
+// NOT necessarily the app's display name. wrapper-plan.md's own prose says
+// "Apps/OELA," which turned out to be shorthand, not the literal folder
+// name: checked directly against the real account (2026-07-30 desktop
+// test session) and the registered folder is "OELA_sync_ianhruday". Getting
+// this wrong is silent and dangerous — the desktop transport would read and
+// write a DIFFERENT file than the phone, each side merging happily with
+// itself and never seeing the other's data, no error anywhere.
+const DROPBOX_APP_SUBPATH = ["Apps", "OELA_sync_ianhruday", "oela-sync.json"];
 
 // Best-effort auto-detect of the local Dropbox root. Dropbox's desktop
 // client has written info.json to a well-known, OS-specific location since
@@ -98,12 +104,85 @@ ipcMain.handle("desktop-read-sync-file", async (_event, root) => {
   }
 });
 
+// The freshness gap, found live testing against a real Dropbox account
+// (2026-07-30): reading this file straight off disk only sees whatever
+// Dropbox's OWN background client has already pulled down, which lags the
+// true cloud state by however long THAT sync takes -- a device's own
+// "Sync now" click can land in the gap and see stale data with no error.
+// Android never has this problem (dropboxTransport.js asks Dropbox's
+// servers directly, every time). The fix: watch the file itself and notify
+// the renderer the instant Dropbox updates it, so "Sync now" isn't the only
+// way this app ever learns something changed -- matching wrapper-plan.md
+// §1's "in normal use, the UI teaches nothing at all... both devices are
+// always live," which the read-from-disk design otherwise quietly breaks.
+let lastWrittenMtimeMs = null; // set by OUR OWN writes below, so the watcher can tell "Dropbox delivered something" from "I just wrote this"
+
 ipcMain.handle("desktop-write-sync-file", async (_event, root, content) => {
   const filePath = syncFilePath(root);
   await fs.mkdir(path.dirname(filePath), { recursive: true });
   await fs.writeFile(filePath, content, "utf8");
   const stat = await fs.stat(filePath);
+  lastWrittenMtimeMs = stat.mtimeMs;
   return { mtimeMs: stat.mtimeMs };
+});
+
+let watcher = null;
+let watchedDir = null;
+let watchedFileName = null;
+let watchedSender = null;
+let debounceTimer = null;
+
+function stopWatching() {
+  if (watcher) { watcher.close(); watcher = null; }
+  if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null; }
+}
+
+// Idempotent: called at the start of every desktopSyncNow() (desktopTransport.js),
+// so it's re-armed on every trigger without either side having to remember to
+// call it separately, and safe to call repeatedly against the same folder.
+// Watches the DIRECTORY, not the file directly -- fs.watch on a file that
+// doesn't exist yet throws, and the very first sync (which creates
+// Apps/<folder>/) hasn't run when connect() first calls this.
+ipcMain.handle("desktop-watch-sync-file", (event, root) => {
+  const filePath = syncFilePath(root);
+  const dir = path.dirname(filePath);
+  const fileName = path.basename(filePath);
+  if (watchedDir === dir && watcher) { watchedSender = event.sender; return true; }
+  stopWatching();
+  watchedDir = dir;
+  watchedFileName = fileName;
+  watchedSender = event.sender;
+  try {
+    watcher = fsWatch(dir, (_eventType, changedName) => {
+      if (changedName && changedName !== watchedFileName) return;
+      if (debounceTimer) clearTimeout(debounceTimer);
+      // Coalesce Dropbox's own multi-step write (temp file + rename, common
+      // sync-client behavior) into one notification, and give the dust a
+      // moment to settle before reading.
+      debounceTimer = setTimeout(async () => {
+        try {
+          const stat = await fs.stat(filePath);
+          // Our own write, not Dropbox delivering something new -- the
+          // ordinary case on every sync this app itself performs, and NOT
+          // something to re-trigger a sync over (that way lies an infinite
+          // write -> watch -> sync -> write loop).
+          if (lastWrittenMtimeMs != null && Math.abs(stat.mtimeMs - lastWrittenMtimeMs) < 500) return;
+          if (watchedSender && !watchedSender.isDestroyed()) watchedSender.send("desktop-sync-file-changed");
+        } catch (e) {
+          // Mid-write elsewhere the file can briefly not exist (rename-based
+          // writers) -- nothing to do; the next real settle fires its own event.
+        }
+      }, 500);
+    });
+    return true;
+  } catch (e) {
+    // The directory doesn't exist yet (brand-new folder, nothing has synced
+    // into it at all) -- nothing to watch until the first write creates it.
+    // desktopSyncNow() re-calls this on every attempt, so the very next sync
+    // (which creates the directory via mkdir) re-arms it successfully.
+    watchedDir = null;
+    return false;
+  }
 });
 
 function createWindow() {
