@@ -127,6 +127,13 @@
     habitDone: {},
     habitDoneOrder: [],
     habitRuns: {},
+    // W4 (wrapper-plan.md §4.3): pulledThisSession is session-only, never
+    // persisted; read by Sync.canSweepAccumulated(), set once a real pull
+    // succeeds. W5 adds syncing/lastError, also session-only — "did the last
+    // attempt work" is a property of right now, not something Reset needs to
+    // touch. lastSyncAt (staleness, §1) and the conflict log ARE persisted,
+    // in Storage under gtd_dropbox_*, not here — see runDropboxSync().
+    sync: { pulledThisSession: false, syncing: false, lastError: null },
     audioCtx: null,
     screen: null, // { kind, taskId (null = new), draft: {...} }
     // chunk 1 (spec.md §3 known issue 1): a real stack, not a single slot.
@@ -810,7 +817,16 @@
   // again whenever the app is opened after a gap, so nothing needs a
   // background timer. Paused habits are frozen: no misses accrue while
   // paused, and the gap simply isn't evaluated.
+  // wrapper-plan.md §4.3: a device must pull before this sweep may persist
+  // accumulated state (habit history), or a stale copy can write a "miss"
+  // over a completion it simply hasn't seen yet -- and because the sweep is
+  // idempotent-per-device (never re-processes a day already in history), the
+  // device that DID see the completion can never correct it afterwards.
+  // Sync.canSweepAccumulated() is a no-op returning true today (no
+  // transport exists yet, Sync.isEnabled() is hard-false), so this changes
+  // nothing about current behavior -- it's the hook W5 flips on.
   function processHabitBoundaries(){
+    if (!Sync.canSweepAccumulated()) return;
     const today = todayStr();
     state.tasks.habit.forEach(function(h){
       if (h.isGroup) return;
@@ -6283,7 +6299,6 @@
     saveTasksLocal("next");
   }
 
-
   // =========================================================
   // BOOT
   // =========================================================
@@ -7421,9 +7436,58 @@
   // desk and dismisses on any outside tap. Nested panels (Background) push into
   // the same dropdown rather than opening a second layer.
   let settingsPanel = "root";
+  // W5: hidden entirely outside the wrapper -- "In a browser, the transport
+  // simply is not offered" (wrapper-plan.md). At the TOP of the menu (author's
+  // placement, this round), above export/import, since it's the row most
+  // likely to need a deliberate tap right before switching devices.
+  function settingsDropboxRowHtml(){
+    if (!DropboxTransport.isAvailable()) return "";
+    if (!Sync.isEnabled()){
+      return '<button type="button" class="settings-item" data-action="dropbox-connect">' +
+        '<span>&#9729;</span><span class="si-label">' + escapeHtml(t("sync.connect")) + '</span></button>' +
+        '<div class="settings-sep"></div>';
+    }
+    const conflicts = dropboxConflictLog();
+    let out =
+      '<button type="button" class="settings-item" data-action="dropbox-sync-now">' +
+        '<span>&#9729;</span><span class="si-label">' + escapeHtml(t("sync.now")) +
+        '<span class="si-note">' + escapeHtml(dropboxSyncStatusLabel()) + '</span></span></button>';
+    if (conflicts.length){
+      out += '<button type="button" class="settings-item" data-action="settings-dropbox-conflicts">' +
+        '<span>&#9888;</span><span class="si-label">' +
+        escapeHtml(conflicts.length === 1 ? t("sync.conflictsOne") : t("sync.conflictsMany").replace("{n}", conflicts.length)) +
+        '</span><span class="si-caret">&#8250;</span></button>';
+    }
+    out += '<button type="button" class="settings-item" data-action="dropbox-disconnect">' +
+      '<span>&#10005;</span><span class="si-label">' + escapeHtml(t("sync.disconnect")) + '</span></button>' +
+      '<div class="settings-sep"></div>';
+    return out;
+  }
+  function settingsDropboxConflictsHtml(){
+    const conflicts = dropboxConflictLog();
+    let out =
+      '<button type="button" class="settings-item settings-back" data-action="settings-root">' +
+        '<span>&#8249;</span><span class="si-label">' + escapeHtml(t("sync.conflictsTitle")) + '</span></button>' +
+      '<div class="settings-sep"></div>';
+    if (!conflicts.length){
+      return out + '<div class="settings-conflict-empty">' + escapeHtml(t("sync.conflictsEmpty")) + '</div>';
+    }
+    out += '<div class="settings-conflict-intro">' + escapeHtml(t("sync.conflictsIntro")) + '</div>';
+    conflicts.forEach(function(c){
+      const when = escapeHtml(new Date(c.at).toLocaleString());
+      out += '<div class="settings-conflict-item"><div class="si-note">' + when + '</div>' +
+        (c.resurrection
+          ? '<div>' + escapeHtml(t("sync.resurrection")) + '</div><div>' + escapeHtml(t("sync.conflictKept").replace("{text}", c.keptText)) + '</div>'
+          : '<div>' + escapeHtml(t("sync.conflictKept").replace("{text}", c.keptText)) + '</div>' +
+            '<div>' + escapeHtml(t("sync.conflictReplaced").replace("{text}", c.lostText || "")) + '</div>'
+        ) + '</div>';
+    });
+    return out;
+  }
   function settingsRootHtml(){
     const surf = SURFACES[currentSurfaceId()] || SURFACES[DEFAULT_SURFACE];
     return (
+      settingsDropboxRowHtml() +
       '<button type="button" class="settings-item" data-action="export-data">' +
         '<span>&#11014;</span><span class="si-label">' + escapeHtml(t("settings.exportBackup")) + '</span></button>' +
       '<button type="button" class="settings-item" data-action="import-data">' +
@@ -7529,6 +7593,7 @@
     menu.innerHTML = settingsPanel === "backgrounds" ? settingsBackgroundsHtml()
       : settingsPanel === "language" ? settingsLanguageHtml()
       : settingsPanel === "debug" ? settingsDebugHtml()
+      : settingsPanel === "dropbox-conflicts" ? settingsDropboxConflictsHtml()
       : settingsRootHtml();
   }
   function openSettings(){
@@ -7548,6 +7613,30 @@
       if (action === "settings-language"){ settingsPanel = "language"; renderSettingsMenu(); return; }
       if (action === "settings-root"){ settingsPanel = "root"; renderSettingsMenu(); return; }
       if (action === "settings-debug"){ settingsPanel = "debug"; renderSettingsMenu(); return; }
+      if (action === "settings-dropbox-conflicts"){ settingsPanel = "dropbox-conflicts"; renderSettingsMenu(); return; }
+      if (action === "dropbox-connect"){
+        // Hands off to the system browser (AppAuth) and back -- nothing to
+        // show mid-flight beyond what Android itself shows. On return, sync
+        // once immediately so "Connect" doesn't sit there looking unconnected.
+        DropboxTransport.connect().then(function(){ renderSettingsMenu(); runDropboxSync(); })
+          .catch(function(e){ state.sync.lastError = (e && e.message) || String(e); renderSettingsMenu(); });
+        return;
+      }
+      if (action === "dropbox-sync-now"){ runDropboxSync(); return; }
+      if (action === "dropbox-disconnect"){
+        // Not behind openConfirmDialog: reversible (reconnect and it picks
+        // back up) and non-destructive (touches neither local nor cloud
+        // data) -- same "applies immediately" tier as the background/
+        // language rows right below it, not the restore-defaults tier below
+        // THAT. ⚑ Builder's call, flagged rather than silently assumed.
+        DropboxTransport.disconnect().then(function(){
+          Storage.remove(DROPBOX_LAST_SYNC_KEY);
+          Storage.remove(DROPBOX_CONFLICT_LOG_KEY);
+          state.sync.lastError = null;
+          renderSettingsMenu();
+        });
+        return;
+      }
       if (action === "settings-pick-lang"){
         // Applies immediately and stays open, like the background picker. setLocale
         // rebuilds the string tables and re-renders the lanes, the tab strip and any
@@ -8190,6 +8279,24 @@
     } else commit();
   }
 
+  // W3 (wrapper-plan.md): storage.js's stampAndTombstone only stamps a record
+  // when its store is next saved for some other reason -- a store nobody has
+  // touched since this chunk shipped would otherwise carry zero modifiedAt
+  // fields indefinitely. Forces that save once at boot, for every
+  // record-array store, using data already loaded into `state` (no extra
+  // reads). Cheap in steady state: once every record has a modifiedAt, this
+  // finds nothing to stamp and calls no save function at all.
+  function backfillModifiedAt(){
+    function anyMissing(arr){ return Array.isArray(arr) && arr.some(function(r){ return r && r.modifiedAt == null; }); }
+    KINDS.forEach(function(k){ if (anyMissing(state.tasks[k])) saveTasksLocal(k); });
+    ["next", "waiting", "current", "future"].forEach(function(k){ if (anyMissing(state.completed[k])) saveCompletedLocal(k); });
+    if (anyMissing(state.events)) saveEvents();
+    if (anyMissing(state.notes)) saveNotes();
+    if (anyMissing(state.tags)) saveTags();
+    if (anyMissing(state.contexts)) saveContexts();
+    if (anyMissing(state.tray)) saveTray();
+  }
+
   function boot(){
     // ⚠ FIRST: every render below reads the live string tables, and they are
     // empty objects until this runs. A blank app is what a missed call looks like.
@@ -8225,6 +8332,17 @@
     // fresh/legacy data seeds nothing here — seedData() owns the samples; an
     // existing-but-empty install just has no events, which is correct.
     { const loadedEvents = loadEvents(); if (loadedEvents) state.events = loadedEvents; }
+    backfillModifiedAt(); // W3: every record-array store gets a modifiedAt, immediately not eventually
+    // W5 trigger 1/4 (open). Fired here, NOT awaited -- boot() stays
+    // synchronous throughout (the same call the async-storage rewrite in
+    // spec.md §2 was rejected to avoid making, W2). Placed just before the
+    // gate it feeds: processHabitBoundaries() below checks
+    // Sync.canSweepAccumulated(), which only opens once THIS call's pull
+    // resolves. Firing it here, immediately before that check, gives it the
+    // best real chance of already being in flight when the gate is tested,
+    // without ever making boot wait on it -- a slow network still falls
+    // through to §4.3's own timeout, not a frozen launch.
+    runDropboxSync();
     processHabitBoundaries();
     processEventBoundaries(); // §7 edge case: boundaries crossed while closed are swept on open, like habits
     ALL_LANES.forEach(renderLane);
@@ -8242,6 +8360,109 @@
     initServiceWorker(); // chunk 9: offline cache + the update-ready banner
   }
 
+  // =========================================================
+  // DROPBOX SYNC ORCHESTRATION (W5, wrapper-plan.md §4.1/§1). sync.js (the
+  // merge engine) and dropboxTransport.js (the network transport) are both
+  // deliberately narrow and UI-agnostic; this is the one place that turns
+  // "a sync ran" into what the app actually shows -- staleness and the
+  // "never silent" conflict report, §1's two visible moments.
+  // =========================================================
+  const DROPBOX_LAST_SYNC_KEY = "gtd_dropbox_last_sync";
+  const DROPBOX_CONFLICT_LOG_KEY = "gtd_dropbox_conflict_log";
+  const DROPBOX_CONFLICT_LOG_CAP = 20; // a personal log, not an audit trail -- old entries just age out
+
+  function dropboxLastSyncAt(){
+    const raw = Storage.get(DROPBOX_LAST_SYNC_KEY);
+    return raw ? Number(raw) : null;
+  }
+  function dropboxConflictLog(){ return Storage.getJSON(DROPBOX_CONFLICT_LOG_KEY, []); }
+
+  // A record's display field differs by store (tasks/events use title, notes
+  // and tray use text) -- this is plain-language display only, never used to
+  // decide anything, so a best-effort pick is fine.
+  function conflictRecordSnippet(rec){
+    if (!rec) return "";
+    const s = rec.title || rec.text || rec.id || "";
+    return s.length > 60 ? s.slice(0, 57) + "…" : s;
+  }
+
+  // §1: "never silent" -- every genuine conflict AND every delete/edit
+  // resurrection the merge reports gets a plain-language line here, not just
+  // applied quietly underneath. Minimal on purpose: which store, a snippet
+  // of what won and what lost, when -- not a full diff viewer.
+  function appendDropboxConflicts(conflicts){
+    if (!conflicts || !conflicts.length) return;
+    const log = dropboxConflictLog();
+    conflicts.forEach(function(c){
+      log.unshift({
+        at: Date.now(),
+        resurrection: !!c.resurrection,
+        keptText: conflictRecordSnippet(c.resurrection ? c.record : c.winner),
+        lostText: c.resurrection ? null : conflictRecordSnippet(c.winner === c.local ? c.remote : c.local)
+      });
+    });
+    Storage.setJSON(DROPBOX_CONFLICT_LOG_KEY, log.slice(0, DROPBOX_CONFLICT_LOG_CAP));
+  }
+
+  function dropboxSyncStatusLabel(){
+    if (state.sync.syncing) return t("sync.syncing");
+    if (state.sync.lastError) return t("sync.error");
+    const at = dropboxLastSyncAt();
+    if (!at) return t("sync.notYetSynced");
+    const min = Math.floor((Date.now() - at) / 60000);
+    if (min < 1) return t("sync.justNow");
+    if (min < 60) return min === 1 ? t("sync.minutesOne") : t("sync.minutesMany").replace("{n}", min);
+    const hr = Math.floor(min / 60);
+    if (hr < 24) return hr === 1 ? t("sync.hoursOne") : t("sync.hoursMany").replace("{n}", hr);
+    const day = Math.floor(hr / 24);
+    return day === 1 ? t("sync.daysOne") : t("sync.daysMany").replace("{n}", day);
+  }
+
+  function isSettingsMenuOpen(){ return !!qs("#dialog-root .settings-menu"); }
+
+  // The one function every trigger (boot, resume, backgrounding, the manual
+  // button) calls. Fire-and-forget everywhere except the manual button,
+  // which only awaits it to know when to stop showing "Syncing…" -- nothing
+  // in the app ever blocks on this, matching Sync.canSweepAccumulated()'s
+  // own tolerance for a sync still in flight (wrapper-plan.md §4.3).
+  async function runDropboxSync(){
+    // Sync.isEnabled(), not DropboxTransport.isAvailable() -- isAvailable()
+    // only means "native platform," which is true the moment the app is
+    // installed, long before anyone has connected Dropbox. Gating the
+    // AUTOMATIC triggers (boot/resume/backgrounding) on isAvailable() alone
+    // would mean every launch tries a real network call and access-token
+    // fetch for a feature the user never opted into -- wasteful, and it
+    // would silently attempt work an unauthorized DropboxAuthPlugin call is
+    // only going to reject anyway. isEnabled() already means "native AND
+    // this device has connected" (sync.js), which is the correct gate here.
+    // DropboxTransport.syncNow() itself still only checks isAvailable() --
+    // it stays callable directly (the manual button's own connect flow
+    // calls it right after Sync.setConnected(true), before isEnabled()
+    // would differ from isAvailable() in practice).
+    if (!Sync.isEnabled()) return;
+    if (state.sync.syncing) return; // already running -- the caller's trigger just missed it, not an error
+    state.sync.syncing = true;
+    if (isSettingsMenuOpen()) renderSettingsMenu();
+    try {
+      const result = await DropboxTransport.syncNow();
+      Storage.set(DROPBOX_LAST_SYNC_KEY, String(Date.now()));
+      state.sync.lastError = null;
+      appendDropboxConflicts(result.conflicts);
+      // A pull may have changed anything -- same render shape as B1's resume
+      // sweep just below (resweepBoundariesOnResume), never a drafting page
+      // mid-edit.
+      ALL_LANES.forEach(renderLane);
+      updateLaneVisibility();
+      updateHabitBadge();
+      if (state.screen && (state.screen.calendarView || state.screen.reviewView)) renderScreen();
+    } catch (e) {
+      state.sync.lastError = (e && e.message) || String(e);
+    } finally {
+      state.sync.syncing = false;
+      if (isSettingsMenuOpen()) renderSettingsMenu();
+    }
+  }
+
   // B1 (wrapper-plan.md §3.2): the boundary sweep used to run at boot only.
   // A resident app can sit backgrounded for days without a cold start, so
   // habits, recurring events and every deadline bar would silently stay on
@@ -8251,6 +8472,7 @@
   // browser tab does, so one listener covers the wrapper AND a browser tab
   // left open overnight, with nothing wrapper-specific to wire up.
   function resweepBoundariesOnResume(){
+    runDropboxSync(); // W5 trigger 2/4 (resume) -- same not-awaited reasoning as boot()'s call, same paragraph above
     processHabitBoundaries();
     processEventBoundaries();
     KINDS.forEach(renderLane);
@@ -8264,6 +8486,24 @@
   }
   document.addEventListener("visibilitychange", function(){
     if (!document.hidden) resweepBoundariesOnResume();
+    // W5 trigger 3/4 (backgrounding, best-effort). This fires at the exact
+    // same OS signal as the app being swiped away entirely -- there is no
+    // way to tell those two apart in advance (author confirmed this reading
+    // after asking about an "on close" trigger; see dropboxTransport.js's
+    // own header for what "best-effort" costs). Not awaited, cannot be:
+    // nothing runs after the page goes hidden to await it. If the process
+    // survives a few seconds, this is what pushes a change made right
+    // before switching devices; if it does not, the next open/resume
+    // anywhere picks it up instead -- verified surviving exactly this kind
+    // of interruption in checks/dropbox_transport.py's group 2.
+    else runDropboxSync();
   });
 
-  document.addEventListener("DOMContentLoaded", boot);
+  // W2 (wrapper-plan.md): the mirror's one recovery branch. In a browser
+  // restoreFromNativeMirrorIfWiped() resolves immediately (window.Capacitor
+  // does not exist) so this is boot() on the very next microtask, same as
+  // today. Only inside the wrapper, and only when localStorage looks wiped,
+  // does boot wait on the native reads that repopulate it first.
+  document.addEventListener("DOMContentLoaded", function(){
+    restoreFromNativeMirrorIfWiped().then(boot).catch(boot);
+  });

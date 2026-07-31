@@ -20,7 +20,7 @@
 // (this file + its boot() call) if the convention is ever retired.
 // =========================================================
 function injectChunkMap(){
-  const FLAG = "gtd_chunk_map_v19";
+  const FLAG = "gtd_chunk_map_v23";
   if (Storage.get(FLAG)) return;
   Storage.set(FLAG, "1");
   ["gtd_chunk_map_v1", "gtd_chunk_map_v2", "gtd_chunk_map_v3", "gtd_chunk_map_v4",
@@ -28,7 +28,8 @@ function injectChunkMap(){
    "gtd_chunk_map_v9", "gtd_chunk_map_v10", "gtd_chunk_map_v11",
    "gtd_chunk_map_v12", "gtd_chunk_map_v13", "gtd_chunk_map_v14",
    "gtd_chunk_map_v15", "gtd_chunk_map_v16", "gtd_chunk_map_v17",
-   "gtd_chunk_map_v18"].forEach(Storage.remove);  // retire superseded flags
+   "gtd_chunk_map_v18", "gtd_chunk_map_v19", "gtd_chunk_map_v20",
+   "gtd_chunk_map_v21", "gtd_chunk_map_v22"].forEach(Storage.remove);  // retire superseded flags
 
   // Replace, don't accumulate (8.2, mirroring 8.1): sweep any previous
   // chunk-map group (tagged via devContext, not a title match, since the
@@ -90,7 +91,11 @@ function injectChunkMap(){
     { title: "✓ 9 — Service worker + offline + install polish", notes: "DONE. The app now works with no internet — it saves a copy of itself the first time you open it online, so airplane mode after that still loads and works. When I ship a change while you have the app open, a small bar appears saying “New version available” with a Reload button; nothing ever updates or interrupts you without that tap. See the fresh QA checklist in Next Actions to try both." },
     { title: "A drawing tool for Notes — only if there is time", notes: "MAYBE. The first thing to cut if the month runs out." },
     { title: "✓ Wrapper W0 — the Android smoke shell", notes: "DONE, verified on a real device. The Android long-press drag bug (known issue 5) is fixed — a device trace showed 26 holds, 26 committed moves, zero contextmenu, zero touchcancel — by owning the WebView rather than rewriting drag code (there was none to rewrite). localStorage survives a force-kill and reopen. Two things landed alongside for every build, phone and computer: the whole card is now a drag surface, not just its title, and contexts stay non-draggable on purpose." },
-    { title: "Wrapper W1 — resume sweep, back button, service worker", notes: "BUILT, not yet tried on the phone. Habits and calendar deadlines now catch up the moment the app is reopened, not only on a cold start — the app used to sit on whatever day it last launched until closed and reopened. The Android back button now goes through the same cancel-and-warn chain as the ✕ button and the Escape key, instead of just quitting outright. And the offline-update banner (chunk 9) no longer tries to install a second copy of itself inside the app on your phone, where it could end up serving an old version on top of a new one." }
+    { title: "✓ Wrapper W1 — resume sweep, back button, service worker", notes: "DONE, verified on the phone. Habits and calendar deadlines now catch up the moment the app is reopened, not only on a cold start. The Android back button goes through the same cancel-and-warn chain as the ✕ button and the Escape key, instead of just quitting outright — this needed a real fix mid-round, since Android's newer predictive-back gesture was silently skipping the old plumbing entirely. And the offline-update banner (chunk 9) no longer tries to install a second copy of itself inside the app on your phone. Also corrected along the way: the desktop's 'discard your changes?' popup had quietly been showing on the phone too, which was never the intent — it's desktop-only now, where Done and ✕ actually need the extra check." },
+    { title: "✓ Wrapper W2 — durable local storage", notes: "DONE, verified on the phone with a real wipe: cleared the app's storage, force-killed it, reopened it, and everything came back exactly as it was — nothing reset to sample data. Every save now quietly backs itself up to a second, sturdier storage spot on your phone that survives things regular app storage doesn't (like Android clearing space under pressure). Invisible in day-to-day use; it only matters the day something would otherwise have been lost." },
+    { title: "✓ Wrapper W3 — every record remembers when it changed", notes: "DONE, invisible in the app itself — groundwork for syncing between devices later. Every action, event, note, tag, list, and capture now quietly carries a timestamp of its last real change, and a deleted one leaves a small record that it existed rather than vanishing without a trace. Neither of those exist yet for habits specifically — that one needs its own careful handling later, tied to how habit streaks get compared between two devices." },
+    { title: "✓ Wrapper W4 — the part that actually merges two devices' changes", notes: "DONE, invisible in the app itself — the rulebook two devices follow when they sync: whoever changed something more recently wins, a genuine same-item disagreement gets flagged rather than one side silently vanishing, and a brand-new or long-away phone never mistakes 'I haven't seen this yet' for 'this was deleted.' Tested by actually running two copies of the app side by side and forcing them to disagree on purpose, 39 separate ways, before ever touching a network." },
+    { title: "Wrapper W5 — actually connecting to Dropbox", notes: "BUILT, not yet tried on the phone. There's a new row at the top of the ⋯ menu: tap Connect Dropbox, sign in once, and from then on your phone and computer quietly stay in sync — when you open the app, when you come back to it, and even a best-effort try right before you switch away. A Sync now button is there too, for whenever you want to be sure right now. If two devices ever changed the exact same thing before they could sync, nothing gets silently thrown away — you'll see 'items changed on both devices' right there in the menu, with plain words about what was kept and what wasn't. Everything about how it merges and recovers from being interrupted mid-sync was tested by simulating it directly; the one thing that genuinely needs your phone is the Dropbox sign-in itself." }
   ];
 
   const groupId = genId();

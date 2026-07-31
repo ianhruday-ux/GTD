@@ -72,6 +72,7 @@ public class MainActivity extends BridgeActivity {
      */
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        registerPlugin(DropboxAuthPlugin.class); // must precede super.onCreate() per Capacitor's own registration contract
         super.onCreate(savedInstanceState);
         WebView web = (getBridge() != null) ? getBridge().getWebView() : null;
         if (web == null) {

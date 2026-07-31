@@ -1,5 +1,10 @@
 {
   "appId": "com.ianhruday.oela",
   "appName": "OELA",
-  "webDir": "../dist"
+  "webDir": "../dist",
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    }
+  }
 }

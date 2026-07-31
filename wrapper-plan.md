@@ -193,7 +193,7 @@ the concern. Out of scope here; flagged so it isn't forgotten.
   provider's file revision/etag.
 - Reads: pull on open, on resume, and after any write.
 - Conflict on the same record: **keep the newest** (ruled), and **report it** (§1).
-- Deletions: tombstones, or S2 bites.
+- Deletions: tombstones, or S2 bites. Tombstones don't live forever — see §4.5.
 - Offline: writes proceed locally and queue. Reconciliation happens on reconnect. This is the normal
   path, not a degraded one.
 
@@ -240,10 +240,71 @@ Builder's call, but the *rule* is not.
 
 ### 4.4 Open for the build session
 
-- The exact lock representation and whether Dropbox's revision CAS is sufficient alone.
+- The exact lock representation and whether Dropbox's revision CAS is sufficient alone. **Partially
+  resolved in conversation, 2026-07-30:** whatever this turns out to be, it must not be an indefinite
+  mutex. A device can die mid-write while briefly holding it (the lock in §4.1 is short-lived by
+  design, not the rejected baton's long-lived authority — but "short" doesn't mean "can't be
+  interrupted"), and an orphaned lock that nothing ever releases would freeze every other device out
+  permanently. Two ways this actually resolves, still open which: if the lock is pure CAS (write only
+  if the file's revision hasn't changed since it was read), there is no separate lock object to strand
+  at all — a crash mid-write just means an atomic write that did or didn't land, nothing lingers. If
+  an explicit lock file/flag turns out to be needed anyway (some multi-step sync operation CAS-on-one-
+  revision can't cover atomically), it must be a **lease, not a mutex**: stamp it with when it was
+  acquired, and let any device treat one older than a short threshold as abandoned and take over — the
+  same `modifiedAt`/`deviceId` machinery W3/W4 already built for records, reused rather than
+  reinvented.
 - Pull cadence beyond open/resume/post-write.
 - The form the conflict report takes (§1).
 - Whether the review surface is the natural home for "these records collided."
+
+### 4.5 Tombstone garbage collection and device rejoin
+
+Resolved in conversation, 2026-07-30, after W3 shipped tombstones as permanently append-only and
+deliberately left the question open. Not built yet — this is the design W4 builds to, recorded now so
+it isn't re-litigated.
+
+**The mechanism.**
+
+- The cloud file carries a device roster. Every write a device makes — an ordinary record or a
+  tombstone — carries its device ID.
+- Each device on the roster records exactly one thing about itself: the timestamp of its last
+  successful full pull.
+- A tombstone is safe to delete once its `deletedAt` predates the **oldest** last-pull timestamp
+  across every device currently on the roster — every device has necessarily pulled at least once
+  since the tombstone was written, so all of them have seen it.
+- ⚑ Chosen over the alternative floated in conversation — each device appending its own ID to an
+  ack-list on the specific tombstone it applied. Same safety guarantee; a pull-timestamp per device is
+  a fixed cost, where an ack-list grows with tombstones × devices. The ack-list is more debuggable
+  ("who specifically hasn't cleared this one") if that ever turns out to matter — not built unless it
+  does.
+- **Device dropout: one year of no writes.** Otherwise a single permanently-gone device (lost,
+  broken, retired without ever being told) freezes GC forever, waiting for a pull that will never
+  come. A year, not six months (this document's first pass): tombstones and roster metadata are tiny
+  — a personal task list's deletions, not a fleet's — so there is no storage-cost reason to be stingy,
+  and dropping a device too eagerly is the failure mode that actually costs something (next point).
+
+**The gap this doesn't close, named rather than hidden.** A device that gets dropped and later
+reconnects — or a brand-new device on its very first sync — has no trustworthy baseline to diff
+against. A local record missing from the cloud is genuinely ambiguous: deleted elsewhere while this
+device was silent (tombstone now correctly gone), or created here and never pushed? No scheme that
+ever discards a tombstone can fully resolve this from the tombstone side — it is inherent to expiry
+itself, not a defect particular to this design.
+
+**The resolution: a device with no baseline never infers a deletion from absence.** Reconciling with
+no prior sync history — true of a rejoining device and a brand-new one alike — is additive-only in
+both directions: a local-only record is a create to push, a cloud-only record is a create to pull.
+"The cloud doesn't have this" is never read as "so delete mine." This is not a special case bolted
+onto the merge engine; it is the same per-record merge every other sync already uses, run once against
+a sparse local side. The only residual risk is a record genuinely deleted elsewhere resurrecting on
+the rejoining device — the same accepted risk class as S2's tombstone-loss resurrection, and it fails
+in the direction this project already prefers: annoying-but-recoverable (delete it again) over silent
+(a freshly created item just gone). §1's "never silent" ruling extends here too — a resurrection
+surfacing this way is reported the same as any other same-record collision, not applied quietly.
+
+**The case this was chased down to fix:** something written on a brand-new phone before its first
+sync completes must never be lost to that first sync. It isn't, once "first sync" is understood as an
+ordinary merge with a sparse local side rather than a special "just take whatever the cloud says"
+step that bypasses the merge engine everywhere else already commits to.
 
 ---
 
@@ -435,6 +496,49 @@ inert — there is no hardware back. B3 changes nothing; the web build still wan
 
 ---
 
+### W2 — Durable local storage (mirror-on-write) — BUILT AND DEVICE-VERIFIED 2026-07-29
+
+**Built with `@capacitor/preferences` and `@capacitor/filesystem`** (both added to `wrapper/`, synced
+into the Android project). `src/storage.js`'s `Storage.set`/`Storage.remove` — already the single
+choke point every write goes through — now also mirror each `gtd_` key: Preferences for anything
+≤200,000 characters (⚑ builder's call; no documented hard ceiling exists for Preferences on Android,
+this is comfortably under where it would ever matter), Filesystem (`Directory.Data`, app-private, no
+permissions needed) for anything larger. A key lives in exactly one store at a time — crossing the
+threshold moves it and best-effort deletes the stale copy from the other, so restore never has to
+reconcile two versions of the same key. `restoreFromNativeMirrorIfWiped()` gates `boot()` behind one
+check: if `window.Capacitor` is absent (every browser, GitHub Pages included) it resolves on the next
+microtask, byte-for-byte today's behavior; inside the wrapper, only when localStorage holds *no*
+`gtd_` key at all does it await the native reads that repopulate it before `boot()` ever touches
+`localStorage`.
+
+**One gap found on the first real device check, fixed same round.** Mirror-on-write only mirrors a
+key when it's next *written* — after installing this build, only `gtd_habit_runs` (touched by the B1
+resume sweep) had a native copy; the other seven `gtd_` keys, untouched since the update, had none.
+Real gap, not theoretical: data written before this chunk existed would sit unprotected until
+something happened to save it again. Closed with `backfillNativeMirror()`, called on every non-wiped
+boot — cheap, fire-and-forget, converges immediately instead of eventually.
+
+**Device-verified, not just tested in a browser** (`adb` + Chrome DevTools Protocol over
+`webview_devtools_remote_*`, same technique W0's drag-log debugging used): after the backfill fix,
+every one of the phone's 8 live `gtd_` keys matched byte-for-byte between `localStorage` and the
+native mirror. Then the actual claim was tested directly — `window.localStorage.clear()` (simulating
+the OS wipe this chunk exists for), `am force-stop` (a real kill, not a background), cold relaunch —
+and every key came back **byte-for-byte identical to its pre-wipe content**, with no reseeding of
+fresh sample data. That is the entire promise of W2, confirmed end to end on the actual device.
+
+*In a browser:* `window.Capacitor` doesn't exist, so `nativeMirrorPlugins()` returns null everywhere
+it's checked — the mirror is a complete no-op, `restoreFromNativeMirrorIfWiped()` resolves
+immediately, and `checks/*.py` (46 files, 0 failures both before and after the backfill fix) confirms
+behavior is unchanged.
+
+**Environment note, not a code issue:** this repo lives inside a OneDrive-synced folder, and Gradle's
+resource merge intermittently failed with "Unable to delete directory" once the two new plugins
+pulled in many localized AndroidX string resources — OneDrive's sync client and Gradle's filesystem
+watcher both grab handles on the same files. Fixed by setting `org.gradle.vfs.watch=false` in
+`android/gradle.properties`; if it recurs, deleting `android/app/build` and rebuilding also clears it.
+
+*Original plan for this chunk follows.*
+
 ### W2 — Durable local storage (mirror-on-write)
 
 **Author's ruling, overturning this document's own recommendation.** The reasoning is recorded
@@ -482,6 +586,66 @@ this cheap — the mirror hooks in at one place.
 
 ---
 
+### W3 — Record identity: `modifiedAt` and tombstones — BUILT AND VERIFIED 2026-07-29
+
+**Built centralized, not at each mutation site.** The audit line above (§3.3 S1) describes the
+obvious approach — touch every create/edit/delete — and frames it as "the single largest piece of
+the sync work." That was true of that approach; it wasn't the only one available. Every mutation
+already funnels through one of a handful of `saveXxx()` functions, each handing its whole array to
+`Storage.setJSON`. Diffing that array against what was there a moment ago (one more
+`Storage.getJSON` on the same key, read before the overwrite) finds every created, changed, and
+removed record without touching app.js or events.js at all — correct by construction for every
+store shaped this way, the same reasoning that made W2's mirror and this app's own
+`serializeAllData()` cheap. `src/storage.js`'s `stampAndTombstone()` does the diff (key-sorted deep
+comparison via `canonicalJSON`, so property-insertion-order differences never read as a change);
+`Storage.setJSON` calls it before every write to anything shaped like a flat `{id, ...}` record
+array.
+
+**Scope, flagged rather than hidden.** Covers tasks (all 5 kinds), events, notes, tags, contexts,
+the completed archives, and the capture tray — the array-shaped stores. Does **not** cover
+`gtd_habit_runs`, `gtd_habit_done`, `gtd_habit_done_order`, or the `gtd_archived_*` maps: those are
+keyed objects, not record arrays, and `habit_runs` in particular is already flagged (§4.2/§4.3) as
+needing bespoke handling tied to the sweep-ordering rule — real W4 work, not something to guess at
+the shape of here. Records that end up archived already carry a correct, frozen `modifiedAt` from
+their life in a covered store before archiving, so this gap is narrower than the exclusion list
+suggests.
+
+**Tombstones are their own append-only store** (`gtd_tombstones`), not in-place markers — every
+existing reader of `state.tasks`/`events`/etc. is completely unaffected, because a deleted record
+still just isn't there. Each tombstone is itself an `{id, ...}` record, so it flows through the exact
+same mechanism when appended (new entries get stamped; nothing is ever removed *from* the tombstone
+log, so appending can never trigger tombstoning itself — no special-casing needed, verified by
+inspection and by test). Unbounded growth here is the same already-accepted tradeoff as the
+completed archives and habit histories (`spec.md` known issue 4) — **not permanent**: §4.5 records the
+garbage-collection design agreed after this chunk shipped, built when W4 is.
+
+**One gap closed proactively rather than found live, this time.** `stampAndTombstone` only stamps a
+record when its store is next saved — a store nobody touches after this ships would otherwise carry
+zero `modifiedAt` fields indefinitely, the same shape of gap W2's mirror had on the first device
+test. Closed before shipping with `backfillModifiedAt()` (`app.js`), called once at boot using data
+already loaded into `state` — no extra reads, and once every record has a timestamp it finds nothing
+to do on subsequent boots.
+
+**⚑ Schema note, resolved.** No migration. Real use has not begun (this document, throughout), so
+existing records simply gain `modifiedAt` the next time their store is saved — accelerated to
+"immediately" by the boot-time backfill above. A record deleted before this chunk existed leaves no
+tombstone; that history is genuinely gone, which is the documented cost of skipping a migration, not
+an oversight.
+
+**Verified with a throwaway Playwright script** (not part of `checks/`, since it tests a mechanism
+those files don't know exists yet): confirmed every pre-existing record picks up `modifiedAt` via the
+backfill, a real UI capture gets stamped through the actual save path, deleting it removes it from
+`gtd_tray` **and** appends exactly one correctly-attributed tombstone (`store`, `recordId`,
+`deletedAt` all correct), and — the case most likely to silently break — an unrelated store's save
+leaves an untouched record's existing `modifiedAt` exactly alone rather than bumping everything to
+"now." All 11 checks passed. The full `checks/*.py` suite (46 files) also passed with zero failures,
+confirming nothing existing regressed.
+
+*In a browser:* invisible and mildly useful on its own, exactly as this section originally said — the
+export file gets richer for free, since `serializeAllData` already sweeps every `gtd_` key.
+
+*Original plan for this chunk follows.*
+
 ### W3 — Record identity: `modifiedAt` and tombstones
 
 The prerequisite for the sync engine.
@@ -499,6 +663,82 @@ time, flag the choice.
 
 ---
 
+### W4 — The sync engine, with no network at all — BUILT AND TESTED 2026-07-30
+
+**`src/sync.js`, new module.** Pure and transport-agnostic on purpose — every function operates on a
+plain "bundle" (`{roster, tombstones, stores}`, one array per §4.2's must-sync stores) and touches
+nothing but `Storage`. `mergeBundles(local, remote, deviceId, baseline)` is the one merge rule, applied
+uniformly to every store (tasks, events, notes, tags, contexts, completed archives, tray — the same
+flat-array scope W3 already committed to; `gtd_habit_runs`/`gtd_habit_done`/`gtd_habit_done_order` and
+the `gtd_archived_*` maps stay out, unchanged from that boundary) — and, with no special-casing,
+to `gtd_tombstones` itself, since a tombstone is just another `{id,...}` record whose content never
+changes once written, so its "merge" degenerates correctly to a union:
+
+- **Newest wins** on genuine conflicts (both sides moved since the last state this device knows they
+  agreed on — one side merely being ahead of a shared baseline is a routine update, not a conflict,
+  and is applied silently; only a real collision is reported, per §1).
+- **A tie on `modifiedAt`** resolves on the larger `deviceId`, deterministically — not a coin flip that
+  could flip-flop the same record between two devices forever.
+- **Delete vs. edit races** resolve the same way: whichever timestamp is newer wins, so an edit made
+  after a delete elsewhere resurrects the record (reported, not silent) rather than being silently
+  discarded — and symmetrically for a delete made after a remote edit.
+- **No baseline (brand-new device, or one rejoining after roster dropout) is additive-only in both
+  directions** — §4.5's resolution, built as designed: never infer a deletion from a record's absence
+  when there's no trustworthy prior state to say it used to be there.
+- **Tombstone GC (§4.5)** exactly as recorded: a tombstone clears once its `deletedAt` predates the
+  oldest last-pull timestamp among currently-active roster devices; a device silent over a year drops
+  off the roster; a device that has never pulled doesn't count toward "oldest" at all (hasn't joined
+  the GC-blocking set yet); if literally nobody has ever pulled, nothing is discarded.
+- **§4.3's pull-before-sweep rule**, wired in: `processHabitBoundaries()` (`app.js`) now opens with
+  `if (!Sync.canSweepAccumulated()) return;`. `Sync.isEnabled()` is hard-`false` — no transport exists
+  yet — so this is a no-op today, verified across a real reload in the test suite via a test-only
+  window flag (`window.__oelaSyncForceEnabled`, undefined and therefore false in any real browser).
+- **Every stamped record now also carries `deviceId`** (`storage.js`'s `stampAndTombstone`, extended)
+  — the tie-break rule and any future "changed on your phone/desktop" reporting both need it.
+- `window.__oelaSync` exposes the engine (`exportBundle`, `importBundle`, `mergeBundles`, `reconcile`,
+  `canSweepAccumulated`, `isEnabled`, `getDeviceId`) — W5's hook, and this chunk's own tests; not a
+  user-facing feature, same pattern as `window.__oelaHandleBack`.
+
+**`checks/sync_engine.py`, new — 39 checks, three groups, all exercising the real code:**
+
+1. Pure `mergeBundles()` logic on hand-built fixture bundles: additive/no-baseline (including the
+   literal "new phone" scenario — a local-only record with nothing in the corresponding cloud slot
+   is kept, not inferred as a deletion), genuine conflict vs. routine one-sided update, the tie-break,
+   both directions of the delete/edit race, and every tombstone-GC case from §4.5 (dropped once safe,
+   a never-pulled device not blocking, nothing discarded when nobody's pulled, roster dropout
+   unblocking a previously-guarded tombstone).
+2. **A real two-device round trip** — two separate browser contexts, each its own `localStorage`,
+   "syncing" only by the test handing one device's `exportBundle()` output to the other's
+   `reconcile()`, exactly the shape W5's transport will eventually automate. The initial capture and
+   the final delete go through the actual UI (fill-and-Enter, reveal-and-click), not raw storage
+   pokes, so the test proves the genuine write path stamps and tombstones correctly, not a
+   reimplementation of it.
+3. **The §4.3 gate across a real reload** — force-enabled via an init script (survives navigation,
+   unlike an in-page monkeypatch), a habit seeded several scheduled days stale, reload: confirmed the
+   boot-time sweep does *not* advance while closed, confirmed it does after a `reconcile()` call opens
+   it (triggered via the same `visibilitychange` dispatch B1's resume sweep already listens for, no
+   second reload needed — a second reload would have reset the session-only gate state itself).
+
+**Two test bugs found and fixed while writing this, worth recording because both looked like engine
+bugs at first:** fixture timestamps for the GC tests were tiny epoch-relative numbers (`1000`, `9000`)
+against a dropout check that compares to the real `Date.now()` — every device read as decades stale.
+And the delete-propagation test reused a record whose `modifiedAt` had just been set artificially into
+the future for an unrelated tie-break test, so a real (real-time) delete moments later looked *older*
+than that inflated edit and correctly triggered resurrection — correct engine behavior, wrong fixture.
+Neither would have been caught without actually running against the real merge code, which is the
+whole argument in this chunk's own opening paragraph for building it exactly this way.
+
+**The lock question raised separately (§4.4) is W5's, not this chunk's** — nothing here holds a lock
+over anything, there being no transport to lock.
+
+Full `checks/*.py` regression suite (46 files) also re-run clean, zero failures — the sweep gate and
+the `deviceId` stamping extension touch code every existing check already exercises.
+
+*In a browser:* fully functional and fully tested, exactly as described below. Nothing about the
+merge is native.
+
+*Original plan for this chunk follows.*
+
 ### W4 — The sync engine, with no network at all
 
 Per-record diff and merge, newest-wins on a same-record collision, and the conflict report that
@@ -515,6 +755,141 @@ accumulated state.
 *In a browser:* fully functional and fully testable. Nothing about the merge is native.
 
 ---
+
+### W5 — Dropbox transport (wrapper only) — BUILT AND TESTED 2026-07-30
+
+**The App Key.** `wrapper/android/secrets.properties` (gitignored — author's ruling: not a real
+secret under the AppAuth/PKCE pattern, since no App Secret is ever collected, but kept out of the
+public repo anyway, "no reason not to"), loaded into `BuildConfig.DROPBOX_APP_KEY` by
+`app/build.gradle`. Missing file → empty string, not a build failure, so a fresh checkout still
+builds.
+
+**OAuth.** `net.openid:appauth` + `androidx.security:security-crypto`, a redirect-URI manifest
+placeholder (`com.ianhruday.oela`, AppAuth's own bundled `RedirectUriReceiverActivity` picks it up —
+nothing to hand-declare), and a real Capacitor plugin, `DropboxAuthPlugin.java`
+(`authorize`/`isAuthorized`/`getAccessToken`/`signOut`, registered in `MainActivity`). PKCE, no app
+secret, matching why the setup checklist never asked for one. The refresh token lives in its own
+Keystore-backed `EncryptedSharedPreferences` file — deliberately **not** W2's `gtd_` mirror, since a
+sync credential and app data have different failure modes: Reset local data must not be able to
+strand a live Dropbox grant. **⚑ Flagged, not fixed:** `EncryptedSharedPreferences` is marked
+`@Deprecated` as of `security-crypto` 1.1.0 (confirmed by reading the actual class file, not
+assumed) — still compiles and works, no replacement class shipped yet in this library version, so
+kept as the least-bad current option. Worth revisiting if AndroidX ships a successor.
+
+**The CORS trap, and how it actually got resolved.** The first design called `fetch()` directly from
+`dropboxTransport.js` and read the file's revision from a custom response header
+(`Dropbox-API-Result`) — which a WebView's `fetch()`, being genuine Chromium, will not expose to JS
+cross-origin without the server opting in via `Access-Control-Expose-Headers`, not something to
+assume of Dropbox's API. Caught by a mocked test, not guessed: every CAS write was silently sending
+`"update": null`. The fix that shipped is **not** a hand-written native HTTP plugin (the first
+instinct) — tracing Capacitor's own bridge source (`native-bridge.js`) found `CapacitorHttp`, an
+*official* Capacitor feature that patches `window.fetch` to run the request through native
+`HttpURLConnection` and hand back *every* response header when reconstructing the JS `Response` — no
+CORS filtering, because the real network call never touches the WebView's browser networking stack
+at all. One config flag (`capacitor.config.json` → `CapacitorHttp.enabled: true`, synced into the
+Android project), not a rewrite. `dropboxTransport.js`'s `fetch()` calls needed zero changes.
+
+**The transport (`src/dropboxTransport.js`).** §4.4's lock question resolved on its own preferred
+branch: **pure CAS on the file revision, no separate lock file** — `mode:{".tag":"update", update:
+rev}` with `autorename:false` (load-bearing: without it, two devices racing their first-ever "add"
+would silently fork into `oela-sync.json` / `oela-sync (1).json` instead of one losing and retrying,
+exactly the silent-divergence class §1 rules out). A brand-new/first-ever sync feeds `Sync.reconcile()`
+an empty bundle rather than special-casing "no file yet" — routes through the same additive-only,
+no-baseline path §4.5 already built for a rejoining device. `DROPBOX_MAX_CAS_RETRIES = 3`.
+
+**Wiring `Sync.isEnabled()` for real.** W4 left it hard-`false` behind a test-only flag. Now: a
+plain, *persisted* `gtd_sync_connected` flag (`Sync.setConnected`/read synchronously), checked
+alongside `window.Capacitor.isNativePlatform()`. Deliberately **not** a live call to
+`isAuthorized()`/`getAccessToken()` — those are async native calls, and `canSweepAccumulated()` is
+read from inside `boot()`'s synchronous sweep; going async there would mean either blocking boot on a
+native round-trip or restructuring `boot()` itself, exactly the surgery W2 already rejected for
+storage. **A real bug found and fixed the same round, by the test suite itself:** the automatic sync
+triggers below were first gated on `DropboxTransport.isAvailable()` (native platform only) — true the
+moment the app is *installed*, long before anyone connects. Every boot would have attempted a real
+network call and access-token fetch for a feature never opted into; on a real device
+`DropboxAuthPlugin` would just reject it ("not signed in"), but it's wasted work and the wrong
+semantics regardless. Caught because `checks/dropbox_transport.py`'s fake-native test harness
+started failing once boot's own auto-sync began racing the test's own explicit calls — re-gated on
+`Sync.isEnabled()` (native **and** connected), which fixed both the real bug and the test collision
+in one change.
+
+**The four triggers (app.js, `runDropboxSync()`).** Settled after asking the author directly, not
+guessed:
+1. **Open** — fired just before `processHabitBoundaries()` in `boot()`, not awaited (boot stays fully
+   synchronous, same discipline as W2's storage decision); gives §4.3's pull-gate the best real chance
+   of already being in flight when it's checked, with a slow network still falling through to the
+   gate's own 5s timeout rather than freezing launch.
+2. **Resume** — first line of `resweepBoundariesOnResume()` (B1), same not-awaited reasoning.
+3. **Backgrounding, best-effort** — new `else` branch on the same `visibilitychange` listener.
+   **Author asked specifically for an "on close" trigger; there isn't one to build.** Backgrounding
+   and being swiped away entirely are the *same* OS signal at the moment it fires — the app cannot
+   tell them apart in advance, so this is opportunistic (may not finish if the process dies) rather
+   than guaranteed. Because a sync is always a full pull-*and*-push, this still means nothing waits
+   more than one open/resume/background cycle to reach Dropbox in realistic use (background one
+   device right before checking the other).
+4. **Manual "Sync now"** — top of the ⋯ settings menu (author's placement), the reliable fallback.
+
+**Author's question, tested directly, not reasoned about:** what survives the app's process dying
+between the local merge and the network upload landing? `Sync.reconcile()` is synchronous and writes
+to `localStorage` the instant it returns, *before* `dropboxSyncNow()`'s subsequent `await` on the
+upload even starts — so a kill there loses nothing locally; the next sync attempt (any of the four
+triggers) picks up cleanly, because `reconcile()` is idempotent against already-merged data. Verified
+in `checks/dropbox_transport.py` group 2 by mocking the upload route to hang forever, confirming the
+local merge already landed, then closing the whole browser context outright (closest a test driver
+gets to an OS killing the process) and resuming in a fresh context sharing the same storage state.
+**Honest limit, not glossed over:** this cannot exercise a kill mid-way through `reconcile()`'s own
+synchronous multi-key write loop (`sync.js`'s `importBundle`) — no `await` inside it, so no instant a
+test driver can interrupt from outside the JS engine. Real but sub-millisecond, same accepted-risk
+class as W2's mirror-write gap.
+
+**The two visible moments (§1).**
+- **Staleness.** `dropboxSyncStatusLabel()` — "Synced just now" / "N minutes/hours/days ago" / "Not
+  yet synced" / "Syncing…" / an error state, in the settings row next to Sync now. Bucketed and
+  tested against a real 90-minutes-old timestamp, not just eyeballed.
+- **Never silent.** Every conflict *and* every delete/edit resurrection `Sync.reconcile()` returns is
+  appended to a capped, persisted log (`gtd_dropbox_conflict_log`, 20 entries) and surfaced as a row
+  in settings ("N items changed on both devices — tap to review") opening a plain-language panel:
+  which text was kept, which was replaced, when. §1's open question — "whether the review surface is
+  the natural home for these" — resolved as **no, not this round**: settings, next to the sync status
+  it's already adjacent to, was the simpler option and is where `wrapper-plan.md`'s own "choose the
+  simplest option, flag it" convention points.
+
+**Settings UI.** Connect Dropbox / Sync now + status / Disconnect, at the top of the ⋯ menu, hidden
+entirely outside the wrapper (`DropboxTransport.isAvailable()` false in any browser tab — GitHub
+Pages unaffected, byte-for-byte). **⚑ Disconnect has no confirm dialog** — builder's call: reversible
+(reconnect picks back up) and non-destructive (touches neither local nor cloud data), so it sits at
+the same "applies immediately" tier as the Background/Language rows, not the Restore-defaults tier.
+
+**⚑ zh-Hans for the new strings is my own pass, not a native-speaker review** like the tutorial/info
+copy got — flagged rather than presented as equally vetted.
+
+**Tested, not guessed — 35 new checks, two files, both found real bugs while being written (not
+after):**
+- `checks/dropbox_transport.py` (17) — a mocked Dropbox Content API (`page.route`, a stateful fake
+  cloud file), driving the real transport code: first-ever sync, a genuine CAS collision with exactly
+  one retry, and the kill/relaunch scenario above. Found: the CORS/header-exposure bug (real, fixed
+  via `CapacitorHttp`); a test-fixture bug of its own (an `intruder` roster entry seeded with
+  `lastPull: 0` — epoch 1970 — correctly discarded by §4.5's year-old roster GC, same class of mistake
+  `sync_engine.py`'s own header already warned about).
+- `checks/dropbox_settings_ui.py` (18) — the same mocking approach, driving the real settings menu
+  through a full connect → sync → staleness-bucketing → genuine conflict → disconnect cycle. Found:
+  a test bug (calling `window.__oelaDropbox.syncNow()` directly bypasses `runDropboxSync()`'s conflict
+  logging entirely — fixed by triggering through the real `visibilitychange` resume path instead) and,
+  jointly with the first file, the `isEnabled()` vs `isAvailable()` gating bug above.
+
+Full `checks/*.py` suite (49 files, including these two) re-run clean after every fix, zero failures.
+
+**What this chunk cannot test, named rather than hidden — W6's/an on-device session's gate:** OAuth
+through a real system browser and back, a real Dropbox account and App Console registration, whether
+`CapacitorHttp`'s native `fetch` patch behaves on an actual device the way reading its source says it
+should, and the AppAuth redirect URI actually round-tripping through Android's intent system. Every
+piece of *logic* — merge, CAS, the kill scenario, the UI — is real-code-tested; the device pass is
+what's left, same shape as W0's drag-log gate and W2's real-wipe test before either was called done.
+
+*In a browser:* the transport is not offered at all. Export/Import stays the web build's answer,
+exactly as `spec.md` §10 says it should.
+
+*Original plan for this chunk follows.*
 
 ### W5 — Dropbox transport (wrapper only)
 

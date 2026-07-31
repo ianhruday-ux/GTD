@@ -845,6 +845,39 @@ const STRINGS = {
   // ---- service worker update banner (chunk 9) ----
   "sw.updateBanner.message": { en: "New version available",          "zh-Hans": "有新版本可用" },
   "sw.updateBanner.reload":  { en: "Reload",                         "zh-Hans": "重新加载" },
+
+  // ---- Dropbox sync (W5, wrapper-plan.md). Wrapper-only -- this whole row
+  // is hidden in a plain browser tab, so these strings only ever render
+  // inside the installed app. ⚑ zh-Hans below is my own pass, not a
+  // native-speaker review like the tutorial/info-button copy got — flagged
+  // rather than presented as equally vetted. "Dropbox" itself stays
+  // untranslated, same treatment as "OELA". ----
+  "sync.connect":            { en: "Connect Dropbox",                "zh-Hans": "连接 Dropbox" },
+  "sync.disconnect":         { en: "Disconnect",                     "zh-Hans": "断开连接" },
+  "sync.now":                { en: "Sync now",                       "zh-Hans": "立即同步" },
+  "sync.syncing":            { en: "Syncing…",                       "zh-Hans": "同步中…" },
+  "sync.notYetSynced":       { en: "Not yet synced",                 "zh-Hans": "尚未同步过" },
+  "sync.justNow":            { en: "Synced just now",                "zh-Hans": "刚刚同步过" },
+  "sync.minutesOne":         { en: "Synced 1 minute ago",            "zh-Hans": "1 分钟前同步过" },
+  "sync.minutesMany":        { en: "Synced {n} minutes ago",         "zh-Hans": "{n} 分钟前同步过" },
+  "sync.hoursOne":           { en: "Synced 1 hour ago",               "zh-Hans": "1 小时前同步过" },
+  "sync.hoursMany":          { en: "Synced {n} hours ago",            "zh-Hans": "{n} 小时前同步过" },
+  "sync.daysOne":            { en: "Synced 1 day ago",                "zh-Hans": "1 天前同步过" },
+  "sync.daysMany":           { en: "Synced {n} days ago",             "zh-Hans": "{n} 天前同步过" },
+  "sync.error":              { en: "Last attempt failed — will try again",
+                               "zh-Hans": "上次同步失败——稍后会重试" },
+  "sync.conflictsOne":       { en: "1 item changed on both devices — tap to review",
+                               "zh-Hans": "有 1 项在两台设备上都被修改——点击查看" },
+  "sync.conflictsMany":      { en: "{n} items changed on both devices — tap to review",
+                               "zh-Hans": "有 {n} 项在两台设备上都被修改——点击查看" },
+  "sync.conflictsTitle":     { en: "Changed on both devices",         "zh-Hans": "两台设备上都有修改" },
+  "sync.conflictsEmpty":     { en: "Nothing to review right now.",    "zh-Hans": "目前没有需要查看的内容。" },
+  "sync.conflictsIntro":     { en: "Each of these changed on two devices before they could sync with each other. The newer change was kept automatically; the older one is what changed here.",
+                               "zh-Hans": "以下内容在两台设备上分别被修改，且尚未来得及互相同步。系统自动保留了较新的修改；下面列出的是被替换掉的较早修改。" },
+  "sync.conflictKept":       { en: "kept: “{text}”",                  "zh-Hans": "保留：“{text}”" },
+  "sync.conflictReplaced":   { en: "replaced: “{text}”",              "zh-Hans": "替换掉：“{text}”" },
+  "sync.resurrection":       { en: "This was deleted on one device but changed on the other — the change won, so it's back.",
+                               "zh-Hans": "这项内容在一台设备上被删除，但在另一台设备上被修改——修改被保留，因此它又出现了。" },
 };
 
 // ⚑ Dev aid, deliberately loud. A missing key used to be the silent failure that

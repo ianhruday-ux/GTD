@@ -1,8 +1,21 @@
 apply plugin: 'com.android.application'
 
+// W5 (Dropbox sync): the App Key lives in secrets.properties, gitignored and
+// never committed (see wrapper-plan.md and the author's ruling 2026-07-30).
+// Missing file -> empty string, not a build failure, so a fresh checkout still
+// builds -- it just can't reach Dropbox until the file is dropped in by hand.
+def secretsFile = rootProject.file("secrets.properties")
+def secrets = new Properties()
+if (secretsFile.exists()) {
+    secretsFile.withInputStream { secrets.load(it) }
+}
+
 android {
     namespace = "com.ianhruday.oela"
     compileSdk = rootProject.ext.compileSdkVersion
+    buildFeatures {
+        buildConfig true
+    }
     defaultConfig {
         applicationId "com.ianhruday.oela"
         minSdkVersion rootProject.ext.minSdkVersion
@@ -10,6 +23,15 @@ android {
         versionCode 1
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField "String", "DROPBOX_APP_KEY", "\"${secrets.getProperty('dropboxAppKey', '')}\""
+        // AppAuth's own manifest (merged in from the net.openid:appauth AAR)
+        // declares RedirectUriReceiverActivity with a <data android:scheme=...>
+        // filled from this placeholder -- no activity to hand-declare here.
+        // Scheme only: "com.ianhruday.oela://oauth2redirect" is the scheme
+        // (com.ianhruday.oela) plus a host segment (oauth2redirect) the code
+        // constructs when building the redirect Uri; the filter matches on
+        // scheme, so the host portion doesn't need its own manifest entry.
+        manifestPlaceholders = [ appAuthRedirectScheme: "com.ianhruday.oela" ]
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
              // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
@@ -35,6 +57,13 @@ dependencies {
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    // W5: OAuth through the system browser (wrapper-plan.md §1 -- "available
+    // because the wrapper owns its auth flow"), PKCE, no app secret involved.
+    implementation "net.openid:appauth:0.11.1"
+    // Refresh token storage -- Keystore-backed, deliberately NOT the gtd_
+    // Preferences/Filesystem mirror W2 built for app data. A sync credential
+    // is not app data and Reset must not be the thing that revokes it.
+    implementation "androidx.security:security-crypto:1.1.0"
     implementation project(':capacitor-android')
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
