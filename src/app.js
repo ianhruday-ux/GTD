@@ -524,7 +524,7 @@
     // (boot reloads gtd_habit_runs after seedData runs).
     const seededRuns = {};
     seededRuns[reviewProjId] = Object.assign(defaultHabitRun(), { schedule: [5] });
-    Storage.setJSON("gtd_habit_runs", seededRuns);
+    Storage.setJSON("gtd_habit_runs", habitMapToStored(seededRuns));
 
     seedTutorial(); // the in-lane onboarding — default data, cleared by completion
     KINDS.forEach(saveTasksLocal);
@@ -705,9 +705,9 @@
   // scheduled day elapses, to decide that day's outcome, then it becomes
   // irrelevant history (superseded by habitRuns[id].history).
   function loadHabitDone(){
-    return Storage.getJSON("gtd_habit_done", {});
+    return habitMapFromStored(Storage.getJSON("gtd_habit_done", []), "date");
   }
-  function saveHabitDone(){ Storage.setJSON("gtd_habit_done", state.habitDone); }
+  function saveHabitDone(){ Storage.setJSON("gtd_habit_done", habitMapToStored(state.habitDone, "date")); }
   function habitDoneToday(taskId){ return state.habitDone[taskId] === todayStr(); }
   // Order habits were checked off today, most-recent-first — habitDone
   // itself only stores one date per habit, not a sequence, so this is what
@@ -743,10 +743,132 @@
   //     habit's page is opened — that's also when the badge clears,
   //   badge: true while a run-ending result hasn't been viewed yet
   // }}
-  function loadHabitRuns(){
-    return Storage.getJSON("gtd_habit_runs", {});
+  // SYNCED AS OF CHUNK B (sync-audit.md §3). Habit progress — the streak, the
+  // history, the paused state — did not sync at all, which made it the only
+  // gap that lost data during the most ordinary act in the app: ticking a
+  // checkbox. It was excluded because a keyed object is not a shape the merge
+  // engine reads.
+  //
+  // Same trick as the archive maps: only the STORED shape changes, to a
+  // record array ([{id: habitId, ...run}]). state.habitRuns stays the keyed
+  // object every call site already uses, so nothing else moves, and reading
+  // still tolerates the old shape so an existing install needs no migration.
+  function habitMapFromStored(raw, valueKey){
+    if (Array.isArray(raw)){
+      const out = {};
+      raw.forEach(function(r){
+        if (!r || typeof r.id !== "string") return;
+        if (valueKey){ out[r.id] = r[valueKey]; return; }
+        const copy = Object.assign({}, r);
+        delete copy.id;
+        out[r.id] = copy;
+      });
+      return out;
+    }
+    return raw && typeof raw === "object" ? raw : {}; // pre-chunk-B keyed object
   }
-  function saveHabitRuns(){ Storage.setJSON("gtd_habit_runs", state.habitRuns); }
+  function habitMapToStored(obj, valueKey){
+    return Object.keys(obj || {}).map(function(id){
+      if (valueKey){ const rec = { id: id }; rec[valueKey] = obj[id]; return rec; }
+      return Object.assign({ id: id }, obj[id]);
+    });
+  }
+  function loadHabitRuns(){
+    return habitMapFromStored(Storage.getJSON("gtd_habit_runs", []));
+  }
+  function saveHabitRuns(){ Storage.setJSON("gtd_habit_runs", habitMapToStored(state.habitRuns)); }
+
+  // ---------------------------------------------------------------------
+  // THE HABIT MERGE (chunk B; sync-audit.md §3, and wrapper-plan.md §1's
+  // standard). Registered with sync.js, which owns no habit knowledge.
+  //
+  // A habit run is three different kinds of thing wearing one coat, and
+  // merging them uniformly is what would eat a completion:
+  //   · history          ACCUMULATED. What actually happened. Irreplaceable.
+  //   · schedule, paused SETTINGS. Ordinary fields; the generic per-field
+  //                      three-way merge is exactly right for them.
+  //   · currentRunStart, personalBest, bestSequence, lifetimeTotal
+  //                      DERIVED. Every one is a function of history.
+  //   · lastProcessedDate, pendingResult, badge
+  //                      DEVICE-LOCAL sweep and celebration bookkeeping.
+  //
+  // So nothing about a streak is ever merged: the aggregates are RECOMPUTED
+  // from the merged history, which means two devices cannot disagree about a
+  // personal best — there is only one history to compute it from.
+  //
+  // That leaves exactly one real decision, and it is the author's ruling:
+  //
+  //   A "done" is something you DID. A "miss" is something nobody did — an
+  //   inference the sweep draws from the absence of a completion, on
+  //   whatever data that device happened to hold. An inference must never
+  //   overwrite a direct assertion. So for a contested day, DONE WINS,
+  //   regardless of timestamps.
+  //
+  // Note what is merged is the raw per-day OUTCOME (done or not), never the
+  // stored status: "stumble" and "miss" are themselves derived — a miss
+  // after a stumble ends a run, a first miss is only a stumble — so they
+  // depend on order and on what came before, and unioning them directly
+  // would produce sequences the rules could never have generated.
+  //
+  // The replay runs through applyHabitDayOutcome/endHabitRun, the SAME
+  // functions live use, rather than a second implementation of the streak
+  // rules that could drift from them.
+  function replayHabitRun(outcomes, schedule, paused){
+    const run = defaultHabitRun();
+    run.schedule = schedule;
+    run.paused = paused;
+    Object.keys(outcomes).sort().forEach(function(date){
+      applyHabitDayOutcome(run, date, outcomes[date] ? "done" : "miss");
+    });
+    return run;
+  }
+  function historyToOutcomes(history){
+    const out = {};
+    (history || []).forEach(function(e){
+      if (!e || typeof e.date !== "string") return;
+      out[e.date] = out[e.date] || e.status === "done";
+    });
+    return out;
+  }
+  function mergeHabitRunRecord(l, r, b){
+    const lo = historyToOutcomes(l.history), ro = historyToOutcomes(r.history);
+    const outcomes = {};
+    const contested = [];
+    Object.keys(lo).concat(Object.keys(ro)).forEach(function(d){
+      if (outcomes.hasOwnProperty(d)) return;
+      const inL = lo.hasOwnProperty(d), inR = ro.hasOwnProperty(d);
+      outcomes[d] = (inL && lo[d]) || (inR && ro[d]); // done if EITHER device says done
+      if (inL && inR && lo[d] !== ro[d]) contested.push(d); // one said done, the other a miss
+    });
+    // Settings ride the generic three-way merge; only these two are real
+    // fields, and neither is derived from anything.
+    const settings = Sync.mergeFields(
+      { schedule: l.schedule, paused: l.paused, modifiedAt: l.modifiedAt, deviceId: l.deviceId },
+      { schedule: r.schedule, paused: r.paused, modifiedAt: r.modifiedAt, deviceId: r.deviceId },
+      b ? { schedule: b.schedule, paused: b.paused } : null
+    );
+    const rebuilt = replayHabitRun(outcomes, settings.record.schedule || defaultHabitRun().schedule,
+                                   !!settings.record.paused);
+    // Device-local, deliberately kept from THIS device: a celebration this
+    // device has not shown yet is not the other device's to deliver, and the
+    // sweep cursor describes this device's own progress through the calendar.
+    rebuilt.lastProcessedDate = l.lastProcessedDate || null;
+    rebuilt.pendingResult = l.pendingResult || null;
+    rebuilt.badge = !!l.badge;
+    rebuilt.id = l.id;
+    rebuilt.modifiedAt = Math.max(l.modifiedAt || 0, r.modifiedAt || 0);
+    rebuilt.deviceId = settings.record.deviceId;
+    return {
+      record: rebuilt,
+      // Only a day the two devices actually disagreed about is worth
+      // reporting, and the report says which way it went -- §1's "never
+      // silent" applies to a completion being upheld just as much as to one
+      // being replaced.
+      conflict: contested.length
+        ? { habitDays: contested.slice(), keptDone: true, local: l, remote: r, winner: rebuilt }
+        : null
+    };
+  }
   function defaultHabitRun(){
     return {
       schedule: [0, 1, 2, 3, 4, 5, 6], paused: false, history: [], currentRunStart: 0,
@@ -1382,6 +1504,25 @@
   }
   function archiveMapToStored(obj){
     return Object.keys(obj || {}).map(function(id){ return { id: id, items: obj[id] || [] }; });
+  }
+  // Chunks A and B each reshaped a pair of stores from keyed objects to record
+  // arrays so the merge engine could read them. Every LOADER tolerates the old
+  // shape, but sync.js reads storage directly (exportBundle), so an install
+  // that has not happened to re-save one of them yet would hand the merge a
+  // plain object. Converting once at boot means the two shapes never coexist
+  // beyond the first launch after an upgrade -- and no migration is needed,
+  // since this IS the migration, and a cheap idempotent one.
+  function normalizeReshapedStores(){
+    const jobs = [
+      ["gtd_habit_runs", function(o){ return habitMapToStored(o); }],
+      ["gtd_habit_done", function(o){ return habitMapToStored(o, "date"); }],
+      ["gtd_archived_waiting", function(o){ return archiveMapToStored(o); }],
+      ["gtd_archived_events", function(o){ return archiveMapToStored(o); }]
+    ];
+    jobs.forEach(function(job){
+      const raw = Storage.getJSON(job[0], null);
+      if (raw && !Array.isArray(raw) && typeof raw === "object") Storage.setJSON(job[0], job[1](raw));
+    });
   }
   function loadArchivedWaiting(){
     return archiveMapFromStored(Storage.getJSON("gtd_archived_waiting", []));
@@ -8408,6 +8549,7 @@
     // fresh/legacy data seeds nothing here — seedData() owns the samples; an
     // existing-but-empty install just has no events, which is correct.
     { const loadedEvents = loadEvents(); if (loadedEvents) state.events = loadedEvents; }
+    normalizeReshapedStores(); // chunks A/B: convert any legacy keyed-object stores before anything reads them for sync
     backfillModifiedAt(); // W3: every record-array store gets a modifiedAt, immediately not eventually
     // W5 trigger 1/4 (open). Fired here, NOT awaited -- boot() stays
     // synchronous throughout (the same call the async-storage rewrite in
@@ -8644,6 +8786,7 @@
     return false;
   }
   Sync.setApplyGate(syncApplyGateOpen);
+  Sync.registerRecordMerger("gtd_habit_runs", mergeHabitRunRecord); // chunk B: done beats miss, aggregates recomputed
 
   // Sync-on-save, trigger 5 of 5 (author ruling 2026-07-30, reversing the
   // earlier four-trigger decision). Debounced rather than immediate: saving a

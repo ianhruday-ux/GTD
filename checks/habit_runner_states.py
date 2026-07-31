@@ -204,7 +204,10 @@ with serve(DIST) as url, sync_playwright() as p:
     close_screen()
 
     cleared = pg.evaluate("""(id) => {
-      const runs = JSON.parse(localStorage.getItem('gtd_habit_runs') || '{}');
+      const raw = JSON.parse(localStorage.getItem('gtd_habit_runs') || '[]');
+      const runs = Array.isArray(raw)
+        ? raw.reduce((m, r) => { if (r && r.id) m[r.id] = r; return m; }, {})
+        : raw;
       return runs[id] ? runs[id].pendingResult : 'MISSING';
     }""", habit_id)
     check(cleared is None, f"the pending result was cleared from storage, not just the draft ({cleared})")

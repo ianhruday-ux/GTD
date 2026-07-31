@@ -32,8 +32,22 @@ const SYNC_STORE_KEYS = [
   // Chunk A (sync-audit.md §2b): what a completed project took down with it,
   // and what un-completing restores from. Reshaped in app.js from keyed
   // objects to record arrays purely so they can live here.
-  "gtd_archived_waiting", "gtd_archived_events"
+  "gtd_archived_waiting", "gtd_archived_events",
+  // Chunk B (sync-audit.md §3): habit progress -- the only gap that lost data
+  // from the most ordinary act in the app. gtd_habit_runs carries a bespoke
+  // merge (registerRecordMerger below); gtd_habit_done is an ordinary record
+  // array. gtd_habit_done_order stays device-local by ruling: it is today-only
+  // display ordering, recomputable and meaningless on another device.
+  "gtd_habit_runs", "gtd_habit_done"
 ];
+
+// A store whose records the generic rule cannot merge correctly registers
+// itself here. Only gtd_habit_runs does, and only because a day's outcome is
+// an assertion rather than an ordinary field -- see app.js
+// mergeHabitRunRecord. Kept as a registry rather than a special case inside
+// mergeRecordArray so sync.js goes on knowing nothing about habits.
+const SYNC_RECORD_MERGERS = {};
+function registerRecordMerger(store, fn){ SYNC_RECORD_MERGERS[store] = fn; }
 const SYNC_TOMBSTONE_KEY = "gtd_tombstones";
 const SYNC_ROSTER_KEY = "gtd_sync_roster";
 const SYNC_BASELINE_KEY = "gtd_sync_baseline"; // this device's own last-merged bundle; never itself synced
@@ -109,7 +123,14 @@ function isDerivedRecord(key, r){
   return key === "gtd_tasks_next" && !!(r && r.eventId);
 }
 function stripDerived(key, arr){
-  return (arr || []).filter(function(r){ return !isDerivedRecord(key, r); });
+  // Array.isArray, not `arr || []`: chunks A and B reshaped four stores from
+  // keyed objects to record arrays, and an install that has not re-saved them
+  // yet still holds the old shape. A plain object is truthy and has no
+  // .filter, so the old guard threw here -- on exportBundle, i.e. on the FIRST
+  // SYNC AFTER UPGRADING. app.js normalizes those stores at boot so nothing is
+  // lost; this makes the crash impossible even if that has not run.
+  if (!Array.isArray(arr)) return [];
+  return arr.filter(function(r){ return !isDerivedRecord(key, r); });
 }
 
 function exportBundle(){
@@ -202,6 +223,70 @@ function newestOf(a, b){
   if (at !== bt) return at > bt ? a : b;
   return (a.deviceId || "") >= (b.deviceId || "") ? a : b;
 }
+
+// ---------------------------------------------------------------------
+// PER-FIELD MERGE (chunk B; author's ruling, sync-audit.md §4b)
+//
+// The whole record used to be the merge unit, so two edits to the SAME item
+// collided even in unrelated fields: change a habit's description on the
+// phone and its temptation bundle on the computer, and one whole record won
+// — the other edit gone, nothing warning you, and the two edits never having
+// touched the same field. Ordinary use, invisible mechanism.
+//
+// ⚑ AND IT NEEDS NO SCHEMA CHANGE, correcting this document's own earlier
+// estimate that every record would have to carry per-field timestamps. It
+// does not: the BASELINE — the last state this device knows both sides
+// agreed on — is already a merge base, which makes this an ordinary
+// three-way merge:
+//
+//     field equal on both sides            -> take it, no question
+//     differs, but local still == baseline -> only THEY changed it -> theirs
+//     differs, but remote still == baseline-> only WE changed it   -> ours
+//     both differ from baseline            -> a genuine field conflict
+//
+// Only that last case needs a tie-break, and it uses the same newest-wins
+// rule as before, at field granularity. So the fix is strictly a refinement:
+// everything that used to be reported as a conflict and resolved by
+// timestamp still is — but only for the fields actually in dispute, instead
+// of dragging every other field down with it.
+//
+// With no baseline there is no merge base and a three-way merge is not
+// defined, so this falls back to whole-record newest-wins, matching the
+// additive-only posture §4.5 already takes for a device with no history.
+// Bookkeeping ABOUT the record, not content OF it. Excluded from the
+// comparison entirely and set explicitly below. Missing this made every
+// ordinary one-sided update look like a conflict: two records edited at
+// different moments always disagree about modifiedAt, so the field-by-field
+// pass reported it every single time and would have buried the real
+// collisions in noise. Caught by checks/sync_chunk_b.py.
+const FIELD_MERGE_METADATA = { id: true, modifiedAt: true, deviceId: true };
+
+function mergeFields(l, r, b){
+  const winner = newestOf(l, r);
+  const loser = winner === l ? r : l;
+  const out = {};
+  const keys = {};
+  Object.keys(l).forEach(function(k){ if (!FIELD_MERGE_METADATA[k]) keys[k] = true; });
+  Object.keys(r).forEach(function(k){ if (!FIELD_MERGE_METADATA[k]) keys[k] = true; });
+  const conflicted = [];
+  if (l.id || r.id) out.id = l.id || r.id;
+  Object.keys(keys).forEach(function(k){
+    const lv = l[k], rv = r[k], bv = b ? b[k] : undefined;
+    if (sameContent(lv, rv)){ out[k] = lv; return; }
+    const lChanged = !sameContent(lv, bv);
+    const rChanged = !sameContent(rv, bv);
+    if (lChanged && !rChanged){ out[k] = lv; return; }
+    if (rChanged && !lChanged){ out[k] = rv; return; }
+    // Both moved since the baseline: a real disagreement about THIS field.
+    out[k] = winner[k];
+    conflicted.push(k);
+  });
+  // modifiedAt/deviceId describe the record, not any one field, and the
+  // merged record is genuinely as new as its newest part.
+  out.modifiedAt = Math.max(l.modifiedAt || 0, r.modifiedAt || 0);
+  out.deviceId = winner.deviceId;
+  return { record: out, conflictedFields: conflicted, loser: loser };
+}
 function tombstonesByRecordId(tombstones, store){
   const m = {};
   (tombstones || []).forEach(function(t){ if (t && t.store === store) m[t.recordId] = t; });
@@ -230,13 +315,30 @@ function mergeRecordArray(localArr, remoteArr, baselineArr, ctx){
     const l = local[id], r = remote[id], b = baseline[id];
     if (l && r){
       if (sameContent(l, r)){ out.push(l); return; }
-      const winner = newestOf(l, r);
-      out.push(winner);
-      // A genuine conflict is BOTH sides having moved since the last state
-      // this device knows they agreed on -- one side simply being ahead of
-      // a shared baseline is a routine update, not something to report.
-      if (b && !sameContent(l, b) && !sameContent(r, b)){
-        conflicts.push({ store: ctx.store, id: id, local: l, remote: r, winner: winner });
+      // A store may know how to merge itself better than the generic rule
+      // can -- habit runs do, because a day's outcome is an assertion rather
+      // than an ordinary field (see mergeHabitRunRecord).
+      if (ctx.mergeRecord){
+        const custom = ctx.mergeRecord(l, r, b);
+        out.push(custom.record);
+        if (custom.conflict) conflicts.push(Object.assign({ store: ctx.store, id: id }, custom.conflict));
+        return;
+      }
+      if (!b){
+        // No merge base, so a three-way merge is undefined: fall back to
+        // whole-record newest-wins, and report nothing -- without a baseline
+        // there is no way to tell a conflict from one side simply being ahead.
+        out.push(newestOf(l, r));
+        return;
+      }
+      const merged = mergeFields(l, r, b);
+      out.push(merged.record);
+      // Only fields BOTH sides moved are a real disagreement. One side merely
+      // being ahead of the baseline is a routine update and is applied
+      // silently -- unchanged from before, just decided per field now.
+      if (merged.conflictedFields.length){
+        conflicts.push({ store: ctx.store, id: id, local: l, remote: r,
+                         winner: merged.record, fields: merged.conflictedFields });
       }
       return;
     }
@@ -322,7 +424,7 @@ function mergeBundles(localBundle, remoteBundle, deviceId, baselineBundle){
     const res = mergeRecordArray(
       localBundle.stores[key], remoteBundle.stores[key],
       baselineBundle ? baselineBundle.stores[key] : [],
-      { store: key, noBaseline: noBaseline,
+      { store: key, noBaseline: noBaseline, mergeRecord: SYNC_RECORD_MERGERS[key],
         localTombstones: localTombByStore[key], remoteTombstones: remoteTombByStore[key] }
     );
     mergedStores[key] = res.array;
@@ -505,6 +607,8 @@ const Sync = {
   setAfterImport: setAfterImport,   // app.js registers its "reload memory from storage" here
   setApplyGate: setApplyGate,       // app.js registers "is a drafting page open?" here
   setOnLocalChange: setOnLocalChange, // app.js registers its debounced "push after a save" here
+  registerRecordMerger: registerRecordMerger, // app.js registers the habit-run merge here
+  mergeFields: mergeFields,         // the generic three-way field merge, reused by that habit merge
   storeKeys: SYNC_STORE_KEYS // read-only reference W5's transport needs to build an empty/first-sync bundle without duplicating this list
 };
 window.__oelaSync = Sync; // W5's hook, and this chunk's own test harness -- not a user-facing feature

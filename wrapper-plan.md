@@ -1069,9 +1069,29 @@ this chunk exists.
 
 ### W7 — Distribution
 
-A sideloadable APK and an unsigned desktop build, plus the plain-language note on how to install
-each. Personal sideloading only — Play Store and Gatekeeper are recurring overhead and `spec.md` §2
-already rules them out for now.
+**W7 carries everything still outstanding, not just packaging.** Recorded here (author, 2026-07-31)
+so the last chunk is not mistaken for "just build an APK":
+
+1. **Export / import must be re-tested, and it now has a SYNC problem, not only a staleness one.**
+   The in-app chunk map has flagged this as TO DO for a while on the grounds that backups had not
+   been exercised since deadlines gained a start date and a push counter, repeats gained a missed-day
+   marker, and the backgrounds were renamed. It has since grown far past that: every record now
+   carries `modifiedAt` and `deviceId`, there are tombstones, a roster and a baseline, and four
+   stores changed shape in chunks A and B.
+   **And import is sync-unaware in three ways — see §11, which is a ruling this chunk must resolve
+   before shipping a backup people rely on.**
+2. **A real desktop pass by the author.** W6 is tested and was driven end to end by the builder over
+   the debugging port, but the author has not sat in front of the Electron app and used it. Every
+   device pass so far (W0, W2, W5) found something no simulation did; there is no reason to assume
+   this one is different.
+3. **Then the packaging itself.** A sideloadable APK and an unsigned desktop build, plus the
+   plain-language note on how to install each. Personal sideloading only — Play Store and Gatekeeper
+   are recurring overhead and `spec.md` §2 already rules them out for now.
+
+⚑ Sequencing note: 1 and 2 are both *finding* work — they exist to surface what is still wrong. 3 is
+*finishing* work. Doing 3 first would mean handing someone an installer for a build whose backup
+story is unverified, which is the wrong order for the one feature whose entire job is to be there
+when everything else has failed.
 
 ---
 
@@ -1122,3 +1142,51 @@ as possible before moving on to the wrapper"):
 - **completing a project from the lane checkbox skipped the confirm and the archiving**, leaving
   linked waiting actions live and a linked recurring event minting a Next Action for ever. Found
   while testing the dialog copy, not by looking for it.
+
+---
+
+## 11. Export/import × sync — an open ruling, raised by the author 2026-07-31
+
+**The question:** delete something on device 1; the tombstone reaches the cloud but device 2 has not
+pulled yet; now import a backup that still contains the deleted item. What happens?
+
+**What happens today, traced through the code, not reasoned about.** `importAllData` (`app.js:7929`)
+removes **every** `gtd_` key and writes back every key in the file with a raw `Storage.set` — no
+stamping, no tombstoning — then reloads. `serializeAllData` is the mirror: it sweeps every `gtd_`
+key. Neither knows sync exists, and "every `gtd_` key" includes sync's own machinery. Three distinct
+problems fall out.
+
+**1. A restored item can be silently re-deleted.** The backup contains the item with its old
+`modifiedAt` (t0) and does not contain the tombstone, so importing *destroys the local tombstone*.
+The next sync pulls the cloud, which still has it (`deletedAt` t1 > t0), and `mergeRecordArray`'s
+`l && !r` branch drops the record — and that path returns **without recording a conflict**. So the
+user restores a backup and the app quietly throws part of it away. Ordinary deliberate action,
+invisible mechanism, no report: it fails §1's standard outright.
+
+**2. Import copies `gtd_device_id`, so two devices can end up with the same identity.** Restoring a
+phone backup onto a new computer is the *normal* way to set one up. Afterwards the roster holds one
+entry for two devices, §4.5's tombstone GC ("oldest last pull across every device") is computed over
+a device set that is wrong, and the `deviceId` tie-break stops distinguishing them. This is the
+worst of the three and the least obvious.
+
+**3. Import copies `gtd_sync_baseline`**, which records what *the other* device had agreed with the
+cloud. A baseline is precisely what licenses inferring "absent means deleted" (§4.5 makes a device
+with no baseline additive-only for exactly this reason). Importing a foreign one can license
+deletions this device was never entitled to make.
+
+**The ruling needed, and the options.** The real question is what *restore* means once two devices
+exist — and it is a design question, not a technical one:
+
+- **(a) Restore means "this is now the truth."** Stamp every restored record `modifiedAt = now`, so
+  the restore beats any earlier deletion and propagates outward. Most intuitive reading of the word
+  restore; it also means a restore can undo deletions on the *other* device, which the user may not
+  expect.
+- **(b) Restore is local and joins afresh.** Never import sync machinery (device id, baseline,
+  tombstones, connection state); clear this device's sync identity so the next sync is a rejoin —
+  additive-only in both directions per §4.5, inferring no deletions at all.
+- **(c) Leave as-is and warn.** Tell the user plainly, in the existing import confirm, that a restore
+  may be partly undone by another device's later changes. Cheapest, and the least honest.
+
+⚑ The builder's view, recorded but NOT decided: **(b) is the floor and is not really optional** —
+copying a device identity is a straightforward defect whichever way the ruling goes. **(a) is the
+part that needs the author**, because it changes what a restore does to the *other* device.

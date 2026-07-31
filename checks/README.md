@@ -68,7 +68,8 @@ So know which of two claims a check is making:
 Where a fallback could mask the difference, assert both. This is the ordinary cost of graceful
 degradation: robustness is bought with diagnosability.
 
-**2. A new check must be proven to FAIL against the unfixed build.**
+**2. A new check must be proven to FAIL against the unfixed build — and to fail, and pass, FOR THE
+REASON YOU THINK.**
 Rebuild the previous commit's `dist/index.html` somewhere and point the check at it. If it passes
 there, it is testing nothing.
 
@@ -76,6 +77,34 @@ there, it is testing nothing.
 in that layout and asserted nothing, another asserted a bundle property that held whether or not the
 fix was present. Both were caught only by running them against the pre-fix build. **A check that has
 never failed is not evidence.**
+
+**2a. A check must RUN against the old build, not merely fail on it.**
+Write fixtures so the old build produces *failures*, not exceptions — tolerate the previous data
+shape, and wrap calls into app code that the old build may throw from. An uncaught throw ends the
+file and reports nothing, which looks like evidence and is not.
+
+*Found doing exactly this:* `sync_chunk_b.py` first died on the pre-fix build because `exportBundle()`
+threw on the legacy keyed shape — the very bug being fixed. Catching it turned "the old build cannot
+even publish" into a legible failure. Rule 2 gave 13 clear failures instead of a stack trace.
+
+**2b. When you change a stored data SHAPE, enumerate every check that reads that key directly, and
+re-verify each one still measures what it claims.**
+`grep` the key across `checks/`. This is bounded, mechanical, and takes a minute.
+
+*Why it is its own rule:* rule 2 only covers checks you are writing *now*. A shape change silently
+re-points **existing** checks, and they do not fail — chunk A changed the archive maps and
+`confirm_dialog_copy.py` went on passing while measuring nothing, because `Object.keys()` on the new
+array returns indices and happened to give the right count.
+
+**2c. Prefer assertions on identity or content over assertions on COUNTS.**
+`the archived entry has id "zzp"` cannot be satisfied by accident; `there is 1 archived entry` can be
+satisfied by any coincidence that yields 1. Where a count is genuinely what you mean, assert
+alongside it something that names the thing.
+
+*These three exist because the obvious phrasing — "do not let checks pass for the wrong reason" —
+reduces to "be careful," which is not a protocol.* A rule that is a character trait fails precisely
+when attention is committed elsewhere, which is when it was needed. Each rule above has something to
+DO instead: run it against the old build, grep the key, assert on a name rather than a number.
 
 **3. Anything touching LAYOUT must be exercised on Black lacquer, at both widths.**
 Set `gtd_surface` to `lacquer` before asserting geometry.

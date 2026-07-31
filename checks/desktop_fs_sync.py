@@ -352,6 +352,13 @@ with serve(DIST) as url, sync_playwright() as p:
     pg3.click('button.icon-btn[data-action="close-tray"]'); pg3.wait_for_timeout(300)
 
     # ---- staleness bucketing, same generic key/label as Dropbox's own UI test ----
+    # Wait for quiet FIRST. Chunk B put habit runs into sync, and the habit
+    # boundary sweep writes one (its lastProcessedDate cursor), so a sweep now
+    # schedules a sync-on-save like any other write. A pending one landing
+    # after the line below would stamp gtd_dropbox_last_sync back to "now" and
+    # the label would read "Synced just now" -- which is exactly what happened,
+    # and is real app behaviour rather than a flaky test.
+    pg3.wait_for_timeout(3500)
     ninety_min_ago = int(time.time() * 1000) - 90 * 60 * 1000
     pg3.evaluate("(t) => localStorage.setItem('gtd_dropbox_last_sync', String(t))", ninety_min_ago)
     pg3.click(".menu-scrim", position={"x": 5, "y": 5}); pg3.wait_for_timeout(150)

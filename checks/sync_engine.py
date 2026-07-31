@@ -346,7 +346,8 @@ with serve(DIST) as url, sync_playwright() as p:
     pg3.reload(); pg3.wait_for_timeout(800)
 
     check(pg3.evaluate("() => window.__oelaSync.isEnabled()") is True, "force-enable survives the reload (real init-script, not a monkeypatch)")
-    runsAfterClosedBoot = pg3.evaluate("() => JSON.parse(localStorage.getItem('gtd_habit_runs')).h1")
+    runsAfterClosedBoot = pg3.evaluate("""() => { const raw = JSON.parse(localStorage.getItem('gtd_habit_runs')||'[]');
+        return Array.isArray(raw) ? (raw.find(r => r && r.id === 'h1') || null) : raw.h1; }""")
     check(runsAfterClosedBoot["lastProcessedDate"] == STALE_DATE,
           f"gate CLOSED: boot's own sweep did NOT advance lastProcessedDate ({runsAfterClosedBoot['lastProcessedDate']})")
     check(len(runsAfterClosedBoot["history"]) == 1, f"and wrote no NEW accumulated history while closed (still just the seeded done day: {runsAfterClosedBoot['history']})")
@@ -361,7 +362,8 @@ with serve(DIST) as url, sync_playwright() as p:
     # session (and pulledThisSession) entirely.
     pg3.evaluate("() => document.dispatchEvent(new Event('visibilitychange'))")
     pg3.wait_for_timeout(300)
-    runsAfterOpenSweep = pg3.evaluate("() => JSON.parse(localStorage.getItem('gtd_habit_runs')).h1")
+    runsAfterOpenSweep = pg3.evaluate("""() => { const raw = JSON.parse(localStorage.getItem('gtd_habit_runs')||'[]');
+        return Array.isArray(raw) ? (raw.find(r => r && r.id === 'h1') || null) : raw.h1; }""")
     check(runsAfterOpenSweep["lastProcessedDate"] != STALE_DATE,
           f"gate OPEN: the resume sweep now advances lastProcessedDate ({runsAfterOpenSweep['lastProcessedDate']})")
     check(len(runsAfterOpenSweep["history"]) > 0, f"and actually wrote accumulated history ({len(runsAfterOpenSweep['history'])} day(s))")
