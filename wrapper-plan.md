@@ -357,6 +357,12 @@ reopens. So by the time the back button exists, there is nothing left for it to 
 7. **Assuming offline is rare.** It is the normal path, and the product promises it.
 8. **Testing the wrapper only on the desktop.** The bug that motivated goal #1 is Android-only and
    device-specific. Electron will not show it.
+9. **Running `assembleDebug` without `npx cap sync android` first.** Found live, W5 device pass:
+   the APK packages whatever's already sitting in `android/app/src/main/assets/public/`, which only
+   updates on an explicit `cap sync` — it does **not** happen automatically, and does not know
+   `dist/index.html` was rebuilt since the last one. A build can succeed, install cleanly, and launch
+   fine while silently running app code from hours earlier. `cap sync android` before *every*
+   `assembleDebug`, not just the first one in a session.
 
 ---
 
@@ -879,12 +885,31 @@ after):**
 
 Full `checks/*.py` suite (49 files, including these two) re-run clean after every fix, zero failures.
 
-**What this chunk cannot test, named rather than hidden — W6's/an on-device session's gate:** OAuth
-through a real system browser and back, a real Dropbox account and App Console registration, whether
-`CapacitorHttp`'s native `fetch` patch behaves on an actual device the way reading its source says it
-should, and the AppAuth redirect URI actually round-tripping through Android's intent system. Every
-piece of *logic* — merge, CAS, the kill scenario, the UI — is real-code-tested; the device pass is
-what's left, same shape as W0's drag-log gate and W2's real-wipe test before either was called done.
+**Device-verified 2026-07-30, same night — the gate is cleared.** Real Dropbox account, real
+AppAuth login through the system browser, real `CapacitorHttp` native fetch, real file landing in
+`Apps/OELA` on dropbox.com. Confirmed two ways, not just eyeballed: `window.__oelaSync.isEnabled()`
+true and a genuine `gtd_dropbox_last_sync` timestamp inside the live WebView (via
+`adb forward` + Chrome DevTools Protocol, the same technique W0/W2 used), and the author independently
+checking dropbox.com directly. Two snags on the way, neither in the app code:
+
+- **The installed APK was running stale web assets.** `assembleDebug` packages whatever's already
+  in `android/app/src/main/assets/public/`, which only updates via `npx cap sync android` — run once,
+  early, for the `CapacitorHttp` config flag, then never again despite `dist/index.html` being rebuilt
+  many times afterward while the settings UI was being written. The phone ran a build from *before*
+  the Connect Dropbox button existed for a full round of confused troubleshooting before the mismatch
+  was caught by diffing build stamps. **Trap, recorded in §6: `npx cap sync android` before every
+  `assembleDebug`, not just the first one in a session.**
+- **adb couldn't see the phone at all, initially** — Windows had bound a generic USB driver rather
+  than a proper Android one. Fixed by installing Samsung's own USB driver
+  (developer.samsung.com/android-usb-driver); a Google-generic driver would likely also have worked
+  but wasn't tried. Environment, not app.
+- **DuckDuckGo (the author's then-default browser) had trouble with the AppAuth redirect**; switching
+  the phone's default browser to Chrome fixed it immediately. Not investigated further — Chrome is a
+  reasonable baseline to require, and this is a one-time device setting, not a per-sync annoyance.
+
+Every piece of *logic* — merge, CAS, the kill scenario, the UI — was already real-code-tested before
+tonight; this pass confirmed the one thing that couldn't be: OAuth and the native HTTP path actually
+working end to end on real hardware against the real Dropbox API.
 
 *In a browser:* the transport is not offered at all. Export/Import stays the web build's answer,
 exactly as `spec.md` §10 says it should.

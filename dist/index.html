@@ -2511,7 +2511,7 @@ body.screen-open #tray-handle{ display:none; }
 (function(){
 "use strict";
 
-const BUILD_STAMP = "30 Jul 19:26";  // replaced by build.py
+const BUILD_STAMP = "30 Jul 20:41";  // replaced by build.py
 
 // =========================================================
 // STORAGE ADAPTER (spec.md §3, known issue 4)
@@ -6739,7 +6739,7 @@ function initTimePickerFields(){
 // (this file + its boot() call) if the convention is ever retired.
 // =========================================================
 function injectChunkMap(){
-  const FLAG = "gtd_chunk_map_v23";
+  const FLAG = "gtd_chunk_map_v24";
   if (Storage.get(FLAG)) return;
   Storage.set(FLAG, "1");
   ["gtd_chunk_map_v1", "gtd_chunk_map_v2", "gtd_chunk_map_v3", "gtd_chunk_map_v4",
@@ -6748,7 +6748,7 @@ function injectChunkMap(){
    "gtd_chunk_map_v12", "gtd_chunk_map_v13", "gtd_chunk_map_v14",
    "gtd_chunk_map_v15", "gtd_chunk_map_v16", "gtd_chunk_map_v17",
    "gtd_chunk_map_v18", "gtd_chunk_map_v19", "gtd_chunk_map_v20",
-   "gtd_chunk_map_v21", "gtd_chunk_map_v22"].forEach(Storage.remove);  // retire superseded flags
+   "gtd_chunk_map_v21", "gtd_chunk_map_v22", "gtd_chunk_map_v23"].forEach(Storage.remove);  // retire superseded flags
 
   // Replace, don't accumulate (8.2, mirroring 8.1): sweep any previous
   // chunk-map group (tagged via devContext, not a title match, since the
@@ -6814,7 +6814,7 @@ function injectChunkMap(){
     { title: "✓ Wrapper W2 — durable local storage", notes: "DONE, verified on the phone with a real wipe: cleared the app's storage, force-killed it, reopened it, and everything came back exactly as it was — nothing reset to sample data. Every save now quietly backs itself up to a second, sturdier storage spot on your phone that survives things regular app storage doesn't (like Android clearing space under pressure). Invisible in day-to-day use; it only matters the day something would otherwise have been lost." },
     { title: "✓ Wrapper W3 — every record remembers when it changed", notes: "DONE, invisible in the app itself — groundwork for syncing between devices later. Every action, event, note, tag, list, and capture now quietly carries a timestamp of its last real change, and a deleted one leaves a small record that it existed rather than vanishing without a trace. Neither of those exist yet for habits specifically — that one needs its own careful handling later, tied to how habit streaks get compared between two devices." },
     { title: "✓ Wrapper W4 — the part that actually merges two devices' changes", notes: "DONE, invisible in the app itself — the rulebook two devices follow when they sync: whoever changed something more recently wins, a genuine same-item disagreement gets flagged rather than one side silently vanishing, and a brand-new or long-away phone never mistakes 'I haven't seen this yet' for 'this was deleted.' Tested by actually running two copies of the app side by side and forcing them to disagree on purpose, 39 separate ways, before ever touching a network." },
-    { title: "Wrapper W5 — actually connecting to Dropbox", notes: "BUILT, not yet tried on the phone. There's a new row at the top of the ⋯ menu: tap Connect Dropbox, sign in once, and from then on your phone and computer quietly stay in sync — when you open the app, when you come back to it, and even a best-effort try right before you switch away. A Sync now button is there too, for whenever you want to be sure right now. If two devices ever changed the exact same thing before they could sync, nothing gets silently thrown away — you'll see 'items changed on both devices' right there in the menu, with plain words about what was kept and what wasn't. Everything about how it merges and recovers from being interrupted mid-sync was tested by simulating it directly; the one thing that genuinely needs your phone is the Dropbox sign-in itself." }
+    { title: "✓ Wrapper W5 — actually connecting to Dropbox", notes: "DONE, verified on the phone with a real Dropbox account: connected, synced, and the file actually showed up in Dropbox. There's a row at the top of the ⋯ menu: tap Connect Dropbox, sign in once, and from then on your phone and computer quietly stay in sync — when you open the app, when you come back to it, and even a best-effort try right before you switch away. A Sync now button is there too, for whenever you want to be sure right now. If two devices ever changed the exact same thing before they could sync, nothing gets silently thrown away — you'll see 'items changed on both devices' right there in the menu, with plain words about what was kept and what wasn't." }
   ];
 
   const groupId = genId();
