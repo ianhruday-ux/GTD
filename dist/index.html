@@ -2514,7 +2514,7 @@ body.screen-open #tray-handle{ display:none; }
 (function(){
 "use strict";
 
-const BUILD_STAMP = "31 Jul 21:52";  // replaced by build.py
+const BUILD_STAMP = "31 Jul 22:10";  // replaced by build.py
 
 // =========================================================
 // STORAGE ADAPTER (spec.md §3, known issue 4)
@@ -7802,28 +7802,58 @@ function injectChunkMap(){
   // Contexts registry (chunk 3, §4.3d) — the one shared Next↔Waiting set.
   function loadContexts(){ return Storage.getJSON("gtd_contexts", null); }
   function saveContexts(){ Storage.setJSON("gtd_contexts", state.contexts); }
-  // ⚑ W7 (author, after the first two-device sync): contexts DISPLAY in a
-  // deterministic order, so both devices agree.
+  // CONTEXT ORDER — hand-arranged, like every other list in the app.
   //
-  // Unlike a lane, a context registry cannot be rearranged by hand — so its
-  // stored order carries no intent, it is just whatever sequence the two
-  // devices happened to merge in. And because contexts are what the action
-  // lanes group BY, a disagreement about their order is a disagreement about
-  // the whole shape of the lane, not a detail.
+  // ⚑ This REPLACES the alphabetical sort added earlier in W7, and the
+  // author's correction is worth recording because it changes what the
+  // requirement was. The complaint was never "the two devices disagree" on
+  // its own — it was "they disagree AND I can't fix it." Alphabetical
+  // answered the first half by removing the disagreement; dragging answers
+  // the whole thing by restoring the agency. Order still doesn't propagate
+  // between devices (nothing hand-arranged does — the merge rebuilds each
+  // array in ITS OWN order, so a lane you drag on the phone stays that way
+  // only on the phone), and that is now fine by ruling: a divergence you can
+  // correct in two seconds is not a defect.
   //
-  // ⚑ Judgment call: ALPHABETICAL. The alternative was creation order (ids
-  // embed a base36 timestamp, so sorting by id would also be deterministic
-  // and would preserve the order you made them in). Alphabetical wins because
-  // in a list you cannot rearrange, findability is the only ordering the user
-  // can actually use — creation order is arbitrary from the outside. Say the
-  // word and it is a one-line change to sort by id instead.
-  // localeCompare so the Chinese build sorts sensibly too; id as the
-  // tiebreaker so two contexts sharing a name can never swap places.
-  function sortedContexts(){
-    return (state.contexts || []).slice().sort(function(a, b){
+  // So this is plain array order, and new contexts unshift to the top like
+  // everything else the app creates.
+  function sortedContexts(){ return state.contexts || []; }
+  // One-time alphabetical normalization, so BOTH devices start hand-ordering
+  // from the same arrangement rather than from whatever sequence each of them
+  // happened to merge in. Runs once ever; after that the order is the user's
+  // and is never touched again. localeCompare for the Chinese build, id as
+  // the tiebreaker so two contexts sharing a name cannot swap places.
+  function normalizeContextOrderOnce(){
+    if (Storage.get("gtd_contexts_ordered") === "1") return;
+    Storage.set("gtd_contexts_ordered", "1");
+    if (!state.contexts || state.contexts.length < 2) return;
+    state.contexts.sort(function(a, b){
       const byName = (a.name || "").localeCompare(b.name || "");
       return byName !== 0 ? byName : (a.id < b.id ? -1 : 1);
     });
+    saveContexts();
+  }
+  // Reorder the registry itself. The drag machinery is entirely reused — a
+  // context group already renders at the cards-root level, which is where
+  // applyLiveMove pins anything marked data-drag-group="1" — so the only new
+  // logic is which array to splice and what to redraw.
+  //
+  // ⚑ Both action lanes redraw, not just the one dragged in (author). There is
+  // ONE context registry behind Next and Waiting, so a drag in either is a
+  // change to both, and the lane you weren't looking at would otherwise keep
+  // rendering its groups in the old order until something else refreshed it.
+  function moveContext(contextId, previousId){
+    const list = state.contexts;
+    const idx = list.findIndex(function(c){ return c.id === contextId; });
+    if (idx === -1) return;
+    const ctx = list[idx];
+    list.splice(idx, 1);
+    const prevIdx = previousId ? list.findIndex(function(c){ return c.id === previousId; }) : -1;
+    if (!previousId) list.unshift(ctx);
+    else if (prevIdx === -1) list.push(ctx);
+    else list.splice(prevIdx + 1, 0, ctx);
+    saveContexts();
+    KINDS.filter(isActionKind).forEach(renderLane);
   }
   function isActionKind(k){ return k === "next" || k === "waiting"; }
   function findContext(id){ return state.contexts.find(function(c){ return c.id === id; }) || null; }
@@ -9849,10 +9879,19 @@ function injectChunkMap(){
     const collapsed = isCollapsed(kind, ctx.id);
     const childrenHtml = members.map(function(c){ return leafCardHtml(kind, c); }).join("") || dropHintHtml();
     return (
-      '<div class="group" data-context-group="' + ctx.id + '">' +
+      // draggable + data-drag-group="1" reuse the list-group mechanics wholesale
+      // (see groupHtml): applyLiveMove already pins anything flagged as a group
+      // to the cards-root, which is exactly where a context group lives.
+      // data-context-group stays as the discriminator commitLiveMove branches on.
+      '<div class="group" draggable="true" data-context-group="' + ctx.id + '"' +
+      ' data-drag-id="' + ctx.id + '" data-drag-parent="" data-drag-group="1">' +
         '<div class="group-header" data-action="toggle-group" data-id="' + ctx.id + '">' +
           '<span class="chevron">' + (collapsed ? "&#9656;" : "&#9662;") + '</span>' +
-          '<span class="group-title" title="' + escapeHtml(t("group.tapToExpand")) + '">' + escapeHtml(ctx.name) + '</span>' +
+          // Same tooltip the list groups carry now that this one reorders too —
+          // press-and-hold is not discoverable, and the tooltip is where the
+          // app teaches it (CLAUDE.md: placeholders and tooltips carry the
+          // teaching, there are no field labels).
+          '<span class="group-title" title="' + escapeHtml(t("group.tapToExpandReorder")) + '">' + escapeHtml(ctx.name) + '</span>' +
           '<span class="count">' + members.length + '</span>' +
           '<button class="group-add" data-action="add-to-context" data-kind="' + kind + '" data-id="' + ctx.id + '" title="' + escapeHtml(t("group.addToContext")) + '">+</button>' +
           '<span class="group-actions">' +
@@ -13750,6 +13789,14 @@ function injectChunkMap(){
       let prev = el.previousElementSibling;
       while (prev && !prev.hasAttribute("data-drag-id")) prev = prev.previousElementSibling;
       const previousId = prev ? prev.getAttribute("data-drag-id") : null;
+      // A context group reorders the shared REGISTRY, not this lane's task
+      // array — it is not in state.tasks[kind] at all, so moveWithinList would
+      // find nothing and silently do nothing. Branching here covers the mouse
+      // and touch paths at once: both commit through this one function.
+      if (el.hasAttribute("data-context-group")){
+        moveContext(el.getAttribute("data-context-group"), previousId);
+        return;
+      }
       moveWithinList(kind, el.getAttribute("data-drag-id"), parentId, previousId);
     }
     document.addEventListener("dragstart", function(e){
@@ -16332,6 +16379,7 @@ function injectChunkMap(){
     bindEvents();
     bindDrawerSwipe(); // finger-follow open/close on the intray drawer, same mechanic as the calendar month swipe
     initLocalData();
+    normalizeContextOrderOnce(); // one-time, so both devices start hand-ordering from the same arrangement
     initCompletedData();
     applyQaScaffolding(); // §8.1/§8.2, but only when the QA switch is on
     state.habitDone = loadHabitDone();

@@ -135,34 +135,99 @@ with serve(DIST) as url, sync_playwright() as p:
     ctx1.close()
 
     # ============================================================
-    # Group 2 -- contexts render in the same order whatever the stored order
+    # Group 2 -- contexts are DRAGGABLE, and the order is the user's
     # ============================================================
-    # Two devices that merged the same contexts in different sequences: the
-    # rendered order must not depend on which one you are holding.
+    # ⚑ Supersedes this file's original group 2, which asserted contexts render
+    # alphabetically. The author's correction: the complaint was never "the two
+    # devices disagree" alone, it was "they disagree AND I can't fix it."
+    # Dragging restores the agency, so the sort is no longer wanted and stored
+    # order is honoured instead.
     ctx2, pg2, errs2 = boot(b, url)
 
     def with_context_order(pg, names):
         pg.evaluate("""(names) => {
             localStorage.setItem('gtd_contexts', JSON.stringify(
-                names.map((n, i) => ({ id: 'ctx-' + n.toLowerCase(), name: n,
-                                       modifiedAt: Date.now(), deviceId: 'd' }))));
+                names.map(n => ({ id: 'ctx-' + n.toLowerCase(), name: n,
+                                  modifiedAt: Date.now(), deviceId: 'd' }))));
+            localStorage.setItem('gtd_contexts_ordered', '1'); // past the one-time normalization
         }""", names)
-        pg.reload(); pg.wait_for_timeout(800)
-        pg.click('button.icon-btn[data-action="close-tray"]'); pg.wait_for_timeout(300)
+        pg.reload(); pg.wait_for_timeout(900)
+        pg.evaluate("() => { const r=document.querySelector('#tray-root'); if(r) r.innerHTML=''; }")
         return group_titles(pg, "next")
 
-    phone_order = with_context_order(pg2, ["Errands", "Calls", "Computer"])
-    desktop_order = with_context_order(pg2, ["Computer", "Errands", "Calls"])
+    stored = with_context_order(pg2, ["Errands", "Calls", "Computer"])
+    check(stored == ["Errands", "Calls", "Computer"],
+          f"THE RULING: contexts render in the order they are STORED, not alphabetically — "
+          f"the arrangement is the user's ({stored})")
 
-    check(phone_order == desktop_order,
-          f"THE RULING: two devices holding the SAME contexts in different stored order render "
-          f"them identically ({phone_order} vs {desktop_order})")
-    check(phone_order == sorted(phone_order),
-          f"and the shared order is alphabetical, which is the only one findable in a list you "
-          f"cannot rearrange ({phone_order})")
-    check(len(phone_order) == 3, f"all three rendered, none lost to the sort ({phone_order})")
+    # Now drag the last one to the top, through the real press-and-hold path.
+    TOUCH = """([sel, x, y, type]) => {
+      const el = document.querySelector(sel);
+      const t = new Touch({ identifier: 7, target: el, clientX: x, clientY: y, pageX: x, pageY: y });
+      const list = type === 'touchend' ? [] : [t];
+      el.dispatchEvent(new TouchEvent(type, { bubbles: true, cancelable: true,
+        touches: list, targetTouches: list, changedTouches: [t] }));
+    }"""
+    SEL = '.lane[data-kind="next"] .group[data-context-group="ctx-computer"] .group-title'
+    src = pg2.locator(SEL).bounding_box()
+    pg2.evaluate(TOUCH, [SEL, src["x"] + src["width"] / 2, src["y"] + src["height"] / 2, "touchstart"])
+    pg2.wait_for_timeout(550)  # past TOUCH_LONG_PRESS_MS
+    check(pg2.locator(".group.dragging").count() == 1,
+          "press and hold on a context group starts a drag — the list-group mechanics, reused")
+
+    TOP = """() => { const r = document.querySelector('.lane[data-kind="next"] .cards-root')
+        .getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + 6 }; }"""
+    for _ in range(5):
+        c = pg2.evaluate(TOP)
+        pg2.evaluate(TOUCH, [SEL, c["x"], c["y"], "touchmove"])
+        pg2.wait_for_timeout(40)
+    c = pg2.evaluate(TOP)
+    pg2.evaluate(TOUCH, [SEL, c["x"], c["y"], "touchend"])
+    pg2.wait_for_timeout(600)
+
+    saved = pg2.evaluate("() => JSON.parse(localStorage.getItem('gtd_contexts')||'[]').map(c => c.name)")
+    check(saved and saved[0] == "Computer",
+          f"dropping it commits to the REGISTRY, not to a lane's task array ({saved})")
+    check(group_titles(pg2, "next")[0] == "Computer",
+          f"the dragged lane shows the new order ({group_titles(pg2, 'next')})")
+    check(group_titles(pg2, "waiting")[0] == "Computer",
+          f"AND SO DOES THE OTHER ACTION LANE — one registry behind both, so a drag in either is "
+          f"a change to both ({group_titles(pg2, 'waiting')})")
+    check(pg2.locator(".dragging, .drop-zone-active").count() == 0,
+          "and every drag cue is cleared once the gesture ends")
     check(not errs2, f"no JS errors in group 2 ({errs2[:3]})")
     ctx2.close()
+
+    # ============================================================
+    # Group 3 -- the one-time alphabetical normalization
+    # ============================================================
+    # So two devices start hand-ordering from the SAME arrangement rather than
+    # from whatever sequence each happened to merge in. Once only: after that
+    # the order belongs to the user and is never touched again.
+    ctx3, pg3, errs3 = boot(b, url)
+    pg3.evaluate("""() => {
+        localStorage.removeItem('gtd_contexts_ordered');
+        localStorage.setItem('gtd_contexts', JSON.stringify(
+            ['Errands','Calls','Computer'].map(n => ({ id: 'ctx-' + n.toLowerCase(), name: n }))));
+    }""")
+    pg3.reload(); pg3.wait_for_timeout(900)
+    pg3.evaluate("() => { const r=document.querySelector('#tray-root'); if(r) r.innerHTML=''; }")
+    first = group_titles(pg3, "next")
+    check(first == ["Calls", "Computer", "Errands"],
+          f"a device that has never hand-ordered gets one alphabetical pass ({first})")
+
+    # Hand-order it, reload, and confirm the normalization does NOT run again.
+    pg3.evaluate("""() => {
+        localStorage.setItem('gtd_contexts', JSON.stringify(
+            ['Errands','Calls','Computer'].map(n => ({ id: 'ctx-' + n.toLowerCase(), name: n }))));
+    }""")
+    pg3.reload(); pg3.wait_for_timeout(900)
+    pg3.evaluate("() => { const r=document.querySelector('#tray-root'); if(r) r.innerHTML=''; }")
+    again = group_titles(pg3, "next")
+    check(again == ["Errands", "Calls", "Computer"],
+          f"and it never runs again — a hand-made order is never re-sorted underneath the user ({again})")
+    check(not errs3, f"no JS errors in group 3 ({errs3[:3]})")
+    ctx3.close()
 
     b.close()
 
