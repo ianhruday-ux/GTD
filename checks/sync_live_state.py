@@ -145,6 +145,22 @@ with serve(DIST) as url, sync_playwright() as p:
     seed_title = "1 CLICK HERE TO START THE TUTORIAL"
     check(seed_title in dom_card_titles(pg2), "fixture: the seeded next-action this device will complete is on screen")
 
+    # ⚑ Establish a baseline BEFORE the remote record arrives (added W7).
+    # Without one, reconcile() reads a non-empty remote as "this device is
+    # joining an existing system" and calls stripSeededRecords() — which
+    # removes the very seeded card this group goes on to tick off. That went
+    # unnoticed until W7 because nothing re-rendered after a merge: the DOM
+    # still showed a card the app had already dropped from state, so the click
+    # below landed on a ghost and the fixture passed for the wrong reason.
+    # An empty remote carries no records, so it takes no strip and leaves a
+    # baseline behind. The destruction chain this group exists to prove is
+    # untouched by it — the merge still delivers 'Party', memory must still
+    # follow storage, and the local save must still not tombstone it.
+    pg2.evaluate("(bundle) => window.__oelaSync.reconcile(bundle)", empty_bundle())
+    pg2.wait_for_timeout(300)
+    check(seed_title in dom_card_titles(pg2),
+          "fixture: and it survives the baseline sync, so there is a real card to complete")
+
     # 1. The other device's record arrives and is merged in.
     party = rec("party-1", "Party", device="the-desktop")
     pg2.evaluate("(bundle) => window.__oelaSync.reconcile(bundle)", remote_with_next([party]))
