@@ -152,16 +152,43 @@ work (`makeKindBtnHtml`, `data-action="make-kind"`); this changes what arming on
 project can't hold linked actions/events and offers unlink-or-delete. Under the page swap it must
 fire **when Make Future is tapped**, because that is when the decision is made.
 
-**⚑ The one design question this raises, unresolved — put it to the author.** That dialog's choice
-(*unlink* vs *delete* the linked events) is a side effect on **other items**, and DRAFT ISOLATION
-says those stage until Save. So either:
+**RULED (author, 2026-08-01): the dialog fires on tap, and its choice is STAGED, applied at Save.**
 
-- (a) the dialog fires on tap and its choice is **staged**, applied at Save — consistent with draft
-  isolation, more work; or
-- (b) the dialog fires on tap and acts **immediately**, like 🗑 does — the existing deliberate
-  exception to draft isolation.
+The dialog's outcome is a single enum — unlink / delete / cancel — so this is cheap. Both branches
+are already id-based (`setLink`, `deleteTask`, `deleteEventEntirely`), and nothing in them needs to
+run at the moment of the tap:
 
-Do not guess. Ask.
+```js
+{ unlink } → setLink(each linked action, null) + unlinkEvents() + changeKind
+{ delete } → deleteTask(each linked action)   + deleteEvents()  + changeKind
+{ cancel } → nothing
+```
+
+Costed before ruling: acting immediately is ~15 lines, staging is ~30. **The extra fifteen buys the
+only thing that matters here** — acting immediately means choosing *Delete* and then leaving with
+**✕** discards the conversion while the project's actions and events are already gone, leaving an
+unchanged Current project that has silently lost its contents. That is worse than the 🗑 exception
+it would lean on: 🗑 destroys the thing you are looking at, deliberately, behind its own confirm;
+this would destroy **other** items as a side effect of a decision the user then backed out of —
+the case DRAFT ISOLATION names explicitly ("including side effects on *other* items").
+
+Staging is also *more correct*, not merely safer: recompute the linked set **at Save**, not at the
+tap, so items added or promoted while the page sat open are included — the same zombie trap
+`applyProjectStaging` already resolves by id. (Consequence to accept: the dialog may have said "2
+actions" and Save may act on 3. The unlink/delete choice still applies.)
+
+**Shape:**
+
+- Split `demoteProjectToFuture` into an **ask** and an **apply**. The ask fires from the make-kind
+  handler; it must no longer call `changeKind`/`closeScreen` — the page swap and Save take those.
+- Store the answer as `draft.demoteChoice = "unlink" | "delete"`. Cancel leaves the convert
+  **unarmed** (no page swap).
+- Apply it in the save path, immediately before `changeKind`, recomputing the linked set by
+  project id.
+- **Disarming the convert clears the stored choice** — author: *"I'm fine with throwing up the
+  dialogue again if the user swaps back and forth."* So re-arming asks again rather than silently
+  reusing a minute-old answer.
+- The no-linked-items path (no dialog, straight swap) stays as it is.
 
 ### Implementation sketch
 
