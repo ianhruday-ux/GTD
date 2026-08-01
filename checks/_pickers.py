@@ -82,9 +82,17 @@ def enable_dev_tools(pg):
     Sets the preferences AND un-hides in place, so it works whether or not the
     check reloads afterwards: the keys are gtddev_, so they survive a reload and
     a Reset the same way the snapshot slot does.
+
+    ⚠ `gtddev_enabled` is the MASTER switch, and it is not optional. The tools
+    are built out of the shipped app now (app.js DEV_TOOLS_BUILT_IN, author's
+    2026-08-01 ruling: "hidden and inaccessible in the final product"), so
+    devGroupOn() reads every group as off no matter what the per-group keys say
+    until this one is set. Without it the toolbar re-hides itself on the next
+    render and the click times out on an invisible button — the same failure
+    this helper was written to prevent, one level up.
     """
     pg.evaluate("""() => {
-      ['gtddev_show_time', 'gtddev_show_snapshot', 'gtddev_show_draglog']
+      ['gtddev_enabled', 'gtddev_show_time', 'gtddev_show_snapshot', 'gtddev_show_draglog']
         .forEach(k => localStorage.setItem(k, '1'));
       const bar = document.querySelector('#dev-toolbar');
       if (bar) bar.hidden = false;
@@ -99,8 +107,12 @@ def enable_qa_scaffolding(pg):
     that expects the checklist or the sprint map to exist has to switch them on
     first, or it asserts against a deliberately clean app.
 
-    Sets the preference AND reloads, since the injectors run at boot.
+    Sets the preference AND reloads, since the injectors run at boot. Needs the
+    master switch too — see enable_dev_tools: with the tools built out, the QA
+    group reads as off and applyQaScaffolding() SWEEPS the checklist and chunk
+    map out of the lanes instead of injecting them.
     """
-    pg.evaluate("() => localStorage.setItem('gtddev_show_qa', '1')")
+    pg.evaluate("""() => { localStorage.setItem('gtddev_enabled', '1');
+                           localStorage.setItem('gtddev_show_qa', '1'); }""")
     pg.reload()
     pg.wait_for_timeout(1200)

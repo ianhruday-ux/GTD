@@ -292,6 +292,17 @@ with serve(DIST) as url, sync_playwright() as p:
         pg.evaluate("() => { const d = document.querySelector('#dialog-root'); if (d) d.innerHTML = ''; }")
         pg.wait_for_timeout(200)
 
+    # ⚠ The Debugging panel is GATED as of 2026-08-01 (author: the dev tools are
+    # hidden and inaccessible in the shipped app — app.js DEV_TOOLS_BUILT_IN).
+    # The QA switch itself is unchanged and still worth exercising, but the row
+    # that opens it is not rendered without the master key, and the gtddev_ clear
+    # just above wiped that too. Put it back so flip() drives the real controls
+    # rather than a menu that no longer has them.
+    pg.evaluate("() => localStorage.setItem('gtddev_enabled', '1')")
+    pg.reload(); pg.wait_for_timeout(1200)
+    check(len(groups()) == 0,
+          f"the master key alone changes nothing — the QA switch is still off ({groups()})")
+
     flip()
     check(len(groups()) == len(EXPECTED), f"switching it on injects the checklist ({groups()})")
     flip()

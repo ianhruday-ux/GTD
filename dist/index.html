@@ -2534,7 +2534,7 @@ body.screen-open #tray-handle{ display:none; }
 (function(){
 "use strict";
 
-const BUILD_STAMP = "01 Aug 06:22";  // replaced by build.py
+const BUILD_STAMP = "01 Aug 13:23";  // replaced by build.py
 
 // =========================================================
 // STORAGE ADAPTER (spec.md §3, known issue 4)
@@ -3636,6 +3636,7 @@ const Sync = {
   stampRestoredRecords: stampRestoredRecords,       // W7: (a) a restore is the truth
   resetSyncIdentityAfterRestore: resetSyncIdentityAfterRestore, // W7: (b) rejoin fresh
   isEnabled: syncIsEnabled,
+  isNativeWrapper: isNativeWrapper,                 // "am I inside a shell?" — one definition, reused rather than re-tested
   setConnected: setSyncConnected,
   exportBundle: exportBundle,
   importBundle: importBundle,
@@ -13259,7 +13260,35 @@ function injectChunkMap(){
       note: "Inject your test checklist and the sprint map into the lanes. Off means anyone you show the app to sees a clean one." }
   ];
   const DEV_GROUP_QA = DEV_GROUPS.find(function(g){ return g.id === "qa"; });
-  function devGroupOn(g){ return Storage.get(g.key) === "1"; }
+  // =========================================================
+  // ⚑ THE MASTER SWITCH (author, 2026-08-01): "the dev tools should be hidden
+  // and inaccessible in the final product. Leave them in just in case I want to
+  // come back to this, but for now, they've served their purpose."
+  //
+  // So none of it is deleted — only the way in is closed. With this false:
+  //   · the ⋯ → Debugging row is not rendered, and its panel cannot be reached;
+  //   · every group reads as OFF however its gtddev_ key is already set, so a
+  //     device that had the time-jump buttons switched on does not strand them
+  //     visible with no menu left to switch them off;
+  //   · devGroupOn(QA) being false makes applyQaScaffolding() SWEEP the QA
+  //     checklist and the sprint chunk map out of the lanes at the next boot,
+  //     rather than inject them. That is the same ruling: they were build
+  //     scaffolding and the build is over. (It also clears the injectors' flag
+  //     keys, so flipping this back on re-injects rather than finding the
+  //     flags set and doing nothing.)
+  //
+  // TO BRING THEM BACK: flip this to true and rebuild. Nothing else moves.
+  //
+  // gtddev_enabled is the CHECK SUITE's way in — eleven files drive the
+  // time-jump buttons, and the same escape-hatch shape already exists for sync
+  // (__oelaSyncForceEnabled). Nothing in the app writes this key; it can only
+  // be set by hand from a console, so it does not reopen the door above.
+  // =========================================================
+  const DEV_TOOLS_BUILT_IN = false;
+  function devToolsEnabled(){
+    return DEV_TOOLS_BUILT_IN || Storage.get("gtddev_enabled") === "1";
+  }
+  function devGroupOn(g){ return devToolsEnabled() && Storage.get(g.key) === "1"; }
   function setDevGroup(g, on){
     Storage.set(g.key, on ? "1" : "0");
     // Toggling the QA group has to act on the lanes immediately — switching it
@@ -16422,9 +16451,13 @@ function injectChunkMap(){
       // ⚑ Where the dev tools live now. A row rather than a permanent bar: they
       // are scaffolding for building the app, and having them across the top of
       // every screen was the clutter the user wanted gone.
-      '<button type="button" class="settings-item" data-action="settings-debug">' +
-        '<span>&#128295;</span><span class="si-label">' + escapeHtml(t("settings.debuggingRow")) + '</span>' +
-        '<span class="si-value">' + devOnCount() + '</span><span class="si-caret">&#8250;</span></button>' +
+      // ⚑ And as of the author's 2026-08-01 ruling the row is not rendered at
+      // all unless DEV_TOOLS_BUILT_IN is flipped back on — see that constant.
+      (devToolsEnabled() ?
+        '<button type="button" class="settings-item" data-action="settings-debug">' +
+          '<span>&#128295;</span><span class="si-label">' + escapeHtml(t("settings.debuggingRow")) + '</span>' +
+          '<span class="si-value">' + devOnCount() + '</span><span class="si-caret">&#8250;</span></button>'
+        : "") +
       '<div class="settings-sep"></div>' +
       '<button type="button" class="settings-item danger" data-action="clear-all-data">' +
         '<span>&#8634;</span><span class="si-label">' + escapeHtml(t("settings.restoreDefaultsRow")) + '</span></button>' +
@@ -16526,7 +16559,14 @@ function injectChunkMap(){
       if (action === "settings-backgrounds"){ settingsPanel = "backgrounds"; renderSettingsMenu(); return; }
       if (action === "settings-language"){ settingsPanel = "language"; renderSettingsMenu(); return; }
       if (action === "settings-root"){ settingsPanel = "root"; renderSettingsMenu(); return; }
-      if (action === "settings-debug"){ settingsPanel = "debug"; renderSettingsMenu(); return; }
+      // Belt and braces: the row above is not rendered when the tools are off,
+      // so this is only reachable by a stale menu still on screen when the
+      // switch flips. Refusing here means there is exactly one gate, not two
+      // that could drift apart.
+      if (action === "settings-debug"){
+        if (!devToolsEnabled()) return;
+        settingsPanel = "debug"; renderSettingsMenu(); return;
+      }
       if (action === "settings-dropbox-conflicts"){ settingsPanel = "dropbox-conflicts"; renderSettingsMenu(); return; }
       if (action === "dropbox-connect"){
         // Android: hands off to the system browser (AppAuth) and back.
@@ -17291,6 +17331,20 @@ function injectChunkMap(){
     // window dragged across 1000px re-renders rather than stranding an open
     // page, tray or menu (trap T1).
     applyLayoutMode();
+    // ⚑ "Data lives in this browser's local storage" is TRUE of the web build
+    // and false in a wrapper, twice over: W2 mirrors every write to native
+    // storage (Preferences/Filesystem) precisely so the browser's copy is not
+    // where the data lives, and once Dropbox is connected it is not even the
+    // only device holding it. Author's ruling (2026-08-01): remove it from the
+    // wrapper entirely rather than reword it — an installed app has no browser
+    // to name, and there is nothing the line would usefully say instead.
+    // Removed, not hidden: the sentence is static markup, so there is no state
+    // that could bring it back. The plain browser tab keeps it, where it is
+    // still the honest description of where a visitor's data sits.
+    if (Sync.isNativeWrapper()){
+      const footerNote = qs("#footer-note");
+      if (footerNote) footerNote.remove();
+    }
     const deskMQ = window.matchMedia("(min-width:" + DESKTOP_MIN_PX + "px)");
     if (deskMQ.addEventListener) deskMQ.addEventListener("change", applyLayoutMode);
     else if (deskMQ.addListener) deskMQ.addListener(applyLayoutMode);   // older Safari

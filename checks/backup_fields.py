@@ -111,6 +111,15 @@ def open_settings(pg):
     pg.click('[data-action="open-overflow"]'); pg.wait_for_timeout(400)
 
 
+def close_settings(pg):
+    # ⚠ Escape does not clear this: the menu lives in #dialog-root behind a
+    # full-viewport .menu-scrim, which goes on swallowing every click underneath
+    # it — the next tab click then times out on "scrim intercepts pointer
+    # events" instead of switching lanes. Dismiss it the way the app does.
+    pg.evaluate("() => { const s = document.querySelector('.menu-scrim'); if (s) s.click(); }")
+    pg.wait_for_timeout(300)
+
+
 def do_export(pg):
     """The REAL export — the settings row, the download it triggers, the file
     it wrote. No serializeAllData() hook exists to shortcut this, which is
@@ -119,6 +128,7 @@ def do_export(pg):
     with pg.expect_download() as dl:
         pg.locator('[data-action="export-data"]').first.click()
     path = dl.value.path()
+    close_settings(pg)   # the menu stays open after a download; the scrim would block every later click
     with open(path, encoding="utf-8") as f:
         return json.loads(f.read())
 
@@ -172,14 +182,23 @@ def card_deadline(pg, title):
 
 
 def lane(pg, kind):
-    """Titles rendered in a lane right now — the tab is switched first, because
-    a lane that is not on screen renders nothing to assert on."""
-    pg.evaluate("""(k) => { const b = document.querySelector('[data-action="tab"][data-kind="' + k + '"]')
-                              || document.querySelector('[data-tab="' + k + '"]');
-                            if (b) b.click(); }""", kind)
-    pg.wait_for_timeout(400)
-    return pg.evaluate("""() => [...document.querySelectorAll('.card .card-title')]
-        .map(e => e.textContent.trim())""")
+    """Switch to a lane's tab and read the titles rendered INSIDE that lane.
+
+    ⚠ Two things this got wrong first, both of which made assertions weaker than
+    they read. The tab is `.tab[data-kind=…]` — an earlier draft clicked a
+    `[data-action="tab"]` selector that does not exist, so the switch was a
+    silent no-op. And EVERY lane renders into the DOM (CSS shows one), so an
+    unscoped `document.querySelectorAll('.card-title')` answers "does this card
+    exist anywhere" when the question asked is "is it in THIS lane". Scoping to
+    `.lane[data-kind]` is what makes the answer the one the check claims.
+    """
+    tab = pg.locator('.tab[data-kind="%s"]' % kind)
+    if tab.count():
+        tab.first.click(); pg.wait_for_timeout(400)
+    return pg.evaluate("""(k) => {
+      const el = document.querySelector('.lane[data-kind="' + k + '"]');
+      return el ? [...el.querySelectorAll('.card-title')].map(e => e.textContent.trim()) : [];
+    }""", kind)
 
 
 def habit_card(pg, title):
@@ -355,7 +374,7 @@ with serve(DIST) as url, sync_playwright() as p:
     open_settings(pg1)
     pg1.click('[data-action="settings-backgrounds"]'); pg1.wait_for_timeout(300)
     pg1.click('[data-bg="lacquer"]'); pg1.wait_for_timeout(500)
-    pg1.keyboard.press("Escape"); pg1.wait_for_timeout(300)
+    close_settings(pg1)
     check(raw(pg1, "gtd_surface") == "lacquer", f"fixture: the surface is Black lacquer ({raw(pg1, 'gtd_surface')})")
 
     # Complete the project from the lane checkbox — the path that archives its

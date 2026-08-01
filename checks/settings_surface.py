@@ -55,9 +55,14 @@ with serve(DIST) as url, sync_playwright() as p:
     check(pg.locator(".settings-menu").count() == 1, "⋯ opens a dropdown")
     check(pg.locator(".choice-dialog-backdrop").count() == 0, "it is not a modal sheet")
     labels = pg.locator(".settings-menu .si-label").all_inner_texts()
-    # ⚑ Debugging joined the menu when the dev toolbar was hidden by default.
+    # ⚑ Debugging joined the menu when the dev toolbar was hidden by default, and
+    # LEFT it again on 2026-08-01: the author ruled the dev tools hidden and
+    # inaccessible in the shipped app (app.js DEV_TOOLS_BUILT_IN). The rows below
+    # are what a person actually sees. The gated panel is still exercised further
+    # down, behind the master switch, and checks/shipped_surface.py owns the
+    # "the row is gone, and comes back if you flip it" claim in both directions.
     check(labels == ["Export a backup", "Import a backup", "Background", "Language",
-                     "Debugging", "Restore app to defaults"], f"rows in order (got {labels})")
+                     "Restore app to defaults"], f"rows in order (got {labels})")
     # ⚑ Language is BUILT now (Chinese round) — no longer a disabled "not built
     # yet" row. It is a live sub-panel like Background, and its value shows the
     # current language in its OWN script.
@@ -192,6 +197,12 @@ with serve(DIST) as url, sync_playwright() as p:
     check(pg.locator("#reset-btn").count() == 0,
           "and Reset local data is gone entirely, not just hidden")
 
+    # ⚠ The Debugging panel is GATED now, not gone (author, 2026-08-01). Its
+    # behaviour below is unchanged and still worth holding, so the master switch
+    # goes on for the rest of this section — the same key checks/_pickers.py's
+    # enable_dev_tools() sets, and the only way in that survives the ruling.
+    pg.evaluate("() => localStorage.setItem('gtddev_enabled', '1')")
+    pg.reload(); load()
     # ⚠ The reload above closed the menu, so reopen it before reaching for a row.
     pg.click('[data-action="open-overflow"]'); pg.wait_for_timeout(300)
     pg.click('[data-action="settings-debug"]'); pg.wait_for_timeout(300)

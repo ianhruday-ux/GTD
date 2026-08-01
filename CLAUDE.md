@@ -132,12 +132,16 @@ served from GitHub Pages. Never hand-edit it — it is generated. Edit `src/` an
 - **No field labels.** Placeholder text inside empty boxes carries the teaching; tooltips carry
   the rest. Edit pages get no info button (the lane tabs and the intray do).
 - **Validation** shows a dashed outline on the offending field, cleared on next input. No popups.
-- **Every chunk ends by injecting a QA checklist into Next Actions** (`injectQAChecklist`,
-  spec.md §8.1) — replace the previous chunk's content *and* its flag key; never accumulate.
-- **Every chunk also refreshes the chunk map** — one Current Project per chunk, seeded with a
-  plain-language description of what that chunk changes (`spec.md` §8.2). Same
-  replace-don't-accumulate discipline as the QA checklist, its own flag key, and it must survive
-  Reset the same way.
+- ⛔ **THE QA CHECKLIST AND CHUNK MAP CONVENTIONS ARE RETIRED** (author, 2026-08-01): *"The dev
+  tools should be hidden and inaccessible in the final product. Leave them in just in case I want
+  to come back to this, but for now, they've served their purpose."* **Do not write either one,
+  and do not update them.** `DEV_TOOLS_BUILT_IN` in `src/app.js` is `false`, which closes the ⋯ →
+  Debugging row and makes `applyQaScaffolding()` sweep both out of the lanes at boot instead of
+  injecting them. The code is all still there, gated, not deleted — flip that one constant and
+  rebuild to get it back. `checks/shipped_surface.py` holds the line in both directions.
+  *(What the two conventions said, for whoever flips the switch: one QA checklist in Next Actions
+  per chunk, `injectQAChecklist`, spec.md §8.1; one Current Project per chunk in the map,
+  spec.md §8.2; both replace-don't-accumulate, each with its own flag key, both surviving Reset.)*
 - **Commit as you go**, with real messages. The repo is the safety net that makes autonomous
   work acceptable; a chunk that can't be reverted is a chunk that shouldn't have been written.
 - **Flag every judgment call** in the handoff summary, inline, where the human can see it.

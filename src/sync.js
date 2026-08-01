@@ -796,6 +796,7 @@ const Sync = {
   stampRestoredRecords: stampRestoredRecords,       // W7: (a) a restore is the truth
   resetSyncIdentityAfterRestore: resetSyncIdentityAfterRestore, // W7: (b) rejoin fresh
   isEnabled: syncIsEnabled,
+  isNativeWrapper: isNativeWrapper,                 // "am I inside a shell?" — one definition, reused rather than re-tested
   setConnected: setSyncConnected,
   exportBundle: exportBundle,
   importBundle: importBundle,
