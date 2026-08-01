@@ -12,7 +12,7 @@
 // =========================================================
 "use strict";
 
-const SW_VERSION = "aa6fa587ebb2";
+const SW_VERSION = "e42d4f1b966b";
 const CACHE_NAME = "oela-" + SW_VERSION;
 // Relative paths only — GitHub Pages serves this from a project subpath
 // (…/GTD/), and an absolute "/index.html" would point at the domain root
