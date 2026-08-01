@@ -308,12 +308,25 @@ function tombstonesByRecordId(tombstones, store){
 // resurrection (annoying, recoverable) rather than silent loss.
 function mergeRecordArray(localArr, remoteArr, baselineArr, ctx){
   const local = byId(localArr), remote = byId(remoteArr), baseline = byId(baselineArr);
-  const ids = {};
-  Object.keys(local).forEach(function(id){ ids[id] = true; });
-  Object.keys(remote).forEach(function(id){ ids[id] = true; });
+  // ⚑ W7 (author, after the first successful two-device sync): a record this
+  // device has NEVER SEEN goes to the TOP, not the bottom.
+  //
+  // Everything the app creates locally is unshifted onto its lane (app.js:
+  // capture, quick-add, convert, move-between-lanes all put the new thing
+  // first), so an item arriving from the other device was the one kind of new
+  // item that landed at the end -- inconsistent with the whole app, and
+  // practically invisible: it appeared below whatever you were already
+  // looking at, which on a full lane means off the bottom of the screen.
+  //
+  // Records BOTH devices already have keep their local position, so this
+  // never reshuffles a lane you have arranged by hand; only genuinely new
+  // arrivals move, and they move to where new things go.
+  const ids = [];
+  Object.keys(remote).forEach(function(id){ if (!local[id]) ids.push(id); });
+  Object.keys(local).forEach(function(id){ ids.push(id); });
   const out = [];
   const conflicts = [];
-  Object.keys(ids).forEach(function(id){
+  ids.forEach(function(id){
     const l = local[id], r = remote[id], b = baseline[id];
     if (l && r){
       if (sameContent(l, r)){ out.push(l); return; }

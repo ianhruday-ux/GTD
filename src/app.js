@@ -235,7 +235,7 @@
   // anchors guards contexts too.
   function getValidContextCueTargets(currentHookIds, excludeHabitId){
     const excluded = new Set(currentHookIds || []);
-    return state.contexts.filter(function(c){
+    return sortedContexts().filter(function(c){
       if (excluded.has(c.id)) return false;
       return habitIncomingHookCount(c.id, excludeHabitId) < MAX_HOOKS;
     });
@@ -366,6 +366,29 @@
   // Contexts registry (chunk 3, §4.3d) — the one shared Next↔Waiting set.
   function loadContexts(){ return Storage.getJSON("gtd_contexts", null); }
   function saveContexts(){ Storage.setJSON("gtd_contexts", state.contexts); }
+  // ⚑ W7 (author, after the first two-device sync): contexts DISPLAY in a
+  // deterministic order, so both devices agree.
+  //
+  // Unlike a lane, a context registry cannot be rearranged by hand — so its
+  // stored order carries no intent, it is just whatever sequence the two
+  // devices happened to merge in. And because contexts are what the action
+  // lanes group BY, a disagreement about their order is a disagreement about
+  // the whole shape of the lane, not a detail.
+  //
+  // ⚑ Judgment call: ALPHABETICAL. The alternative was creation order (ids
+  // embed a base36 timestamp, so sorting by id would also be deterministic
+  // and would preserve the order you made them in). Alphabetical wins because
+  // in a list you cannot rearrange, findability is the only ordering the user
+  // can actually use — creation order is arbitrary from the outside. Say the
+  // word and it is a one-line change to sort by id instead.
+  // localeCompare so the Chinese build sorts sensibly too; id as the
+  // tiebreaker so two contexts sharing a name can never swap places.
+  function sortedContexts(){
+    return (state.contexts || []).slice().sort(function(a, b){
+      const byName = (a.name || "").localeCompare(b.name || "");
+      return byName !== 0 ? byName : (a.id < b.id ? -1 : 1);
+    });
+  }
   function isActionKind(k){ return k === "next" || k === "waiting"; }
   function findContext(id){ return state.contexts.find(function(c){ return c.id === id; }) || null; }
   function contextNameExists(name){
@@ -2448,7 +2471,7 @@
         else if (!r.contextId || !findContext(r.contextId)){ html += leafCardHtml(kind, r); } // loose / orphaned
         // context members are rendered in their context group below
       });
-      state.contexts.forEach(function(ctx){
+      sortedContexts().forEach(function(ctx){
         const members = all.filter(function(t){ return !t.isGroup && t.contextId === ctx.id; });
         html += contextGroupHtml(kind, ctx, members);
       });
@@ -4117,7 +4140,7 @@
   // greying out, per the no-field-labels teaching convention.
   function contextOptionsHtml(selectedId){
     let html = '<option value="">' + escapeHtml(t("field.noContext")) + '</option>';
-    state.contexts.forEach(function(c){
+    sortedContexts().forEach(function(c){
       html += '<option value="' + c.id + '"' + (c.id === selectedId ? " selected" : "") + '>' + escapeHtml(c.name) + '</option>';
     });
     return html;
