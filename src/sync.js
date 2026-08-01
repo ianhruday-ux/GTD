@@ -592,7 +592,12 @@ function reconcile(remoteBundle){
   // Joining an existing system: drop this device's own seeded content first.
   if (!baseline && bundleHasAnyRecord(remoteBundle)) local = stripSeededRecords(local);
   const result = mergeBundles(local, remoteBundle, deviceId, baseline);
-  result.merged.roster[deviceId] = { lastPull: Date.now() };
+  // W7: a farewell sync REMOVES this device rather than stamping it, so the
+  // roster stops counting a device that has deliberately left. mergeRoster
+  // unions both sides, so the entry has to be deleted after the merge -- doing
+  // it before would just have the remote's copy union straight back in.
+  if (leavingRoster) delete result.merged.roster[deviceId];
+  else result.merged.roster[deviceId] = { lastPull: Date.now() };
   const gc = gcTombstonesAndRoster(result.merged.tombstones, result.merged.roster);
   result.merged.tombstones = gc.tombstones;
   result.merged.roster = gc.roster;
@@ -711,8 +716,46 @@ function resetSyncIdentityAfterRestore(){
   Storage.remove(SYNC_ROSTER_KEY);
 }
 
+// ---------------------------------------------------------------------
+// LEAVING THE ROSTER (W7, author's suggestion).
+//
+// "Hitting Disconnect in the main menu and hitting Disconnect and Restore are
+// both signals of intent that the device no longer wants to be on the roster."
+// Exactly right, and it matters more than it looks: §4.5's tombstone GC keeps
+// every tombstone until the OLDEST last-pull across every rostered device, so
+// one abandoned entry pins the GC horizon for a year (SYNC_ROSTER_DROPOUT_MS)
+// and every device carries tombstones it could have dropped.
+//
+// Implemented as a flag rather than a separate code path so the farewell push
+// goes through the SAME transport orchestration as every other sync -- the
+// alternative was a second, near-identical push routine in each of the two
+// transports. reconcile() consults it in the one place it would otherwise
+// stamp this device's own lastPull.
+let leavingRoster = false;
+function setLeavingRoster(on){ leavingRoster = !!on; }
+// How many devices this device last saw sharing the file. Used to decide
+// whether a propagating reset is even a meaningful thing to offer.
+function rosterDeviceCount(){
+  const roster = Storage.getJSON(SYNC_ROSTER_KEY, {});
+  return roster && typeof roster === "object" ? Object.keys(roster).length : 0;
+}
+
+// Keys a RESTORE-TO-DEFAULTS must not wipe. Device identity above all: reset
+// used to clear it, so every reset minted a new id and abandoned the old one
+// in the roster -- the same defect class as the import bug, arrived at from
+// the other direction. The baseline survives for a subtler reason, see
+// app.js's eraseAllData: without it the next sync is a baseline-less rejoin,
+// stripSeededRecords fires, and the freshly seeded defaults are withheld from
+// the push -- so the other devices would be emptied and never reseeded.
+const SYNC_RESTORE_SURVIVOR_KEYS = [SYNC_DEVICE_ID_KEY, SYNC_CONNECTED_KEY,
+                                    SYNC_BASELINE_KEY, SYNC_TOMBSTONE_KEY];
+function isRestoreSurvivorKey(k){ return SYNC_RESTORE_SURVIVOR_KEYS.indexOf(k) !== -1; }
+
 const Sync = {
   getDeviceId: getDeviceId,
+  setLeavingRoster: setLeavingRoster,               // W7: disconnect takes this device off the roster
+  rosterDeviceCount: rosterDeviceCount,             // W7: is a propagating reset meaningful here?
+  isRestoreSurvivorKey: isRestoreSurvivorKey,       // W7: what a restore-to-defaults must keep
   isSyncMachineryKey: isSyncMachineryKey,           // W7: what a backup must never carry in
   stampRestoredRecords: stampRestoredRecords,       // W7: (a) a restore is the truth
   resetSyncIdentityAfterRestore: resetSyncIdentityAfterRestore, // W7: (b) rejoin fresh

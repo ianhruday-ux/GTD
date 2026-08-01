@@ -7980,11 +7980,84 @@
   // app-wide destructive control (Clear all app data — today's Reset);
   // Export/Import join it in chunk 8. Lane-scoped Completed clearing stays put.
   // =========================================================
-  function clearAllAppData(){
-    // A true clear: every gtd_ key (data + injected-flag bookkeeping). gtddev_
-    // keys (snapshot, drag-log settings) survive, like Reset always has.
-    Storage.keys().forEach(function(key){ if (key.indexOf("gtd_") === 0) Storage.remove(key); });
+  // Disconnecting, with a farewell push first (W7, author's suggestion):
+  // "hitting Disconnect and hitting Disconnect and Restore are both signals of
+  // intent that the device no longer wants to be on the roster." The push
+  // removes this device's roster entry, which matters because §4.5's tombstone
+  // GC holds every tombstone until the OLDEST last-pull across the roster --
+  // one abandoned entry pins that horizon for a year.
+  //
+  // BEST EFFORT, deliberately. If the farewell push fails (offline, expired
+  // token) the disconnect still happens: refusing to disconnect because the
+  // network is down would be a worse failure than a stale roster entry, and
+  // the year-long dropout in gcTombstonesAndRoster is the backstop that
+  // already exists for exactly this.
+  function disconnectSyncThen(done){
+    const transport = activeSyncTransport();
+    if (!transport){ if (done) done(); return; }
+    Sync.setLeavingRoster(true);
+    Promise.resolve()
+      .then(function(){ return transport.syncNow(); })
+      .catch(function(){ /* see BEST EFFORT above */ })
+      .then(function(){
+        Sync.setLeavingRoster(false);
+        return transport.disconnect();
+      })
+      .then(function(){
+        Storage.remove(DROPBOX_LAST_SYNC_KEY);
+        Storage.remove(DROPBOX_CONFLICT_LOG_KEY);
+        state.sync.lastError = null;
+        if (done) done();
+      });
+  }
+  // RESTORE TO DEFAULTS, in two flavours (W7, author's ruling).
+  //
+  // The warning has always said "everything you've entered will be permanently
+  // erased… this can't be undone." Sync quietly made that FALSE: the cloud
+  // still held everything, so the next sync poured it all back and stripped
+  // the fresh sample data on the way in. A reset on a connected device gave
+  // you neither your data nor the defaults. The author's ruling is to make the
+  // warning true again rather than to soften it.
+  //
+  // `propagate` decides whose data. Both paths keep this device's IDENTITY --
+  // the old code cleared gtd_device_id, so every reset minted a new id and
+  // abandoned the old one in the roster, which is the same defect the import
+  // fix addressed from the other side.
+  function clearAllAppData(propagate){
+    if (propagate) tombstoneEverySyncedRecord();
+    // Every other gtd_ key (data + injected-flag bookkeeping). gtddev_ keys
+    // (snapshot, drag-log settings) survive, like Reset always has.
+    Storage.keys().forEach(function(key){
+      if (key.indexOf("gtd_") !== 0) return;
+      if (propagate && Sync.isRestoreSurvivorKey(key)) return;
+      Storage.remove(key);
+    });
     window.location.reload();
+  }
+  // The wipe that TRAVELS. Writing an empty array through setJSON runs
+  // storage.js's stampAndTombstone, which diffs against what is in storage and
+  // mints a tombstone for every record that vanished -- the identical
+  // machinery an ordinary delete uses, rather than a second implementation of
+  // "publish a deletion" that could drift from it. An empty array passes the
+  // record-array gate ([].every() is true), which is what makes this work.
+  //
+  // Then the stores are REMOVED, because initLocalData() only reseeds when a
+  // lane store is missing -- an empty array reads as "this lane is genuinely
+  // empty" and would leave the app blank instead of restored. Storage.remove
+  // does not tombstone, so the tombstones minted a moment ago survive it.
+  //
+  // ⚑ THE RESEED, which the author flagged: the cloud deliberately holds no
+  // sample data, so tombstoning everything would empty the other devices and
+  // leave them empty. Keeping the BASELINE is what fixes it. With a baseline
+  // present the next sync is an ordinary three-way merge rather than a rejoin,
+  // so stripSeededRecords never fires, and the defaults this device seeds on
+  // reload publish as ordinary new records. The other devices then receive the
+  // deletions AND the fresh sample data in the same bundle. No new bundle
+  // field, no reseed signal, no new merge semantics -- the existing rules
+  // already say exactly this once the baseline is allowed to survive.
+  function tombstoneEverySyncedRecord(){
+    Sync.storeKeys.forEach(function(k){ Storage.setJSON(k, []); });
+    Sync.storeKeys.forEach(function(k){ Storage.remove(k); });
   }
   // ▲ POST-SPRINT (§P1): the settings surface is a DROPDOWN anchored under the
   // header ⋯, not a modal sheet. A modal is a room you have to leave; settings
@@ -8202,12 +8275,7 @@
         // data) -- same "applies immediately" tier as the background/
         // language rows right below it, not the restore-defaults tier below
         // THAT. ⚑ Builder's call, flagged rather than silently assumed.
-        activeSyncTransport().disconnect().then(function(){
-          Storage.remove(DROPBOX_LAST_SYNC_KEY);
-          Storage.remove(DROPBOX_CONFLICT_LOG_KEY);
-          state.sync.lastError = null;
-          renderSettingsMenu();
-        });
+        disconnectSyncThen(function(){ renderSettingsMenu(); });
         return;
       }
       if (action === "settings-pick-lang"){
@@ -8234,10 +8302,26 @@
         return;
       }
       if (action === "clear-all-data"){
-        openConfirmDialog(t("confirm.restoreDefaultsMessage"), [
-          { label: t("confirm.eraseRestoreDefaults"), style: "danger", action: clearAllAppData },
-          { label: t("chrome.cancel"), action: function(){} }
-        ]);
+        // With other devices on the roster the choice is real, so it is put to
+        // the user rather than guessed at (author's ruling). With none, the
+        // second option would describe something that cannot happen, so the
+        // dialog stays exactly as it was.
+        const shared = Sync.isEnabled() && Sync.rosterDeviceCount() > 1;
+        const buttons = [];
+        if (shared){
+          buttons.push({ label: t("confirm.restoreAllDevices"), style: "danger",
+                         action: function(){ clearAllAppData(true); } });
+          buttons.push({ label: t("confirm.disconnectAndRestore"), style: "danger",
+                         action: function(){ disconnectSyncThen(function(){ clearAllAppData(false); }); } });
+        } else {
+          buttons.push({ label: t("confirm.eraseRestoreDefaults"), style: "danger",
+                         action: function(){ clearAllAppData(false); } });
+        }
+        buttons.push({ label: t("chrome.cancel"), action: function(){} });
+        openConfirmDialog(
+          t("confirm.restoreDefaultsMessage") + (shared ? " " + t("confirm.restoreAlsoDeletesElsewhere") : ""),
+          buttons
+        );
       }
     });
   }

@@ -632,6 +632,17 @@ const STRINGS = {
     "zh-Hans": "把应用恢复到默认状态？你输入的一切——笔记、行动、项目、习惯——都会被永久清除，替换成示例数据。此操作无法撤销。"
   },
   "confirm.eraseRestoreDefaults": { en: "Erase & restore defaults", "zh-Hans": "清除并恢复默认" },
+  // W7. The stark warning above was TRUE before sync and quietly stopped being
+  // true after it -- the cloud kept a copy, so the next sync poured everything
+  // back. The author's ruling is to make it true again, which means saying out
+  // loud that the erase travels. Appended only when the roster shows another
+  // device, so it never describes something that cannot happen.
+  "confirm.restoreAlsoDeletesElsewhere": {
+    en: "This will also delete your data on any device you sync with.",
+    "zh-Hans": "这也会删除你同步的所有其他设备上的数据。"
+  },
+  "confirm.restoreAllDevices": { en: "Erase on all devices", "zh-Hans": "清除所有设备上的数据" },
+  "confirm.disconnectAndRestore": { en: "Disconnect & erase here only", "zh-Hans": "断开连接，仅清除本设备" },
   "confirm.importInvalidJson": { en: "That file isn’t valid backup JSON.", "zh-Hans": "该文件不是有效的备份 JSON。" },
   "confirm.importNotBackup": { en: "That file doesn’t look like an OELA backup.", "zh-Hans": "该文件看起来不是 OELA 的备份文件。" },
   "confirm.importReplaceWarning": { en: "This will replace everything currently in the app.", "zh-Hans": "这将替换应用中当前的所有内容。" },
