@@ -3868,7 +3868,16 @@
     // ⚑ An event now satisfies this too (user QA). It always should have — §4.3b
     // has always counted a linked event as a way forward — but until this round a
     // creation page could not make one, so the gate never had to ask.
-    if (s.kind === "current" && !s.taskId && !projectDraftHasWayForward(s)){
+    // ⚑ AND WHEN CONVERTING SOMEDAY → CURRENT (author: "it shouldn't let you
+    // save without linking or creating an action. This check is used when
+    // creating projects"). Same gate, same reason: §4.3b's whole distinction is
+    // that a Current project has a way forward and a Someday one does not, so
+    // promoting into Current without one produces exactly the stalled project
+    // the review then has to report. The page swap is what makes this possible
+    // to enforce -- the swapped page is a Current project page, so it already
+    // carries the linked panel and its two ways to answer.
+    const becomingCurrent = viewKind(s) === "current" && (!s.taskId || d.convertTo === "current");
+    if (becomingCurrent && !projectDraftHasWayForward(s)){
       s.invalidField = "projectActions";
       renderScreen();
       return;
@@ -4042,9 +4051,17 @@
     // convert buttons — disarm Complete first. Mirror of the guard in
     // screenComplete.
     if (s.draft.willComplete) return;
-    // §4.13a (chunk 3): "Make Waiting" is inert while a deadline is set --
-    // backstop for the greyed button (which has no disabled attribute).
-    if (destKind === "waiting" && s.draft.deadline && s.draft.deadline.date) return;
+    // §4.13a (chunk 3): a dated thing does not wait, so this convert is
+    // refused while a deadline is set -- but it now SAYS SO (author). The
+    // button used to render greyed and do nothing, which stated the refusal
+    // without ever naming the cause; the cause is two rows up the same page
+    // and one tap to clear. Same dashed-red mark as every other validation,
+    // cleared the moment the deadline changes.
+    if (destKind === "waiting" && s.draft.deadline && s.draft.deadline.date){
+      s.invalidField = "deadline";
+      renderScreen();
+      return;
+    }
     // Author's ruling: the Someday-can't-hold-this warning moves off Save and
     // onto THIS TAP, "because that is when the decision is made". Its answer is
     // STAGED, not acted on — see askDemoteChoice.
@@ -4306,7 +4323,11 @@
   // greyed teaching affordance (4.2), but it read as a broken control rather
   // than a lesson, so it was deleted (user round). FLAG: this contradicts
   // 4.2's "the icon still appears, greyed" line -- update the spec to match.
-  function deadlineFieldsHtml(draft, kind){
+  // `invalid` (author): the deadline is what BLOCKS a convert to Waiting, so
+  // when someone taps Make Waiting on a dated action it is this field that gets
+  // the outline -- see screenMakeKind. The same dashed-red mark every other
+  // save-time validation uses; no popup, cleared the moment the date changes.
+  function deadlineFieldsHtml(draft, kind, invalid){
     const d = draft.deadline || {};
     // Recurrence lives on EVENTS only now (§4.13, chunk 7). Chunk 3 removed the
     // recurrence <select> and the daily/weekly "make it a habit" bubble from
@@ -4314,7 +4335,7 @@
     return (
       '<div>' +
         '<div class="screen-row">' +
-          '<div class="screen-boxed-row">' +
+          '<div class="screen-boxed-row' + (invalid ? " field-invalid" : "") + '">' +
             '<span class="field-icon">&#128197;</span>' +
             '<input type="text" readonly inputmode="none" class="screen-date" data-field="deadline-date" placeholder="' + escapeHtml(t("field.noDeadline")) + '" value="' + escapeHtml(d.date || "") + '">' +
             (d.date ? '<input type="text" readonly inputmode="none" class="screen-time" data-field="deadline-time" placeholder="--:--" value="' + escapeHtml(d.time || "") + '">' : "") +
@@ -5072,25 +5093,26 @@
   function accentVarForKind(kind){
     return kind === "next" ? "--red" : kind === "waiting" ? "--yellow" : kind === "current" ? "--forest" : kind === "future" ? "--royal" : kind === "notes" ? "--teal" : kind === "tags" ? "--brass" : kind === "review" ? "--brass" : kind === "event" ? "--yellow" : kind === "calendar" ? "--brass" : "--purple";
   }
-  // DRAFT ISOLATION (§13.0 Chunk A): armed renders a filled pill reading
-  // "Converting to X on save", the same "nothing has happened yet, but
-  // here's what Save will do" language as the armed Complete badge —
-  // saveScreen is what actually performs the conversion.
   // MUTUAL EXCLUSION (user ruling): disabled (grey, inert) while Complete
-  // is armed — the two can never logically fire together.
-  function makeKindBtnHtml(destKind, label, arrow, armed, disabled, disabledTitle){
+  // is armed — the two can never logically fire together. That is now the ONLY
+  // grey case: a set deadline no longer greys this button (author), because a
+  // blocker sitting two rows up the same page, one tap from being cleared, is
+  // nothing like a genuine either/or.
+  // ⚑ THE ARMED PILL IS GONE (author): "instead of 'converting on save' just
+  // swap the make waiting button for the 'make next action' button that already
+  // lives on that page." The page swap has already said what is pending --
+  // badge, colour and fields all change -- and a filled pill announcing it on
+  // top of that was a second voice saying the same thing. `dataDest` is what
+  // remains of the mechanism; see screenConvertBtnHtml.
+  function makeKindBtnHtml(destKind, label, arrow, disabled, disabledTitle, dataDest){
     const accentVar = accentVarForKind(destKind);
-    const style = armed
-      ? 'background:var(' + accentVar + ');border-color:var(' + accentVar + ');color:var(--dark-on-accent);'
-      : disabled
-        ? 'border-color:var(--paper-2);color:var(--text-soft);cursor:default;'
-        : 'border-color:var(' + accentVar + ');color:var(' + accentVar + ');';
-    const text = armed
-      ? "\u2713 " + escapeHtml(t("outcome.convertingToOnSave").replace("{kind}", KIND_BADGE_LABEL[destKind]))
-      : ((arrow === "left" ? "&#8592; " : "") + escapeHtml(label) + (arrow === "right" ? " &#8594;" : ""));
-    const title = armed ? escapeHtml(t("outcome.tapToUndo")) : disabled ? escapeHtml(disabledTitle || t("outcome.disarmToConvert")) : "";
+    const style = disabled
+      ? 'border-color:var(--paper-2);color:var(--text-soft);cursor:default;'
+      : 'border-color:var(' + accentVar + ');color:var(' + accentVar + ');';
+    const text = (arrow === "left" ? "&#8592; " : "") + escapeHtml(label) + (arrow === "right" ? " &#8594;" : "");
+    const title = disabled ? escapeHtml(disabledTitle || t("outcome.disarmToConvert")) : "";
     return (
-      '<button type="button" class="btn screen-make-kind-btn' + (armed ? " armed" : "") + (disabled ? " disabled" : "") + '" data-action="make-kind" data-dest="' + destKind + '" ' +
+      '<button type="button" class="btn screen-make-kind-btn' + (disabled ? " disabled" : "") + '" data-action="make-kind" data-dest="' + (dataDest || destKind) + '" ' +
         'title="' + title + '" style="' + style + '">' + text +
       '</button>'
     );
@@ -5099,13 +5121,19 @@
   //
   // Each call site names the partner of the kind IT renders (next→waiting,
   // waiting→next, current→future, future→current). With a convert armed the
-  // page has already swapped, so the branch running is the destination's and
-  // its partner is where we came FROM -- but the button must stay pointed at
-  // the armed destination, or tapping it would arm a second conversion instead
-  // of undoing the first. So: armed ⇒ data-dest is draft.convertTo, and
-  // screenMakeKind reads that as "disarm". The label is ignored when armed
-  // (makeKindBtnHtml renders "✓ Converting to X on save" instead), which is why
-  // the destination branch's own wording never leaks through.
+  // page has already swapped, so the branch running is the DESTINATION's and
+  // the button it asks for is the destination page's own -- "← Make Next
+  // Action" on a swapped-to-Waiting page. That is exactly what the author asked
+  // for ("just swap the make waiting button for the make next action button
+  // that already lives on that page"), and it is honest: on an unsaved draft,
+  // undoing the pending conversion and making it a Next Action are the same
+  // outcome.
+  //
+  // ⚑ ONE THING DIFFERS from the real button: data-dest stays pointed at the
+  // ARMED destination, so screenMakeKind reads the tap as a DISARM. Pointing it
+  // at the partner would instead arm a convert whose destination is the lane
+  // the item is already in, and Save would hand changeKind a move from a lane
+  // to itself.
   function screenConvertBtnHtml(s, partner, label, arrow, disabled, disabledTitle){
     // ⚑ NOT on a child page opened from a project (W7's "reached sideways"
     // ruling, which already withholds Complete and Delete there). This button
@@ -5119,8 +5147,8 @@
     // opened from its lane, still converts it.
     if (s.staging) return "";
     const armed = !!(s.draft && s.draft.convertTo);
-    return makeKindBtnHtml(armed ? s.draft.convertTo : partner, label, arrow, armed,
-      !armed && !!disabled, disabledTitle);
+    return makeKindBtnHtml(partner, label, arrow, !armed && !!disabled, disabledTitle,
+      armed ? s.draft.convertTo : null);
   }
   // Completed-item page chrome (§12.2 step 5): ← (back, no save) and 🗑, and
   // deliberately NO ✕ — with nothing editable, ← and ✕ would be one gesture.
@@ -5188,10 +5216,10 @@
     // Convert button(s) for this kind — greyed and inert. screenMakeKind
     // guards completedView, so a tap does nothing even if the class slips.
     const tip = t("outcome.restoreToConvert");
-    if (kind === "next") fields += makeKindBtnHtml("waiting", t("outcome.makeWaiting"), "right", false, true, tip);
-    else if (kind === "waiting") fields += makeKindBtnHtml("next", t("outcome.makeNext"), "left", false, true, tip);
-    else if (kind === "current") fields += makeKindBtnHtml("future", t("outcome.makeFuture"), "", false, true, tip);
-    else if (kind === "future") fields += makeKindBtnHtml("current", t("outcome.makeCurrent"), "", false, true, tip);
+    if (kind === "next") fields += makeKindBtnHtml("waiting", t("outcome.makeWaiting"), "right", true, tip);
+    else if (kind === "waiting") fields += makeKindBtnHtml("next", t("outcome.makeNext"), "left", true, tip);
+    else if (kind === "current") fields += makeKindBtnHtml("future", t("outcome.makeFuture"), "", true, tip);
+    else if (kind === "future") fields += makeKindBtnHtml("current", t("outcome.makeCurrent"), "", true, tip);
     fields += '<button type="button" class="btn screen-complete-pill" data-action="completed-restore" title="' + escapeHtml(t("outcome.restoreToActive")) + '">↩ ' + escapeHtml(t("outcome.restore")) + '</button>';
     return '<div class="screen-body">' + fields + '</div>';
   }
@@ -5248,15 +5276,17 @@
       fields += '<textarea class="screen-field-desc" data-field="notesClean" placeholder="' + escapeHtml(t("field.description")) + '">' + escapeHtml(draft.notesClean) + '</textarea>';
       fields += linkRowHtml(draft, linkLocked);
       fields += contextRowHtml(draft);
-      fields += deadlineFieldsHtml(draft, kind);
+      fields += deadlineFieldsHtml(draft, kind, s.invalidField === "deadline");
       if (s.taskId){
-        // §4.13a (chunk 3): a dated thing does not wait. Disable "Make Waiting"
-        // whenever a deadline is set -- converting would have to silently drop
-        // the date. Complete-armed also disables it (existing mutual exclusion).
-        const dated = !!(draft.deadline && draft.deadline.date);
+        // §4.13a (chunk 3): a dated thing does not wait.
+        // ⚑ The button is NO LONGER GREYED for it (author). Grey said "you
+        // can't", full stop, and left you to work out why; the blocker is on
+        // this very page and takes one tap to clear, which is nothing like the
+        // Complete/Convert race the grey treatment was invented for. Tapping it
+        // now OUTLINES THE DEADLINE -- it points at the thing in the way
+        // instead of going dead (screenMakeKind).
         convertHtml += screenConvertBtnHtml(s, "waiting", t("outcome.makeWaiting"), "right",
-          !!draft.willComplete || dated,
-          dated ? t("waiting.blockedByDeadline") : null);
+          !!draft.willComplete);
       }
       fields += advancedRowHtml(draft);
     } else if (kind === "waiting"){
@@ -5299,7 +5329,15 @@
           // it wrong \u2014 a scold for being at step one. On an EXISTING project it is
           // a true statement about a saved thing and stays live; on a NEW one it
           // waits for the blocked save (invalidField) to have something to report.
-          const showFlag = s.taskId ? !hasWay : (s.invalidField === "projectActions");
+          // ⚑ A project being CONVERTED into Current counts as the new-page
+          // case, not the existing-project case: it is not a Current project
+          // yet, so "this has no next step" would be a scold delivered the
+          // instant you tapped Make Current, before you had any chance to
+          // answer it. Same reasoning as the creation page above -- wait for
+          // the blocked save to have something true to report.
+          const showFlag = (s.taskId && draft.convertTo !== "current")
+            ? !hasWay
+            : (s.invalidField === "projectActions");
           if (showFlag) fields += '<div class="screen-project-flag">' + escapeHtml(t("project.noNextStepFlag")) + '</div>';
         }
         if (s.taskId) convertHtml += screenConvertBtnHtml(s, "future", t("outcome.makeFuture"), "", !!draft.willComplete);
@@ -6607,7 +6645,14 @@
 
       const clearDeadlineBtn = e.target.closest('[data-action="clear-deadline"]');
       if (clearDeadlineBtn){
-        if (state.screen){ state.screen.draft.deadline = null; renderScreen(); }
+        if (state.screen){
+          state.screen.draft.deadline = null;
+          // Clearing the date is the fix for "you can't convert a dated action"
+          // (screenMakeKind), so the outline that said so comes off with it --
+          // the convention is "cleared on next input", and this IS the input.
+          if (state.screen.invalidField === "deadline") state.screen.invalidField = null;
+          renderScreen();
+        }
         return;
       }
 
@@ -6699,6 +6744,9 @@
       else if (field === "deadline-date"){
         if (!el.value){ draft.deadline = null; }
         else { draft.deadline = draft.deadline || { date: "", time: "" }; draft.deadline.date = el.value; }
+        // Same "cleared on next input" rule as every other validation mark: the
+        // date changing is what answers the Make-Waiting refusal.
+        if (state.screen.invalidField === "deadline") state.screen.invalidField = null;
       }
       else if (field === "deadline-time"){ if (draft.deadline) draft.deadline.time = el.value; }
     });

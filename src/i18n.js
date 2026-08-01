@@ -385,8 +385,12 @@ const STRINGS = {
   "outcome.makeFuture":      { en: "Make Future / Someday",      "zh-Hans": "转为将来/某天项目" },
   "outcome.makeCurrent":     { en: "Make Current Project",       "zh-Hans": "转为当前项目" },
   "outcome.disarmToConvert": { en: "Disarm Complete to convert", "zh-Hans": "先取消“完成”才能转换" },
-  "outcome.tapToUndo":       { en: "Tap to undo",                "zh-Hans": "点一下可撤销" },
-  "outcome.convertingToOnSave": { en: "Converting to {kind} on save", "zh-Hans": "保存时将转为{kind}" },
+  // outcome.tapToUndo / outcome.convertingToOnSave retired (author): the armed
+  // convert no longer renders a filled "✓ Converting to X on save" pill. Under
+  // THE PAGE SWAP the page itself has already changed kind, and the button
+  // becomes the destination page's own — outcome.makeNext and friends, above.
+  // Deleted rather than left dormant: an unused translated string is how the
+  // intray shipped an English placeholder (see checks/i18n_no_hardcoded.py).
   "outcome.restoreToConvert":{ en: "Restore the item to convert it", "zh-Hans": "先恢复该项目才能转换" },
   "outcome.complete":        { en: "Complete",                   "zh-Hans": "完成" },
   "outcome.completeOnSaveTitle": { en: "Complete on save",       "zh-Hans": "保存时标记完成" },

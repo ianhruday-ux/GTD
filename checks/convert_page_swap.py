@@ -172,12 +172,34 @@ def discard(pg):
 
 
 def save(pg):
+    # Tolerant for the protocol reason (checks/README.md): where the PRE-CHANGE
+    # build lets a save through that this build blocks, the page is already
+    # closed by the second save and there is nothing to click. A missing Save
+    # still shows up as a failed assertion below -- which is the report we want
+    # -- rather than a 30-second abort that discards every other group.
+    if pg.locator('[data-action="screen-save"]').count() == 0:
+        return False
     pg.locator('[data-action="screen-save"]').first.click(); pg.wait_for_timeout(700)
+    return True
 
 
 def arm(pg, dest):
-    pg.locator('[data-action="make-kind"][data-dest="%s"]' % dest).first.click()
+    sel = '[data-action="make-kind"][data-dest="%s"]' % dest
+    if pg.locator(sel).count() == 0:
+        return False
+    pg.locator(sel).first.click()
     pg.wait_for_timeout(500)
+    return True
+
+
+def click_if(pg, sel):
+    """Tolerant click, same protocol reason as fill(): a control the PRE-CHANGE
+    build never renders must be REPORTED, not waited on for 30 seconds."""
+    if pg.locator(sel).count() == 0:
+        return False
+    pg.locator(sel).first.click()
+    pg.wait_for_timeout(400)
+    return True
 
 
 def fill(pg, sel, text):
@@ -289,9 +311,27 @@ with serve(DIST) as url, sync_playwright() as p:
     ctx5, pg5, errs5 = boot(b, url)
     open_item(pg5, "next", "n1")
     arm(pg5, "waiting")
-    check(pg5.locator('[data-action="make-kind"][data-dest="waiting"].armed').count() == 1,
-          "on the swapped page the convert button is ARMED and still points at the destination "
-          "-- tapping it must undo, not arm a second conversion")
+    # ⚑ The armed pill ("✓ Converting to Waiting On on save") is retired
+    # (author): the swapped page shows the destination page's OWN convert
+    # button -- "← Make Next Action" on a Waiting page -- because the swap has
+    # already said what is pending. Only data-dest differs from the real thing:
+    # it stays pointed at the ARMED destination so the tap reads as a disarm.
+    btn5 = pg5.locator('[data-action="make-kind"]')
+    check(btn5.count() == 1 and btn5.first.get_attribute("data-dest") == "waiting",
+          "the swapped page's convert button still points at the destination -- tapping it must "
+          "undo, not arm a conversion into the lane the item is already in")
+    check("armed" not in (btn5.first.get_attribute("class") or ""),
+          f"and it is NOT a filled 'converting on save' pill ({btn5.first.get_attribute('class')!r})")
+    label5 = btn5.first.inner_text().strip()
+    discard(pg5)  # ⚠ the swapped page is still open; it would intercept the next click
+    open_item(pg5, "waiting", "w1")  # what a REAL Waiting page's button says
+    real_label = pg5.locator('[data-action="make-kind"]').first.inner_text().strip()
+    discard(pg5)
+    check(label5 == real_label,
+          f"it is word for word the button that already lives on a Waiting page "
+          f"({label5!r} vs {real_label!r})")
+    open_item(pg5, "next", "n1")
+    arm(pg5, "waiting")
     arm(pg5, "waiting")
     check(page_kind(pg5) == "next" and has(pg5, DEADLINE) and not has(pg5, WAITFOR),
           f"disarming swaps the page back ({page_kind(pg5)})")
@@ -316,15 +356,39 @@ with serve(DIST) as url, sync_playwright() as p:
     ctx6.close()
 
     # ============================================================
-    # Group 7 -- a dated Next Action still cannot become Waiting
+    # Group 7 -- a dated Next Action still cannot become Waiting,
+    #            and now it SAYS WHY
     # ============================================================
-    # §4.13a: a dated thing does not wait. The swap must not have re-opened this.
+    # §4.13a: a dated thing does not wait. The swap must not have re-opened
+    # this. ⚑ But the button is no longer greyed for it (author): grey said
+    # "you can't" and left you to work out why, when the blocker is two rows up
+    # the same page and one tap from being cleared -- "not immediately obvious
+    # why the item can't convert, so there needs to be a visual indicator."
     ctx7, pg7, errs7 = boot(b, url)
     open_item(pg7, "next", "n2")
+    btn7 = pg7.locator('[data-action="make-kind"][data-dest="waiting"]')
+    check("disabled" not in (btn7.first.get_attribute("class") or ""),
+          f"Make Waiting is NOT rendered disabled on a dated action "
+          f"({btn7.first.get_attribute('class')!r})")
     arm(pg7, "waiting")
     check(page_kind(pg7) == "next",
-          f"the greyed Make Waiting on a dated action does not swap the page ({page_kind(pg7)})")
+          f"tapping it still refuses to swap the page ({page_kind(pg7)})")
     check(not has(pg7, WAITFOR), "and no 'waiting for' field appears")
+    marked = pg7.evaluate("""() => {
+        const el = document.querySelector('[data-field="deadline-date"]');
+        const row = el && el.closest('.screen-boxed-row');
+        return !!(row && row.classList.contains('field-invalid'));
+    }""")
+    check(marked,
+          "THE INDICATOR: the DEADLINE is outlined -- the refusal points at the thing in the way")
+    # "Cleared on next input" -- and the input that answers this one is clearing
+    # the date, which is also the fix.
+    pg7.locator('[data-action="clear-deadline"]').first.click(); pg7.wait_for_timeout(400)
+    still = pg7.evaluate("""() => !!document.querySelector('.screen-boxed-row.field-invalid')""")
+    check(not still, "clearing the deadline clears the outline with it")
+    arm(pg7, "waiting")
+    check(page_kind(pg7) == "waiting",
+          f"and now the convert goes through, on the same page, without leaving it ({page_kind(pg7)})")
     check(not errs7, f"no JS errors in group 7 ({errs7[:3]})")
     ctx7.close()
 
@@ -452,14 +516,36 @@ with serve(DIST) as url, sync_playwright() as p:
     # ============================================================
     # Group 14 -- Future -> Current, the fourth button
     # ============================================================
+    # ⚑ AND IT NEEDS A WAY FORWARD (author: "when converting a someday project
+    # to a current project, it shouldn't let you save without linking or
+    # creating an action. This check is used when creating projects"). §4.3b's
+    # whole distinction is that a Current project has one and a Someday project
+    # does not, so promoting without one mints exactly the stalled project the
+    # review then has to report. The gate existed for creation only; the page
+    # swap is what makes it enforceable here, since the swapped page is a
+    # Current project page and already carries the linked panel.
     ctx14, pg14, errs14 = boot(b, url)
     open_item(pg14, "future", "f1")
     arm(pg14, "current")
     check(page_kind(pg14) == "current", f"a Someday project swaps to a Current page ({page_kind(pg14)})")
     check(has(pg14, DEADLINE),
           "which has the deadline field a Someday project is not allowed (§4.3)")
+    check(not has(pg14, '.screen-project-flag'),
+          "and does NOT scold about the missing next step the instant you tap -- you have not "
+          "had a chance to answer yet (same rule as the creation page)")
     save(pg14)
-    check(lane_of(pg14, "f1") == "current", f"Save promotes it ({lane_of(pg14, 'f1')})")
+    check(lane_of(pg14, "f1") == "future",
+          f"Save is BLOCKED with no way forward -- the project stays in Someday ({lane_of(pg14, 'f1')})")
+    check(has(pg14, '.screen-project-flag') or has(pg14, '.field-invalid'),
+          "and the blocked save is what makes the flag appear")
+    # Answer it the way the page invites: link an action that already exists.
+    # ⚠ Guarded (checks/README.md): on the PRE-CHANGE build the save above is not
+    # blocked, so the page has already closed and neither control exists -- this
+    # has to report that, not hang for 30 seconds on a locator.
+    click_if(pg14, '[data-action="open-link-picker"]')
+    click_if(pg14, '[data-action="pick-link"]')
+    save(pg14)
+    check(lane_of(pg14, "f1") == "current", f"with an action linked, Save promotes it ({lane_of(pg14, 'f1')})")
     check(not errs14, f"no JS errors in group 14 ({errs14[:3]})")
     ctx14.close()
 
@@ -540,6 +626,41 @@ with serve(DIST) as url, sync_playwright() as p:
           "swap an inert one would invite a condition onto an item that stays a Next Action")
     check(not errs17, f"no JS errors in group 17 ({errs17[:3]})")
     ctx17.close()
+
+    # ============================================================
+    # Group 18 -- the linked list's ✕ is styled like the app
+    # ============================================================
+    # Author: "the X in the project list should be styled to match the rest of
+    # the app." It was a bare .chip-x, and .chip-x is only ever styled INSIDE
+    # .note-chip / .notes-filter-btn -- so out here it matched no rule and fell
+    # through to the browser's default button chrome: a pale grey box with a
+    # hard border, against a dark translucent row. Asserted computed, because
+    # the bug was the ABSENCE of a rule and only the computed style can see that.
+    ctx18, pg18, errs18 = boot(b, url)
+    open_item(pg18, "current", "p1")
+    style = pg18.evaluate("""() => {
+        const x = document.querySelector('.linked-action-row > .chip-x');
+        if (!x) return null;
+        const c = getComputedStyle(x);
+        const row = document.querySelector('.linked-action-item');
+        const rc = row ? getComputedStyle(row) : null;
+        return { bg: c.backgroundColor, radius: c.borderTopLeftRadius, w: c.width, h: c.height,
+                 rowBg: rc ? rc.backgroundColor : null,
+                 rowRadius: rc ? rc.borderTopLeftRadius : null };
+    }""")
+    check(style is not None, "fixture: the linked row carries its ✕")
+    # ⚑ Compared against the ROW, not against a guessed default. The pre-change
+    # value was rgb(240,240,240) -- an opaque light grey, i.e. the browser's own
+    # button face -- and an assertion listing colours it must not be would have
+    # missed it by one digit. "Matches the rest of the app" is a relationship.
+    check(style and style["bg"] == style["rowBg"],
+          f"it wears the row's own background, not the browser's button face ({style})")
+    check(style and style["radius"] == style["rowRadius"],
+          f"it takes the same corner radius as the row it sits against ({style})")
+    check(style and style["w"] == style["h"],
+          f"and is square, so it reads as a control on the row, not a second row ({style})")
+    check(not errs18, f"no JS errors in group 18 ({errs18[:3]})")
+    ctx18.close()
 
     b.close()
 

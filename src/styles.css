@@ -1084,6 +1084,22 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
    row so a mis-tap can be undone without discarding the whole page. */
 .linked-action-row{ display:flex; align-items:center; gap:4px; }
 .linked-action-row > .linked-action-item{ flex:1; min-width:0; }
+/* ⚑ The ✕ was a bare .chip-x, and .chip-x is only ever styled INSIDE
+   .note-chip / .notes-filter-btn — out here it matched no rule at all and fell
+   through to the browser's default button chrome: a pale grey box with a hard
+   border, sitting against a row that is dark and translucent (author: "the X in
+   the project list should be styled to match the rest of the app"). Borrows the
+   row's own border, radius and hover, and the quiet ✕ colour every other clear
+   control uses. Square, so it reads as a control on the row rather than a
+   second row. */
+.linked-action-row > .chip-x{
+  flex:0 0 auto; width:28px; height:28px; padding:0;
+  display:flex; align-items:center; justify-content:center;
+  border:1px solid rgba(255,255,255,0.1); border-radius:6px;
+  background:rgba(255,255,255,0.04); color:var(--text-soft);
+  font-size:15px; line-height:1; cursor:pointer;
+}
+.linked-action-row > .chip-x:hover{ background:rgba(255,255,255,0.1); color:var(--text-primary); }
 /* W7: the day an open pause began, beside the Pause button. Quiet — it is a
    fact about the habit, not a control, and must not compete with the button. */
 .habit-paused-since{ margin-left:0.6rem; font-size:0.82rem; color:var(--text-soft); align-self:center; }
