@@ -380,8 +380,10 @@ with serve(DIST) as url, sync_playwright() as p:
     pg.evaluate("() => { const r = document.querySelector('#tray-root'); if (r) r.innerHTML = ''; }")
     pg.click('.tab[data-kind="current"]'); pg.wait_for_timeout(400)
     pg.locator('.card-title:has-text("ZZ convert me")').first.click(); pg.wait_for_timeout(600)
-    pg.locator('[data-action="make-kind"][data-dest="future"]').first.click(); pg.wait_for_timeout(300)
-    pg.locator('[data-action="screen-save"]').first.click(); pg.wait_for_timeout(700)
+    # ⚑ UPDATED (author's ruling, 2026-08-01): the warning fires when Make
+    # Future is TAPPED, not at Save, and its answer is staged until Save. The
+    # dialog's WORDING -- what this group is actually about -- is unchanged.
+    pg.locator('[data-action="make-kind"][data-dest="future"]').first.click(); pg.wait_for_timeout(400)
     dlg = pg.evaluate("""() => { const d = document.querySelector('.choice-dialog-backdrop');
       return d ? d.textContent : null; }""")
     check(dlg is not None, "converting a project with links asks first")
@@ -390,7 +392,8 @@ with serve(DIST) as url, sync_playwright() as p:
     pg.evaluate("""() => { const d = document.querySelector('.choice-dialog-backdrop');
       const b = [...d.querySelectorAll('button')].find(x => /unlink/i.test(x.textContent));
       if (b) b.click(); }""")
-    pg.wait_for_timeout(900)
+    pg.wait_for_timeout(500)
+    pg.locator('[data-action="screen-save"]').first.click(); pg.wait_for_timeout(900)
     after = pg.evaluate("""() => {
       const n = JSON.parse(localStorage.getItem('gtd_notes') || '[]').find(x => x.id === 'zz-n1');
       const fut = JSON.parse(localStorage.getItem('gtd_tasks_future') || '[]')

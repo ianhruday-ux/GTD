@@ -162,15 +162,22 @@ with serve(DIST) as url, sync_playwright() as p:
     seed()
     open_project()
     # ⚠ Converting is DRAFT-ONLY like everything else on this page: the button
-    # arms it, Save commits it. Clicking the button alone does nothing.
+    # arms it, Save commits it. Clicking the button alone converts nothing.
+    # ⚑ UPDATED (author's ruling, 2026-08-01): the warning fires when Make
+    # Future is TAPPED, not at Save -- "that is when the decision is made" --
+    # and the answer is STAGED, applied at Save. This suite used to save first
+    # and then answer; that order is superseded, not broken.
     pg.locator('[data-action="make-kind"][data-dest="future"]').first.click()
-    pg.wait_for_timeout(300)
-    pg.click('[data-action="screen-save"]'); pg.wait_for_timeout(600)
+    pg.wait_for_timeout(400)
     msg = dialog_text()
     check(msg is not None and "calendar" in msg.lower(),
-          f"parking a project asks about its calendar entries ({msg})")
+          f"parking a project asks about its calendar entries, AT THE TAP ({msg})")
     pg.locator('.choice-dialog button:has-text("Unlink")').first.click()
-    pg.wait_for_timeout(800)
+    pg.wait_for_timeout(500)
+    st_mid = state()
+    check(st_mid["live"] == 1 and st_mid["link"] is not None,
+          f"and answering it changes NOTHING yet -- the choice is staged ({st_mid})")
+    pg.click('[data-action="screen-save"]'); pg.wait_for_timeout(800)
     st = state()
     check(st["live"] == 1, f"unlink KEEPS the calendar entry ({st})")
     check(st["link"] is None, f"but it is no longer tied to the project ({st})")

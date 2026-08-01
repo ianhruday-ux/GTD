@@ -3258,6 +3258,14 @@
   // warning — a state-compare, not a dirty flag, so create-then-delete and
   // edit-then-revert are silent (§12.1).
   function projectDraftDirty(s){
+    // An armed Complete or Convert is a staged intention like any other, and
+    // under THE PAGE SWAP an armed convert can be carrying a demoteChoice --
+    // a decision about OTHER items -- so it is exactly what this confirm
+    // exists to protect. screenDirty (the non-project equivalent) has counted
+    // these since trap T6b; this one never did, so on the phone, where the
+    // desktop-only fallback confirm does not run, ✕ discarded a project's
+    // armed conversion in silence.
+    if (s.draft && (s.draft.willComplete || s.draft.convertTo)) return true;
     const staged = s.draft.staged;
     if (staged){
       if ((staged.creates || []).length) return true;
@@ -4022,7 +4030,11 @@
       // Author: "I'm fine with throwing up the dialogue again if the user swaps
       // back and forth." A minute-old answer to a question about OTHER items is
       // not consent for a conversion you re-armed after changing your mind.
-      s.draft.demoteChoice = null;
+      // ⚑ delete, not = null: draftFingerprint hashes the draft's KEY SET, so a
+      // leftover key would leave the page permanently "dirty" after an arm and
+      // disarm that changed nothing, and the discard confirm would fire on a
+      // page the user had put back exactly as they found it.
+      delete s.draft.demoteChoice;
       renderScreen();
       return;
     }

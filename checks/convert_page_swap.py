@@ -343,6 +343,15 @@ with serve(DIST) as url, sync_playwright() as p:
     check((rec(pg8, "a1") or {}).get("linkedProjectId") == "p1",
           "but the ANSWER IS STAGED -- the linked action is still linked")
     check(lane_of(pg8, "p1") == "current", "and the project has not moved")
+    # ⚑ ✕ must WARN. projectDraftDirty counted staged links, unlinks, creates
+    # and deletes but not an armed convert, and it is the project page's only
+    # discard gate on the phone (the other one is desktop-only) -- so a
+    # conversion carrying a decision about other items was discarded in silence.
+    pg8.locator('[data-action="screen-cancel"]').first.click(); pg8.wait_for_timeout(400)
+    check(dialog_open(pg8),
+          "✕ on a page with an armed convert warns before discarding it")
+    dialog_click(pg8, 1)  # keep editing
+    check(page_kind(pg8) == "future", "and declining leaves the swapped page open, still armed")
     check(not errs8, f"no JS errors in group 8 ({errs8[:3]})")
     ctx8.close()
 
