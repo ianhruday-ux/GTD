@@ -56,7 +56,9 @@ life into it without exporting a backup now and then.
 ## Android
 
 The app is not on the Play Store, so you install it yourself. This is called sideloading and it is a
-normal, supported thing to do — Android just asks you to confirm you meant it, twice.
+normal, supported thing to do — but Android has been making it steadily less pleasant, and on a
+current phone it is more than a couple of confirmations. Step 4 is the awkward one. Read it before
+you start rather than in the middle.
 
 1. **Get `OELA-1.0.apk` onto the phone.** Email it to yourself, put it in Dropbox, or plug the phone
    into a computer and copy it across. Downloading it in Chrome on the phone is easiest.
@@ -64,16 +66,34 @@ normal, supported thing to do — Android just asks you to confirm you meant it,
    open **Files** → **Downloads** and tap it there.
 3. **Android will say the app you tapped from isn't allowed to install apps.** Tap **Settings** on
    that prompt, turn on **Allow from this source**, and press back. This is a permission you are
-   granting to Chrome (or Files), not to me.
-4. **Play Protect will then say the app is unsafe, or that it can't scan it.** Tap **More details**
-   → **Install anyway**. It says this about every app that didn't come from the Play Store; it has
-   not examined OELA and found something. If that sentence doesn't reassure you, that is a
-   reasonable place to stop — use the one-file version instead, which asks nothing of you.
+   granting to whatever you tapped from — Chrome, Dropbox, Files — not to me.
+4. **Play Protect will block it.** On some phones the dialog offers **More details → Install
+   anyway** and you can just tap that. **On many current phones it does not** — there is no
+   install-anyway option at all, only a button that dismisses it. If that's what you get, you have
+   to switch Play Protect off for the length of the install:
+
+   - **Play Store** → your **profile icon** (top right) → **Play Protect** → the **gear icon** →
+     turn off **Scan apps with Play Protect**, and confirm.
+   - Install the APK.
+   - **Go back and turn it on again.** It only needs to be off for the install itself, not to run
+     the app afterwards.
+
+   Play Protect says this about any app that didn't come from the Play Store, especially one it has
+   never seen before. It has not examined OELA and found something — it has no idea what OELA is,
+   and that is the entire complaint. But turning it off, even briefly, is a real reduction in your
+   phone's protection, and you are doing it on my say-so. **If you'd rather not, stop here and use
+   the one-file version** — it asks nothing of you and is the same app.
 5. **Install.** Then find OELA in your app drawer.
 
 **Updates.** When I send you a newer APK, just install it over the top — your lists are kept. This
 only works because every build I hand out is signed with the same key. If you ever *uninstall* OELA,
 Android deletes its data with it, so export a backup first.
+
+**If you have `adb`, skip all of the above.** `adb install -r OELA-1.0.apk` over USB goes around
+both step 3 and step 4 entirely — no source permission, no Play Protect dialog, nothing to switch
+off and remember to switch back on. It is by far the least annoying route if you already have the
+Android platform tools, and the only reason it isn't the main instruction is that most people
+don't.
 
 ### Why it asks for permission to use the internet
 
