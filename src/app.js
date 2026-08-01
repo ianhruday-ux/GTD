@@ -4785,7 +4785,12 @@
     }
     const eventRows = targets.events.map(function(ev){
       const d = dateStrToDate(effDate(ev, ev.date));
-      return itemBtn(ev.id, "event", ev.title || t("cal.untitledEvent"),
+      // project.untitled, not an invented cal.untitledEvent: that key does not
+      // exist, and t() returns the KEY when it misses -- so an unnamed event
+      // would have rendered the literal string "cal.untitledEvent" in the
+      // picker, in both languages. project.untitled is what the linked-notes
+      // list already uses for exactly this.
+      return itemBtn(ev.id, "event", ev.title || t("project.untitled"),
                      d.toLocaleDateString(undefined, { month: "short", day: "numeric" }));
     });
     const nextRows = targets.actions.filter(function(a){ return a.kind === "next"; })
@@ -9538,7 +9543,10 @@
     // not say WHY is a dead end rather than a hint. Truncated, because these
     // strings come from Dropbox and can run long.
     if (state.sync.lastError){
-      const why = String(state.sync.lastError).trim();
+      // Through t(): an authored reason (err.sync.*) is translated, and any
+      // other message -- Dropbox's own, or the native plugin's -- falls through
+      // unchanged, because t() returns the key it was given when it misses.
+      const why = t(String(state.sync.lastError).trim());
       return t("sync.error") + (why ? " — " + (why.length > 90 ? why.slice(0, 89) + "…" : why) : "");
     }
     const at = dropboxLastSyncAt();

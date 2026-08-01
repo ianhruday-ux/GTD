@@ -1,3 +1,10 @@
+// ⚑ ERROR MESSAGES ARE i18n KEYS (author: "check that those sync reports have
+// translations as well"). The sync status line surfaces the reason a sync
+// failed, and these were raw English -- so a Chinese build read
+// "同步失败 — No Dropbox folder connected". app.js runs the message through
+// t(), which RETURNS THE KEY when it misses, so an authored reason gets
+// translated and anything foreign (Dropbox's own API errors, the native auth
+// plugin) still falls through verbatim rather than being swallowed.
 // =========================================================
 // DROPBOX TRANSPORT (W5, wrapper-plan.md §4.1/§4.4/§5) — the one place in
 // the app that knows Dropbox exists. sync.js (W4) is pure and
@@ -60,7 +67,7 @@ async function dropboxIsAuthorized(){
 // yet to protect until a syncNow() actually runs.
 async function dropboxConnect(){
   const plugin = dropboxPlugin();
-  if (!plugin) throw new Error("Dropbox sync is only available in the installed app");
+  if (!plugin) throw new Error("err.sync.wrapperOnly");
   await plugin.authorize();
   Sync.setConnected(true);
 }
@@ -73,7 +80,7 @@ async function dropboxDisconnect(){
 
 async function dropboxAccessToken(){
   const plugin = dropboxPlugin();
-  if (!plugin) throw new Error("Dropbox sync is only available in the installed app");
+  if (!plugin) throw new Error("err.sync.wrapperOnly");
   const res = await plugin.getAccessToken(); // refreshes silently if the stored token has expired (native side, AuthState.performActionWithFreshTokens)
   return res.accessToken;
 }
@@ -106,9 +113,9 @@ async function dropboxDownload(token){
     const errBody = await resp.json().catch(function(){ return null; });
     const tag = errBody && errBody.error && errBody.error.path && errBody.error.path[".tag"];
     if (tag === "not_found") return { exists: false, rev: null, bundle: null };
-    throw new Error("Dropbox download failed: " + (errBody ? JSON.stringify(errBody) : resp.status));
+    throw new Error("err.sync.downloadFailed");
   }
-  if (!resp.ok) throw new Error("Dropbox download failed: HTTP " + resp.status);
+  if (!resp.ok) throw new Error("err.sync.downloadFailed");
   const resultHeader = resp.headers.get("Dropbox-API-Result");
   const meta = resultHeader ? JSON.parse(resultHeader) : null;
   const bundle = await resp.json();
@@ -133,7 +140,7 @@ async function dropboxUpload(token, bundle, mode){
     body: JSON.stringify(bundle)
   });
   if (resp.status === 409) return { conflict: true };
-  if (!resp.ok) throw new Error("Dropbox upload failed: HTTP " + resp.status);
+  if (!resp.ok) throw new Error("err.sync.uploadFailed");
   const meta = await resp.json();
   return { conflict: false, rev: meta.rev };
 }
@@ -142,7 +149,7 @@ async function dropboxUpload(token, bundle, mode){
 // the push under CAS if another device wrote in between. Returns the
 // conflicts W4 found so the UI can honor §1's "never silent" ruling.
 async function dropboxSyncNow(){
-  if (!dropboxIsAvailable()) throw new Error("Dropbox sync is only available in the installed app");
+  if (!dropboxIsAvailable()) throw new Error("err.sync.wrapperOnly");
   const token = await dropboxAccessToken();
   let allConflicts = [];
   for (let attempt = 0; attempt < DROPBOX_MAX_CAS_RETRIES; attempt++){
@@ -171,7 +178,7 @@ async function dropboxSyncNow(){
     // run again against it -- merging is idempotent against already-merged
     // data, nothing gets double-applied.
   }
-  throw new Error("Dropbox sync: too many conflicting writes in a row — try again shortly");
+  throw new Error("err.sync.tooManyWrites");
 }
 
 const DropboxTransport = {

@@ -878,6 +878,15 @@ const STRINGS = {
   // native-speaker review like the tutorial/info-button copy got — flagged
   // rather than presented as equally vetted. "Dropbox" itself stays
   // untranslated, same treatment as "OELA". ----
+  // Sync failure reasons. Thrown as KEYS by the transports so the status line
+  // can translate them; see the header comment in dropboxTransport.js.
+  "err.sync.wrapperOnly":     { en: "Sync is only available in the installed app", "zh-Hans": "同步仅在已安装的应用中可用" },
+  "err.sync.noFolder":        { en: "No Dropbox folder connected",     "zh-Hans": "未连接 Dropbox 文件夹" },
+  "err.sync.noFolderChosen":  { en: "No folder was chosen",            "zh-Hans": "未选择文件夹" },
+  "err.sync.fileKeptChanging":{ en: "The sync file kept changing — try again shortly", "zh-Hans": "同步文件一直在变动——请稍后重试" },
+  "err.sync.tooManyWrites":   { en: "Too many conflicting writes in a row — try again shortly", "zh-Hans": "连续出现过多写入冲突——请稍后重试" },
+  "err.sync.downloadFailed":  { en: "Couldn’t read the sync file from Dropbox", "zh-Hans": "无法从 Dropbox 读取同步文件" },
+  "err.sync.uploadFailed":    { en: "Couldn’t write the sync file to Dropbox",  "zh-Hans": "无法向 Dropbox 写入同步文件" },
   "sync.connect":            { en: "Connect Dropbox",                "zh-Hans": "连接 Dropbox" },
   "sync.disconnect":         { en: "Disconnect",                     "zh-Hans": "断开连接" },
   "sync.now":                { en: "Sync now",                       "zh-Hans": "立即同步" },

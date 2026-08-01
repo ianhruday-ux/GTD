@@ -1,3 +1,10 @@
+// ⚑ ERROR MESSAGES ARE i18n KEYS (author: "check that those sync reports have
+// translations as well"). The sync status line surfaces the reason a sync
+// failed, and these were raw English -- so a Chinese build read
+// "同步失败 — No Dropbox folder connected". app.js runs the message through
+// t(), which RETURNS THE KEY when it misses, so an authored reason gets
+// translated and anything foreign (Dropbox's own API errors, the native auth
+// plugin) still falls through verbatim rather than being swallowed.
 // =========================================================
 // DESKTOP TRANSPORT (W6, wrapper-plan.md) — the fs-based sibling to
 // dropboxTransport.js (W5). Same shared file — the exact one
@@ -51,10 +58,10 @@ function desktopEmptyBundle(){
 // already sits at (dropboxTransport.js's own note).
 async function desktopConnect(){
   const bridge = desktopBridge();
-  if (!bridge) throw new Error("Dropbox sync is only available in the installed app");
+  if (!bridge) throw new Error("err.sync.wrapperOnly");
   let folder = await bridge.detectDropboxFolder();
   if (!folder) folder = await bridge.pickFolder();
-  if (!folder) throw new Error("No folder was chosen");
+  if (!folder) throw new Error("err.sync.noFolderChosen");
   Storage.set(DESKTOP_SYNC_FOLDER_KEY, folder);
   Sync.setConnected(true);
 }
@@ -72,7 +79,7 @@ async function desktopDisconnect(){
 // the check is a re-read of that timestamp immediately before writing.
 async function desktopSyncNow(){
   const bridge = desktopBridge();
-  if (!bridge) throw new Error("Dropbox sync is only available in the installed app");
+  if (!bridge) throw new Error("err.sync.wrapperOnly");
   // ⚑ SELF-HEAL (W7). A device that believes it is connected but has lost its
   // folder path used to be stuck for good: every sync threw here, and the only
   // way out was noticing the message and manually disconnecting/reconnecting.
@@ -87,7 +94,7 @@ async function desktopSyncNow(){
     folder = await bridge.detectDropboxFolder();
     if (folder) Storage.set(DESKTOP_SYNC_FOLDER_KEY, folder);
   }
-  if (!folder) throw new Error("No Dropbox folder connected");
+  if (!folder) throw new Error("err.sync.noFolder");
   // Re-arm the freshness watch on every attempt -- idempotent in main.js if
   // already watching this folder, and this is also what re-arms it after a
   // brand-new folder's very first sync just created the directory the watch
@@ -116,7 +123,7 @@ async function desktopSyncNow(){
     await bridge.writeSyncFile(folder, JSON.stringify(result.bundle));
     return { conflicts: allConflicts };
   }
-  throw new Error("Dropbox sync: the file kept changing underneath this sync — try again shortly");
+  throw new Error("err.sync.fileKeptChanging");
 }
 
 const DesktopTransport = {

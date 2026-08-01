@@ -2518,7 +2518,7 @@ body.screen-open #tray-handle{ display:none; }
 (function(){
 "use strict";
 
-const BUILD_STAMP = "01 Aug 02:31";  // replaced by build.py
+const BUILD_STAMP = "01 Aug 02:44";  // replaced by build.py
 
 // =========================================================
 // STORAGE ADAPTER (spec.md §3, known issue 4)
@@ -3635,6 +3635,13 @@ const Sync = {
 };
 window.__oelaSync = Sync; // W5's hook, and this chunk's own test harness -- not a user-facing feature
 
+// ⚑ ERROR MESSAGES ARE i18n KEYS (author: "check that those sync reports have
+// translations as well"). The sync status line surfaces the reason a sync
+// failed, and these were raw English -- so a Chinese build read
+// "同步失败 — No Dropbox folder connected". app.js runs the message through
+// t(), which RETURNS THE KEY when it misses, so an authored reason gets
+// translated and anything foreign (Dropbox's own API errors, the native auth
+// plugin) still falls through verbatim rather than being swallowed.
 // =========================================================
 // DROPBOX TRANSPORT (W5, wrapper-plan.md §4.1/§4.4/§5) — the one place in
 // the app that knows Dropbox exists. sync.js (W4) is pure and
@@ -3697,7 +3704,7 @@ async function dropboxIsAuthorized(){
 // yet to protect until a syncNow() actually runs.
 async function dropboxConnect(){
   const plugin = dropboxPlugin();
-  if (!plugin) throw new Error("Dropbox sync is only available in the installed app");
+  if (!plugin) throw new Error("err.sync.wrapperOnly");
   await plugin.authorize();
   Sync.setConnected(true);
 }
@@ -3710,7 +3717,7 @@ async function dropboxDisconnect(){
 
 async function dropboxAccessToken(){
   const plugin = dropboxPlugin();
-  if (!plugin) throw new Error("Dropbox sync is only available in the installed app");
+  if (!plugin) throw new Error("err.sync.wrapperOnly");
   const res = await plugin.getAccessToken(); // refreshes silently if the stored token has expired (native side, AuthState.performActionWithFreshTokens)
   return res.accessToken;
 }
@@ -3743,9 +3750,9 @@ async function dropboxDownload(token){
     const errBody = await resp.json().catch(function(){ return null; });
     const tag = errBody && errBody.error && errBody.error.path && errBody.error.path[".tag"];
     if (tag === "not_found") return { exists: false, rev: null, bundle: null };
-    throw new Error("Dropbox download failed: " + (errBody ? JSON.stringify(errBody) : resp.status));
+    throw new Error("err.sync.downloadFailed");
   }
-  if (!resp.ok) throw new Error("Dropbox download failed: HTTP " + resp.status);
+  if (!resp.ok) throw new Error("err.sync.downloadFailed");
   const resultHeader = resp.headers.get("Dropbox-API-Result");
   const meta = resultHeader ? JSON.parse(resultHeader) : null;
   const bundle = await resp.json();
@@ -3770,7 +3777,7 @@ async function dropboxUpload(token, bundle, mode){
     body: JSON.stringify(bundle)
   });
   if (resp.status === 409) return { conflict: true };
-  if (!resp.ok) throw new Error("Dropbox upload failed: HTTP " + resp.status);
+  if (!resp.ok) throw new Error("err.sync.uploadFailed");
   const meta = await resp.json();
   return { conflict: false, rev: meta.rev };
 }
@@ -3779,7 +3786,7 @@ async function dropboxUpload(token, bundle, mode){
 // the push under CAS if another device wrote in between. Returns the
 // conflicts W4 found so the UI can honor §1's "never silent" ruling.
 async function dropboxSyncNow(){
-  if (!dropboxIsAvailable()) throw new Error("Dropbox sync is only available in the installed app");
+  if (!dropboxIsAvailable()) throw new Error("err.sync.wrapperOnly");
   const token = await dropboxAccessToken();
   let allConflicts = [];
   for (let attempt = 0; attempt < DROPBOX_MAX_CAS_RETRIES; attempt++){
@@ -3808,7 +3815,7 @@ async function dropboxSyncNow(){
     // run again against it -- merging is idempotent against already-merged
     // data, nothing gets double-applied.
   }
-  throw new Error("Dropbox sync: too many conflicting writes in a row — try again shortly");
+  throw new Error("err.sync.tooManyWrites");
 }
 
 const DropboxTransport = {
@@ -3820,6 +3827,13 @@ const DropboxTransport = {
 };
 window.__oelaDropbox = DropboxTransport; // parallels window.__oelaSync — the UI's hook (task 5) and this chunk's own future test harness
 
+// ⚑ ERROR MESSAGES ARE i18n KEYS (author: "check that those sync reports have
+// translations as well"). The sync status line surfaces the reason a sync
+// failed, and these were raw English -- so a Chinese build read
+// "同步失败 — No Dropbox folder connected". app.js runs the message through
+// t(), which RETURNS THE KEY when it misses, so an authored reason gets
+// translated and anything foreign (Dropbox's own API errors, the native auth
+// plugin) still falls through verbatim rather than being swallowed.
 // =========================================================
 // DESKTOP TRANSPORT (W6, wrapper-plan.md) — the fs-based sibling to
 // dropboxTransport.js (W5). Same shared file — the exact one
@@ -3873,10 +3887,10 @@ function desktopEmptyBundle(){
 // already sits at (dropboxTransport.js's own note).
 async function desktopConnect(){
   const bridge = desktopBridge();
-  if (!bridge) throw new Error("Dropbox sync is only available in the installed app");
+  if (!bridge) throw new Error("err.sync.wrapperOnly");
   let folder = await bridge.detectDropboxFolder();
   if (!folder) folder = await bridge.pickFolder();
-  if (!folder) throw new Error("No folder was chosen");
+  if (!folder) throw new Error("err.sync.noFolderChosen");
   Storage.set(DESKTOP_SYNC_FOLDER_KEY, folder);
   Sync.setConnected(true);
 }
@@ -3894,7 +3908,7 @@ async function desktopDisconnect(){
 // the check is a re-read of that timestamp immediately before writing.
 async function desktopSyncNow(){
   const bridge = desktopBridge();
-  if (!bridge) throw new Error("Dropbox sync is only available in the installed app");
+  if (!bridge) throw new Error("err.sync.wrapperOnly");
   // ⚑ SELF-HEAL (W7). A device that believes it is connected but has lost its
   // folder path used to be stuck for good: every sync threw here, and the only
   // way out was noticing the message and manually disconnecting/reconnecting.
@@ -3909,7 +3923,7 @@ async function desktopSyncNow(){
     folder = await bridge.detectDropboxFolder();
     if (folder) Storage.set(DESKTOP_SYNC_FOLDER_KEY, folder);
   }
-  if (!folder) throw new Error("No Dropbox folder connected");
+  if (!folder) throw new Error("err.sync.noFolder");
   // Re-arm the freshness watch on every attempt -- idempotent in main.js if
   // already watching this folder, and this is also what re-arms it after a
   // brand-new folder's very first sync just created the directory the watch
@@ -3938,7 +3952,7 @@ async function desktopSyncNow(){
     await bridge.writeSyncFile(folder, JSON.stringify(result.bundle));
     return { conflicts: allConflicts };
   }
-  throw new Error("Dropbox sync: the file kept changing underneath this sync — try again shortly");
+  throw new Error("err.sync.fileKeptChanging");
 }
 
 const DesktopTransport = {
@@ -4843,6 +4857,15 @@ const STRINGS = {
   // native-speaker review like the tutorial/info-button copy got — flagged
   // rather than presented as equally vetted. "Dropbox" itself stays
   // untranslated, same treatment as "OELA". ----
+  // Sync failure reasons. Thrown as KEYS by the transports so the status line
+  // can translate them; see the header comment in dropboxTransport.js.
+  "err.sync.wrapperOnly":     { en: "Sync is only available in the installed app", "zh-Hans": "同步仅在已安装的应用中可用" },
+  "err.sync.noFolder":        { en: "No Dropbox folder connected",     "zh-Hans": "未连接 Dropbox 文件夹" },
+  "err.sync.noFolderChosen":  { en: "No folder was chosen",            "zh-Hans": "未选择文件夹" },
+  "err.sync.fileKeptChanging":{ en: "The sync file kept changing — try again shortly", "zh-Hans": "同步文件一直在变动——请稍后重试" },
+  "err.sync.tooManyWrites":   { en: "Too many conflicting writes in a row — try again shortly", "zh-Hans": "连续出现过多写入冲突——请稍后重试" },
+  "err.sync.downloadFailed":  { en: "Couldn’t read the sync file from Dropbox", "zh-Hans": "无法从 Dropbox 读取同步文件" },
+  "err.sync.uploadFailed":    { en: "Couldn’t write the sync file to Dropbox",  "zh-Hans": "无法向 Dropbox 写入同步文件" },
   "sync.connect":            { en: "Connect Dropbox",                "zh-Hans": "连接 Dropbox" },
   "sync.disconnect":         { en: "Disconnect",                     "zh-Hans": "断开连接" },
   "sync.now":                { en: "Sync now",                       "zh-Hans": "立即同步" },
@@ -12347,7 +12370,12 @@ function injectChunkMap(){
     }
     const eventRows = targets.events.map(function(ev){
       const d = dateStrToDate(effDate(ev, ev.date));
-      return itemBtn(ev.id, "event", ev.title || t("cal.untitledEvent"),
+      // project.untitled, not an invented cal.untitledEvent: that key does not
+      // exist, and t() returns the KEY when it misses -- so an unnamed event
+      // would have rendered the literal string "cal.untitledEvent" in the
+      // picker, in both languages. project.untitled is what the linked-notes
+      // list already uses for exactly this.
+      return itemBtn(ev.id, "event", ev.title || t("project.untitled"),
                      d.toLocaleDateString(undefined, { month: "short", day: "numeric" }));
     });
     const nextRows = targets.actions.filter(function(a){ return a.kind === "next"; })
@@ -17100,7 +17128,10 @@ function injectChunkMap(){
     // not say WHY is a dead end rather than a hint. Truncated, because these
     // strings come from Dropbox and can run long.
     if (state.sync.lastError){
-      const why = String(state.sync.lastError).trim();
+      // Through t(): an authored reason (err.sync.*) is translated, and any
+      // other message -- Dropbox's own, or the native plugin's -- falls through
+      // unchanged, because t() returns the key it was given when it misses.
+      const why = t(String(state.sync.lastError).trim());
       return t("sync.error") + (why ? " — " + (why.length > 90 ? why.slice(0, 89) + "…" : why) : "");
     }
     const at = dropboxLastSyncAt();
