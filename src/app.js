@@ -520,6 +520,7 @@
     if (kind === "next") pushBackPromotedDependents(task);
     if (kind === "current" || kind === "future"){
       restoreArchivedWaitingForProject(taskId); // renders "waiting" itself
+      restoreEventsForProject(taskId);          // and this one renders next + waiting
     }
   }
   // §10's RULING, built here for the first time — the spec closed the question
@@ -571,6 +572,16 @@
     if (kind === "current" || kind === "future"){
       const archived = loadArchivedWaiting();
       if (archived[taskId]){ delete archived[taskId]; saveArchivedWaiting(archived); }
+      // ⚑ The events too (2026-08-01). Chunk 7 taught completion to archive
+      // linked events but never taught either of the two places that already
+      // handle archived WAITING items about them — this is the second of the
+      // pair (restoreTask is the first). Without it, deleting a completed
+      // project for good stranded its events in gtd_archived_events forever:
+      // unreachable, unrestorable, and still syncing between devices. Same
+      // reasoning as the waiting items directly above — once the project is
+      // deleted there is nothing left to reopen against.
+      const archivedEv = loadArchivedEvents();
+      if (archivedEv[taskId]){ delete archivedEv[taskId]; saveArchivedEvents(archivedEv); }
     }
     if (!skipRender) renderLane(kind);
   }
@@ -1954,18 +1965,51 @@
     saveEvents();
     return linked.length;
   }
-  // The mirror, ready for the un-complete control the same way
-  // restoreWaitingForProject is. Not wired to a button yet.
+  // The mirror of archiveEventsForProject, and as of the author's 2026-08-01
+  // ruling it is WIRED: "does the fat finger protection extend to projects and
+  // their linked actions? The answer is yes."
+  //
+  // It sat here defined-and-uncalled from the day chunk 7 archived events, so
+  // completing a project took its calendar entries down and un-completing left
+  // them down — the archive was a one-way door for exactly the mistake the
+  // archive exists to undo. Chunk A then made the map SYNC, which fixed the
+  // half that crosses devices and left the local half still broken.
+  //
+  // ⚠ THE ORDER OF THE TWO SAVES IS THE PROTECTION, not housekeeping, and it is
+  // why this now matches restoreArchivedWaitingForProject line for line: the
+  // live events are written FIRST and the archive copy dropped only after. The
+  // other order leaves an instant in which neither store holds them, and the
+  // one thing this function exists to prevent is a linked event disappearing.
   function restoreEventsForProject(projectId){
     const archived = loadArchivedEvents();
     const rows = archived[projectId];
     if (!rows || !rows.length) return 0;
-    state.events = (state.events || []).concat(rows.map(function(ev){ return Object.assign({}, ev); }));
+    const restored = rows.map(function(ev){
+      const copy = Object.assign({}, ev);
+      // Same emergency-restore rule the waiting items get: the project itself
+      // is live again by now (restoreTask unshifts it before calling this), so
+      // linkedProjectId resolves — but a context can have died while the event
+      // sat archived, and a pseudo-action pointing at one that no longer
+      // exists has nowhere to land.
+      if (copy.contextId && !findContext(copy.contextId)) copy.contextId = null;
+      return copy;
+    });
+    state.events = (state.events || []).concat(restored);
+    // ⚑ Each restored event is ABSENT from the previous gtd_events array, so
+    // storage.js's stampAndTombstone treats it as new and stamps modifiedAt =
+    // now with this device's id (the same treatment the waiting items get from
+    // their own save). That is what makes the restore survive: archiving wrote
+    // a tombstone, and a record coming back with a timestamp OLDER than its own
+    // deletion is one the next merge would dutifully delete again.
+    saveEvents();
     delete archived[projectId];
     saveArchivedEvents(archived);
-    saveEvents();
     processEventBoundaries();
-    return rows.length;
+    // The archive took the live rows with it (removePseudoRow), so putting the
+    // events back has to put those rows back on screen too — completeProject
+    // re-renders both lanes for the same reason.
+    renderLane("next"); renderLane("waiting");
+    return restored.length;
   }
   // Restores a project's archived Waiting actions back into the live
   // Waiting list. Not wired to any button yet — the un-complete-project
