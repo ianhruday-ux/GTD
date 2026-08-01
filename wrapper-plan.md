@@ -1167,11 +1167,26 @@ was the *habit* half, and that shipped this round (commits `373e562`, `d888cc8`)
 39 new checks in `checks/sync_w7_assertions.py`, 16 of which fail on the pre-change build. All 54
 existing suites pass.
 
-**Still open, and it is §11 below verbatim:** the export/import half. The author has ruled that a
-restore propagates — option (a) — but the builder's floor question is unanswered: whether (b)'s "never
-import sync identity" (device id, baseline, connection state) is included, which it must be for the
-roster and tombstone GC to survive a restore-onto-a-new-machine. Nothing in this round touched
-`importAllData`.
+**§11 is now RULED AND BUILT** (commit `d1ad13e`). The author took (a) *and* (b): a restore
+propagates outward, and identity is never restored. §11 below is kept as written for the reasoning;
+the resolution is:
+
+- Export omits sync bookkeeping and import refuses it — `gtd_device_id`, `gtd_sync_baseline`,
+  `gtd_sync_connected`, `gtd_tombstones`, `gtd_sync_roster`. Baseline/tombstones/roster are
+  **cleared**, not merely refused, so the device rejoins additive-only and a restore infers no
+  deletions from what the backup lacks.
+- Restored records are stamped `modifiedAt = now` and attributed to the restoring device, so they
+  beat a later deletion elsewhere; the resurrection is reported.
+- Two things found while testing it: a lane the backup doesn't mention is restored **empty** rather
+  than left absent (otherwise `initLocalData` re-seeds every lane over the restore on the next
+  boot), and the additive rejoin path now reports resurrections instead of returning before the
+  tombstone check.
+
+17 checks in `checks/restore_x_sync.py`, 11 failing pre-change.
+
+**What remains of W7:** items 2 and 3 — the author's own desktop pass, and the packaging (a
+sideloadable APK and an unsigned desktop build, plus the plain-language install notes). The in-app
+chunk map and QA checklist are still due when W7 actually ships, per §7's note above.
 
 ---
 
