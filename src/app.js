@@ -1779,7 +1779,15 @@
     state.tasks[sourceKind] = list.filter(function(t){ return t.id !== taskId && t.parent !== taskId; });
     root.parent = null;
     root.linkedProjectId = root.isGroup ? null : root.linkedProjectId;
-    root.deadline = root.isGroup ? null : (root.deadline || null);
+    // ⚑ A DATED THING DOES NOT WAIT (§4.13a, author: "deadlines can't live in the
+    // waiting lane"). Every other route into Waiting already honours this — the
+    // page has no deadline field, saveScreen nulls it, and the convert button is
+    // inert while a date is set — but this one did not. MOVE_MAP only ever
+    // promotes, so the single next→waiting caller is pushBackPromotedDependents:
+    // complete a Next Action, give the dependent it promoted a deadline, then
+    // undo the completion inside the window, and the item went back to Waiting
+    // still carrying the date. Narrow, but it is the only hole left in the rule.
+    root.deadline = (root.isGroup || destKind === "waiting") ? null : (root.deadline || null);
     root.whenText = null;
     root.conditionId = null;
     root.conditionKind = null;
@@ -2068,20 +2076,32 @@
   // links at all, and the user chooses unlink or delete. An unlinked event keeps
   // firing as an ordinary calendar entry, exactly as an unlinked action stays in
   // its lane — the meeting may still be real even if the project is parked.
-  function demoteProjectToFuture(projectId){
+  //
+  // ⚑ SPLIT IN TWO (author, 2026-08-01: "the warning dialogue about actions and
+  // projects should get moved to the make future button instead of the save
+  // button"). askDemoteChoice runs at the TAP, because that is when the decision
+  // is made; applyDemoteChoice runs at Save. In between, the answer sits on the
+  // draft as an enum — which is the whole reason this is worth thirty lines
+  // rather than fifteen. Acting on Delete at the tap and then leaving with ✕
+  // would discard the conversion while the project's actions and events were
+  // already gone: an unchanged Current project silently emptied. DRAFT ISOLATION
+  // names that case in as many words ("including side effects on *other*
+  // items"), and it is worse than the 🗑 exception it would have leaned on — 🗑
+  // destroys the thing you are looking at, deliberately, behind its own confirm.
+  //
+  // Staging is also MORE CORRECT than acting at the tap: the linked set is
+  // recomputed at Save, so an action added or promoted while the page sat open
+  // is included. The dialog may therefore have said "2 actions" and Save act on
+  // 3; the unlink-or-delete choice still applies, and the alternative is a
+  // stale by-value snapshot — the §9 zombie trap applyProjectStaging already
+  // resolves by id.
+  function askDemoteChoice(projectId, done){
     const linked = linkedActionsForProject(projectId);
     const linkedEvents = (state.events || []).filter(function(ev){ return ev.linkedProjectId === projectId; });
-    if (!linked.length && !linkedEvents.length){
-      changeKind("current", "future", projectId).then(function(){ if (state.screen) closeScreen(); });
-      return;
-    }
-    function unlinkEvents(){
-      linkedEvents.forEach(function(ev){ ev.linkedProjectId = null; });
-      if (linkedEvents.length){ saveEvents(); renderLane("next"); }
-    }
-    function deleteEvents(){
-      linkedEvents.forEach(function(ev){ deleteEventEntirely(ev); });
-    }
+    // Nothing to warn about: swap the page straight away. Save still recomputes,
+    // and applyDemoteChoice's null-choice default covers anything that arrives
+    // in the meantime.
+    if (!linked.length && !linkedEvents.length){ done("unlink"); return; }
     const nouns = [];
     if (linked.length) nouns.push(t("confirm.nounActions"));
     if (linkedEvents.length) nouns.push(t("confirm.nounCalendarEntries"));
@@ -2103,22 +2123,36 @@
     const keeps = noteCount
       ? (noteCount === 1 ? t("confirm.notesKeptOne") : t("confirm.notesKeptMany").replace("{n}", noteCount))
       : "";
+    // ⚑ Each branch only ANSWERS. It must not call changeKind or closeScreen any
+    // more: the page swap and Save own those now.
     openConfirmDialog(
       t("confirm.somedayCantHold").replace("{what}", what) + keeps,
       [
-        { label: t("confirm.unlink"), style: "primary", action: function(){
-            linked.forEach(function(l){ setLink(l.kind, l.task.id, null); });
-            unlinkEvents();
-            changeKind("current", "future", projectId).then(function(){ if (state.screen) closeScreen(); });
-          } },
-        { label: t("chrome.delete"), style: "danger", action: function(){
-            linked.forEach(function(l){ deleteTask(l.kind, l.task.id); });
-            deleteEvents();
-            changeKind("current", "future", projectId).then(function(){ if (state.screen) closeScreen(); });
-          } },
-        { label: t("chrome.cancel"), action: function(){} }
+        { label: t("confirm.unlink"), style: "primary", action: function(){ done("unlink"); } },
+        { label: t("chrome.delete"), style: "danger", action: function(){ done("delete"); } },
+        { label: t("chrome.cancel"), action: function(){ done(null); } }
       ]
     );
+  }
+  // The APPLY half, run in the save path immediately before changeKind. The
+  // linked set is recomputed HERE, by project id — never the snapshot the
+  // dialog counted.
+  //
+  // A null choice means the dialog never ran (nothing was linked at the tap).
+  // Anything that arrived since is UNLINKED, never deleted: the Someday
+  // invariant has to hold either way, and destroying items nobody was asked
+  // about is not a defensible default.
+  function applyDemoteChoice(projectId, choice){
+    const linked = linkedActionsForProject(projectId);
+    const linkedEvents = (state.events || []).filter(function(ev){ return ev.linkedProjectId === projectId; });
+    if (choice === "delete"){
+      linked.forEach(function(l){ deleteTask(l.kind, l.task.id); });
+      linkedEvents.forEach(function(ev){ deleteEventEntirely(ev); });
+      return;
+    }
+    linked.forEach(function(l){ setLink(l.kind, l.task.id, null); });
+    linkedEvents.forEach(function(ev){ ev.linkedProjectId = null; });
+    if (linkedEvents.length){ saveEvents(); renderLane("next"); }
   }
 
   // =========================================================
@@ -2851,6 +2885,40 @@
   //    habitTrackHtml() and the habitRuns engine above.
   // =========================================================
   function isProjectKind(k){ return k === "current" || k === "future"; }
+  // THE PAGE SWAP (author, 2026-08-01: "I like option 1"). Arming a convert
+  // re-renders the page AS the destination kind, with the destination's fields;
+  // ✕ still discards; Save validates as the destination and only then moves the
+  // item. It used to work this way, lost it to draft isolation, and the loss was
+  // not followed through: Next → Waiting kept neither whenText nor conditionId
+  // (a Next Action is forbidden both by §4.2), so the convert minted a Waiting
+  // row with nothing to wait ON -- a state the Waiting page's own save gate
+  // refuses, and which isWaitingOrphaned did not report either. The swap makes
+  // it unreachable again: you supply the condition on the page before saving.
+  //
+  // The reason the old behaviour was rejected no longer holds -- that was
+  // before projects had staging. A draft can hold a pending structural change
+  // safely now (draft.staged does it for creates, links, detaches and deletes),
+  // so a pending KIND is the same kind of promise.
+  //
+  // ⚑ s.kind is NOT touched. It is where the item still LIVES, and Save needs it
+  // to know which lane to move out of, which lane to updateTask against, and
+  // what to delete. Render paths ask viewKind; storage paths ask s.kind. Mixing
+  // the two is the only real hazard in this design.
+  function viewKind(s){
+    if (!s) return null;
+    // Page types that are not the action/project template at all: their kind is
+    // structural, and none of them carry a convert.
+    if (s.completedView || s.eventView || s.noteView || s.tagsView) return s.kind;
+    return (s.draft && s.draft.convertTo) || s.kind;
+  }
+  // The other half of the pair -- for next↔waiting and current↔future, the kind
+  // this page's single convert button points AT. On a swapped page that is the
+  // origin, which is why the destination's own outgoing button doubles as the
+  // "undo the conversion" control without any special case.
+  function convertPartnerOf(kind){
+    return kind === "next" ? "waiting" : kind === "waiting" ? "next"
+         : kind === "current" ? "future" : kind === "future" ? "current" : null;
+  }
 
   function openScreen(kind, taskId, prefill){
     let draft;
@@ -2885,7 +2953,14 @@
       if (!task) return;
       draft = { title: task.title, notesClean: task.notesClean || "", linkedProjectId: task.linkedProjectId || null, deadline: getDeadline(task), bundleText: task.bundleText || "" };
       if (isActionKind(kind)) draft.contextId = task.contextId || null;
-      if (kind === "waiting"){
+      // ⚑ Both action kinds, not just Waiting (THE PAGE SWAP): a Next Action
+      // converting to Waiting renders the "waiting for" row on the spot, and it
+      // needs somewhere to put the answer. Priming these lazily at arm time
+      // would work but would change the draft's SHAPE mid-page, which the
+      // discard-warning fingerprint reads as an edit that arming-then-disarming
+      // could never undo. A Next Action's stored record has neither field, so
+      // they read back empty and saveScreen drops them by destination kind.
+      if (isActionKind(kind)){
         draft.whenText = task.whenText || "";
         draft.conditionId = task.conditionId || null;
         draft.conditionKind = task.conditionKind || null;
@@ -2895,7 +2970,7 @@
     } else {
       draft = { title: "", notesClean: "", linkedProjectId: null, deadline: null, bundleText: "" };
       if (isActionKind(kind)) draft.contextId = (prefill && prefill.contextId) || null;
-      if (kind === "waiting"){
+      if (isActionKind(kind)){
         draft.whenText = ""; draft.conditionId = null; draft.conditionKind = null; draft.conditionLabel = null; draft.conditionPicker = false;
       }
     }
@@ -3497,6 +3572,16 @@
     if (s.tagsView){ saveTagsScreen(s); return; } // chunk 6 (§4.9b)
     if (s.noteView){ saveNoteScreen(s); return; } // chunk 6 (§4.9)
     if (s.eventView){ saveEventScreen(s); return; } // chunk 7 (§4.15a)
+    // THE PAGE SWAP: with a convert armed the page IS the destination kind, so
+    // Save validates and shapes the record as the destination. That is the whole
+    // point of the swap — Next → Waiting with nothing to wait on is now blocked
+    // with the dashed outline, on a page that has the field to fix it in,
+    // instead of silently landing condition-less in the Waiting lane.
+    // s.kind remains the lane the item is being moved OUT of, which is what
+    // updateTask, deleteTask and changeKind all still read.
+    // Complete wins if both somehow armed — the UI's mutual exclusion prevents
+    // it, and the convert site below carries the same defensive precedence.
+    const effKind = s.draft.willComplete ? s.kind : viewKind(s);
     let title = (s.draft.title || "").trim();
     if (!title){
       if (!s.taskId){ closeScreen(); return; } // silent discard on create
@@ -3509,7 +3594,11 @@
     // Frozen hookedLabel/condition labels make duplicate titles ambiguous,
     // and the Tidy sort wants unambiguous keys — overdue independently.
     // Same dashed-outline pattern as the other save-time validations.
-    const dupe = state.tasks[s.kind].some(function(t){
+    // ⚑ effKind: the rule is per-LANE, so a convert must be checked against the
+    // lane it is landing in, not the one it is leaving. (Behaviour change,
+    // flagged: converting onto a title that already exists in the destination
+    // lane is now blocked where it used to go through and make a duplicate.)
+    const dupe = state.tasks[effKind].some(function(t){
       return !t.isGroup && t.id !== s.taskId && (t.title || "").trim().toLowerCase() === title.toLowerCase();
     });
     if (dupe){
@@ -3639,7 +3728,10 @@
       return;
     }
 
-    if (s.kind === "waiting"){
+    // ⚑ effKind, not s.kind: a Next Action with "Make Waiting" armed is saved
+    // through this gate, which is what makes the condition mandatory before the
+    // conversion can happen at all.
+    if (effKind === "waiting"){
       const d = s.draft;
       // Enforce mutual exclusivity at save time (§4.2 -- text vs. hook; the
       // date option is gone as of chunk 3, §4.13a). A hooked condition wins
@@ -3660,12 +3752,17 @@
 
     const data = {
       title: title, notesClean: s.draft.notesClean, linkedProjectId: s.draft.linkedProjectId, deadline: s.draft.deadline,
-      whenText: s.kind === "waiting" ? ((s.draft.whenText || "").trim() || null) : null,
-      conditionId: s.kind === "waiting" ? s.draft.conditionId : null,
-      conditionKind: s.kind === "waiting" ? s.draft.conditionKind : null,
-      conditionLabel: s.kind === "waiting" ? s.draft.conditionLabel : null,
-      bundleText: (s.kind === "next" || s.kind === "waiting") ? ((s.draft.bundleText || "").trim() || null) : null,
-      contextId: isActionKind(s.kind) ? (s.draft.contextId || null) : null,
+      // ⚑ effKind throughout: the record is shaped for where it is GOING. The
+      // condition collected on a swapped-to-Waiting page is written onto the
+      // still-in-Next record here, and changeKind (which keeps whenText and the
+      // condition when the destination is Waiting) carries it across a moment
+      // later. Shaping by s.kind instead is exactly how the old convert lost it.
+      whenText: effKind === "waiting" ? ((s.draft.whenText || "").trim() || null) : null,
+      conditionId: effKind === "waiting" ? s.draft.conditionId : null,
+      conditionKind: effKind === "waiting" ? s.draft.conditionKind : null,
+      conditionLabel: effKind === "waiting" ? s.draft.conditionLabel : null,
+      bundleText: isActionKind(effKind) ? ((s.draft.bundleText || "").trim() || null) : null,
+      contextId: isActionKind(effKind) ? (s.draft.contextId || null) : null,
       // The list this was drafted into, if it was opened from a list's +
       // (user). Only meaningful on a create; an edit never moves an item
       // between lists from here, so it is read off the draft rather than
@@ -3705,14 +3802,10 @@
       } else if (convertTo){
         // Convert AFTER the edits above landed — same ordering rule as
         // Complete, so a rename made in this draft is what appears in the
-        // new lane. demoteProjectToFuture owns its own linked-actions
-        // prompt (a real confirmation about mutating OTHER items, distinct
-        // from the "are you sure you want to convert" dialog this chunk
-        // deliberately skips) and closes the screen itself once the user
-        // picks Unlink/Delete; Cancel there simply leaves this page open
-        // with Convert still armed, same as any other unresolved draft.
-        if (convertTo === "future" && kind === "current") demoteProjectToFuture(taskId);
-        else changeKind(kind, convertTo, taskId).then(closeScreen);
+        // new lane. No dialog can fire from here any more: the only one
+        // convert ever had (the Someday-can't-hold-this warning) now fires
+        // at the tap and arrives here as a staged choice.
+        commitConvert(s, kind, convertTo, taskId);
       } else {
         closeScreen();
       }
@@ -3790,10 +3883,10 @@
       }
       applyProjectStaging(s);
       if (willComplete && s.taskId){ completeProject(s.kind, s.taskId); closeScreen(); return; }
-      if (convertTo){
-        if (convertTo === "future" && s.kind === "current"){ demoteProjectToFuture(s.taskId); return; }
-        changeKind(s.kind, convertTo, s.taskId).then(closeScreen); return;
-      }
+      // ⚑ AFTER applyProjectStaging, deliberately: the demote's linked set is
+      // recomputed inside commitConvert, so an action staged onto this project
+      // in the same draft is included in the unlink-or-delete the user chose.
+      if (convertTo){ commitConvert(s, s.kind, convertTo, s.taskId); return; }
       consumeCaptureForScreen(s); // §4.8b: a capture sorted to Project is now filed
       closeScreen();
     }
@@ -3911,12 +4004,28 @@
   // AFTER the field edits land, so a rename made in this draft survives
   // into the new lane; ✕ discards it like any other draft field. No "are
   // you sure" dialog — nothing escapes the page until Save.
+  //
+  // THE PAGE SWAP (author, 2026-08-01): arming also re-renders the page as the
+  // destination kind (see viewKind). Nothing else about the contract moves —
+  // still draft-only, still applied at Save, still discarded by ✕.
   function screenMakeKind(destKind){
     const s = state.screen;
     if (!s || !s.taskId) return;
     // Completed page: convert buttons are greyed + inert (§12.2 step 5) —
     // restore first. Backstop for the disabled rendering.
     if (s.completedView) return;
+    // DISARM FIRST, before any guard below. On a swapped page this button is
+    // the only way BACK, so nothing may be allowed to strand the user on the
+    // destination — and none of the arming guards make sense for an undo.
+    if (s.draft.convertTo === destKind){
+      s.draft.convertTo = null;
+      // Author: "I'm fine with throwing up the dialogue again if the user swaps
+      // back and forth." A minute-old answer to a question about OTHER items is
+      // not consent for a conversion you re-armed after changing your mind.
+      s.draft.demoteChoice = null;
+      renderScreen();
+      return;
+    }
     // MUTUAL EXCLUSION (user ruling): an armed Complete disables the
     // convert buttons — disarm Complete first. Mirror of the guard in
     // screenComplete.
@@ -3924,8 +4033,30 @@
     // §4.13a (chunk 3): "Make Waiting" is inert while a deadline is set --
     // backstop for the greyed button (which has no disabled attribute).
     if (destKind === "waiting" && s.draft.deadline && s.draft.deadline.date) return;
-    s.draft.convertTo = (s.draft.convertTo === destKind) ? null : destKind;
+    // Author's ruling: the Someday-can't-hold-this warning moves off Save and
+    // onto THIS TAP, "because that is when the decision is made". Its answer is
+    // STAGED, not acted on — see askDemoteChoice.
+    if (destKind === "future" && s.kind === "current"){
+      askDemoteChoice(s.taskId, function(choice){
+        if (!choice) return; // Cancel: the convert stays unarmed, no page swap
+        s.draft.demoteChoice = choice;
+        s.draft.convertTo = destKind;
+        renderScreen();
+      });
+      return;
+    }
+    s.draft.convertTo = destKind;
     renderScreen();
+  }
+  // The committer both save paths share. Nothing here ASKS anything — the only
+  // dialog convert has left fires at the tap (askDemoteChoice) and arrives here
+  // as draft.demoteChoice. Runs after the page's own edits have landed, so a
+  // rename made in this draft is what appears in the new lane.
+  function commitConvert(s, fromKind, toKind, taskId){
+    if (toKind === "future" && fromKind === "current"){
+      applyDemoteChoice(taskId, s.draft.demoteChoice || null);
+    }
+    return changeKind(fromKind, toKind, taskId).then(closeScreen);
   }
   // Full drafting page for a project-linked action (the ✎ next to each
   // quick-add row). Opened as a child screen: saving, cancelling, or
@@ -4880,7 +5011,9 @@
     const showDelete = !!s.taskId && !openedAsProjectMember(s);
     // Event pages read "Appointment" once a time is set (§4.14 — the time is
     // the only thing that distinguishes the two; they are not separate types).
-    const badge = s.eventView ? (s.draft && s.draft.time ? t("badge.appointment") : t("badge.event")) : KIND_BADGE_LABEL[s.kind];
+    // ⚑ viewKind, not s.kind: with a convert armed the page IS the destination
+    // (the page swap), and the badge is the loudest thing that says so.
+    const badge = s.eventView ? (s.draft && s.draft.time ? t("badge.appointment") : t("badge.event")) : KIND_BADGE_LABEL[viewKind(s)];
     // ▲ DESKTOP (ruling 4): ← and 🗑 move OUT of the header and into the card's
     // footer as "Done" and "Delete". They are not rendered in both places —
     // exactly one element carries data-action="screen-save" in either mode, so
@@ -4949,6 +5082,22 @@
         'title="' + title + '" style="' + style + '">' + text +
       '</button>'
     );
+  }
+  // The drafting page's single convert button, under THE PAGE SWAP.
+  //
+  // Each call site names the partner of the kind IT renders (next→waiting,
+  // waiting→next, current→future, future→current). With a convert armed the
+  // page has already swapped, so the branch running is the destination's and
+  // its partner is where we came FROM -- but the button must stay pointed at
+  // the armed destination, or tapping it would arm a second conversion instead
+  // of undoing the first. So: armed ⇒ data-dest is draft.convertTo, and
+  // screenMakeKind reads that as "disarm". The label is ignored when armed
+  // (makeKindBtnHtml renders "✓ Converting to X on save" instead), which is why
+  // the destination branch's own wording never leaks through.
+  function screenConvertBtnHtml(s, partner, label, arrow, disabled, disabledTitle){
+    const armed = !!(s.draft && s.draft.convertTo);
+    return makeKindBtnHtml(armed ? s.draft.convertTo : partner, label, arrow, armed,
+      !armed && !!disabled, disabledTitle);
   }
   // Completed-item page chrome (§12.2 step 5): ← (back, no save) and 🗑, and
   // deliberately NO ✕ — with nothing editable, ← and ✕ would be one gesture.
@@ -5027,7 +5176,10 @@
     if (s.tagsView) return tagsPageBodyHtml(s); // chunk 6 (§4.9b)
     if (s.noteView) return noteBodyHtml(s); // chunk 6 (§4.9)
     if (s.eventView) return eventBodyHtml(s); // chunk 7 (§4.14/§4.15) — NOT the action template
-    const draft = s.draft, kind = s.kind;
+    // ⚑ THE PAGE SWAP: this whole function renders the kind the page is SHOWING,
+    // which is the armed convert's destination when there is one. s.kind is
+    // untouched underneath (see viewKind) and is what Save reads.
+    const draft = s.draft, kind = viewKind(s);
     // §12.1: lock the project link when this action is opened as a child of
     // the project it actually belongs to (membership, not provenance).
     const linkLocked = !!(s.staging && draft.linkedProjectId && draft.linkedProjectId === s.staging.projectId);
@@ -5079,7 +5231,7 @@
         // whenever a deadline is set -- converting would have to silently drop
         // the date. Complete-armed also disables it (existing mutual exclusion).
         const dated = !!(draft.deadline && draft.deadline.date);
-        convertHtml += makeKindBtnHtml("waiting", t("outcome.makeWaiting"), "right", draft.convertTo === "waiting",
+        convertHtml += screenConvertBtnHtml(s, "waiting", t("outcome.makeWaiting"), "right",
           !!draft.willComplete || dated,
           dated ? t("waiting.blockedByDeadline") : null);
       }
@@ -5093,7 +5245,7 @@
       fields += linkRowHtml(draft, linkLocked);
       fields += contextRowHtml(draft);
       fields += waitingForRowHtml(draft, s.invalidField === "waitingFor");
-      if (s.taskId) convertHtml += makeKindBtnHtml("next", t("outcome.makeNext"), "left", draft.convertTo === "next", !!draft.willComplete);
+      if (s.taskId) convertHtml += screenConvertBtnHtml(s, "next", t("outcome.makeNext"), "left", !!draft.willComplete);
       fields += advancedRowHtml(draft);
     } else if (isProjectKind(kind)){
       fields += '<textarea class="screen-field-desc" data-field="notesClean" placeholder="' + escapeHtml(t("field.description")) + '">' + escapeHtml(draft.notesClean) + '</textarea>';
@@ -5127,7 +5279,7 @@
           const showFlag = s.taskId ? !hasWay : (s.invalidField === "projectActions");
           if (showFlag) fields += '<div class="screen-project-flag">' + escapeHtml(t("project.noNextStepFlag")) + '</div>';
         }
-        if (s.taskId) convertHtml += makeKindBtnHtml("future", t("outcome.makeFuture"), "", draft.convertTo === "future", !!draft.willComplete);
+        if (s.taskId) convertHtml += screenConvertBtnHtml(s, "future", t("outcome.makeFuture"), "", !!draft.willComplete);
       } else {
         // ⚑ Future projects get LINKED NOTES (user: "it should be possible to
         // link notes to the future projects page"). Notes only, and no segmented
@@ -5139,7 +5291,7 @@
         // Future project) and the page simply never showed it.
         // Same notes interface as a Current project's Notes side, count badge and
         // all — deliberately WITHOUT the Actions/Notes segmented control, which is
-        // the one part that cannot carry over: demoteProjectToFuture exists
+        // the one part that cannot carry over: the demote warning exists
         // precisely because a Someday project may not hold linked actions, so a
         // toggle to that list would offer what the conversion just refused.
         {
@@ -5153,7 +5305,7 @@
             (fTotal ? ' <span class="seg-count">' + fTotal + '</span>' : "") + '</div>' +
             linkedNotesListHtml(s, fpid);
         }
-        if (s.taskId) convertHtml += makeKindBtnHtml("current", t("outcome.makeCurrent"), "", draft.convertTo === "current", !!draft.willComplete);
+        if (s.taskId) convertHtml += screenConvertBtnHtml(s, "current", t("outcome.makeCurrent"), "", !!draft.willComplete);
       }
     } else if (kind === "habit"){
       fields += '<textarea class="screen-field-desc" data-field="notesClean" placeholder="' + escapeHtml(t("habit.identityPlaceholder")) + '">' + escapeHtml(draft.notesClean) + '</textarea>';
@@ -5348,6 +5500,14 @@
       const scrollTop = oldBody ? oldBody.scrollTop : 0;
       const card = existing.querySelector(".screen-card") || existing;
       card.innerHTML = inner;
+      // ⚑ THE PAGE SWAP: arming a convert re-renders in place (the key holds
+      // s.kind, deliberately — a rebuild would replay the slide-in and throw
+      // away the scroll position for what is a change of fields, not of item).
+      // The lane accent and data-kind live on the OVERLAY, which the in-place
+      // branch never touched, so without this the page swapped its fields and
+      // kept the old lane's colour.
+      existing.setAttribute("data-kind", viewKind(s));
+      existing.style.setProperty("--lane-accent", "var(" + accentVarForKind(viewKind(s)) + ")");
       const newBody = existing.querySelector(".screen-body");
       if (newBody) newBody.scrollTop = scrollTop;
       autoGrowAll();
@@ -5363,7 +5523,7 @@
     // centered card and the overlay around it becomes the scrim. One DOM, two
     // stylesheets' worth of rules — a per-mode DOM would fork the in-place
     // re-render path and the habit runner mount, which is a bug farm.
-    root.innerHTML = '<div class="screen-overlay" data-kind="' + s.kind + '" data-screen-key="' + key + '" style="--lane-accent:var(' + accentVarForKind(s.kind) + ')">' +
+    root.innerHTML = '<div class="screen-overlay" data-kind="' + viewKind(s) + '" data-screen-key="' + key + '" style="--lane-accent:var(' + accentVarForKind(viewKind(s)) + ')">' +
       '<div class="screen-card">' + inner + '</div></div>';
     requestAnimationFrame(function(){
       const overlay = qs(".screen-overlay");
@@ -7589,7 +7749,19 @@
   // CHECKBOX shape + the Calendar chip + the "it moved" banner.
   // =========================================================
   function isWaitingOrphaned(task){
-    if (!task || !task.conditionId) return false;
+    if (!task) return false;
+    // ⚑ A Waiting action with NO condition at all is orphaned too. This used to
+    // return false for it — the function only ever caught a DANGLING condition —
+    // so a row waiting on nothing was invisible to the review while the review
+    // said "all clear". §4.2 makes the condition mandatory and the Waiting page's
+    // save gate enforces it, so this should be unreachable; the convert used to
+    // reach it anyway (see viewKind / THE PAGE SWAP, which closes that door).
+    // Kept as the safety net for any row already in that state, and for the next
+    // path that finds a way in.
+    // FLAG — behaviour change: previously-invisible rows start appearing in the
+    // review. That is the point, but it is a change.
+    if (!task.conditionId && !(task.whenText || "").trim()) return true;
+    if (!task.conditionId) return false;
     // Same fix as the cueBlock lookup in leafCardHtml: search both live
     // pools, not the one named by the (possibly stale) conditionKind.
     const live = state.tasks.next.concat(state.tasks.waiting)
@@ -7968,7 +8140,13 @@
     } else if (l.kind === "stalled"){
       bodyHtml += '<span class="review-card-note">⚠ ' + escapeHtml(t("review.noWayForward")) + '</span>';
     } else if (l.kind === "orphaned"){
-      bodyHtml += '<span class="review-card-note cue-orphaned-text">🪝 ' + escapeHtml(t("waiting.after")) + ' ' + escapeHtml(l.task.conditionLabel || t("picker.deletedItem")) + '</span>';
+      // ⚑ Two shapes of orphan now: a DANGLING condition ("After <the thing that
+      // went away>") and NO condition at all, which isWaitingOrphaned started
+      // reporting this round. The second must not borrow the first's wording —
+      // "After a deleted item" would invent a deletion that never happened.
+      bodyHtml += l.task.conditionId
+        ? '<span class="review-card-note cue-orphaned-text">🪝 ' + escapeHtml(t("waiting.after")) + ' ' + escapeHtml(l.task.conditionLabel || t("picker.deletedItem")) + '</span>'
+        : '<span class="review-card-note cue-orphaned-text">🪝 ' + escapeHtml(t("review.waitingOnNothing")) + '</span>';
     }
     bodyHtml += '</button>';
 

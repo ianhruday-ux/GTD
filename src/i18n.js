@@ -570,6 +570,10 @@ const STRINGS = {
   "review.infoOrphanedLabel": { en: "Waiting on something gone:",   "zh-Hans": "在等一个已经不存在的东西：" },
   "review.infoMissedLabel":  { en: "A repeat you missed:",          "zh-Hans": "一个你错过的重复项：" },
   "review.noWayForward":     { en: "no way forward",                "zh-Hans": "没有下一步" },
+  // The orphaned card's note when the row has NO condition at all rather than a
+  // dangling one — "After a deleted item" would have been a plain lie about a
+  // row that never had one. Same card, same fix-it row underneath.
+  "review.waitingOnNothing": { en: "not waiting on anything",        "zh-Hans": "没有在等任何东西" },
   // review.iDidIt retired — merged into review.completed, later unified
   // further across every "mark this done" verb on the review surface
   // (author rulings, second and third QA rounds).

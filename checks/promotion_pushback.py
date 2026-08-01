@@ -242,6 +242,41 @@ with serve(DIST) as url, sync_playwright() as p:
     check(not errs3, f"no JS errors in group 3 ({errs3[:3]})")
     ctx3.close()
 
+    # ============================================================
+    # Group 4 -- the way back drops the deadline
+    # ============================================================
+    # §4.13a, restated by the author: "deadlines can't live in the waiting lane."
+    # Every other route into Waiting honours it (the page has no deadline field,
+    # saveScreen nulls it, the convert button is inert while a date is set), and
+    # this one did not: MOVE_MAP only promotes, so pushBackPromotedDependents is
+    # the ONLY next→waiting mover in the app, and it preserved the deadline.
+    # Promote a dependent, give it a date while it sits in Next, undo the
+    # completion inside the window -- it must not go back dated.
+    ctx4, pg4, errs4 = boot(b, url)
+    install_pair(pg4)
+    complete_source(pg4)
+    check("THE DEPENDENT" in lane(pg4, "next"), "fixture: the dependent is promoted")
+    # Written through storage + reload rather than into the live page: memory and
+    # localStorage must never disagree (the sync invariant), and a reload is the
+    # one way to set a field this fixture cannot reach through the UI without
+    # driving the date picker.
+    pg4.evaluate("""() => {
+        const arr = JSON.parse(localStorage.getItem('gtd_tasks_next'));
+        arr.forEach(t => { if (t.id === 'dep-1') t.deadline = { date: '2099-01-01', time: null }; });
+        localStorage.setItem('gtd_tasks_next', JSON.stringify(arr));
+    }""")
+    pg4.reload(); pg4.wait_for_timeout(900)
+    pg4.evaluate("() => { const r=document.querySelector('#tray-root'); if(r) r.innerHTML=''; }")
+    dated = rec_in(pg4, "next", "dep-1")
+    check(dated and dated.get("deadline"), f"fixture: it now carries a deadline in Next ({dated and dated.get('deadline')})")
+    uncomplete_source(pg4)
+    back = rec_in(pg4, "waiting", "dep-1")
+    check(bool(back), f"undoing the completion pushes it back to Waiting ({lane(pg4,'waiting')})")
+    check(back and not back.get("deadline"),
+          f"AND THE DEADLINE IS DROPPED -- a dated thing does not wait ({back and back.get('deadline')})")
+    check(not errs4, f"no JS errors in group 4 ({errs4[:3]})")
+    ctx4.close()
+
     b.close()
 
 for line in notes + fails:
