@@ -1080,6 +1080,9 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 }
 .screen-complete-pill:hover{ filter:brightness(1.06); }
 .screen-complete-pill.done{ background:var(--desk); border:1px solid var(--lane-accent, var(--moss)); color:var(--lane-accent, var(--moss)); }
+/* W7: the day an open pause began, beside the Pause button. Quiet — it is a
+   fact about the habit, not a control, and must not compete with the button. */
+.habit-paused-since{ margin-left:0.6rem; font-size:0.82rem; color:var(--text-soft); align-self:center; }
 .screen-complete-pill.paused{ background:var(--desk); border:1px solid var(--paper-2); color:var(--text-soft); cursor:default; box-shadow:none; }
 .screen-complete-pill.paused:hover{ filter:none; }
 

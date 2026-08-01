@@ -1118,6 +1118,9 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 }
 .screen-complete-pill:hover{ filter:brightness(1.06); }
 .screen-complete-pill.done{ background:var(--desk); border:1px solid var(--lane-accent, var(--moss)); color:var(--lane-accent, var(--moss)); }
+/* W7: the day an open pause began, beside the Pause button. Quiet — it is a
+   fact about the habit, not a control, and must not compete with the button. */
+.habit-paused-since{ margin-left:0.6rem; font-size:0.82rem; color:var(--text-soft); align-self:center; }
 .screen-complete-pill.paused{ background:var(--desk); border:1px solid var(--paper-2); color:var(--text-soft); cursor:default; box-shadow:none; }
 .screen-complete-pill.paused:hover{ filter:none; }
 
@@ -2511,7 +2514,7 @@ body.screen-open #tray-handle{ display:none; }
 (function(){
 "use strict";
 
-const BUILD_STAMP = "31 Jul 03:40";  // replaced by build.py
+const BUILD_STAMP = "31 Jul 19:06";  // replaced by build.py
 
 // =========================================================
 // STORAGE ADAPTER (spec.md §3, known issue 4)
@@ -2872,7 +2875,9 @@ const SYNC_DEVICE_ID_KEY = "gtd_device_id";
 const SYNC_CONNECTED_KEY = "gtd_sync_connected"; // W5: set/cleared by whichever transport connects (dropboxTransport.js today) -- a plain synchronous flag so the boot-time gate below never needs to await a native call
 const SYNC_ROSTER_DROPOUT_MS = 365 * 24 * 60 * 60 * 1000; // wrapper-plan.md §4.5: a year, deliberately generous
 const SYNC_GATE_TIMEOUT_MS = 5000; // §4.3: how long a sweep waits for a pull before sweeping local-only anyway
-const sessionStart = Date.now();
+// (W7 removed the last reader of a session-start timestamp -- the sweep gate's
+// timeout now runs from its own first refusal, not from boot. See
+// canSweepAccumulated.)
 
 function getDeviceId(){
   let id = Storage.get(SYNC_DEVICE_ID_KEY);
@@ -3398,18 +3403,35 @@ function reconcile(remoteBundle){
   // pointless if this is skipped -- see the invariant comment.
   if (afterImportHook) afterImportHook();
   if (state.sync) state.sync.pulledThisSession = true;
+  lastPullAt = Date.now();
+  gateWaitStartedAt = 0; // a pull landed; any wait in progress is satisfied
   return { conflicts: result.conflicts, bundle: result.merged, applied: true };
 }
 
 // wrapper-plan.md §4.3: "a device must pull before its sweep may persist
-// accumulated state." Hard-false today (no transport exists), so this is a
-// no-op returning true -- zero behavior change -- while the rule itself is
-// real and under test (see syncIsEnabled's test-only override), ready for
-// W5 to flip on.
-function canSweepAccumulated(){
+// accumulated state."
+//
+// ⚑ W7: this used to read state.sync.pulledThisSession, which is SESSION
+// scoped, and to time its fallback out from sessionStart -- so a resident app
+// that pulled once at 9am had the gate wide open at the 4am boundary the next
+// morning and finalized the day on whatever it happened to be holding. Both
+// halves were wrong for the same reason: the question is not "has this device
+// pulled at all?" but "has it pulled since the thing it is about to finalize
+// became final?" Callers pass that moment as sinceMs (app.js passes the
+// boundary it is sweeping from); a caller with nothing specific in mind
+// passes nothing and gets the old any-pull-will-do behavior.
+//
+// The timeout is the escape hatch for a slow or dead network, and it now runs
+// from the first refusal rather than from session start, so it grants the
+// same few seconds of grace at every boundary instead of being permanently
+// expired on a long-lived session.
+let lastPullAt = 0;
+let gateWaitStartedAt = 0;
+function canSweepAccumulated(sinceMs){
   if (!syncIsEnabled()) return true;
-  if (state.sync && state.sync.pulledThisSession) return true;
-  return (Date.now() - sessionStart) > SYNC_GATE_TIMEOUT_MS;
+  if (lastPullAt && lastPullAt >= (sinceMs || 0)){ gateWaitStartedAt = 0; return true; }
+  if (!gateWaitStartedAt) gateWaitStartedAt = Date.now();
+  return (Date.now() - gateWaitStartedAt) > SYNC_GATE_TIMEOUT_MS;
 }
 
 const Sync = {
@@ -4539,6 +4561,10 @@ const STRINGS = {
   "habit.newHabitDefault": { en: "New habit",                     "zh-Hans": "新习惯" },
   "habit.markDoneToday":  { en: "Mark done for today",           "zh-Hans": "标记为今天已完成" },
   "habit.pausedUnpause":  { en: "Paused — unpause to complete",  "zh-Hans": "已暂停——恢复后才能完成" },
+  // W7: pause is a dated range, so the card and page name the day it began.
+  // A bare "Paused" taught users it was a switch; the date teaches the bracket
+  // they opened and will close, and makes a forgotten pause visible.
+  "habit.pausedSince":    { en: "Paused since {date}",           "zh-Hans": "自 {date} 起暂停" },
   "group.deleteList":     { en: "Delete list",                   "zh-Hans": "删除列表" },
   "note.emptyNoNotes":    { en: "No notes yet.",                 "zh-Hans": "还没有笔记。" },
   "note.emptyForFilter":  { en: "No notes for this filter.",     "zh-Hans": "没有符合此筛选条件的笔记。" },
@@ -7558,7 +7584,7 @@ function injectChunkMap(){
     const target = state.tasks.habit.find(function(h){ return h.id === hook.id && !h.isGroup; });
     if (!target) return false;
     const run = ensureHabitRun(target.id);
-    if (run.paused) return false;
+    if (isRunPaused(run)) return false;
     return run.schedule.indexOf(boundaryNow().getDay()) !== -1;
   }
   // Bidirectional (7 out, 7 in): one anchor per weekday bounds what a cue
@@ -8005,16 +8031,55 @@ function injectChunkMap(){
   // =========================================================
   // HABITS
   // =========================================================
-  // habitDone: {habitId: "YYYY-MM-DD"} — the most recent date the user
-  // tapped the checkbox for. Only ever meaningfully compared against
-  // "today"; day-boundary processing below reads it once, at the moment a
-  // scheduled day elapses, to decide that day's outcome, then it becomes
-  // irrelevant history (superseded by habitRuns[id].history).
+  // habitDone: {habitId: {date, state:"done"|"cleared", at}} — the user's most
+  // recent ASSERTION about a day, not merely the fact of a tick.
+  //
+  // ⚑ W7, author's ruling. Un-ticking used to delete the entry outright, which
+  // made it an ABSENCE, and absence is what the sweep reads as "nobody did
+  // this" -- an inference. So the deliberate act of correcting a fat-finger
+  // was recorded in the one form the merge is built to discard, and DONE WINS
+  // then resurrected the mistake on the other device, permanently, the moment
+  // either device promoted the day into history.
+  //
+  // Now both acts are assertions and both are stored:
+  //   · tick     -> {state:"done",    at: now}
+  //   · un-tick  -> {state:"cleared", at: now}
+  // and a contested day is settled by WHICHEVER ASSERTION IS LATER. The
+  // original ruling is unchanged and in fact restored to its actual wording --
+  // an inference must never overwrite an assertion -- it just no longer has to
+  // stand in for "explicitly not done", which previously had no way to be
+  // said. Re-completing after un-completing therefore works too: it is simply
+  // a third, later assertion.
+  //
+  // Never removed, only superseded, so this store no longer mints a tombstone
+  // on an un-tick (storage.js stampAndTombstone diffs saves for removals).
   function loadHabitDone(){
-    return habitMapFromStored(Storage.getJSON("gtd_habit_done", []), "date");
+    // Tolerates all three shapes it can meet, so no migration ships with this:
+    // the pre-chunk-B keyed object {id: "YYYY-MM-DD"}, chunk B's record array
+    // [{id, date}], and this one. The first two are pure "done" assertions
+    // with no timestamp, which resolveOutcome reads as un-asserted and settles
+    // by the old done-wins rule -- exactly right for data recorded before
+    // un-ticking could be said out loud.
+    const out = habitMapFromStored(Storage.getJSON("gtd_habit_done", []));
+    Object.keys(out).forEach(function(id){
+      const v = out[id];
+      if (typeof v === "string") out[id] = { date: v, state: "done", at: 0 };
+      else if (v && !v.state) v.state = "done";
+    });
+    return out;
   }
-  function saveHabitDone(){ Storage.setJSON("gtd_habit_done", habitMapToStored(state.habitDone, "date")); }
-  function habitDoneToday(taskId){ return state.habitDone[taskId] === todayStr(); }
+  function saveHabitDone(){ Storage.setJSON("gtd_habit_done", habitMapToStored(state.habitDone)); }
+  // The assertion this device holds about a given day, or null. "Cleared" is
+  // an assertion and is returned as one -- callers asking "was it done?" must
+  // check .state, not merely that something came back.
+  function habitAssertionFor(taskId, date){
+    const a = state.habitDone[taskId];
+    return a && a.date === date ? a : null;
+  }
+  function habitDoneToday(taskId){
+    const a = habitAssertionFor(taskId, todayStr());
+    return !!a && a.state === "done";
+  }
   // Order habits were checked off today, most-recent-first — habitDone
   // itself only stores one date per habit, not a sequence, so this is what
   // lets the Completed-habits section put the latest tick at the top.
@@ -8034,8 +8099,10 @@ function injectChunkMap(){
   }
 
   // habitRuns: {habitId: {
-  //   schedule: [0..6] (Sun=0),  paused: bool,
-  //   history: [{date, status:"done"|"stumble"|"miss"}, ...]  (scheduled
+  //   schedule: [0..6] (Sun=0),
+  //   pausedRanges: [{from, to}, ...]  (W7 -- see the pause block below;
+  //     `to` null while open, [from, to) so the day you resume counts),
+  //   history: [{date, status:"done"|"stumble"|"miss", assertedAt?}, ...]  (scheduled
   //     days only, oldest first, spans every run ever — kept so a tied
   //     run's ghost can be swapped in per the edge-case ruling),
   //   currentRunStart: index into history where the in-progress run begins,
@@ -8080,9 +8147,106 @@ function injectChunkMap(){
     });
   }
   function loadHabitRuns(){
-    return habitMapFromStored(Storage.getJSON("gtd_habit_runs", []));
+    const out = habitMapFromStored(Storage.getJSON("gtd_habit_runs", []));
+    // W7: pause was a bare boolean before dated ranges. Converted on read
+    // rather than by a migration (CLAUDE.md: migrations are optional until
+    // real use begins) -- an open range is dated from the last day the sweep
+    // finalized, which is the day pause froze it, so a habit paused under the
+    // old model keeps protecting the same days under the new one.
+    Object.keys(out).forEach(function(id){
+      const r = out[id];
+      if (!r || typeof r !== "object") return;
+      if (!Array.isArray(r.pausedRanges)){
+        r.pausedRanges = r.paused ? [{ from: r.lastProcessedDate || todayStr(), to: null }] : [];
+      }
+      delete r.paused;
+    });
+    return out;
   }
   function saveHabitRuns(){ Storage.setJSON("gtd_habit_runs", habitMapToStored(state.habitRuns)); }
+
+  // ---------------------------------------------------------------------
+  // PAUSE AS DATED RANGES (W7, author's ruling).
+  //
+  // PURPOSE (CLAUDE.md's question 1). Pause exists to protect the TRUTHFULNESS
+  // of the record. A miss is an inference drawn from absence, but some
+  // absences are not failures -- illness, travel, a closed gym. Without pause
+  // the user's only options are to let a real run die for reasons unconnected
+  // to their commitment, or to tick the box anyway; a streak tracker with no
+  // pause trains its users to lie to it, and a history containing lies makes
+  // the personal best worthless. Pause is how you say "these days were not
+  // part of the experiment" without lying and without being punished.
+  //
+  // It is deliberately NOT a break from struggling -- that is just missing,
+  // and the stumble grace already covers it. Pause is for INAPPLICABLE, not
+  // for FAILING, which is why it stays behind a deliberate open-and-save on
+  // the habit's own page and is not offered next to the checkbox.
+  //
+  // WHY DATED (the sync half). A boolean says only "parked now" and carries no
+  // opinion about any particular day, so a device that had not yet heard about
+  // the pause went on sweeping misses -- and misses union in and cannot be
+  // beaten by anything except a done. Pausing IS a direct assertion, but
+  // undated it was not in a form the merge could hear, so the inference won by
+  // default. Dating it makes the protection RETROACTIVE: a stale device's
+  // fabricated misses no longer have to be prevented, they are filtered at
+  // replay time once the range arrives. That is the property no amount of
+  // gate-tightening could buy.
+  //
+  // [from, to): the day you pause is inside the range, the day you resume is
+  // not. `to` null means still open, which is the only thing run.paused ever
+  // meant -- so it is now DERIVED rather than stored, and cannot disagree.
+  function dateInPausedRanges(date, ranges){
+    return (ranges || []).some(function(r){
+      return r && r.from <= date && (!r.to || date < r.to);
+    });
+  }
+  function isRunPaused(run){
+    return (run.pausedRanges || []).some(function(r){ return r && !r.to; });
+  }
+  // The day the open pause began — what the card and page show, so pause reads
+  // as a bracket you opened rather than a switch you flipped.
+  function pausedSinceDate(run){
+    const open = (run.pausedRanges || []).filter(function(r){ return r && !r.to; })
+      .map(function(r){ return r.from; }).sort();
+    return open.length ? open[0] : null;
+  }
+  // What the paused pill says, on the card and on the page. The DATE is the
+  // teaching here (CLAUDE.md's question 2): a bare "Paused" reads as a switch
+  // that is on, which is precisely the mental model the boolean encoded and
+  // this round is replacing. Same short date style the deadline pills use.
+  function pausedPillText(run){
+    const since = pausedSinceDate(run);
+    if (!since) return t("outcome.paused");
+    const d = dateStrToDate(since);
+    return t("habit.pausedSince").replace("{date}",
+      d.toLocaleDateString(undefined, { month: "short", day: "numeric" }));
+  }
+  function openPausedRange(run, date){
+    if (isRunPaused(run)) return;
+    run.pausedRanges = (run.pausedRanges || []).concat([{ from: date, to: null }]);
+  }
+  function closePausedRanges(run, date){
+    (run.pausedRanges || []).forEach(function(r){ if (r && !r.to) r.to = date; });
+  }
+  // Ranges ACCUMULATE like history -- they are dated facts, never fields, so
+  // they are unioned rather than three-way merged. Keyed by `from`, since two
+  // devices describing the same pause agree about when it started.
+  function mergePausedRanges(a, b){
+    const byFrom = {};
+    (a || []).concat(b || []).forEach(function(r){
+      if (!r || typeof r.from !== "string") return;
+      const prev = byFrom[r.from];
+      if (!prev){ byFrom[r.from] = { from: r.from, to: r.to || null }; return; }
+      // A resume is an assertion; an open range is only the absence of one
+      // yet, so any close beats none. Two devices that both closed the same
+      // pause: the EARLIER resume is the one the user actually made -- a later
+      // one is a stale device repeating a resume it had not heard about.
+      // ⚑ Judgment call (spec silent): earliest-close wins.
+      if (!prev.to){ prev.to = r.to || null; return; }
+      if (r.to && r.to < prev.to) prev.to = r.to;
+    });
+    return Object.keys(byFrom).sort().map(function(k){ return byFrom[k]; });
+  }
 
   // ---------------------------------------------------------------------
   // THE HABIT MERGE (chunk B; sync-audit.md §3, and wrapper-plan.md §1's
@@ -8107,8 +8271,20 @@ function injectChunkMap(){
   //   A "done" is something you DID. A "miss" is something nobody did — an
   //   inference the sweep draws from the absence of a completion, on
   //   whatever data that device happened to hold. An inference must never
-  //   overwrite a direct assertion. So for a contested day, DONE WINS,
-  //   regardless of timestamps.
+  //   overwrite a direct assertion.
+  //
+  // ⚑ W7 restates that ruling without changing it. It used to be implemented
+  // as the shorthand "DONE WINS, regardless of timestamps", which was only
+  // ever correct because the model had no way to SAY "explicitly not done" —
+  // un-ticking deleted the record, producing an absence indistinguishable
+  // from never having ticked. Now un-ticking is an assertion too, so the rule
+  // is implemented as what it always said:
+  //
+  //   assertion vs inference  -> the assertion, always, whichever way it goes
+  //   assertion vs assertion  -> the LATER one (this is what timestamps are for)
+  //   inference vs inference  -> done-wins, unchanged, and the only path
+  //                              pre-W7 history can take (it carries no
+  //                              assertion stamps, so it is all inference here)
   //
   // Note what is merged is the raw per-day OUTCOME (done or not), never the
   // stored status: "stumble" and "miss" are themselves derived — a miss
@@ -8119,12 +8295,32 @@ function injectChunkMap(){
   // The replay runs through applyHabitDayOutcome/endHabitRun, the SAME
   // functions live use, rather than a second implementation of the streak
   // rules that could drift from them.
-  function replayHabitRun(outcomes, schedule, paused){
+  // A day's outcome, carrying the assertion that produced it: {done, at}.
+  // `at` 0 means nobody asserted anything and the sweep inferred it.
+  function resolveOutcome(a, c){
+    if (!a) return c;
+    if (!c) return a;
+    if (a.at && c.at) return a.at >= c.at ? a : c;  // assertion vs assertion: the later
+    if (a.at) return a;                             // assertion beats inference...
+    if (c.at) return c;                             // ...whichever side holds it
+    return { done: a.done || c.done, at: 0 };       // neither asserted: done-wins (pre-W7 data)
+  }
+  function replayHabitRun(outcomes, schedule, pausedRanges){
     const run = defaultHabitRun();
     run.schedule = schedule;
-    run.paused = paused;
+    run.pausedRanges = pausedRanges || [];
     Object.keys(outcomes).sort().forEach(function(date){
-      applyHabitDayOutcome(run, date, outcomes[date] ? "done" : "miss");
+      const o = outcomes[date];
+      // An asserted DONE outranks a pause: the only ways one exists inside a
+      // paused stretch are the completion locked in on the day pause began,
+      // and a device that had not yet heard about the pause — and in both
+      // cases the user did in fact do it, so it counts.
+      if (o.done){ applyHabitDayOutcome(run, date, "done", o.at); return; }
+      // Everything else inside a paused stretch is simply not part of the
+      // experiment. Note this is where a stale device's fabricated misses go
+      // to die, retroactively, which is the whole point of dating pause.
+      if (dateInPausedRanges(date, run.pausedRanges)) return;
+      applyHabitDayOutcome(run, date, "miss", o.at);
     });
     return run;
   }
@@ -8132,7 +8328,8 @@ function injectChunkMap(){
     const out = {};
     (history || []).forEach(function(e){
       if (!e || typeof e.date !== "string") return;
-      out[e.date] = out[e.date] || e.status === "done";
+      out[e.date] = resolveOutcome(out[e.date],
+                                   { done: e.status === "done", at: e.assertedAt || 0 });
     });
     return out;
   }
@@ -8142,19 +8339,19 @@ function injectChunkMap(){
     const contested = [];
     Object.keys(lo).concat(Object.keys(ro)).forEach(function(d){
       if (outcomes.hasOwnProperty(d)) return;
-      const inL = lo.hasOwnProperty(d), inR = ro.hasOwnProperty(d);
-      outcomes[d] = (inL && lo[d]) || (inR && ro[d]); // done if EITHER device says done
-      if (inL && inR && lo[d] !== ro[d]) contested.push(d); // one said done, the other a miss
+      const a = lo[d], c = ro[d];
+      outcomes[d] = resolveOutcome(a, c);
+      if (a && c && a.done !== c.done) contested.push(d); // the devices actually disagreed
     });
-    // Settings ride the generic three-way merge; only these two are real
-    // fields, and neither is derived from anything.
+    // Schedule is the only real FIELD left: pause became dated ranges, which
+    // accumulate like history and are unioned rather than merged.
     const settings = Sync.mergeFields(
-      { schedule: l.schedule, paused: l.paused, modifiedAt: l.modifiedAt, deviceId: l.deviceId },
-      { schedule: r.schedule, paused: r.paused, modifiedAt: r.modifiedAt, deviceId: r.deviceId },
-      b ? { schedule: b.schedule, paused: b.paused } : null
+      { schedule: l.schedule, modifiedAt: l.modifiedAt, deviceId: l.deviceId },
+      { schedule: r.schedule, modifiedAt: r.modifiedAt, deviceId: r.deviceId },
+      b ? { schedule: b.schedule } : null
     );
     const rebuilt = replayHabitRun(outcomes, settings.record.schedule || defaultHabitRun().schedule,
-                                   !!settings.record.paused);
+                                   mergePausedRanges(l.pausedRanges, r.pausedRanges));
     // Device-local, deliberately kept from THIS device: a celebration this
     // device has not shown yet is not the other device's to deliver, and the
     // sweep cursor describes this device's own progress through the calendar.
@@ -8169,15 +8366,41 @@ function injectChunkMap(){
       // Only a day the two devices actually disagreed about is worth
       // reporting, and the report says which way it went -- §1's "never
       // silent" applies to a completion being upheld just as much as to one
-      // being replaced.
+      // being replaced. W7: which way it went is no longer always "done",
+      // so the resolved outcome per day is reported instead of a flat flag.
       conflict: contested.length
-        ? { habitDays: contested.slice(), keptDone: true, local: l, remote: r, winner: rebuilt }
+        ? { habitDays: contested.slice(),
+            habitResolved: contested.reduce(function(m, d){ m[d] = outcomes[d].done; return m; }, {}),
+            local: l, remote: r, winner: rebuilt }
+        : null
+    };
+  }
+  // gtd_habit_done needs its own merger too (W7). An assertion record is
+  // ATOMIC — date, state and stamp are one statement about one day — so the
+  // generic per-field merge is actively wrong here: it could take `date` from
+  // the device that ticked yesterday and `state` from the device that cleared
+  // today, producing a statement neither device ever made. Whole record,
+  // latest assertion wins, which is the same rule the history merge applies
+  // to the same facts one day later.
+  function mergeHabitDoneRecord(l, r){
+    const winner = (r.at || 0) > (l.at || 0) ? r : l;
+    const rec = Object.assign({}, winner);
+    rec.id = l.id;
+    rec.modifiedAt = Math.max(l.modifiedAt || 0, r.modifiedAt || 0);
+    return {
+      record: rec,
+      // Two devices asserting different things about the same day is a real
+      // disagreement and §1 says it is never silent -- even though the loser
+      // is usually just this device's own earlier tick.
+      conflict: (l.date === r.date && l.state !== r.state)
+        ? { habitDays: [l.date], habitResolved: { [l.date]: rec.state === "done" },
+            local: l, remote: r, winner: rec }
         : null
     };
   }
   function defaultHabitRun(){
     return {
-      schedule: [0, 1, 2, 3, 4, 5, 6], paused: false, history: [], currentRunStart: 0,
+      schedule: [0, 1, 2, 3, 4, 5, 6], pausedRanges: [], history: [], currentRunStart: 0,
       personalBest: 0, bestSequence: [], lifetimeTotal: 0, lastProcessedDate: null,
       pendingResult: null, badge: false
     };
@@ -8193,9 +8416,23 @@ function injectChunkMap(){
   // A miss ends the run only if the *previous* day in this run was already
   // a stumble (never-miss-twice); a single miss is just a stumble and the
   // run continues. A "done" always just extends the run.
-  function applyHabitDayOutcome(run, date, status){
+  //
+  // assertedAt (W7) is the timestamp of the user act this outcome came from --
+  // a tick or an un-tick -- and is absent when the sweep merely inferred the
+  // day from an absence. It has to survive INTO history, not just into the
+  // sweep, because the sweep is where a day stops being contestable: once two
+  // devices have each promoted the same day, an entry with no stamp is
+  // indistinguishable from a genuine inference, and the merge would resurrect
+  // a corrected fat-finger. Carrying it is what makes the ruling hold after
+  // the 4am boundary as well as before it.
+  function historyEntry(date, status, assertedAt){
+    const e = { date: date, status: status };
+    if (assertedAt) e.assertedAt = assertedAt;
+    return e;
+  }
+  function applyHabitDayOutcome(run, date, status, assertedAt){
     if (status === "done"){
-      run.history.push({ date: date, status: "done" });
+      run.history.push(historyEntry(date, "done", assertedAt));
       run.lifetimeTotal++;
       return;
     }
@@ -8212,10 +8449,10 @@ function injectChunkMap(){
     const entries = currentRunEntries(run);
     const last = entries[entries.length - 1];
     if (last && last.status === "stumble"){
-      run.history.push({ date: date, status: "miss" });
+      run.history.push(historyEntry(date, "miss", assertedAt));
       endHabitRun(run);
     } else {
-      run.history.push({ date: date, status: "stumble" });
+      run.history.push(historyEntry(date, "stumble", assertedAt));
     }
   }
   function endHabitRun(run){
@@ -8247,44 +8484,87 @@ function injectChunkMap(){
   // paused, and the gap simply isn't evaluated.
   // wrapper-plan.md §4.3: a device must pull before this sweep may persist
   // accumulated state (habit history), or a stale copy can write a "miss"
-  // over a completion it simply hasn't seen yet -- and because the sweep is
-  // idempotent-per-device (never re-processes a day already in history), the
-  // device that DID see the completion can never correct it afterwards.
-  // Sync.canSweepAccumulated() is a no-op returning true today (no
-  // transport exists yet, Sync.isEnabled() is hard-false), so this changes
-  // nothing about current behavior -- it's the hook W5 flips on.
+  // over a completion it simply hasn't seen yet.
+  //
+  // ⚑ W7: the gate now asks whether this device has pulled since the BOUNDARY
+  // it is about to finalize across, not merely whether it has pulled at all
+  // this session — see sync.js canSweepAccumulated. The moment is computed
+  // from the real clock deliberately: the question is about network
+  // freshness, and feeding it the QA-offset clock would jam the gate shut for
+  // the whole of a time-jump testing session.
+  function lastRealBoundaryMs(){
+    const d = new Date();
+    d.setHours(d.getHours() - 4); // same 4am day-start as boundaryNow()
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() + 4 * 3600 * 1000;
+  }
+  // Returns whether anything actually changed, so callers can skip a render —
+  // and so the post-pull re-sweep can't spin (a write triggers a debounced
+  // push, which lands a merge, which re-sweeps...).
   function processHabitBoundaries(){
-    if (!Sync.canSweepAccumulated()) return;
+    if (!Sync.canSweepAccumulated(lastRealBoundaryMs())) return false;
     const today = todayStr();
+    let changed = false;
     state.tasks.habit.forEach(function(h){
       if (h.isGroup) return;
       const run = ensureHabitRun(h.id);
-      if (!run.lastProcessedDate){ run.lastProcessedDate = today; return; }
+      if (!run.lastProcessedDate){ run.lastProcessedDate = today; changed = true; return; }
       if (run.lastProcessedDate === today) return;
       // Paused habits are FROZEN outright (design ruling from the pause/
       // completion round: pausing disables completion itself, so there is
-      // nothing to sweep — the earlier technical fix that recorded done
-      // days during a paused gap is superseded; a completion made just
-      // before pausing is locked into history by screenTogglePause).
-      if (run.paused){ run.lastProcessedDate = today; return; }
+      // nothing to sweep — a completion made just before pausing is locked
+      // into history by saveScreen's pause transition). Under dated ranges
+      // the replay would filter these days anyway; skipping them here keeps
+      // history from accumulating entries that only ever get thrown away.
+      if (isRunPaused(run)){ run.lastProcessedDate = today; changed = true; return; }
       let cursor = dateStrToDate(run.lastProcessedDate);
       const todayDate = dateStrToDate(today);
       while (cursor.getTime() < todayDate.getTime()){
         const ds = dateToStr(cursor);
-        // The already-in-history guard covers the complete→pause path,
-        // where screenTogglePause locked today's done in immediately —
-        // without it, that day would be recorded a second time here
-        // (complete → pause → unpause, then the next day's sweep).
-        if (run.schedule.indexOf(cursor.getDay()) !== -1 &&
-            !run.history.some(function(en){ return en.date === ds; })){
-          const status = (state.habitDone[h.id] === ds) ? "done" : "miss";
-          applyHabitDayOutcome(run, ds, status);
-        }
+        if (run.schedule.indexOf(cursor.getDay()) !== -1 && sweepDay(run, h.id, ds)) changed = true;
         cursor = addDaysToDate(cursor, 1);
       }
       run.lastProcessedDate = today;
+      changed = true;
     });
-    saveHabitRuns();
+    if (changed) saveHabitRuns();
+    return changed;
+  }
+  // Finalizes ONE scheduled day. Returns whether it wrote anything.
+  function sweepDay(run, habitId, ds){
+    const asserted = habitAssertionFor(habitId, ds);
+    const at = asserted ? (asserted.at || 0) : 0;
+    const existing = run.history.find(function(en){ return en.date === ds; });
+    if (existing){
+      // The already-in-history guard covers the complete→pause path, where
+      // the pause transition locked today's done in immediately — without it
+      // that day would be recorded a second time here.
+      //
+      // ⚑ W7: but it also used to drop a LATER assertion on the floor. If a
+      // merge brought in the other device's promoted outcome for a day this
+      // device still holds a newer assertion about, the entry was already
+      // present, so the correction was skipped and could never be applied
+      // again — the sweep is once-per-day-per-device. Comparing stamps first
+      // is what closes that, and it is the last hole in the un-complete path.
+      if (!at || at <= (existing.assertedAt || 0)) return false;
+      return rebuildRunWithOutcome(run, ds, { done: asserted.state === "done", at: at });
+    }
+    applyHabitDayOutcome(run, ds, asserted && asserted.state === "done" ? "done" : "miss", at);
+    return true;
+  }
+  // Replacing a day already in history means every derived aggregate after it
+  // is wrong, so the run is replayed from its own outcomes rather than
+  // patched in place — the same rebuild the merge does, through the same
+  // functions, for the same reason (no second implementation of the rules).
+  function rebuildRunWithOutcome(run, date, outcome){
+    const outcomes = historyToOutcomes(run.history);
+    outcomes[date] = outcome;
+    const rebuilt = replayHabitRun(outcomes, run.schedule, run.pausedRanges);
+    run.history = rebuilt.history;
+    run.currentRunStart = rebuilt.currentRunStart;
+    run.personalBest = rebuilt.personalBest;
+    run.bestSequence = rebuilt.bestSequence;
+    run.lifetimeTotal = rebuilt.lifetimeTotal;
+    return true;
   }
   function toggleHabit(taskId){
     // Design ruling (pause/completion round): PAUSE MEANS PAUSE — a
@@ -8292,13 +8572,19 @@ function injectChunkMap(){
     // checkbox and the page's Complete badge render disabled; this guard
     // is the backstop for every path that reaches them (card tap, the
     // delayed check-animation path, the page badge).
-    if (ensureHabitRun(taskId).paused) return;
+    if (isRunPaused(ensureHabitRun(taskId))) return;
     const today = todayStr();
-    if (state.habitDone[taskId] === today){
-      delete state.habitDone[taskId];
+    const wasDone = habitDoneToday(taskId);
+    // W7: the record is SUPERSEDED, never removed. Deleting it made an
+    // un-tick an absence, which is the one form the merge is built to
+    // discard — see the habitDone block above. Date.now() and not
+    // boundaryNow(): this orders two devices' assertions against each other,
+    // exactly like storage.js's modifiedAt, and a QA time jump must never
+    // skew that ordering.
+    state.habitDone[taskId] = { date: today, state: wasDone ? "cleared" : "done", at: Date.now() };
+    if (wasDone){
       state.habitDoneOrder = state.habitDoneOrder.filter(function(id){ return id !== taskId; });
     } else {
-      state.habitDone[taskId] = today;
       state.habitDoneOrder.unshift(taskId);
     }
     saveHabitDone();
@@ -9207,14 +9493,14 @@ function injectChunkMap(){
       }
     }
     let cueBlock = "";
-    if (isHabit && habitRun.paused){
+    if (isHabit && isRunPaused(habitRun)){
       // QA ruling: a paused habit's card shows the Paused pill and
       // NOTHING cue-related — no live hook pills, no fallback text, no
       // "No cue today", no "+ add plan". Cues describe when the habit
       // fires, and a paused habit doesn't fire; rendering them contradicts
       // the pause. The full cue set stays visible on the habit page. The
       // "New result" badge is a notification, not a cue — it still shows.
-      cueBlock = '<span class="link-pill" style="opacity:0.7;">&#9208; Paused</span>';
+      cueBlock = '<span class="link-pill" style="opacity:0.7;">&#9208; ' + escapeHtml(pausedPillText(habitRun)) + '</span>';
       if (habitRun.badge) cueBlock += '<span class="link-pill" style="border-color:var(--red); color:var(--red);">&#9679; New result</span>';
     } else if (isHabit){
       // 11.3: the card shows only today's LIVE cues. Dead hooks (target
@@ -9303,7 +9589,7 @@ function injectChunkMap(){
       // Paused habits get an inert checkbox (design ruling: pausing
       // disables completion). A ✓ earned before pausing stays visible —
       // frozen, not erased — but can't be toggled until unpause.
-      const pausedNow = habitRun.paused;
+      const pausedNow = isRunPaused(habitRun);
       checkboxHtml = '<button class="check' + (done ? " checked" : "") + (pausedNow ? " check-paused" : "") +
         '" data-action="toggle-habit" data-id="' + task.id +
         '" title="' + escapeHtml(pausedNow ? t("habit.pausedUnpause") : t("habit.markDoneToday")) + '">' + (done ? "&#10003;" : "") + '</button>';
@@ -9778,7 +10064,7 @@ function injectChunkMap(){
           title: task.title, notesClean: task.notesClean || "",
           cueRows: cueRows, hookPicker: false, hookPickerRow: 0,
           bundleText: task.bundleText || "",
-          schedule: run.schedule.slice(), paused: run.paused,
+          schedule: run.schedule.slice(), paused: isRunPaused(run),
           done: habitDoneToday(taskId), // draft field — see screenComplete
           pendingResult: consumeHabitPendingResult(taskId)
         };
@@ -10376,11 +10662,13 @@ function injectChunkMap(){
           // draft was unpaused.)
           const wantDone = !!d.done;
           if (habitDoneToday(s.taskId) !== wantDone){
+            // W7: superseded, never removed — same assertion record the
+            // checkbox writes (see toggleHabit). Un-completing from the page
+            // is every bit as deliberate as un-ticking on the card.
+            state.habitDone[s.taskId] = { date: todayStr(), state: wantDone ? "done" : "cleared", at: Date.now() };
             if (wantDone){
-              state.habitDone[s.taskId] = todayStr();
               state.habitDoneOrder.unshift(s.taskId);
             } else {
-              delete state.habitDone[s.taskId];
               state.habitDoneOrder = state.habitDoneOrder.filter(function(id){ return id !== s.taskId; });
             }
             saveHabitDone();
@@ -10391,7 +10679,7 @@ function injectChunkMap(){
           // value actually changed (toggling twice in a draft is a no-op,
           // so lastProcessedDate isn't jumped spuriously).
           const nowPaused = !!d.paused;
-          if (run.paused !== nowPaused){
+          if (isRunPaused(run) !== nowPaused){
             const today = todayStr();
             if (nowPaused){
               // About to pause. lastProcessedDate jumping to today means
@@ -10400,13 +10688,26 @@ function injectChunkMap(){
               // into history now, or it's lost the moment pause lands. A
               // day merely unfinished when paused is fine to skip —
               // that's what Pause is for.
+              //
+              // W7: keyed on the ASSERTION, not on the bare presence of a
+              // tick, so tick → un-tick → pause no longer resurrects the
+              // tick. The stamp rides into history with it, which is what
+              // lets the other device's copy of this day be compared
+              // against it later. The day pause begins is inside the range
+              // ([from, to)), and the replay lets an asserted done outrank
+              // the pause — which is exactly why this lock-in still works.
               const scheduledToday = run.schedule.indexOf(boundaryNow().getDay()) !== -1;
               const alreadyRecorded = run.history.some(function(e){ return e.date === today; });
-              if (scheduledToday && habitDoneToday(s.taskId) && !alreadyRecorded){
-                applyHabitDayOutcome(run, today, "done");
+              const a = habitAssertionFor(s.taskId, today);
+              if (scheduledToday && a && a.state === "done" && !alreadyRecorded){
+                applyHabitDayOutcome(run, today, "done", a.at || 0);
               }
+              openPausedRange(run, today);
+            } else {
+              // Resuming: the range closes at today, and [from, to) means
+              // today is outside it — you are back, so today counts.
+              closePausedRanges(run, today);
             }
-            run.paused = nowPaused;
             run.lastProcessedDate = today;
           }
           saveHabitRuns();
@@ -10869,10 +11170,12 @@ function injectChunkMap(){
     if (s.invalidField === "habitSchedule" && s.draft.schedule.length) s.invalidField = null;
     renderScreen();
   }
-  // Pause takes effect immediately (like a switch), not gated behind Save —
-  // "persists until manually unpaused" reads as a standing state change,
-  // not a draft edit. Jumping lastProcessedDate to today means no misses
-  // accrue for the days spent paused, and none get backfilled on unpause.
+  // ⚑ The comment that used to sit here said pause "takes effect immediately
+  // (like a switch), not gated behind Save" — flatly contradicting the body
+  // below and the DRAFT ISOLATION ruling that superseded it. Left over from
+  // the pause/completion round, which moved the run-side work into saveScreen
+  // and did not clear the header. Corrected, not deleted, so the next reader
+  // doesn't have to work out which of the two comments was true.
   function screenTogglePause(){
     // DRAFT ISOLATION (design principle, this round): the pause switch —
     // like every control on a create/edit page — edits the DRAFT only.
@@ -11327,12 +11630,21 @@ function injectChunkMap(){
       '<div class="screen-row"><div class="habit-day-row' + (invalid ? " field-invalid" : "") + '">' + chips + '</div></div>'
     );
   }
-  function habitPauseBtnHtml(draft){
+  function habitPauseBtnHtml(draft, taskId){
+    // The since-line reports the SAVED run, never the draft (DRAFT
+    // ISOLATION): a pause armed but not yet saved has no range and no start
+    // date to name, and claiming one would be the page asserting something
+    // \u2715 is still able to discard. So it appears only once the bracket is
+    // really open \u2014 which is also the moment it starts being worth seeing.
+    const run = taskId ? state.habitRuns[taskId] : null;
+    const since = run && isRunPaused(run)
+      ? '<span class="habit-paused-since">' + escapeHtml(pausedPillText(run)) + '</span>'
+      : '';
     return (
       '<div class="screen-row">' +
         '<button type="button" class="btn btn-ghost btn-small habit-pause-btn' + (draft.paused ? " active" : "") + '" data-action="screen-toggle-pause">' +
           (draft.paused ? "\u25B6 " + escapeHtml(t("habit.unpause")) : "\u23F8 " + escapeHtml(t("habit.pause"))) +
-        '</button>' +
+        '</button>' + since +
       '</div>'
     );
   }
@@ -11814,7 +12126,7 @@ function injectChunkMap(){
       fields += habitScheduleHtml(draft, s.invalidField === "habitSchedule");
       fields += advancedRowHtml(draft);
       if (s.taskId){
-        fields += habitPauseBtnHtml(draft);
+        fields += habitPauseBtnHtml(draft, s.taskId);
         fields += habitTrackHtml(s);
       }
     }
@@ -12781,7 +13093,7 @@ function injectChunkMap(){
         // Paused habits are inert (design ruling) — bail before the
         // optimistic check animation, or the box would flash a ✓ that
         // toggleHabit's own guard then refuses to persist.
-        if (ensureHabitRun(habitId).paused) return;
+        if (isRunPaused(ensureHabitRun(habitId))) return;
         // Same idea as complete: renderLane rebuilds the element right
         // away, so pop the animation on the live button and defer the
         // state flip just long enough for it to read.
@@ -16069,8 +16381,38 @@ function injectChunkMap(){
     state.tags = loadTags();
     const loadedEvents = loadEvents();
     if (loadedEvents) state.events = loadedEvents;
+    // ⚑ W7 DEFECT FIX. These two were missing, and they are the two stores
+    // chunk B added to sync. A merged habit history reached localStorage and
+    // never reached memory, so the next saveHabitRuns() wrote the stale
+    // in-memory copy straight back over it -- the exact failure the "memory
+    // follows storage, always, in the same breath" invariant exists to
+    // prevent (sync.js reconcile()). It also meant §4.3's sweep gate was
+    // protecting nothing for habits: the sweep read pre-pull memory however
+    // patiently it had waited for the pull. habitDoneOrder is deliberately
+    // NOT here -- it is device-local today-only display ordering and does
+    // not sync (sync.js SYNC_STORE_KEYS).
+    state.habitDone = loadHabitDone();
+    state.habitRuns = loadHabitRuns();
   }
-  Sync.setAfterImport(reloadSyncedStateFromStorage);
+  // A pull that lands mid-session has to re-run the boundary sweep, not just
+  // reload memory. The sweep is gated on having pulled (§4.3), so at boot it
+  // legitimately refuses and returns having done nothing; without this, the
+  // day it declined to finalize would sit unswept until the next resume.
+  // Idempotent by construction -- processHabitBoundaries only writes when a
+  // day actually needs finalizing, and re-renders only follow a real change.
+  function afterSyncImport(){
+    reloadSyncedStateFromStorage();
+    processHabitBoundaries();
+    // Unconditionally, not only when the sweep wrote something: the merge
+    // itself just changed what the lanes should be showing, and nothing else
+    // on the path from reconcile() to here redraws them (neither transport
+    // does -- see dropboxTransport.js). Safe while a drafting page is open
+    // because sync.js's apply gate has already refused to apply at all.
+    KINDS.forEach(renderLane);
+    updateLaneVisibility();
+    updateHabitBadge();
+  }
+  Sync.setAfterImport(afterSyncImport);
 
   // DRAFT ISOLATION x sync, author ruling 2026-07-30 (option 1 of three
   // offered): a merge may not land while a drafting page is open. The other
@@ -16092,7 +16434,8 @@ function injectChunkMap(){
     return false;
   }
   Sync.setApplyGate(syncApplyGateOpen);
-  Sync.registerRecordMerger("gtd_habit_runs", mergeHabitRunRecord); // chunk B: done beats miss, aggregates recomputed
+  Sync.registerRecordMerger("gtd_habit_runs", mergeHabitRunRecord);   // chunk B + W7: assertions settle a day, aggregates recomputed
+  Sync.registerRecordMerger("gtd_habit_done", mergeHabitDoneRecord);  // W7: an assertion record is atomic, latest wins
 
   // Sync-on-save, trigger 5 of 5 (author ruling 2026-07-30, reversing the
   // earlier four-trigger decision). Debounced rather than immediate: saving a

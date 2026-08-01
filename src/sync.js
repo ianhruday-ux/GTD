@@ -55,7 +55,9 @@ const SYNC_DEVICE_ID_KEY = "gtd_device_id";
 const SYNC_CONNECTED_KEY = "gtd_sync_connected"; // W5: set/cleared by whichever transport connects (dropboxTransport.js today) -- a plain synchronous flag so the boot-time gate below never needs to await a native call
 const SYNC_ROSTER_DROPOUT_MS = 365 * 24 * 60 * 60 * 1000; // wrapper-plan.md §4.5: a year, deliberately generous
 const SYNC_GATE_TIMEOUT_MS = 5000; // §4.3: how long a sweep waits for a pull before sweeping local-only anyway
-const sessionStart = Date.now();
+// (W7 removed the last reader of a session-start timestamp -- the sweep gate's
+// timeout now runs from its own first refusal, not from boot. See
+// canSweepAccumulated.)
 
 function getDeviceId(){
   let id = Storage.get(SYNC_DEVICE_ID_KEY);
@@ -581,18 +583,35 @@ function reconcile(remoteBundle){
   // pointless if this is skipped -- see the invariant comment.
   if (afterImportHook) afterImportHook();
   if (state.sync) state.sync.pulledThisSession = true;
+  lastPullAt = Date.now();
+  gateWaitStartedAt = 0; // a pull landed; any wait in progress is satisfied
   return { conflicts: result.conflicts, bundle: result.merged, applied: true };
 }
 
 // wrapper-plan.md §4.3: "a device must pull before its sweep may persist
-// accumulated state." Hard-false today (no transport exists), so this is a
-// no-op returning true -- zero behavior change -- while the rule itself is
-// real and under test (see syncIsEnabled's test-only override), ready for
-// W5 to flip on.
-function canSweepAccumulated(){
+// accumulated state."
+//
+// ⚑ W7: this used to read state.sync.pulledThisSession, which is SESSION
+// scoped, and to time its fallback out from sessionStart -- so a resident app
+// that pulled once at 9am had the gate wide open at the 4am boundary the next
+// morning and finalized the day on whatever it happened to be holding. Both
+// halves were wrong for the same reason: the question is not "has this device
+// pulled at all?" but "has it pulled since the thing it is about to finalize
+// became final?" Callers pass that moment as sinceMs (app.js passes the
+// boundary it is sweeping from); a caller with nothing specific in mind
+// passes nothing and gets the old any-pull-will-do behavior.
+//
+// The timeout is the escape hatch for a slow or dead network, and it now runs
+// from the first refusal rather than from session start, so it grants the
+// same few seconds of grace at every boundary instead of being permanently
+// expired on a long-lived session.
+let lastPullAt = 0;
+let gateWaitStartedAt = 0;
+function canSweepAccumulated(sinceMs){
   if (!syncIsEnabled()) return true;
-  if (state.sync && state.sync.pulledThisSession) return true;
-  return (Date.now() - sessionStart) > SYNC_GATE_TIMEOUT_MS;
+  if (lastPullAt && lastPullAt >= (sinceMs || 0)){ gateWaitStartedAt = 0; return true; }
+  if (!gateWaitStartedAt) gateWaitStartedAt = Date.now();
+  return (Date.now() - gateWaitStartedAt) > SYNC_GATE_TIMEOUT_MS;
 }
 
 const Sync = {

@@ -804,6 +804,10 @@ const STRINGS = {
   "habit.newHabitDefault": { en: "New habit",                     "zh-Hans": "新习惯" },
   "habit.markDoneToday":  { en: "Mark done for today",           "zh-Hans": "标记为今天已完成" },
   "habit.pausedUnpause":  { en: "Paused — unpause to complete",  "zh-Hans": "已暂停——恢复后才能完成" },
+  // W7: pause is a dated range, so the card and page name the day it began.
+  // A bare "Paused" taught users it was a switch; the date teaches the bracket
+  // they opened and will close, and makes a forgotten pause visible.
+  "habit.pausedSince":    { en: "Paused since {date}",           "zh-Hans": "自 {date} 起暂停" },
   "group.deleteList":     { en: "Delete list",                   "zh-Hans": "删除列表" },
   "note.emptyNoNotes":    { en: "No notes yet.",                 "zh-Hans": "还没有笔记。" },
   "note.emptyForFilter":  { en: "No notes for this filter.",     "zh-Hans": "没有符合此筛选条件的笔记。" },
