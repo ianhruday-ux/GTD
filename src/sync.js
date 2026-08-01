@@ -380,7 +380,23 @@ function mergeRecordArray(localArr, remoteArr, baselineArr, ctx){
       return;
     }
     if (r && !l){
-      if (ctx.noBaseline || !b){ out.push(r); return; } // additive: their creation, pull it
+      if (ctx.noBaseline || !b){
+        // Additive: their creation, pull it. ⚑ But the SAME resurrection check
+        // the l && !r branch does, for the same reason -- and this is the side
+        // that matters more. Found live: after a restore, the phone (which
+        // brought the record back) reported it and the desktop (which had
+        // deleted it) said nothing, because a record this device deleted is by
+        // definition absent from its baseline, so `!b` sent it down this path
+        // and it returned before ever looking at its own tombstone.
+        //
+        // The person who deleted the thing is the one who needs telling it
+        // came back. No noise on a genuine first join: a brand-new device has
+        // no tombstones to match against.
+        const t0 = ctx.localTombstones[id];
+        out.push(r);
+        if (t0) conflicts.push({ store: ctx.store, id: id, resurrection: true, record: r, tombstone: t0 });
+        return;
+      }
       const tomb = ctx.localTombstones[id];
       if (tomb && tomb.deletedAt >= (r.modifiedAt || 0)) return; // our delete wins; stays gone
       out.push(r);

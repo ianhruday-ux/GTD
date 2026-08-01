@@ -197,6 +197,16 @@ with serve(DIST) as url, sync_playwright() as p:
     check("second local item, before the race" in local_tray_texts(pg1), "the item queued during the race still made it to disk after the retry")
     final_bundle = json.loads(next(iter(disk1.files.values()))["content"])
     check("intruder" in final_bundle["roster"], "the OTHER write that won the race is still present too -- the retry merged with it, didn't clobber it")
+    # ⚑ A RETRY MUST NOT DOUBLE-REPORT (found live by the author: two conflict
+    # log entries for one restored item). Every attempt re-reads the file and
+    # re-runs the whole merge, so it re-derives the SAME conflicts rather than
+    # finding new ones -- and both transports used to CONCATENATE them across
+    # attempts, turning an invisible, self-resolving race into visible
+    # duplicates. The race above provokes exactly one retry, so any conflict it
+    # produces must still be reported exactly once.
+    ids2 = [(c.get("store"), c.get("id")) for c in (result2 or {}).get("conflicts", [])]
+    check(len(ids2) == len(set(ids2)),
+          f"a retried sync reports each conflict ONCE, not once per attempt ({ids2})")
 
     check(not errs1, f"no JS errors in group 1 ({errs1[:3]})")
 

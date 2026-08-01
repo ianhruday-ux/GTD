@@ -2514,7 +2514,7 @@ body.screen-open #tray-handle{ display:none; }
 (function(){
 "use strict";
 
-const BUILD_STAMP = "01 Aug 00:14";  // replaced by build.py
+const BUILD_STAMP = "01 Aug 01:20";  // replaced by build.py
 
 // =========================================================
 // STORAGE ADAPTER (spec.md §3, known issue 4)
@@ -3200,7 +3200,23 @@ function mergeRecordArray(localArr, remoteArr, baselineArr, ctx){
       return;
     }
     if (r && !l){
-      if (ctx.noBaseline || !b){ out.push(r); return; } // additive: their creation, pull it
+      if (ctx.noBaseline || !b){
+        // Additive: their creation, pull it. ⚑ But the SAME resurrection check
+        // the l && !r branch does, for the same reason -- and this is the side
+        // that matters more. Found live: after a restore, the phone (which
+        // brought the record back) reported it and the desktop (which had
+        // deleted it) said nothing, because a record this device deleted is by
+        // definition absent from its baseline, so `!b` sent it down this path
+        // and it returned before ever looking at its own tombstone.
+        //
+        // The person who deleted the thing is the one who needs telling it
+        // came back. No noise on a genuine first join: a brand-new device has
+        // no tombstones to match against.
+        const t0 = ctx.localTombstones[id];
+        out.push(r);
+        if (t0) conflicts.push({ store: ctx.store, id: id, resurrection: true, record: r, tombstone: t0 });
+        return;
+      }
       const tomb = ctx.localTombstones[id];
       if (tomb && tomb.deletedAt >= (r.modifiedAt || 0)) return; // our delete wins; stays gone
       out.push(r);
@@ -3766,7 +3782,14 @@ async function dropboxSyncNow(){
     const download = await dropboxDownload(token);
     const remoteBundle = download.exists ? download.bundle : dropboxEmptyBundle();
     const result = Sync.reconcile(remoteBundle); // merges; applies locally unless a drafting page is open (result.applied)
-    allConflicts = allConflicts.concat(result.conflicts);
+    // ⚑ REPLACE, don't concat (found live: two log entries for one event).
+    // Every attempt re-downloads and re-runs the whole merge from scratch, so
+    // a CAS retry re-derives the SAME conflicts rather than finding new ones.
+    // Concatenating reported each one once per attempt, turning "someone wrote
+    // between our download and our upload" -- an invisible, self-resolving
+    // race -- into duplicate entries in the user's conflict log. The last
+    // attempt's set is the one that actually reached the cloud.
+    allConflicts = result.conflicts;
     const mode = download.exists ? { ".tag": "update", update: download.rev } : { ".tag": "add" };
     // result.bundle, NOT Sync.exportBundle(). These are identical whenever the
     // merge was applied, but when it was DEFERRED (drafting page open, author
@@ -3894,7 +3917,12 @@ async function desktopSyncNow(){
     const read = await bridge.readSyncFile(folder);
     const remoteBundle = read.exists ? JSON.parse(read.content) : desktopEmptyBundle();
     const result = Sync.reconcile(remoteBundle); // merges; applies locally unless a drafting page is open (result.applied)
-    allConflicts = allConflicts.concat(result.conflicts);
+    // REPLACE, don't concat -- same fix and same reason as dropboxTransport.js:
+    // every attempt re-reads the file and re-runs the merge from scratch, so a
+    // retry re-derives the SAME conflicts. Concatenating reported each one once
+    // per attempt, turning an invisible self-resolving race into duplicate
+    // entries in the user's conflict log.
+    allConflicts = result.conflicts;
     const recheck = await bridge.readSyncFile(folder);
     if (recheck.exists !== read.exists || recheck.mtimeMs !== read.mtimeMs){
       continue; // something else (most likely the Dropbox daemon syncing a remote change to disk) wrote in between -- loop and merge again against what's actually there now
@@ -16704,12 +16732,32 @@ function injectChunkMap(){
   // resurrection the merge reports gets a plain-language line here, not just
   // applied quietly underneath. Minimal on purpose: which store, a snippet
   // of what won and what lost, when -- not a full diff viewer.
+  // ⚑ A conflict is logged ONCE per event, not once per sync that re-derives
+  // it (found live: two entries for one restored item). The same disagreement
+  // is re-computed by every sync until the cloud settles -- a resurrection in
+  // particular persists until the restored record has actually been pushed --
+  // so without this the log fills with repeats of one thing and stops being
+  // readable, which for a log whose whole job is "never silent" is its own
+  // kind of failure.
+  //
+  // Sixty seconds, and keyed on store+id: long enough to swallow a CAS retry
+  // and the back-to-back open/resume syncs that follow one action, short
+  // enough that the same record genuinely contested again later still gets its
+  // own entry.
+  const CONFLICT_DEDUPE_MS = 60000;
   function appendDropboxConflicts(conflicts){
     if (!conflicts || !conflicts.length) return;
     const log = dropboxConflictLog();
+    const now = Date.now();
     conflicts.forEach(function(c){
+      const key = (c.store || "") + ":" + (c.id || "");
+      const seen = log.some(function(e){
+        return e.key === key && (now - (e.at || 0)) < CONFLICT_DEDUPE_MS;
+      });
+      if (seen) return;
       log.unshift({
-        at: Date.now(),
+        at: now,
+        key: key,
         resurrection: !!c.resurrection,
         keptText: conflictRecordSnippet(c.resurrection ? c.record : c.winner),
         lostText: c.resurrection ? null : conflictRecordSnippet(c.winner === c.local ? c.remote : c.local)

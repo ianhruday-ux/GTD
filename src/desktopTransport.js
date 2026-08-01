@@ -99,7 +99,12 @@ async function desktopSyncNow(){
     const read = await bridge.readSyncFile(folder);
     const remoteBundle = read.exists ? JSON.parse(read.content) : desktopEmptyBundle();
     const result = Sync.reconcile(remoteBundle); // merges; applies locally unless a drafting page is open (result.applied)
-    allConflicts = allConflicts.concat(result.conflicts);
+    // REPLACE, don't concat -- same fix and same reason as dropboxTransport.js:
+    // every attempt re-reads the file and re-runs the merge from scratch, so a
+    // retry re-derives the SAME conflicts. Concatenating reported each one once
+    // per attempt, turning an invisible self-resolving race into duplicate
+    // entries in the user's conflict log.
+    allConflicts = result.conflicts;
     const recheck = await bridge.readSyncFile(folder);
     if (recheck.exists !== read.exists || recheck.mtimeMs !== read.mtimeMs){
       continue; // something else (most likely the Dropbox daemon syncing a remote change to disk) wrote in between -- loop and merge again against what's actually there now

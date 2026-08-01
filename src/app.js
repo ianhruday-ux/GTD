@@ -9181,12 +9181,32 @@
   // resurrection the merge reports gets a plain-language line here, not just
   // applied quietly underneath. Minimal on purpose: which store, a snippet
   // of what won and what lost, when -- not a full diff viewer.
+  // ⚑ A conflict is logged ONCE per event, not once per sync that re-derives
+  // it (found live: two entries for one restored item). The same disagreement
+  // is re-computed by every sync until the cloud settles -- a resurrection in
+  // particular persists until the restored record has actually been pushed --
+  // so without this the log fills with repeats of one thing and stops being
+  // readable, which for a log whose whole job is "never silent" is its own
+  // kind of failure.
+  //
+  // Sixty seconds, and keyed on store+id: long enough to swallow a CAS retry
+  // and the back-to-back open/resume syncs that follow one action, short
+  // enough that the same record genuinely contested again later still gets its
+  // own entry.
+  const CONFLICT_DEDUPE_MS = 60000;
   function appendDropboxConflicts(conflicts){
     if (!conflicts || !conflicts.length) return;
     const log = dropboxConflictLog();
+    const now = Date.now();
     conflicts.forEach(function(c){
+      const key = (c.store || "") + ":" + (c.id || "");
+      const seen = log.some(function(e){
+        return e.key === key && (now - (e.at || 0)) < CONFLICT_DEDUPE_MS;
+      });
+      if (seen) return;
       log.unshift({
-        at: Date.now(),
+        at: now,
+        key: key,
         resurrection: !!c.resurrection,
         keptText: conflictRecordSnippet(c.resurrection ? c.record : c.winner),
         lostText: c.resurrection ? null : conflictRecordSnippet(c.winner === c.local ? c.remote : c.local)

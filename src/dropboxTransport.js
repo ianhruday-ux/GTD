@@ -149,7 +149,14 @@ async function dropboxSyncNow(){
     const download = await dropboxDownload(token);
     const remoteBundle = download.exists ? download.bundle : dropboxEmptyBundle();
     const result = Sync.reconcile(remoteBundle); // merges; applies locally unless a drafting page is open (result.applied)
-    allConflicts = allConflicts.concat(result.conflicts);
+    // ⚑ REPLACE, don't concat (found live: two log entries for one event).
+    // Every attempt re-downloads and re-runs the whole merge from scratch, so
+    // a CAS retry re-derives the SAME conflicts rather than finding new ones.
+    // Concatenating reported each one once per attempt, turning "someone wrote
+    // between our download and our upload" -- an invisible, self-resolving
+    // race -- into duplicate entries in the user's conflict log. The last
+    // attempt's set is the one that actually reached the cloud.
+    allConflicts = result.conflicts;
     const mode = download.exists ? { ".tag": "update", update: download.rev } : { ".tag": "add" };
     // result.bundle, NOT Sync.exportBundle(). These are identical whenever the
     // merge was applied, but when it was DEFERRED (drafting page open, author
