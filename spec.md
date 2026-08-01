@@ -2182,7 +2182,7 @@ orphan pill flags it in the lane; the review catches it for triage. One mechanis
 force back into Waiting any dependents its completion promoted. `restoreTask` never did this. The
 question was whether it should.
 
-**RULING: reverse the promotion only if the un-completion happens within 10 minutes.** The failure
+**RULING: reverse the promotion only if the un-completion happens within 5 minutes.** *(Was 10; narrowed by the author 2026-07-31, when the mechanism was actually built — see below. The pseudo-action revival window in §4.15c is a DIFFERENT feature and remains 10.)* The failure
 this protects against is a mistap while scrolling — noticed within seconds or not at all. Beyond that
 window, a promoted dependent has had a life of its own, possibly for weeks, and yanking it back to
 Waiting would be the app overriding the user's more recent reality with an inference.
@@ -2190,11 +2190,11 @@ Waiting would be the app overriding the user's more recent reality with an infer
 **Mechanism — no timer, no background process, no interaction with the §9 deferral rules.** A promoted
 dependent records **`promotedBy: <taskId>`** and **`promotedAt: <timestamp>`**. `restoreTask` asks,
 lazily and only at the moment anyone cares: *does any live Next Action say it was promoted by this
-item, within the last 10 minutes?* If yes, push it back to Waiting. If no, leave it alone. Two fields
+item, within the last 5 minutes?* If yes, push it back to Waiting. If no, leave it alone. Two fields
 and one check; the "expiry" is evaluated on read, never fired.
 
 **Explicitly ruled, so it isn't guessed:** if the promoted dependent has been **edited** since, it is
-**still pushed back** — its edits survive, only its lane changes. Simpler rule, and within 10 minutes
+**still pushed back** — its edits survive, only its lane changes. Simpler rule, and within 5 minutes
 it cannot be surprising. *(Accepted, minor: a user who edits a just-promoted action may see it move.
 Narrow window, rare case.)*
 

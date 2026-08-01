@@ -495,9 +495,55 @@
     saveTasksLocal(kind);
     renderLane(kind);
     refreshProjectFlags(kind);
+    if (kind === "next") pushBackPromotedDependents(task);
     if (kind === "current" || kind === "future"){
       restoreArchivedWaitingForProject(taskId); // renders "waiting" itself
     }
+  }
+  // §10's RULING, built here for the first time — the spec closed the question
+  // and nothing implemented it, so the window has effectively been zero:
+  // un-completing an action never pushed back the dependents its completion
+  // promoted. (`promotedBy`/`promotedAt` appeared nowhere in the source.)
+  //
+  // ⚑ FIVE minutes, not the spec's ten (author, this round). What this guards
+  // is a mistap while scrolling — noticed within seconds or not at all — so
+  // the window only has to outlast "wait, that was the wrong row". Beyond it a
+  // promoted dependent has had a life of its own, and yanking it back would be
+  // the app overriding the user's more recent reality with an inference.
+  // spec.md §10 updated to match. NOTE this is deliberately NOT the same
+  // window as the pseudo-action revival (§4.15c, still ten): different
+  // feature, different ruling — say so if they should be unified.
+  //
+  // No timer and no background process: the expiry is evaluated on read, at
+  // the only moment anyone cares.
+  const PROMOTION_PUSHBACK_MS = 5 * 60 * 1000;
+  function pushBackPromotedDependents(restored){
+    const now = Date.now();
+    const due = state.tasks.next.filter(function(t){
+      return t.promotedBy === restored.id && t.promotedAt &&
+             (now - t.promotedAt) <= PROMOTION_PUSHBACK_MS;
+    });
+    if (!due.length) return;
+    due.forEach(function(t){
+      moveItem("next", "waiting", t.id, false);
+      const back = state.tasks.waiting.find(function(x){ return x.id === t.id; });
+      if (!back) return;
+      // moveItem cleared the link on the way out and again on the way back, so
+      // the condition is REBUILT rather than remembered. conditionKind is
+      // "next" by construction: completeTask only promotes when the completed
+      // item was a Next Action, and restoreTask has just put it back there.
+      back.conditionId = restored.id;
+      back.conditionKind = "next";
+      back.conditionLabel = restored.title; // the same frozen denormalised name the link carries
+      delete back.promotedBy;
+      delete back.promotedAt;
+    });
+    // Ruled explicitly in the spec so it isn't guessed: a dependent EDITED
+    // since promotion is still pushed back. Its edits survive; only its lane
+    // changes. Inside five minutes that cannot be surprising.
+    saveTasksLocal("next");
+    saveTasksLocal("waiting");
+    renderLane("waiting");
   }
   // Delete ONE completed item from the archive (§12.2 step 1). Deliberately
   // NOT routed through deleteTask: that operates on live lanes only, its
@@ -1467,7 +1513,22 @@
     const dependents = kind === "next"
       ? state.tasks.waiting.filter(function(t){ return t.conditionId === taskId && !t.isGroup; })
       : [];
-    function promoteDependents(){ dependents.forEach(function(dep){ moveItem("waiting", "next", dep.id, false); }); }
+    // §10's pushback ruling: a promoted dependent records WHAT promoted it and
+    // WHEN, so un-completing the source shortly afterwards can put it back.
+    // Written here because moveItem deliberately clears conditionId/Kind/Label
+    // on the way across — after the move the dependent has no memory of the
+    // link at all, which is why the spec called for two new fields rather than
+    // a lookup.
+    function promoteDependents(){
+      if (!dependents.length) return;
+      const at = Date.now(); // wall clock, like every other cross-device stamp
+      dependents.forEach(function(dep){
+        moveItem("waiting", "next", dep.id, false);
+        const moved = state.tasks.next.find(function(t){ return t.id === dep.id; });
+        if (moved){ moved.promotedBy = taskId; moved.promotedAt = at; }
+      });
+      saveTasksLocal("next");
+    }
     // New Completed archive: the finished item moves to the top of
     // state.completed[kind] rather than disappearing for good — kept
     // forever per the retention ruling (§4.12b).
