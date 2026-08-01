@@ -1184,9 +1184,14 @@ the resolution is:
 
 17 checks in `checks/restore_x_sync.py`, 11 failing pre-change.
 
-**What remains of W7:** items 2 and 3 — the author's own desktop pass, and the packaging (a
-sideloadable APK and an unsigned desktop build, plus the plain-language install notes). The in-app
-chunk map and QA checklist are still due when W7 actually ships, per §7's note above.
+**W7 item 2 (the author's desktop pass) is DONE**, 2026-08-01 — not as a set-piece but by using the
+Electron build all night to drive the sync, restore and reset testing above. It found the
+"connected with nowhere to write" defect, the duplicated conflict entries and the silent
+resurrection, which is exactly the argument for insisting on a device pass.
+
+**What remains of W7: item 3 only — the packaging.** A sideloadable APK and an unsigned desktop
+build, plus the plain-language note on how to install each. The in-app chunk map and QA checklist
+are still due when W7 actually ships, per §7's note above.
 
 ---
 
