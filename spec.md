@@ -1375,7 +1375,7 @@ repair retains users through illness, travel, grief; rigid streaks backfire).
 - **Recurring EVENTS collapse into one entry per series** with a completion count ("Pay rent ×6").
   *(Actions do not recur — §7, §4.15b. What archives is the completed occurrence of an event, via its
   pseudo-action.)* Un-completing rolls back the most recent occurrence and decrements the count —
-  **and only within 10 minutes of the completion** (§4.15c, §7: the window governs, and "the most
+  **and only within the undo window — 5 minutes** (§4.15c, §7: the window governs, and "the most
   recent" is simply what the window can reach). **Needs a `seriesId` — see §3 known issue 3.**
 - **Un-completion reversal cascade — RULED (§9):** un-completing an action pushes back the
   dependents its completion promoted **only within a 10-minute window** (`promotedBy` +
@@ -1683,7 +1683,7 @@ beyond the current occurrence is a **projection from the rule, never stored.**
   wrongly puts it. Chunk 3 deletes it from there; chunk 7 rebuilds it here.)*
 
 **4.15c Un-complete × a series — closed, and it needs LITTLE new machinery (but not none).**
-A pseudo-action **cannot be revived beyond 10 minutes** after completion. Inside the window,
+A pseudo-action **cannot be revived beyond the undo window (5 minutes)** after completion. Inside the window,
 un-completing rolls the series back and the pseudo-action returns; outside it, the archive entry
 stands and the series has moved on.
 
@@ -1918,7 +1918,7 @@ A chunk that can't be reverted is a chunk that shouldn't have been written.
 
 **Completed section**
 - Un-complete is allowed, but only **one instance** per recurring series (the most recent); the count
-  decrements. **And only within 10 minutes of the completion** (§4.15c) — past that, the archive entry
+  decrements. **And only within the undo window — 5 minutes** (§4.15c) — past that, the archive entry
   stands and the series has moved on. *(Reconciled this round: this bullet and §4.15c were two rules
   for one question. The 10-minute window governs; "the most recent" is what the window can reach.)*
 - **EMERGENCY RULE — restoration with dangling references.** When a restored item's structural
@@ -2182,7 +2182,7 @@ orphan pill flags it in the lane; the review catches it for triage. One mechanis
 force back into Waiting any dependents its completion promoted. `restoreTask` never did this. The
 question was whether it should.
 
-**RULING: reverse the promotion only if the un-completion happens within 5 minutes.** *(Was 10; narrowed by the author 2026-07-31, when the mechanism was actually built — see below. The pseudo-action revival window in §4.15c is a DIFFERENT feature and remains 10.)* The failure
+**RULING: reverse the promotion only if the un-completion happens within 5 minutes.** *(Was 10; narrowed by the author 2026-07-31 when the mechanism was actually built, then UNIFIED 2026-08-01 with the pseudo-action revival window of §4.15c — "basically the same feature for two different data types". One constant, `UNDO_WINDOW_MS`, five minutes, both data types.)* The failure
 this protects against is a mistap while scrolling — noticed within seconds or not at all. Beyond that
 window, a promoted dependent has had a life of its own, possibly for weeks, and yanking it back to
 Waiting would be the app overriding the user's more recent reality with an inference.

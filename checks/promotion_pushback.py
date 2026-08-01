@@ -20,7 +20,7 @@ app overriding the user's more recent reality with an inference.
 Offline-only behaviour -- no sync involved, which matches the author's own read
 ("this is probably unrelated, because it fails offline too").
 """
-import os, sys, json, functools, http.server, socket, socketserver, threading, contextlib, time
+import os, sys, json, datetime, functools, http.server, socket, socketserver, threading, contextlib, time
 from playwright.sync_api import sync_playwright
 
 try:
@@ -173,6 +173,74 @@ with serve(DIST) as url, sync_playwright() as p:
           f"and is not duplicated back into Waiting ({lane(pg2,'waiting')})")
     check(not errs2, f"no JS errors in group 2 ({errs2[:3]})")
     ctx2.close()
+
+    # ============================================================
+    # Group 3 -- the CALENDAR half moved to the same window
+    # ============================================================
+    # "It's basically the same feature for two different data types, so they
+    # should be unified" (author). The pseudo-action revival window was ten
+    # minutes and the promotion pushback five; they are now one constant.
+    #
+    # ⚠ This boundary was previously untested. boundary_4am.py completes and
+    # then jumps a whole hour ("undo window long closed") and sync_chunk_a.py
+    # un-completes immediately -- both pass at five OR ten, so nothing pinned
+    # the value and the unification could have been a no-op nobody noticed.
+    # Real clock control, so the assertion is on the boundary itself.
+    ctx3 = b.new_context(viewport={"width": 420, "height": 900})
+    pg3 = ctx3.new_page()
+    errs3 = []
+    pg3.on("pageerror", lambda e: errs3.append(str(e)))
+    base = datetime.datetime(2026, 8, 3, 12, 0, 0)
+
+    def series_fixture(minutes_after_completion):
+        pg3.clock.install(time=base)
+        pg3.goto(url); pg3.wait_for_timeout(800)
+        pg3.evaluate("() => { const r=document.querySelector('#tray-root'); if(r) r.innerHTML=''; }")
+        # A daily series whose pseudo-action is due today.
+        pg3.evaluate("""() => {
+            localStorage.setItem('gtd_events', JSON.stringify([{
+              id: 'ev-1', taskId: 'pseudo-1', title: 'DAILY THING', date: '2026-08-03',
+              time: null, recurrence: 'daily', interval: 1, completedOccs: [],
+              completedAt: null, completedFrom: null }]));
+        }""")
+        pg3.reload(); pg3.wait_for_timeout(900)
+        pg3.evaluate("() => { const r=document.querySelector('#tray-root'); if(r) r.innerHTML=''; }")
+        box = pg3.locator('.lane[data-kind="next"] button.check[data-action="complete"]').first
+        if not box.count():
+            return "NO-CHECKBOX"
+        box.click(); pg3.wait_for_timeout(700)
+        pg3.clock.set_fixed_time(base + datetime.timedelta(minutes=minutes_after_completion))
+        pg3.reload(); pg3.wait_for_timeout(900)
+        pg3.evaluate("() => { const r=document.querySelector('#tray-root'); if(r) r.innerHTML=''; }")
+        # ⚠ Toggle only if it is actually collapsed. The collapse state lives in
+        # localStorage and this helper runs twice in ONE browser context, so an
+        # unconditional click opened it the first time and CLOSED it the second
+        # -- which reads as "no restore button" and blames the code for the
+        # fixture. Query first, toggle only if that came up empty.
+        sel_restore = '.lane[data-kind="next"] [data-action="restore"]'
+        if not pg3.locator(sel_restore).count():
+            hdr = pg3.locator('.lane[data-kind="next"] [data-action="toggle-group"][data-id="__completed_open__"]')
+            if hdr.count():
+                hdr.first.click(); pg3.wait_for_timeout(400)
+        restore = pg3.locator(sel_restore).first
+        if not restore.count():
+            return "NO-RESTORE-BUTTON: " + repr(pg3.evaluate("""() => {
+                const l = document.querySelector('.lane[data-kind=\"next\"]');
+                return l ? l.innerText.slice(0, 300) : 'no lane';
+            }"""))
+        restore.click(); pg3.wait_for_timeout(700)
+        return pg3.evaluate("""() => (JSON.parse(localStorage.getItem('gtd_tasks_next')||'[]')
+            .some(t => t.title === 'DAILY THING'))""")
+
+    inside = series_fixture(3)
+    check(inside is True,
+          f"three minutes on, un-completing a series occurrence still rolls it back ({inside})")
+    outside = series_fixture(7)
+    check(outside is False,
+          f"THE UNIFICATION: seven minutes on it is REFUSED -- the calendar half now uses the same "
+          f"five-minute window as the promotion pushback, not its old ten ({outside})")
+    check(not errs3, f"no JS errors in group 3 ({errs3[:3]})")
+    ctx3.close()
 
     b.close()
 

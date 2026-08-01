@@ -35,7 +35,11 @@ function recurOptions(){
   return ["none", "daily", "weekly", "monthly", "yearly"].map(function(v){ return { v: v, label: t("cal." + RECUR_KEY[v]) }; });
 }
 function recurLabel(v){ return t("cal." + (RECUR_KEY[v] || "repeats")); }
-const CAL_UNDO_WINDOW_MS = 10 * 60 * 1000; // §4.15c: un-complete a series occurrence within 10 minutes
+// ⚑ UNIFIED (author, 2026-08-01): this used to be its own ten-minute
+// UNDO_WINDOW_MS, separate from the promotion pushback's five. They are
+// the same feature for two data types -- un-completing shortly after
+// completing undoes the side effect the completion caused -- so there is now
+// one window, declared in app.js. See UNDO_WINDOW_MS there for the reasoning.
 
 function loadEvents(){ return Storage.getJSON("gtd_events", null); }
 function saveEvents(){ Storage.setJSON("gtd_events", state.events); }
@@ -242,10 +246,10 @@ function processEventBoundaries(){
       return;
     }
     if (isRecurring(ev)){
-      // (1) COMPLETION-DRIVEN roll: 10 minutes after the pseudo-action was
+      // (1) COMPLETION-DRIVEN roll: once the undo window after the pseudo-action's completion
       //     completed, the series moves on (§4.15b/§4.15c). Before the window
       //     closes, un-completing rolls it back (restorePseudoAction).
-      if (ev.completedAt != null && nowInstant() >= ev.completedAt + CAL_UNDO_WINDOW_MS){
+      if (ev.completedAt != null && nowInstant() >= ev.completedAt + UNDO_WINDOW_MS){
         const nd = nextOccurrenceDate(ev.completedFrom || ev.date, ev.recurrence, ev.interval);
         if (nd){ ev.date = nd; }
         ev.completedAt = null; ev.completedFrom = null;
@@ -385,10 +389,10 @@ function onPseudoActionRestored(task){
   if (!ev) return true; // event deleted meanwhile: restore as a plain orphaned row
   const occ = task.occCanon || task.occDate || ev.date;
   if (isRecurring(ev)){
-    // Inside the 10-minute window (§4.15c): roll the series back and let the
+    // Inside the undo window (§4.15c): roll the series back and let the
     // pseudo-action return. Outside it: the archive entry stands and the series
     // has moved on — REFUSE the restore so it can't duplicate the rolled row.
-    if (ev.completedAt != null && nowInstant() < ev.completedAt + CAL_UNDO_WINDOW_MS){
+    if (ev.completedAt != null && nowInstant() < ev.completedAt + UNDO_WINDOW_MS){
       ev.completedAt = null; ev.completedFrom = null;
     } else {
       return false;

@@ -74,6 +74,28 @@
   // Task lanes (each backed by state.tasks[k]). Notes are a lane too but NOT a
   // task kind — they have their own store — so KINDS stays task-only and
   // ALL_LANES is what tab/lane rendering and visibility iterate (chunk 6).
+  // ⚑ THE UNDO WINDOW — one constant, one ruling, both data types.
+  //
+  // "It's basically the same feature for two different data types, so they
+  // should be unified" (author, 2026-08-01). There were two: the pseudo-action
+  // revival window (§4.15c) at ten minutes, and the promotion pushback (§10)
+  // at five. They ARE the same feature — un-completing something shortly after
+  // completing it undoes the side effect the completion caused — differing
+  // only in what the side effect was:
+  //
+  //   · a Waiting dependent promoted into Next Actions   (§10)
+  //   · a recurring series rolled on to its next date     (§4.15c)
+  //
+  // FIVE minutes, the narrower of the two. What this guards is a mistap while
+  // scrolling, noticed within seconds or not at all, so the window only has to
+  // outlast "wait, that was the wrong row". Past it, the thing the completion
+  // set in motion has had a life of its own, and reversing it would be the app
+  // overriding the user's more recent reality with an inference.
+  //
+  // Declared here rather than in events.js so there is one home for a rule
+  // that is not calendar-specific; events.js is stapled after app.js and reads
+  // it only from inside functions, so ordering is not a concern.
+  const UNDO_WINDOW_MS = 5 * 60 * 1000;
   const KINDS = ["next", "waiting", "current", "future", "habit"];
   const ALL_LANES = ["next", "waiting", "current", "future", "habit", "notes"];
   // =========================================================
@@ -505,23 +527,13 @@
   // un-completing an action never pushed back the dependents its completion
   // promoted. (`promotedBy`/`promotedAt` appeared nowhere in the source.)
   //
-  // ⚑ FIVE minutes, not the spec's ten (author, this round). What this guards
-  // is a mistap while scrolling — noticed within seconds or not at all — so
-  // the window only has to outlast "wait, that was the wrong row". Beyond it a
-  // promoted dependent has had a life of its own, and yanking it back would be
-  // the app overriding the user's more recent reality with an inference.
-  // spec.md §10 updated to match. NOTE this is deliberately NOT the same
-  // window as the pseudo-action revival (§4.15c, still ten): different
-  // feature, different ruling — say so if they should be unified.
-  //
   // No timer and no background process: the expiry is evaluated on read, at
-  // the only moment anyone cares.
-  const PROMOTION_PUSHBACK_MS = 5 * 60 * 1000;
+  // the only moment anyone cares. See UNDO_WINDOW_MS for the window itself.
   function pushBackPromotedDependents(restored){
-    const now = Date.now();
+    const now = nowMs(); // same clock the stamp was written with, see promoteDependents
     const due = state.tasks.next.filter(function(t){
       return t.promotedBy === restored.id && t.promotedAt &&
-             (now - t.promotedAt) <= PROMOTION_PUSHBACK_MS;
+             (now - t.promotedAt) <= UNDO_WINDOW_MS;
     });
     if (!due.length) return;
     due.forEach(function(t){
@@ -1521,7 +1533,12 @@
     // a lookup.
     function promoteDependents(){
       if (!dependents.length) return;
-      const at = Date.now(); // wall clock, like every other cross-device stamp
+      // nowMs(), NOT Date.now(): this stamp is only ever compared against
+      // "now" on the same device, so it does not need the wall clock that
+      // cross-device ordering does (modifiedAt) — and using the QA-jumpable
+      // clock is what makes the window testable with the time-jump buttons,
+      // exactly as the calendar half of this feature already is.
+      const at = nowMs();
       dependents.forEach(function(dep){
         moveItem("waiting", "next", dep.id, false);
         const moved = state.tasks.next.find(function(t){ return t.id === dep.id; });
