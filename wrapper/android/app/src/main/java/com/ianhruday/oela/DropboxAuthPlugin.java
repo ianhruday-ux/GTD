@@ -15,6 +15,7 @@ import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import java.security.GeneralSecurityException;
 import java.io.IOException;
+import java.util.Collections;
 import net.openid.appauth.AuthState;
 import net.openid.appauth.AuthorizationException;
 import net.openid.appauth.AuthorizationRequest;
@@ -93,9 +94,26 @@ public class DropboxAuthPlugin extends Plugin {
         // the entire reason no App Secret was collected in the setup
         // checklist (public-client PKCE has none), and it must not be
         // disabled here or the exchange step will be rejected by Dropbox.
+        // ⚑ token_access_type=offline IS LOAD-BEARING, and its absence is what
+        // broke phone sync roughly four hours after every login (found live,
+        // 2026-07-31: the phone last synced successfully at 23:09 on the 30th
+        // and every attempt after that failed, while the desktop -- which uses
+        // no OAuth at all, just the local Dropbox folder -- carried on fine).
+        //
+        // Dropbox issues SHORT-LIVED access tokens (~4 hours) and returns a
+        // refresh token ONLY when this parameter is present. Without it the
+        // grant we store has an access token and nothing to renew it with, so
+        // getAccessToken()'s performActionWithFreshTokens() below has nothing
+        // to refresh FROM and rejects -- correctly, and permanently, until the
+        // user logs in again. The symptom is the worst kind: connecting works,
+        // syncing works, and then it quietly stops that evening.
+        //
+        // AppAuth has no typed setter for this; it is a Dropbox-specific
+        // authorization parameter and rides in additionalParameters.
         AuthorizationRequest request = new AuthorizationRequest.Builder(
                 serviceConfig, clientId, ResponseTypeValues.CODE, Uri.parse(REDIRECT_URI))
             .setScope(SCOPE)
+            .setAdditionalParameters(Collections.singletonMap("token_access_type", "offline"))
             .build();
 
         saveCall(call);

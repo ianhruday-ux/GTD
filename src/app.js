@@ -8964,7 +8964,17 @@
 
   function dropboxSyncStatusLabel(){
     if (state.sync.syncing) return t("sync.syncing");
-    if (state.sync.lastError) return t("sync.error");
+    // ⚑ SHOW THE ACTUAL REASON, not just "failed" (added after the phone
+    // stopped syncing on 2026-07-31 and the menu could only say that it had).
+    // The reason was sitting in lastError the whole time; diagnosing it
+    // instead took reading the shared Dropbox file and then the Java. On a
+    // phone there is no console to fall back on, so a status line that will
+    // not say WHY is a dead end rather than a hint. Truncated, because these
+    // strings come from Dropbox and can run long.
+    if (state.sync.lastError){
+      const why = String(state.sync.lastError).trim();
+      return t("sync.error") + (why ? " — " + (why.length > 90 ? why.slice(0, 89) + "…" : why) : "");
+    }
     const at = dropboxLastSyncAt();
     if (!at) return t("sync.notYetSynced");
     const min = Math.floor((Date.now() - at) / 60000);
