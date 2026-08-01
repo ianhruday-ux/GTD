@@ -1080,6 +1080,10 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 }
 .screen-complete-pill:hover{ filter:brightness(1.06); }
 .screen-complete-pill.done{ background:var(--desk); border:1px solid var(--lane-accent, var(--moss)); color:var(--lane-accent, var(--moss)); }
+/* W7: a linked row that is STAGED, not yet saved — its own ✕ sits beside the
+   row so a mis-tap can be undone without discarding the whole page. */
+.linked-action-row{ display:flex; align-items:center; gap:4px; }
+.linked-action-row > .linked-action-item{ flex:1; min-width:0; }
 /* W7: the day an open pause began, beside the Pause button. Quiet — it is a
    fact about the habit, not a control, and must not compete with the button. */
 .habit-paused-since{ margin-left:0.6rem; font-size:0.82rem; color:var(--text-soft); align-self:center; }

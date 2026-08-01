@@ -548,9 +548,18 @@ function collapseCompletedSeries(items){
 // `stagedEvents` are events added from an UNSAVED project page: they are not in
 // state.events yet (§12.1 staging) but the page must still show what it is about
 // to create, or adding one looks like it did nothing.
-function projectLinkedEventRowsHtml(projectId, stagedEvents){
+// alsoLinkIds (W7): events being ATTACHED to this project by a staged link.
+// They are real events with a real page, so unlike stagedEvents they are not
+// inert -- they simply do not carry linkedProjectId yet, because nothing on a
+// drafting page is written until Save.
+function projectLinkedEventRowsHtml(projectId, stagedEvents, alsoLinkIds, unlinkIds){
   if (!projectId) return "";
-  const evs = (state.events || []).filter(function(ev){ return ev.linkedProjectId === projectId; })
+  const alsoSet = {};
+  (alsoLinkIds || []).forEach(function(id){ alsoSet[id] = 1; });
+  // W7: a staged detach leaves the list immediately, like a staged link joins it.
+  const goneSet = {};
+  (unlinkIds || []).forEach(function(id){ goneSet[id] = 1; });
+  const evs = (state.events || []).filter(function(ev){ return (ev.linkedProjectId === projectId || alsoSet[ev.id]) && !goneSet[ev.id]; })
     .concat((stagedEvents || []).filter(function(ev){ return ev.linkedProjectId === projectId; }));
   if (!evs.length) return "";
   // Show the live occurrence at its EFFECTIVE date/time (a moved one included).

@@ -823,6 +823,13 @@ const STRINGS = {
   // A bare "Paused" taught users it was a switch; the date teaches the bracket
   // they opened and will close, and makes a forgotten pause visible.
   "habit.pausedSince":    { en: "Paused since {date}",           "zh-Hans": "自 {date} 起暂停" },
+  // W7: the project page could always CREATE into itself and never attach
+  // something already in the app. These label the missing half.
+  "project.linkExisting":     { en: "Link existing",                "zh-Hans": "关联已有项目" },
+  "project.linkExistingTitle":{ en: "Link an existing action or event", "zh-Hans": "关联一个已有的行动或事件" },
+  "project.nothingToLink":    { en: "Nothing to link — actions and events already attached to a project don't appear here. Move one from its own page.",
+                                "zh-Hans": "没有可关联的项目——已归属某个项目的行动和事件不会出现在这里。请在它自己的页面上移动它。" },
+  "project.removeFromProject":{ en: "Remove from this project",     "zh-Hans": "从此项目中移除" },
   "group.deleteList":     { en: "Delete list",                   "zh-Hans": "删除列表" },
   "note.emptyNoNotes":    { en: "No notes yet.",                 "zh-Hans": "还没有笔记。" },
   "note.emptyForFilter":  { en: "No notes for this filter.",     "zh-Hans": "没有符合此筛选条件的笔记。" },

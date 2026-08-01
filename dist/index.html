@@ -1118,6 +1118,10 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 }
 .screen-complete-pill:hover{ filter:brightness(1.06); }
 .screen-complete-pill.done{ background:var(--desk); border:1px solid var(--lane-accent, var(--moss)); color:var(--lane-accent, var(--moss)); }
+/* W7: a linked row that is STAGED, not yet saved — its own ✕ sits beside the
+   row so a mis-tap can be undone without discarding the whole page. */
+.linked-action-row{ display:flex; align-items:center; gap:4px; }
+.linked-action-row > .linked-action-item{ flex:1; min-width:0; }
 /* W7: the day an open pause began, beside the Pause button. Quiet — it is a
    fact about the habit, not a control, and must not compete with the button. */
 .habit-paused-since{ margin-left:0.6rem; font-size:0.82rem; color:var(--text-soft); align-self:center; }
@@ -2514,7 +2518,7 @@ body.screen-open #tray-handle{ display:none; }
 (function(){
 "use strict";
 
-const BUILD_STAMP = "01 Aug 01:26";  // replaced by build.py
+const BUILD_STAMP = "01 Aug 02:15";  // replaced by build.py
 
 // =========================================================
 // STORAGE ADAPTER (spec.md §3, known issue 4)
@@ -4784,6 +4788,13 @@ const STRINGS = {
   // A bare "Paused" taught users it was a switch; the date teaches the bracket
   // they opened and will close, and makes a forgotten pause visible.
   "habit.pausedSince":    { en: "Paused since {date}",           "zh-Hans": "自 {date} 起暂停" },
+  // W7: the project page could always CREATE into itself and never attach
+  // something already in the app. These label the missing half.
+  "project.linkExisting":     { en: "Link existing",                "zh-Hans": "关联已有项目" },
+  "project.linkExistingTitle":{ en: "Link an existing action or event", "zh-Hans": "关联一个已有的行动或事件" },
+  "project.nothingToLink":    { en: "Nothing to link — actions and events already attached to a project don't appear here. Move one from its own page.",
+                                "zh-Hans": "没有可关联的项目——已归属某个项目的行动和事件不会出现在这里。请在它自己的页面上移动它。" },
+  "project.removeFromProject":{ en: "Remove from this project",     "zh-Hans": "从此项目中移除" },
   "group.deleteList":     { en: "Delete list",                   "zh-Hans": "删除列表" },
   "note.emptyNoNotes":    { en: "No notes yet.",                 "zh-Hans": "还没有笔记。" },
   "note.emptyForFilter":  { en: "No notes for this filter.",     "zh-Hans": "没有符合此筛选条件的笔记。" },
@@ -10541,7 +10552,41 @@ function injectChunkMap(){
   // project saves. That keeps DRAFT ISOLATION exactly: an event added while
   // drafting a project that is then ✕'d out of goes with it, instead of being
   // stranded in the calendar linked to a project that never existed.
-  function newStagedSet(){ return { creates: [], edits: {}, deletes: {}, completes: {}, noteCreates: [], eventCreates: [] }; }
+  // `links` (W7): EXISTING actions and events being attached to this project.
+  // The project page could always CREATE things into itself and never link
+  // anything already in the app — the reverse direction existed (an action's
+  // own page carries a project select) but not this one. Staged like every
+  // other change on a drafting page, so ✕ discards the link and only Save
+  // writes linkedProjectId onto the other item: DRAFT ISOLATION explicitly
+  // covers "side effects on other items", and this is exactly that.
+  // `unlinks` (W7): the way OUT of a project, which never existed. §12.1's own
+  // comment said "you remove it from the project's own list instead" and
+  // described a control nobody had built -- so detaching an action was only
+  // possible by completing or deleting it, and once Complete and Delete are
+  // blocked for linked items (author's ruling) an action could check into a
+  // project and never leave. Staged like everything else here.
+  function newStagedSet(){ return { creates: [], edits: {}, deletes: {}, completes: {}, noteCreates: [], eventCreates: [], links: [], unlinks: [] }; }
+  function stagedLinks(s){ return (s && s.draft && s.draft.staged && s.draft.staged.links) || []; }
+  function stagedUnlinks(s){ return (s && s.draft && s.draft.staged && s.draft.staged.unlinks) || []; }
+  // An item opened from a project's linked list, that the project ALREADY has
+  // -- as opposed to one created on this page and not yet saved. Complete and
+  // Delete are withheld for these (author's ruling): they are pre-existing
+  // items reached sideways, and destroying one from inside a project draft you
+  // might still ✕ out of is not what "open" should offer. Fields stay editable.
+  //
+  // A staged create is deliberately NOT covered: its row carries no ✕ of its
+  // own, so Delete is the only way to take back a mis-added action, and
+  // withholding it would strand the row until you discarded the whole page.
+  // Once saved it becomes an ordinary linked item and loses Delete on the next
+  // open, which is the direction the ruling wants.
+  function openedAsProjectMember(s){
+    if (!s || !s.staging || !s.draft) return false;
+    if (s.draft.linkedProjectId !== s.staging.projectId) return false;
+    return !stagedCreate(s.staging.parent, s.taskId);
+  }
+  function stagedLinkedEventIds(s){
+    return stagedLinks(s).filter(function(l){ return l.kind === "event"; }).map(function(l){ return l.id; });
+  }
   // The project id a project draft stages against — the live id when editing,
   // or the id minted at open for a brand-new project (so children can link).
   function stagingProjectId(s){ return (s && (s.taskId || (s.draft && s.draft.projectId))) || null; }
@@ -10570,6 +10615,11 @@ function injectChunkMap(){
   function projectDraftHasWayForward(s){
     if (projectDraftLinked(s).length) return true;
     if (stagedEventCreates(s).length) return true;
+    // A staged LINK is a way forward too. §4.3's gate blocks saving a new
+    // Current project with nothing to do next, and an action you just attached
+    // is as much a next step as one you just typed — refusing to save there
+    // would be the gate reading its own bookkeeping instead of the project.
+    if (stagedLinks(s).length) return true;
     const pid = stagingProjectId(s);
     return !!(pid && typeof projectHasLinkedEvent === "function" && projectHasLinkedEvent(pid));
   }
@@ -10577,8 +10627,11 @@ function injectChunkMap(){
     const pid = stagingProjectId(s);
     const staged = s.draft.staged || newStagedSet();
     const out = [];
+    const unlinked = {};
+    (staged.unlinks || []).forEach(function(u){ unlinked[u.id] = true; });
     linkedActionsForProject(pid).forEach(function(l){
       if (staged.deletes[l.task.id] || staged.completes[l.task.id]) return;
+      if (unlinked[l.task.id]) return; // staged detach: gone from the list, still in its lane
       const ed = staged.edits[l.task.id];
       const task = ed ? Object.assign({}, l.task, ed) : l.task;
       out.push({ kind: (ed && ed.kind) || l.kind, task: task });
@@ -10586,6 +10639,17 @@ function injectChunkMap(){
     (staged.creates || []).forEach(function(c){
       if (c.stagedComplete) return;
       out.push({ kind: c.kind, task: Object.assign({}, c) });
+    });
+    // Staged LINKS render in the list immediately, so attaching something and
+    // looking back at the list shows it there -- otherwise the button appears
+    // to do nothing until Save. Marked stagedLink so the row can carry a ✕
+    // that un-attaches it: without one a mis-tap could only be undone by ✕-ing
+    // the whole page, which throws away every other edit too.
+    (staged.links || []).forEach(function(lk){
+      if (lk.kind === "event") return; // events render in their own dated band
+      const found = findTaskAnywhere(lk.id);
+      if (!found) return; // deleted from under us since it was picked
+      out.push({ kind: found.kind, task: found.task, stagedLink: true });
     });
     return out;
   }
@@ -10677,6 +10741,8 @@ function injectChunkMap(){
       if ((staged.creates || []).length) return true;
       if ((staged.noteCreates || []).length) return true;
       if ((staged.eventCreates || []).length) return true;
+      if ((staged.links || []).length) return true;   // W7: attaching something is a real edit to discard
+      if ((staged.unlinks || []).length) return true; // ...and so is detaching one
       if (Object.keys(staged.deletes).length) return true;
       if (Object.keys(staged.completes).length) return true;
       for (const id in staged.edits){
@@ -10718,6 +10784,7 @@ function injectChunkMap(){
   function applyProjectStaging(s){
     const staged = s.draft.staged;
     if (!staged) return;
+    const pid = stagingProjectId(s); // the id staged links are written against
     const touched = [];
     (staged.creates || []).forEach(function(c){
       const task = Object.assign({}, c);
@@ -10726,6 +10793,49 @@ function injectChunkMap(){
       state.tasks[kind].unshift(task);
       touched.push(task.id);
     });
+    // W7 -- staged LINKS become real here, and only here. Written by id
+    // wherever the item now lives (the §9 zombie trap: an action can have been
+    // promoted from Waiting to Next while this page was open). Re-checked
+    // rather than trusted: the picker only offered UNLINKED items, but that was
+    // when it was picked, and the other device -- or the other lane -- may have
+    // linked it since. Last writer wins would silently steal it from a project
+    // this screen never mentioned, which is the exact thing excluding
+    // already-linked items from the picker exists to prevent.
+    let linkedAnything = false;
+    (staged.links || []).forEach(function(lk){
+      if (lk.kind === "event"){
+        const ev = findEvent(lk.id);
+        if (!ev || ev.linkedProjectId) return;
+        ev.linkedProjectId = pid;
+        linkedAnything = true;
+        return;
+      }
+      const found = findTaskAnywhere(lk.id);
+      if (!found || found.task.linkedProjectId) return;
+      found.task.linkedProjectId = pid;
+      touched.push(lk.id);
+      linkedAnything = true;
+    });
+    // ...and staged DETACHES. The item itself is untouched beyond losing the
+    // link -- it stays in its lane, keeps its edits, keeps its history. This is
+    // "remove from project", never "delete".
+    (staged.unlinks || []).forEach(function(u){
+      if (u.kind === "event"){
+        const ev = findEvent(u.id);
+        if (ev && ev.linkedProjectId === pid){ ev.linkedProjectId = null; linkedAnything = true; }
+        return;
+      }
+      const found = findTaskAnywhere(u.id);
+      if (found && found.task.linkedProjectId === pid){
+        found.task.linkedProjectId = null;
+        touched.push(u.id);
+        linkedAnything = true;
+      }
+    });
+    if (linkedAnything){
+      saveEvents();
+      KINDS.filter(isActionKind).forEach(saveTasksLocal);
+    }
     // Notes staged from this project page become real here, and only here.
     if ((staged.noteCreates || []).length){
       (staged.noteCreates || []).forEach(function(n){ state.notes.unshift(Object.assign({}, n)); });
@@ -11643,7 +11753,9 @@ function injectChunkMap(){
     // ⚑ Simplification: events sit as a dated band above the action sub-tree
     // rather than being interleaved with deadlined actions; nested dependents
     // on events are chunk 8.
-    const eventRows = projectLinkedEventRowsHtml(s.draft && s.draft.projectId, stagedEventCreates(s));
+    const eventRows = projectLinkedEventRowsHtml(stagingProjectId(s), stagedEventCreates(s),
+                                                stagedLinkedEventIds(s),
+                                                stagedUnlinks(s).map(function(u){ return u.id; }));
     if (!linked.length) return eventRows ? ('<div class="screen-hook-pick-label">' + escapeHtml(t("project.linkedActionsLabel")) + '</div><div class="linked-actions-list">' + eventRows + '</div>') : "";
     const byId = {};
     linked.forEach(function(l){ byId[l.task.id] = l; });
@@ -11673,9 +11785,25 @@ function injectChunkMap(){
       const open = l.external
         ? 'data-action="open-edit" data-kind="waiting" data-id="' + l.task.id + '"'
         : 'data-action="open-linked-action" data-kind="' + l.kind + '" data-id="' + l.task.id + '"';
-      html += '<button type="button" class="linked-action-item' + (depth > 0 ? " indented" : "") + '" ' + open + (depth > 1 ? ' style="margin-left:' + (depth * 22) + 'px;"' : '') + '>' +
+      const rowBtn = '<button type="button" class="linked-action-item' + (depth > 0 ? " indented" : "") + '" ' + open + (depth > 1 ? ' style="margin-left:' + (depth * 22) + 'px;"' : '') + '>' +
         kindDot(l.kind) + escapeHtml(l.task.title) +
       '</button>';
+      // A staged (not yet saved) link carries its own ✕ so a mis-tap can be
+      // undone without ✕-ing the whole page and losing every other edit. Live
+      // links deliberately do NOT get one -- removing something already in the
+      // project goes through its own page, which is the existing contract.
+      // Wrapped in a row rather than nesting the ✕ inside the open button,
+      // which would be a button inside a button.
+      // Every row that is IN the project gets a ✕ now: staged links drop the
+      // staged link, live ones stage a detach. Staged CREATES keep their Delete
+      // instead -- a thing that does not exist yet cannot be "removed from the
+      // project", it can only not be created.
+      const isStagedCreate = !!stagedCreate(s, l.task.id);
+      html += (l.stagedLink || (!isStagedCreate && !l.external))
+        ? '<div class="linked-action-row">' + rowBtn +
+            '<button type="button" class="chip-x" data-action="' + (l.stagedLink ? "unstage-link" : "unlink-linked") + '" data-id="' + l.task.id + '" title="' + escapeHtml(t("project.removeFromProject")) + '">&times;</button>' +
+          '</div>'
+        : rowBtn;
       (dependents[l.task.id] || []).forEach(function(dep){ itemHtml(dep, Math.min(depth + 1, 4)); });
     }
     // Roots: anything whose condition isn't itself in this list.
@@ -11768,6 +11896,9 @@ function injectChunkMap(){
         '<button type="button" class="btn btn-ghost btn-small project-add-note" data-action="generate-action" data-gen-kind="next">' + escapeHtml(t("project.newAction")) + '</button>' +
         '<button type="button" class="btn btn-ghost btn-small project-add-note" data-action="generate-action" data-gen-kind="waiting">' + escapeHtml(t("project.newWaitingAction")) + '</button>' +
         '<button type="button" class="btn btn-ghost btn-small project-add-note" data-action="new-linked-event">' + escapeHtml(t("project.newEvent")) + '</button>' +
+        // W7: the missing half. Every button beside it CREATES; this one
+        // attaches something that already exists.
+        '<button type="button" class="btn btn-ghost btn-small project-add-note" data-action="open-link-picker">' + escapeHtml(t("project.linkExisting")) + '</button>' +
       '</div>';
     const body = tab === "notes"
       ? linkedNotesListHtml(s, pid)
@@ -12164,6 +12295,87 @@ function injectChunkMap(){
       '</div>'
     );
   }
+  // What the "Link existing" picker offers (W7).
+  //
+  // ⚑ UNLINKED ONLY — author's ruling. An action already belonging to another
+  // project is excluded rather than moved. Moving one remains possible from the
+  // action's own page, which has a project select and names the project you are
+  // moving it out of; doing it from HERE would silently empty a project this
+  // screen never mentions, and could leave it stalled, with nothing on screen
+  // saying so. Nothing is lost — only the quiet path to it.
+  //
+  // Also excluded: group rows (not actions), anything already linked here,
+  // anything already staged as a link, and staged creates (they are in the list
+  // already and are not yet real).
+  // Pure, so BOTH surfaces that offer this share one definition of eligible --
+  // the project page and the review's stalled card. Two copies of "which items
+  // can be linked" is exactly how the two would drift apart.
+  function linkTargetsFor(pid, excludeIds){
+    const skip = {};
+    (excludeIds || []).forEach(function(id){ skip[id] = true; });
+    const out = { actions: [], events: [] };
+    ["next", "waiting"].forEach(function(k){
+      state.tasks[k].forEach(function(t){
+        if (t.isGroup || t.linkedProjectId || skip[t.id]) return;
+        if (pid && t.id === pid) return;
+        out.actions.push({ kind: k, task: t });
+      });
+    });
+    (state.events || []).forEach(function(ev){
+      if (ev.linkedProjectId || skip[ev.id]) return;
+      out.events.push(ev);
+    });
+    return out;
+  }
+  function linkTargetsForScreen(s){
+    return linkTargetsFor(stagingProjectId(s), stagedLinks(s).map(function(l){ return l.id; }));
+  }
+  // The grouped list itself, in the shared picker language. Takes the action
+  // and any extra attributes so the two surfaces can route their picks
+  // differently while looking and grouping identically.
+  function linkPickListHtml(targets, action, extraAttr){
+    function itemBtn(id, kind, title, hint){
+      return '<button type="button" class="screen-hook-pick-item" data-action="' + action + '" ' +
+        'data-id="' + escapeHtml(id) + '" data-link-kind="' + kind + '"' + (extraAttr || "") + '>' +
+        kindDot(kind === "event" ? "event" : kind) + escapeHtml(title) +
+        (hint ? ' <span class="cal-agenda-kind">' + escapeHtml(hint) + '</span>' : "") +
+      '</button>';
+    }
+    function group(label, rows){
+      return rows.length ? '<div class="screen-hook-pick-label">' + escapeHtml(label) + '</div>' +
+        '<div class="screen-hook-pick-list">' + rows.join("") + '</div>' : "";
+    }
+    const eventRows = targets.events.map(function(ev){
+      const d = dateStrToDate(effDate(ev, ev.date));
+      return itemBtn(ev.id, "event", ev.title || t("cal.untitledEvent"),
+                     d.toLocaleDateString(undefined, { month: "short", day: "numeric" }));
+    });
+    const nextRows = targets.actions.filter(function(a){ return a.kind === "next"; })
+      .map(function(a){ return itemBtn(a.task.id, "next", a.task.title, null); });
+    const waitRows = targets.actions.filter(function(a){ return a.kind === "waiting"; })
+      .map(function(a){ return itemBtn(a.task.id, "waiting", a.task.title, null); });
+    const body = group(t("picker.conditionNextActions"), nextRows) +
+                 group(t("picker.conditionWaitingActions"), waitRows) +
+                 group(t("picker.conditionUpcomingEvents"), eventRows);
+    // Empty state is a teaching surface, not an error (§12.1b): "unlinked only"
+    // is a rule the user cannot see from a blank list and would read as a bug.
+    return body || '<div class="empty-note">' + escapeHtml(t("project.nothingToLink")) + '</div>';
+  }
+  // ⚑ THE SHARED PICKER LANGUAGE (author: "we settled on a unified style for
+  // the pickers"). Same wrapper, label/list/item classes and Back row the hook
+  // and condition pickers use -- this asks the same kind of question ("which
+  // existing item?"), so a second look for it would be a new thing to learn for
+  // nothing. An earlier draft reused the linked-list classes and quietly became
+  // a third style.
+  function linkPickerHtml(s){
+    return (
+      '<div class="pick-body">' +
+        '<div class="screen-hook-pick-label">' + escapeHtml(t("project.linkExistingTitle")) + '</div>' +
+        linkPickListHtml(linkTargetsForScreen(s), "pick-link", "") +
+        '<div class="screen-row" style="margin-top:8px;"><button type="button" class="btn btn-ghost btn-small" data-action="screen-cancel-link-pick">' + escapeHtml(t("picker.back")) + '</button></div>' +
+      '</div>'
+    );
+  }
   // Condition picker for Waiting items — grouped by kind since a condition
   // can be either a Next Action or another Waiting action. Cycle filtering
   // (getValidConditionTargets) already excludes anything that would loop.
@@ -12210,7 +12422,10 @@ function injectChunkMap(){
     );
   }
   function screenHeaderHtml(s){
-    const showDelete = !!s.taskId;
+    // W7 (author): withheld for an item the project already has, opened from
+    // its linked list. Kept for a staged create, whose row has no ✕ and for
+    // which Delete is the only take-back. See openedAsProjectMember.
+    const showDelete = !!s.taskId && !openedAsProjectMember(s);
     // Event pages read "Appointment" once a time is set (§4.14 — the time is
     // the only thing that distinguishes the two; they are not separate types).
     const badge = s.eventView ? (s.draft && s.draft.time ? t("badge.appointment") : t("badge.event")) : KIND_BADGE_LABEL[s.kind];
@@ -12371,6 +12586,15 @@ function injectChunkMap(){
         habitHookPickerHtml(s) +
       '</div>';
     }
+    // W7: the link picker takes over the project page the same way the hook and
+    // condition pickers take over theirs -- the title stays visible and read-only
+    // so you can see which project you are attaching to.
+    if (isProjectKind(kind) && draft.linkPicker){
+      return '<div class="screen-body">' +
+        '<input type="text" class="screen-field-title" data-field="title" placeholder="' + escapeHtml(TITLE_PLACEHOLDER[kind]) + '" value="' + escapeHtml(draft.title) + '" readonly>' +
+        linkPickerHtml(s) +
+      '</div>';
+    }
     if (kind === "waiting" && draft.conditionPicker){
       return '<div class="screen-body">' +
         '<input type="text" class="screen-field-title" data-field="title" placeholder="' + escapeHtml(TITLE_PLACEHOLDER[kind]) + '" value="' + escapeHtml(draft.title) + '" readonly>' +
@@ -12491,7 +12715,10 @@ function injectChunkMap(){
     }
 
     let completeHtml = "";
-    if ((kind === "next" || kind === "waiting" || isProjectKind(kind)) && s.taskId){
+    // W7: no Complete either, for the same reason and by the same ruling --
+    // an item reached sideways through a project draft should not be
+    // completable from inside a page you might still ✕ out of.
+    if ((kind === "next" || kind === "waiting" || isProjectKind(kind)) && s.taskId && !openedAsProjectMember(s)){
       // STRICT UNIFORMITY (user ruling): Complete here is draft-only too.
       // It no longer archives-and-closes on tap; it ARMS the completion,
       // the page stays open, Save carries it out (archive + close) and ✕
@@ -13154,6 +13381,32 @@ function injectChunkMap(){
         const inp = qs("#review-form-input"); if (inp) inp.focus();
         return;
       }
+      const revLinkPick = e.target.closest('[data-action="review-link-pick"]');
+      if (revLinkPick){
+        const s = state.screen;
+        // The project rides on the ROW (data-project), not looked up from the
+        // card key: data-id is already spoken for by the item being linked, and
+        // every other button on this card carries its target the same way.
+        const pid = revLinkPick.getAttribute("data-project");
+        const id = revLinkPick.getAttribute("data-id");
+        if (pid && id){
+          if (revLinkPick.getAttribute("data-link-kind") === "event"){
+            const ev = findEvent(id);
+            if (ev && !ev.linkedProjectId){ ev.linkedProjectId = pid; saveEvents(); }
+          } else {
+            const found = findTaskAnywhere(id);
+            if (found && !found.task.linkedProjectId){
+              found.task.linkedProjectId = pid;
+              saveTasksLocal(found.kind);
+            }
+          }
+          KINDS.filter(isActionKind).forEach(renderLane);
+          renderLane("current");
+        }
+        if (s) s.reviewForm = null;
+        renderScreen();
+        return;
+      }
       if (e.target.closest('[data-action="review-form-cancel"]')){ if (state.screen) state.screen.reviewForm = null; renderScreen(); return; }
       if (e.target.closest('[data-action="review-pushdate-save"]')){ reviewSavePushDate(); return; }
       if (e.target.closest('[data-action="review-addnext-save"]')){ reviewSaveAddNext(); return; }
@@ -13625,6 +13878,58 @@ function injectChunkMap(){
         state.screenStack.push(state.screen);
         state.screen = null;
         openNoteScreen(null, { projectLinks: [{ id: pid, name: pname }], staging: staging });
+        return;
+      }
+      // W7 -- the link-existing picker. A sub-view of THIS page, not a new
+      // screen: nothing is committed, so there is nothing to come back from.
+      if (e.target.closest('[data-action="open-link-picker"]')){
+        if (!state.screen || !state.screen.draft) return;
+        state.screen.draft.linkPicker = true;
+        renderScreen();
+        return;
+      }
+      if (e.target.closest('[data-action="screen-cancel-link-pick"]')){
+        if (!state.screen || !state.screen.draft) return;
+        state.screen.draft.linkPicker = false;
+        renderScreen();
+        return;
+      }
+      const pickLinkBtn = e.target.closest('[data-action="pick-link"]');
+      if (pickLinkBtn){
+        const s = state.screen;
+        if (!s || !s.draft) return;
+        s.draft.staged = s.draft.staged || newStagedSet();
+        s.draft.staged.links.push({ id: pickLinkBtn.getAttribute("data-id"),
+                                    kind: pickLinkBtn.getAttribute("data-link-kind") });
+        // Straight back to the list, so the thing you just attached is visible
+        // where it will live. Picking one at a time is deliberate: the list is
+        // what tells you what you have done, and a multi-select would hide it.
+        s.draft.linkPicker = false;
+        if (s.invalidField === "projectActions") s.invalidField = null;
+        renderScreen();
+        return;
+      }
+      const unstageLinkBtn = e.target.closest('[data-action="unstage-link"]');
+      if (unstageLinkBtn){
+        const s = state.screen;
+        if (!s || !s.draft || !s.draft.staged) return;
+        const id = unstageLinkBtn.getAttribute("data-id");
+        s.draft.staged.links = s.draft.staged.links.filter(function(l){ return l.id !== id; });
+        renderScreen();
+        return;
+      }
+      // Detaching something the project ALREADY has. Staged, not immediate:
+      // ✕-ing the page must put it back, like every other change here.
+      const unlinkBtn = e.target.closest('[data-action="unlink-linked"]');
+      if (unlinkBtn){
+        const s = state.screen;
+        if (!s || !s.draft) return;
+        s.draft.staged = s.draft.staged || newStagedSet();
+        const id = unlinkBtn.getAttribute("data-id");
+        if (!s.draft.staged.unlinks.some(function(u){ return u.id === id; })){
+          s.draft.staged.unlinks.push({ id: id, kind: findEvent(id) ? "event" : "action" });
+        }
+        renderScreen();
         return;
       }
       if (e.target.closest('[data-action="new-linked-event"]')){
@@ -15256,6 +15561,22 @@ function injectChunkMap(){
     } else if (l.kind === "stalled"){
       if (form && form.type === "text"){
         menuHtml = reviewInlineFormHtml(t("review.whatsNextAction"), "text", "review-addnext-save", t("review.add"), "", invalid, "next", l.id);
+      } else if (form && form.type === "link"){
+        // ⚑ Author: the link picker belongs here too. It is the only entry in
+        // this band that gives a stalled project a way forward WITHOUT making
+        // something new -- often the honest answer, since the action usually
+        // already exists and simply was never attached.
+        //
+        // Acts IMMEDIATELY, unlike the project page's copy. The review has no
+        // draft and no ✕ to discard into; every other button on this card
+        // commits on tap, and a picker that silently staged instead would be
+        // the odd one out. Same list, same grouping, same look -- only the
+        // routing differs.
+        menuHtml =
+          '<div class="pick-body">' +
+            linkPickListHtml(linkTargetsFor(l.id, []), "review-link-pick", ' data-project="' + l.id + '"') +
+            '<div class="review-menu-row">' + reviewMenuBtn("review-form-cancel", t("picker.back"), "") + '</div>' +
+          '</div>';
       } else if (form && form.type === "waiting"){
         // ⚑ Two fields, not one (user: stalled projects need a waiting action
         // here too). A Waiting action is invalid without something to wait ON
@@ -15276,6 +15597,9 @@ function injectChunkMap(){
         // A button that resolves/edits in place (Completed) stays plain.
         menuHtml =
           reviewBandHtml(
+            // Author: above the make-something-new buttons, because attaching
+            // what already exists is the first thing to try.
+            reviewMenuBtn("review-form-start", t("project.linkExisting"), ' data-key="' + l.key + '" data-type="link"') +
             reviewMenuBtn("review-form-start", t("review.addNextAction"), ' data-key="' + l.key + '" data-type="text" data-target="next"') +
             reviewMenuBtn("review-form-start", t("review.addWaitingAction"), ' data-key="' + l.key + '" data-type="waiting" data-target="waiting"') +
             // ⚑ The third one the user asked for originally, parked until a project
@@ -17588,9 +17912,18 @@ function collapseCompletedSeries(items){
 // `stagedEvents` are events added from an UNSAVED project page: they are not in
 // state.events yet (§12.1 staging) but the page must still show what it is about
 // to create, or adding one looks like it did nothing.
-function projectLinkedEventRowsHtml(projectId, stagedEvents){
+// alsoLinkIds (W7): events being ATTACHED to this project by a staged link.
+// They are real events with a real page, so unlike stagedEvents they are not
+// inert -- they simply do not carry linkedProjectId yet, because nothing on a
+// drafting page is written until Save.
+function projectLinkedEventRowsHtml(projectId, stagedEvents, alsoLinkIds, unlinkIds){
   if (!projectId) return "";
-  const evs = (state.events || []).filter(function(ev){ return ev.linkedProjectId === projectId; })
+  const alsoSet = {};
+  (alsoLinkIds || []).forEach(function(id){ alsoSet[id] = 1; });
+  // W7: a staged detach leaves the list immediately, like a staged link joins it.
+  const goneSet = {};
+  (unlinkIds || []).forEach(function(id){ goneSet[id] = 1; });
+  const evs = (state.events || []).filter(function(ev){ return (ev.linkedProjectId === projectId || alsoSet[ev.id]) && !goneSet[ev.id]; })
     .concat((stagedEvents || []).filter(function(ev){ return ev.linkedProjectId === projectId; }));
   if (!evs.length) return "";
   // Show the live occurrence at its EFFECTIVE date/time (a moved one included).
