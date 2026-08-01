@@ -2534,7 +2534,7 @@ body.screen-open #tray-handle{ display:none; }
 (function(){
 "use strict";
 
-const BUILD_STAMP = "01 Aug 14:19";  // replaced by build.py
+const BUILD_STAMP = "01 Aug 14:49";  // replaced by build.py
 
 // =========================================================
 // STORAGE ADAPTER (spec.md §3, known issue 4)
@@ -8125,6 +8125,7 @@ function injectChunkMap(){
     if (peek && peek.eventId && !onPseudoActionRestored(peek)) return;
     const task = state.completed[kind].splice(idx, 1)[0];
     delete task.completedAt;
+    delete task.completedByProject; // it is live again; the association is over
     sanitizeRestoredParentage(kind, task);
     saveCompletedLocal(kind);
     state.tasks[kind].unshift(task);
@@ -8134,7 +8135,12 @@ function injectChunkMap(){
     if (kind === "next") pushBackPromotedDependents(task);
     if (kind === "current" || kind === "future"){
       restoreArchivedWaitingForProject(taskId); // renders "waiting" itself
-      restoreEventsForProject(taskId);          // and this one renders next + waiting
+      // ⚠ EVENTS BEFORE NEXT ACTIONS, and the order is load-bearing: restoring a
+      // pseudo-action looks its event up (onPseudoActionRestored → findEvent) to
+      // roll the series back, and an event still sitting in the archive cannot
+      // be found, so the row would be refused for the wrong reason.
+      restoreEventsForProject(taskId);          // renders next + waiting itself
+      restoreNextActionsForProject(taskId);
     }
   }
   // §10's RULING, built here for the first time — the spec closed the question
@@ -9625,6 +9631,49 @@ function injectChunkMap(){
     renderLane("next"); renderLane("waiting");
     return restored.length;
   }
+  // ⚑ THE THIRD KIND (author, 2026-08-01, extending the same ruling): "it should
+  // extend to everything linked to the project, including next actions."
+  //
+  // Linked NEXT actions are not archived like the waiting ones — completeProject
+  // completes them outright, because §4.6 says they complete silently and they
+  // are genuinely done. So un-completing has to know which completed actions
+  // THIS project's completion completed. Nothing recorded that, so completion
+  // now stamps `completedByProject` and this reads it back.
+  //
+  // ⚠ Why a marker rather than "un-complete every completed action linked to
+  // this project": the second one also resurrects actions the user ticked off by
+  // hand days earlier, which turns an undo into a rewrite of their history. The
+  // undo has to reverse the click, not the week.
+  //
+  // Restoration goes through restoreTask itself rather than reimplementing the
+  // move, which keeps three behaviours in one place instead of two: parentage
+  // sanitising, the promoted-dependents pushback (§10), and — the one that
+  // matters here — a pseudo-action's undo window (§4.15c). A repeat's row comes
+  // back only if the project is un-completed inside that window; outside it the
+  // series has already rolled and restoring would duplicate the rolled row.
+  // Fat-fingering a project and undoing it IS the inside-the-window case, which
+  // is the whole subject of the ruling.
+  function restoreNextActionsForProject(projectId){
+    const ids = state.completed.next
+      .filter(function(t){ return t.completedByProject === projectId; })
+      .map(function(t){ return t.id; });
+    if (!ids.length) return 0;
+    let restored = 0;
+    ids.forEach(function(id){
+      const before = state.completed.next.length;
+      restoreTask("next", id);
+      if (state.completed.next.length < before) restored++;
+    });
+    // Whatever refused to come back (a repeat whose series has rolled on) is no
+    // longer associated with a completed project at all, so the marker goes
+    // either way rather than lying in wait for the next time this one is ticked.
+    let dirty = false;
+    state.completed.next.forEach(function(t){
+      if (t.completedByProject === projectId){ delete t.completedByProject; dirty = true; }
+    });
+    if (dirty) saveCompletedLocal("next");
+    return restored;
+  }
   // Restores a project's archived Waiting actions back into the live
   // Waiting list. Not wired to any button yet — the un-complete-project
   // control that would call this is chunk 5's Completed section; this is
@@ -9683,6 +9732,26 @@ function injectChunkMap(){
     const eventCount = (state.events || []).filter(function(ev){ return ev.linkedProjectId === projectId; }).length;
     function doComplete(){
       nextLinked.forEach(function(l){ completeTask(l.kind, l.task.id); });
+      // ⚑ Record that THIS completion is what completed them, so un-completing
+      // the project can reverse exactly these and nothing the user ticked off
+      // themselves (restoreNextActionsForProject). Stamped after the fact rather
+      // than threaded through completeTask, which is called from six other
+      // places that have no project to name.
+      // ⚑ Schema: a new optional field on completed records, no migration —
+      // real use has not begun (CLAUDE.md), and an action completed before this
+      // shipped simply has no marker and stays completed, which is exactly what
+      // it did yesterday.
+      if (nextLinked.length){
+        const justCompleted = {};
+        nextLinked.forEach(function(l){ justCompleted[l.task.id] = true; });
+        let dirty = false;
+        state.completed.next.forEach(function(t){
+          if (justCompleted[t.id] && t.completedByProject !== projectId){
+            t.completedByProject = projectId; dirty = true;
+          }
+        });
+        if (dirty) saveCompletedLocal("next");
+      }
       if (waitingLinked.length){
         archiveWaitingForProject(projectId, waitingLinked.map(function(l){ return l.task; }));
         waitingLinked.forEach(function(l){ deleteTask(l.kind, l.task.id); });

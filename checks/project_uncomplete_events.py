@@ -1,8 +1,14 @@
-"""Un-completing a project brings its linked EVENTS back — and they survive.
+"""Un-completing a project brings back everything linked to it — and it survives.
 
-Author's ruling, 2026-08-01: *"does the fat finger protection extend to projects
-and their linked actions? The answer is yes. Give it the same timestamp treatment
-as waiting actions and events."*
+Author's ruling, 2026-08-01, in two parts: *"does the fat finger protection
+extend to projects and their linked actions? The answer is yes. Give it the same
+timestamp treatment as waiting actions and events."* — then, asked whether it
+covered the next actions too: *"Yes, it should extend to everything linked to the
+project, including next actions."*
+
+So un-completing a project now reverses all three kinds: the archived WAITING
+actions (which always worked), the archived EVENTS (which never did), and the
+NEXT actions the completion completed outright (which nothing recorded).
 
 WHAT WAS WRONG. Completing a project archives its linked waiting actions AND its
 linked events (`archiveEventsForProject`, chunk 7) — archived rather than deleted
@@ -28,8 +34,19 @@ save path stamps it `modifiedAt = now` with this device's id. Group 2 proves the
 restore survives that merge, and then proves WHY by rolling the timestamp back
 and watching the same merge eat it.
 
+THE NEXT ACTIONS NEEDED A MARKER, not a query. They are not archived — §4.6 has
+them complete silently, because they are genuinely done — so "which completed
+actions did this project's completion complete?" had no answer in the data.
+Completion now stamps `completedByProject`. The obvious alternative, un-completing
+every completed action that happens to link to the project, would also resurrect
+the ones the user ticked off by hand days earlier: the undo has to reverse the
+click, not the week. The fixture below carries one of each and checks they are
+told apart.
+
 Protocols 4 and 5 both apply and are honoured in one fixture: the project carries
-a linked waiting action, a linked RECURRING event and a linked note, and goes
+a linked waiting action, a linked NEXT action, an action the user completed by
+hand, a waiting action hooked to the linked one (so completion promotes it and
+un-completion must push it back), a linked RECURRING event and a linked note —
 through completion, un-completion, deletion, and a sync round trip.
 """
 import os, functools, http.server, socket, socketserver, threading, contextlib, json, sys, time, datetime
@@ -110,7 +127,29 @@ def seed(pg):
                        isGroup: false, parent: null, linkedProjectId: 'p-kitchen',
                        contextId: null, conditionText: 'the fitter calls back',
                        conditionKind: 'text' });
+        // Hooked to the linked next action below, NOT to the project: completing
+        // that action promotes this one into Next (§4.2), so un-completing has to
+        // push it back (§10). Tests the cascade, not the link.
+        wait.unshift({ id: 'w-order', title: 'ZZ Order the worktop', notesClean: '',
+                       isGroup: false, parent: null, linkedProjectId: null,
+                       contextId: null, conditionText: 'ZZ Measure the alcove',
+                       conditionKind: 'task', conditionId: 'n-measure' });
         localStorage.setItem('gtd_tasks_waiting', JSON.stringify(wait));
+
+        const nxt = JSON.parse(localStorage.getItem('gtd_tasks_next') || '[]');
+        nxt.unshift({ id: 'n-measure', title: 'ZZ Measure the alcove', notesClean: '',
+                      isGroup: false, parent: null, linkedProjectId: 'p-kitchen',
+                      contextId: null, whenText: null });
+        localStorage.setItem('gtd_tasks_next', JSON.stringify(nxt));
+
+        // ⚠ THE DISCRIMINATOR. Linked to the same project and completed BY HAND,
+        // before any of this. Un-completing the project must not resurrect it:
+        // the undo reverses the click, not the week.
+        const done = JSON.parse(localStorage.getItem('gtd_completed_next') || '[]');
+        done.unshift({ id: 'n-colour', title: 'ZZ Pick a colour', notesClean: '',
+                       isGroup: false, parent: null, linkedProjectId: 'p-kitchen',
+                       contextId: null, whenText: null, completedAt: '2026-06-10' });
+        localStorage.setItem('gtd_completed_next', JSON.stringify(done));
 
         localStorage.setItem('gtd_events', JSON.stringify([
           { id: 'e-site', taskId: 't-site', title: 'ZZ Site meeting', date: '2026-06-15',
@@ -238,22 +277,55 @@ with serve(DIST) as url, sync_playwright() as p:
           "the waiting action came back too, as it always did")
     check("ZZ Kitchen" in lane(pg1, "current"), "and the project itself is live again")
 
-    # ⚑ TODAY'S OCCURRENCE STAYS TICKED, and that is existing design rather than
-    # a gap in this fix — traced, not assumed. A pseudo-action inherits its
-    # event's linkedProjectId, so it IS one of the project's linked next
-    # actions, and completeProject completes those silently (§4.6 as refined in
-    # 9). The event was therefore archived already carrying completedOccs for
-    # today. Un-completing restores the SERIES, not that one tick, exactly as it
-    # does not un-complete the ordinary next actions the same click completed.
-    #
-    # ⚑ FLAGGED FOR THE AUTHOR, deliberately not decided here: whether the
-    # fat-finger protection should reach one step further and un-complete the
-    # actions a project's completion completed for you. That is the same shape
-    # of question as the ruling this file implements, and it is theirs.
+    # ⚑ TODAY'S OCCURRENCE COMES BACK UN-TICKED, and this is the case the ruling
+    # was extended to cover. A pseudo-action inherits its event's
+    # linkedProjectId, so it IS one of the project's linked next actions and the
+    # project's completion ticked it — which the author had never done. Restoring
+    # the next actions runs it back through onPseudoActionRestored, which (inside
+    # the 10-minute undo window, §4.15c) rolls the series back and un-records the
+    # occurrence. Outside that window the row is refused by design: the series has
+    # already rolled and putting it back would duplicate the rolled row.
+    # Fat-fingering a project and undoing it is the inside-the-window case.
     occs = (ev_after or {}).get("completedOccs") or []
-    check(occs == ["2026-06-15"],
-          f"today's occurrence stays recorded complete — the project's completion ticked it as a "
-          f"linked next action, and un-completing restores the series, not that tick ({occs})")
+    check(occs == [],
+          f"THE EXTENDED RULING: today's occurrence is no longer recorded complete — the tick the "
+          f"project's completion applied is undone with it ({occs})")
+    check((ev_after or {}).get("completedAt") in (None, 0),
+          f"and the series is no longer armed to roll ({(ev_after or {}).get('completedAt')})")
+    check("ZZ Site meeting" in lane(pg1, "next"),
+          f"RENDERED: so the occurrence is back on the lane, untouched ({lane(pg1, 'next')[:5]})")
+
+    # ---- the third kind: the next actions the completion completed ----
+    completed_next = pg1.evaluate("""() => JSON.parse(localStorage.getItem('gtd_completed_next') || '[]')
+        .map(t => ({ id: t.id, title: t.title, byProject: t.completedByProject || null }))""")
+    live_next = lane(pg1, "next")
+
+    check("ZZ Measure the alcove" in live_next,
+          f"THE EXTENDED RULING: the linked NEXT action the project's completion completed is live "
+          f"again ({live_next[:5]})")
+    check(not any(t["id"] == "n-measure" for t in completed_next),
+          f"and gone from the completed list rather than sitting in both ({completed_next})")
+    check(any(t["id"] == "n-colour" for t in completed_next),
+          f"⚠ THE DISCRIMINATOR: the action the USER completed by hand a week earlier is still "
+          f"completed — the undo reverses the click, not the week ({completed_next})")
+    check("ZZ Pick a colour" not in live_next,
+          f"and it did not reappear on the lane ({live_next[:5]})")
+    check(not any(t["byProject"] for t in completed_next),
+          f"no stale completedByProject marker is left behind to fire next time ({completed_next})")
+
+    # The cascade, free from reusing restoreTask: completing the linked action
+    # promoted its dependent into Next (§4.2), so un-completing pushes it back.
+    check("ZZ Order the worktop" in lane(pg1, "waiting"),
+          f"RENDERED: the waiting action that completion PROMOTED is pushed back to Waiting "
+          f"(§10) ({lane(pg1, 'waiting')[:5]})")
+    check("ZZ Order the worktop" not in lane(pg1, "next"),
+          f"and is not left duplicated in Next ({lane(pg1, 'next')[:5]})")
+
+    n_measure = pg1.evaluate("""() => JSON.parse(localStorage.getItem('gtd_tasks_next') || '[]')
+        .find(t => t.id === 'n-measure') || null""")
+    check(n_measure and n_measure.get("modifiedAt", 0) > deleted_at,
+          f"and the restored action carries the same fresh stamp the events do, so a stale device "
+          f"cannot re-complete it ({n_measure and n_measure.get('modifiedAt')} > {deleted_at})")
 
     note_state = pg1.evaluate("""() => {
       const n = JSON.parse(localStorage.getItem('gtd_notes') || '[]').find(x => x.id === 'n-tiles');
