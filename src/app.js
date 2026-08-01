@@ -8178,10 +8178,23 @@
   // of chunk 7) — it does, because it sweeps ALL gtd_ keys, gtd_events included.
   // Import REPLACES (never merges): merge is a conflict engine in disguise (§10);
   // replace makes the file an honest snapshot.
+  //
+  // ⚑ W7 (wrapper-plan.md §11, author's ruling): "every gtd_ key" is no longer
+  // literally every gtd_ key. Sync's own bookkeeping lives under the same
+  // prefix, and a backup is the user's DATA, not this device's place in the
+  // sync system. Export omits it and import refuses it — see sync.js's
+  // RESTORING A BACKUP block for the full ruling. Neither half of that is a
+  // detail: importing gtd_device_id gave two devices one identity, which is
+  // the normal outcome of restoring a phone backup onto a new computer.
   // =========================================================
   function serializeAllData(){
     const data = {};
-    Storage.keys().forEach(function(k){ if (k.indexOf("gtd_") === 0) data[k] = Storage.get(k); });
+    Storage.keys().forEach(function(k){
+      // Excluded on the way OUT as well as the way in. A backup carrying
+      // another device's identity is a loaded gun even if this build refuses
+      // to fire it -- the file outlives the build that wrote it.
+      if (k.indexOf("gtd_") === 0 && !Sync.isSyncMachineryKey(k)) data[k] = Storage.get(k);
+    });
     return { app: "OELA", format: 1, exportedAt: new Date().toISOString(), data: data };
   }
   function exportAllData(){
@@ -8211,10 +8224,47 @@
         const data = payload && payload.data;
         if (!data || typeof data !== "object"){ importError(t("confirm.importNotBackup")); return; }
         closeDialog();
-        openConfirmDialog(t("confirm.importReplaceWarning"), [
+        // The sync sentence only appears on a device that actually syncs --
+        // on a plain browser tab it would describe consequences that cannot
+        // happen, which is its own kind of dishonesty.
+        const warning = t("confirm.importReplaceWarning") +
+          (Sync.isEnabled() ? " " + t("confirm.importAlsoSyncs") : "");
+        openConfirmDialog(warning, [
           { label: t("confirm.replaceEverything"), style: "danger", action: function(){
-              Storage.keys().forEach(function(k){ if (k.indexOf("gtd_") === 0) Storage.remove(k); });
-              Object.keys(data).forEach(function(k){ if (k.indexOf("gtd_") === 0) Storage.set(k, data[k]); });
+              // (a) A restore is the truth: stamp every restored record now,
+              // so it beats an earlier deletion on the other device instead
+              // of being silently re-deleted by it.
+              Sync.stampRestoredRecords(data);
+              // Clear only what a restore replaces. Sync machinery is NOT
+              // cleared here -- gtd_device_id in particular must survive, or
+              // this device forgets who it is and mints a second identity on
+              // the next boot, which is the very failure being fixed.
+              Storage.keys().forEach(function(k){
+                if (k.indexOf("gtd_") === 0 && !Sync.isSyncMachineryKey(k)) Storage.remove(k);
+              });
+              Object.keys(data).forEach(function(k){
+                // Belt and braces: a backup written by an older build still
+                // carries the machinery keys, and this is where they are
+                // refused. Export having stopped emitting them is not enough.
+                if (k.indexOf("gtd_") === 0 && !Sync.isSyncMachineryKey(k)) Storage.set(k, data[k]);
+              });
+              // ⚑ A LANE THE BACKUP DOES NOT MENTION IS RESTORED EMPTY, not
+              // left absent. initLocalData() treats ANY missing lane store as
+              // "this install has no data" and calls seedData(), which
+              // re-seeds EVERY lane -- so restoring a backup written before a
+              // lane existed (gtd_tasks_habit, or notes before chunk 6) wiped
+              // the restore on the very next boot and tombstoned every record
+              // it had just written. Found by checks/restore_x_sync.py.
+              // Writing "[]" says "this lane is empty", which is what the
+              // backup actually means, and is a claim seedData never overrides.
+              KINDS.forEach(function(k){
+                const key = "gtd_tasks_" + k;
+                if (Storage.get(key) === null) Storage.set(key, "[]");
+              });
+              // (b) Rejoin fresh -- baseline, tombstones and roster go, this
+              // device's id and connection stay. Runs AFTER the writes above
+              // so nothing it clears can be reinstated by them.
+              Sync.resetSyncIdentityAfterRestore();
               window.location.reload();
             } },
           { label: t("chrome.cancel"), action: function(){} }

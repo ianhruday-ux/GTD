@@ -345,7 +345,21 @@ function mergeRecordArray(localArr, remoteArr, baselineArr, ctx){
       return;
     }
     if (l && !r){
-      if (ctx.noBaseline || !b){ out.push(l); return; } // additive: local creation, keep/push it
+      if (ctx.noBaseline || !b){
+        // Additive: local creation, keep/push it. But a remote tombstone for
+        // a record we are keeping is a RESURRECTION whichever branch notices
+        // it, and §1 says it is never silent -- W7, found by
+        // checks/restore_x_sync.py. This is the path a restored device takes
+        // (a restore clears the baseline deliberately, so it rejoins
+        // additive-only), which makes it exactly the case the user most wants
+        // reported: the restore brought back something deleted elsewhere.
+        // No noise on a genuine first join -- it fires only when the far end
+        // holds a tombstone for an id this device actually has.
+        const t0 = ctx.remoteTombstones[id];
+        out.push(l);
+        if (t0) conflicts.push({ store: ctx.store, id: id, resurrection: true, record: l, tombstone: t0 });
+        return;
+      }
       const tomb = ctx.remoteTombstones[id];
       if (tomb && tomb.deletedAt >= (l.modifiedAt || 0)) return; // their delete wins; drop it
       out.push(l); // our edit is newer than their delete (or no tombstone reached us yet)
@@ -614,8 +628,81 @@ function canSweepAccumulated(sinceMs){
   return (Date.now() - gateWaitStartedAt) > SYNC_GATE_TIMEOUT_MS;
 }
 
+// =========================================================
+// RESTORING A BACKUP (W7, wrapper-plan.md §11 -- author's ruling).
+//
+// A backup is the USER'S DATA. It is not this device's place in the sync
+// system, and importAllData used to make no distinction: it wiped every gtd_
+// key and wrote back every gtd_ key in the file, sync's own bookkeeping
+// included. Three things fell out, and the worst was the quietest --
+// restoring a phone backup onto a new computer, which is the NORMAL way to
+// set one up, gave two devices the SAME IDENTITY. The roster then held one
+// entry for two devices, tombstone GC (§4.5, "oldest last pull across every
+// device") was computed over a device set that was wrong, and the deviceId
+// tie-break stopped distinguishing them.
+//
+// THE RULING, in two halves:
+//
+//   (a) A RESTORE IS THE TRUTH and propagates outward. Every restored record
+//       is stamped modifiedAt = now, so it beats an earlier deletion on the
+//       other device rather than being silently re-deleted by it. That
+//       re-deletion was the sharpest failure of §1's never-silent standard in
+//       the whole audit: mergeRecordArray's `l && !r` branch drops the record
+//       and returns WITHOUT recording a conflict. A now-stamped record takes
+//       the resurrection path instead, which does report.
+//
+//   (b) IDENTITY IS NEVER RESTORED. The device keeps its own id and rejoins
+//       fresh. Baseline, tombstones and roster are CLEARED rather than
+//       imported -- and clearing beats keeping, because after a restore this
+//       device's data no longer matches its old baseline either, and a
+//       baseline is precisely what licenses inferring "absent means deleted".
+//       With none, §4.5 makes the next sync additive-only in both directions:
+//       a restore asserts what it contains and infers nothing from what it
+//       does not. So restoring January's backup cannot silently delete what
+//       the other device did in February.
+//
+// gtd_sync_connected stays local too: a backup saying "connected" does not
+// make a fresh machine connected -- it has no token.
+const SYNC_MACHINERY_KEYS = [SYNC_DEVICE_ID_KEY, SYNC_BASELINE_KEY, SYNC_CONNECTED_KEY,
+                             SYNC_TOMBSTONE_KEY, SYNC_ROSTER_KEY];
+function isSyncMachineryKey(k){ return SYNC_MACHINERY_KEYS.indexOf(k) !== -1; }
+
+// (a). Only the stores the merge engine actually reasons about; everything
+// else in a backup is settings, which no device contests.
+function stampRestoredRecords(data){
+  const now = Date.now();
+  const deviceId = getDeviceId();
+  SYNC_STORE_KEYS.forEach(function(k){
+    if (typeof data[k] !== "string") return;
+    let arr;
+    try { arr = JSON.parse(data[k]); } catch (e){ return; }
+    // A backup predating chunk A/B holds keyed objects for the reshaped
+    // stores. Left alone deliberately: normalizeReshapedStores() converts
+    // them at the next boot and backfillModifiedAt() stamps them there.
+    if (!Array.isArray(arr)) return;
+    arr.forEach(function(r){
+      if (!r || typeof r.id !== "string") return;
+      r.modifiedAt = now;
+      r.deviceId = deviceId;
+    });
+    data[k] = JSON.stringify(arr);
+  });
+  return data;
+}
+
+// (b). Called AFTER the restored keys are written, so nothing it clears can
+// be resurrected by the write that follows it.
+function resetSyncIdentityAfterRestore(){
+  Storage.remove(SYNC_BASELINE_KEY);
+  Storage.remove(SYNC_TOMBSTONE_KEY);
+  Storage.remove(SYNC_ROSTER_KEY);
+}
+
 const Sync = {
   getDeviceId: getDeviceId,
+  isSyncMachineryKey: isSyncMachineryKey,           // W7: what a backup must never carry in
+  stampRestoredRecords: stampRestoredRecords,       // W7: (a) a restore is the truth
+  resetSyncIdentityAfterRestore: resetSyncIdentityAfterRestore, // W7: (b) rejoin fresh
   isEnabled: syncIsEnabled,
   setConnected: setSyncConnected,
   exportBundle: exportBundle,

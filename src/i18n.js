@@ -635,6 +635,10 @@ const STRINGS = {
   "confirm.importInvalidJson": { en: "That file isn’t valid backup JSON.", "zh-Hans": "该文件不是有效的备份 JSON。" },
   "confirm.importNotBackup": { en: "That file doesn’t look like an OELA backup.", "zh-Hans": "该文件看起来不是 OELA 的备份文件。" },
   "confirm.importReplaceWarning": { en: "This will replace everything currently in the app.", "zh-Hans": "这将替换应用中当前的所有内容。" },
+  // W7: shown only when this device syncs. A restore propagates (author's
+  // ruling), so it can bring back something deleted on the other device --
+  // which is worth saying plainly BEFORE it happens, not discovering after.
+  "confirm.importAlsoSyncs": { en: "Your other devices will get the restored items too, including anything you deleted there.", "zh-Hans": "你的其他设备也会收到恢复的内容，包括你在那里删除过的项目。" },
   "confirm.replaceEverything": { en: "Replace everything",          "zh-Hans": "替换全部" },
   "confirm.ok":               { en: "OK",                           "zh-Hans": "好" },
   "confirm.deleteTitleForGood": { en: "Delete “{title}” for good?", "zh-Hans": "永久删除“{title}”吗？" },
