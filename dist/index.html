@@ -2534,7 +2534,7 @@ body.screen-open #tray-handle{ display:none; }
 (function(){
 "use strict";
 
-const BUILD_STAMP = "01 Aug 14:49";  // replaced by build.py
+const BUILD_STAMP = "01 Aug 15:26";  // replaced by build.py
 
 // =========================================================
 // STORAGE ADAPTER (spec.md §3, known issue 4)
@@ -4212,6 +4212,15 @@ const STRINGS = {
   "settings.build":      { en: "Build",      "zh-Hans": "版本" },
 
   // ---- chrome shared by every drafting page ----
+  // The line along the bottom of the app. It was the last user-facing string in
+  // the whole product still hard-coded in English — it lives in index.html's
+  // markup rather than in a JS string, which is exactly why the i18n sweep and
+  // checks/i18n_no_hardcoded.py (which reads JS) both walked past it. A reader
+  // of 简体中文 got one English sentence, in the web build, which is the build
+  // the testers are given. (In a wrapper the line is removed outright instead —
+  // see applyFooterNote: an installed app has no browser to name.)
+  "chrome.footerNote": { en: "Data lives in this browser's local storage.",
+                         "zh-Hans": "数据保存在此浏览器的本地存储中。" },
   "chrome.saveBack": { en: "Save and go back", "zh-Hans": "保存并返回" },
   "chrome.back":     { en: "Back",             "zh-Hans": "返回" },
   "chrome.cancel":   { en: "Cancel",           "zh-Hans": "取消" },
@@ -4969,6 +4978,8 @@ function applyLocale(){
   if (typeof renderShell === "function") renderShell();
   if (typeof renderTabLabels === "function") renderTabLabels();
   if (typeof renderSwUpdateBannerLabels === "function") renderSwUpdateBannerLabels();
+  // The footer line lives in index.html's markup, so nothing else repaints it.
+  if (typeof applyFooterNote === "function") applyFooterNote();
   // Desktop round: the header's Language/Background dropdowns carry their own
   // labels in their own language, and setLocale knows nothing about them
   // otherwise (trap T12).
@@ -9216,6 +9227,28 @@ function injectChunkMap(){
   // (§6) is untouched; this repaints committed truth, not draft state.
   function refreshProjectFlags(kind){
     if (kind === "next" || kind === "waiting") renderLane("current");
+  }
+  // =========================================================
+  // THE FOOTER LINE, and the two different things it has to do.
+  //
+  // ⚑ IN A WRAPPER IT IS REMOVED (author, 2026-08-01). "Data lives in this
+  // browser's local storage" is true of the web build and false in an installed
+  // one twice over: W2 mirrors every write to native storage precisely so the
+  // browser's copy is not where the data lives, and a connected device is not
+  // even the only holder. Removed rather than reworded — an installed app has no
+  // browser to name, and there is nothing the line would usefully say instead.
+  //
+  // ⚑ IN A BROWSER IT IS TRANSLATED. It sat in index.html's markup rather than
+  // in a JS string, so it was the one user-facing sentence the i18n sweep never
+  // reached and a reader of 简体中文 met in English. Written from t() here, and
+  // re-written by applyLocale() on a language switch, like every other piece of
+  // static chrome (renderTabLabels, renderSwUpdateBannerLabels).
+  // =========================================================
+  function applyFooterNote(){
+    const el = qs("#footer-note");
+    if (!el) return;
+    if (Sync.isNativeWrapper()){ el.remove(); return; }
+    el.textContent = t("chrome.footerNote");
   }
   function deleteTask(kind, taskId){
     // If this is a habit that other habits are hooked onto, freeze their
@@ -17444,20 +17477,7 @@ function injectChunkMap(){
     // window dragged across 1000px re-renders rather than stranding an open
     // page, tray or menu (trap T1).
     applyLayoutMode();
-    // ⚑ "Data lives in this browser's local storage" is TRUE of the web build
-    // and false in a wrapper, twice over: W2 mirrors every write to native
-    // storage (Preferences/Filesystem) precisely so the browser's copy is not
-    // where the data lives, and once Dropbox is connected it is not even the
-    // only device holding it. Author's ruling (2026-08-01): remove it from the
-    // wrapper entirely rather than reword it — an installed app has no browser
-    // to name, and there is nothing the line would usefully say instead.
-    // Removed, not hidden: the sentence is static markup, so there is no state
-    // that could bring it back. The plain browser tab keeps it, where it is
-    // still the honest description of where a visitor's data sits.
-    if (Sync.isNativeWrapper()){
-      const footerNote = qs("#footer-note");
-      if (footerNote) footerNote.remove();
-    }
+    applyFooterNote();
     const deskMQ = window.matchMedia("(min-width:" + DESKTOP_MIN_PX + "px)");
     if (deskMQ.addEventListener) deskMQ.addEventListener("change", applyLayoutMode);
     else if (deskMQ.addListener) deskMQ.addListener(applyLayoutMode);   // older Safari

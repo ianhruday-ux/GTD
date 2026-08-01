@@ -282,11 +282,14 @@ wrapper at all, stronger than the long-press fix or the app icon.
 These were identified in a collision audit and are **not yet fixed**. Read the relevant one
 before building the chunk it touches.
 
-1. **`state.returnScreen` is a single slot** (blocks chunks 5, 6 and 6b). The child-screen return flow
-   stashes exactly one screen. The intray sorts an item → opens a project page → whose quick-add
-   ✎ opens a child page: two levels. Chunk B's staging adds per-frame draft state on top. **Design
-   a real navigation stack once,** before chunk 5 and Chunk B each hack around the single slot
-   independently.
+1. **~~`state.returnScreen` is a single slot~~ — RESOLVED (chunk 1, confirmed 2026-08-01).** The real
+   navigation stack this entry asked for exists: `state.screenStack` is an array (`app.js`), pushed
+   and popped at every screen transition, and the Android back button rides on it (W1/§5 of
+   `wrapper-plan.md`). Recorded as resolved rather than deleted because `wrapper-plan.md` §3.5 flagged
+   the entry as stale for a fortnight and nobody acted on it, and an open issue that is not open costs
+   a session the moment someone designs around it. *(Original text: the child-screen return flow
+   stashed exactly one screen — intray → project page → quick-add child page is two levels — and
+   staging added per-frame draft state on top.)*
 2. **Fixed chrome × drag auto-scroll** (chunk 2). The collapsing tab bar is scroll-triggered;
    drag auto-scroll deliberately scrolls the page while a finger is held at the edge. So a drag
    near the top will expand the tab bar, changing reserved content space, shifting every element
@@ -299,13 +302,19 @@ before building the chunk it touches.
    longer has to survive across a chain of new task IDs — it is a field on **one** event and on its
    archive entries, internal to chunk 7. It is still required; it is no longer a cross-chunk
    dependency.
-4. **Unbounded growth × localStorage's ~5MB ceiling.** Three stores grow forever by ruling:
-   completed archives (keep-everything retention), habit run histories, archived Waiting sets.
-   Every `setItem` in the app is currently **uncaught** — a `QuotaExceededError` mid-save would
-   throw partway through a multi-store commit, leaving state half-persisted with no user-visible
-   error. `src/storage.js` must catch and surface this. Note also that `habitLapNumber` counts
-   every "miss" ever written, so any future pruning of run history would silently corrupt lap
-   numbers.
+4. **~~Unbounded growth × localStorage's ~5MB ceiling~~ — CLOSED, SUPERSEDED (author, 2026-08-01):
+   *"the problem is superseded by the wrapper version."*** The growth is unchanged and by ruling —
+   completed archives, habit run histories, archived Waiting sets, and now the tombstone log all keep
+   everything — but the ceiling it was measured against is no longer the one the real user meets. The
+   wrapper is where the author's own data lives, and W2 mirrors every write to native storage
+   (Preferences, or Filesystem above 200,000 characters), which has no 5MB wall. What remains is the
+   *public web build*, where the ceiling is real and the data is a demo.
+   **Both halves of the original entry are addressed rather than merely reclassified:** `storage.js`
+   catches `QuotaExceededError` and surfaces it (`confirm.storageFull`) instead of throwing partway
+   through a multi-store commit, so the failure is visible rather than silent-and-half-written.
+   ⚠ **The one live trap, kept because it outlives the ruling:** `habitLapNumber` counts every "miss"
+   ever written, so any future pruning of run history silently corrupts lap numbers. Anyone who does
+   eventually add retention limits has to read that first.
 5. **~~DuckDuckGo/Android long-press text selection~~ — FIXED by the wrapper, 2026-07-28 (chunk
    W0).** Recorded in full because the fix was not what this entry predicted. The diagnosis was
    right: a sustained press-and-hold triggers the platform's native long-press, racing the app's
@@ -325,8 +334,10 @@ before building the chunk it touches.
    carries the old mitigation** (title-scoped blocking + the idle watchdog), which remains the best
    available there — this is a wrapper-only cure, and `wrapper/android/.../MainActivity.java` holds
    the whole of it.
-6. **Boundary sweep is boot-only** (wrapper). Fine for browser tabs, wrong for an installed app.
-   Must also fire on resume.
+6. **~~Boundary sweep is boot-only~~ — RESOLVED (chunk W1, 2026-07-29, device-verified).**
+   `resweepBoundariesOnResume()` (`app.js`) runs `processHabitBoundaries` / `processEventBoundaries`
+   and re-renders whenever `visibilitychange` goes non-hidden, so a phone suspended overnight and
+   opened at 9am processes the 4am boundary. Also where W5's sync-on-resume hangs.
 
 ---
 
@@ -2254,7 +2265,14 @@ window. Reload to see the latest."* This does not fix the problem; it refuses to
   - **The undesigned corner, recorded so it isn't re-derived:** hooking to a *recurring* event means
     promoting on **the first occurrence after the hook is set** — coherent, but it must be said, and
     now it is.
-  - **⏳ OPEN, deferred to real use (user, this round): should an *uncompleted bump* orphan the
+  - **✅ CLOSED — NO CHANGE (author, 2026-08-01):** *"No change needed at this time. I may reevaluate
+    if I pick the project up again."* Rolling forward stands as the behaviour. The analysis below is
+    kept intact rather than deleted, because it is the reasoning a future session would otherwise
+    redo from scratch — and the two facts that decided it are still the facts: the fix costs roughly
+    five subsystems, and the missed occurrence already surfaces on its own in the review, so the app
+    may already discharge its duty to surface without touching the dependent at all. **Anyone
+    reopening this starts here, not from the code.**
+    *(Original entry, ⏳ OPEN, deferred to real use:)* **should an *uncompleted bump* orphan the
     dependent?** When a recurring occurrence passes uncompleted and is replaced at the next 4 AM
     boundary (§4.15b), the same task ID rolls forward, so today the dependent silently re-targets the
     next occurrence. The question is whether a *missed* occurrence should instead orphan the dependent
@@ -2276,7 +2294,17 @@ window. Reload to see the latest."* This does not fix the problem; it refuses to
     globally unique and that nothing enumerates `gtd_tasks_next` assuming every row renders. §1's
     ID-preservation ruling implies the first; the second is a build-session check.)*
 
-- **Run-history durability.** Habit runs, personal bests, and lifetime totals live only in
+- **✅ Run-history durability — CLOSED (2026-08-01), and every clause of it is now built.** The entry
+  below asked for backup; what shipped is four layers, which is why it can be closed rather than
+  merely reclassified. **Export/import** (chunk 8) carries habit runs and is re-tested field by field
+  against today's shapes (`checks/backup_fields.py`). **W2's native mirror** puts every write in
+  durable storage the OS does not reclaim, device-verified by wiping localStorage and cold-starting.
+  **Chunk B** made habit progress sync at all — it was the last store that did not, which meant two
+  devices kept separate scores. **W7** made a day's outcome an assertion with a timestamp, so a
+  contested day resolves to the later assertion instead of a completion being erased by a stale
+  device's inferred miss. "Stranded on a device switch" is now the ordinary case: connect the new
+  device and the history arrives.
+  *(Original entry:)* Habit runs, personal bests, and lifetime totals live only in
   localStorage — evictable, clearable, stranded on a device switch. This is the irreplaceable
   class: earned history isn't retypeable. **Answered by export/import — which is now chunk 8, near
   the END of the sprint** (the resequence moved it *down*, on the grounds that there is no real data
@@ -2287,7 +2315,29 @@ window. Reload to see the latest."* This does not fix the problem; it refuses to
   accepted risk only because none of the data is real yet. The remaining question — whether the wrapper should own durable native storage —
   is a wrapper decision, not a sprint one. *(Not urgent before real use begins — see §1.)*
 
-### Cloud-file sync — DIRECTION ADOPTED, build post-wrapper. Analysis recorded so it isn't redone.
+### Cloud-file sync — ⚠ BUILT. THIS SECTION IS THE PRE-BUILD ANALYSIS, NOT THE DESIGN.
+
+> **READ THIS BEFORE THE SECTION BELOW.** Everything from here to the end of §10 was written before
+> any of it was built, and it is kept for its reasoning, not its conclusions. **Two of those
+> conclusions are now wrong, and both are the kind a session would design against:**
+>
+> - **"Adopted path step 2: one-way mirror, one device authoritative, the other pulls and does not
+>   write."** *Not what shipped.* Sync is **two-way and per-record**, both devices always live, no
+>   authority and no possession. The one-way mirror was rejected in the wrapper planning round
+>   because it solved a possession problem the author does not have.
+> - **"Step 3, two-way merge: only if v1 proves inadequate… do not start it casually."** *It was
+>   started deliberately and it is finished.* Per-record `modifiedAt` + `deviceId`, tombstones with
+>   garbage collection, newest-wins on a genuine collision with the collision **reported** rather
+>   than applied silently, a habit-day rule where an assertion always beats an inference, and
+>   additive-only reconciliation for a device with no baseline. Transport is Dropbox: the API via
+>   AppAuth/PKCE on Android (W5), the same file straight off disk on the Electron desktop (W6).
+>
+> The paragraph below warning that a naive two-way blob sync "passes every test and eats data later"
+> is the one part that aged perfectly — it is why the merge is per-record and why the engine was
+> built and tested with no network attached at all (W4) before a byte crossed a wire.
+>
+> **The authority for what sync actually does is `wrapper-plan.md` (§0–§4.5 and the W-chunk
+> entries) and `sync-audit.md`.** Not this section.
 
 **The idea (user's, adopted):** rather than run a server, keep the app's data as a file in the
 user's own existing cloud storage (Google Drive, Dropbox, OneDrive), and have the phone app and the
@@ -2326,6 +2376,13 @@ question — it's the user's drive.
    **operation log** replayed on both sides, not a timestamp-merged blob. Per-record `modifiedAt`
    merging handles most cases but needs deletion tombstones or deleted items resurrect. This is
    genuinely more work than most of the rest of the app; do not start it casually.
+
+- **✅ A drawing surface for Notes — CLOSED (author, 2026-08-01):** *"Closed for now. I may add it if
+  I pick the project up again."* It was carried the whole sprint as the designated first thing to cut
+  if the month ran out, and the month ran out with everything else built, which is the outcome that
+  ruling was written for. Recorded here because its only previous home was the in-app chunk map,
+  and that is retired (CLAUDE.md) — an item that lives nowhere is an item that gets rediscovered as
+  an obligation.
 
 - *Parked future flags:* habit classification and per-class animations; per-direction sync toggles
   (moot while Google is gone); the project-planning Blackboard.

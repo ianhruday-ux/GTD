@@ -1603,6 +1603,28 @@
   function refreshProjectFlags(kind){
     if (kind === "next" || kind === "waiting") renderLane("current");
   }
+  // =========================================================
+  // THE FOOTER LINE, and the two different things it has to do.
+  //
+  // ⚑ IN A WRAPPER IT IS REMOVED (author, 2026-08-01). "Data lives in this
+  // browser's local storage" is true of the web build and false in an installed
+  // one twice over: W2 mirrors every write to native storage precisely so the
+  // browser's copy is not where the data lives, and a connected device is not
+  // even the only holder. Removed rather than reworded — an installed app has no
+  // browser to name, and there is nothing the line would usefully say instead.
+  //
+  // ⚑ IN A BROWSER IT IS TRANSLATED. It sat in index.html's markup rather than
+  // in a JS string, so it was the one user-facing sentence the i18n sweep never
+  // reached and a reader of 简体中文 met in English. Written from t() here, and
+  // re-written by applyLocale() on a language switch, like every other piece of
+  // static chrome (renderTabLabels, renderSwUpdateBannerLabels).
+  // =========================================================
+  function applyFooterNote(){
+    const el = qs("#footer-note");
+    if (!el) return;
+    if (Sync.isNativeWrapper()){ el.remove(); return; }
+    el.textContent = t("chrome.footerNote");
+  }
   function deleteTask(kind, taskId){
     // If this is a habit that other habits are hooked onto, freeze their
     // cue label at whatever this habit was last called, rather than
@@ -9830,20 +9852,7 @@
     // window dragged across 1000px re-renders rather than stranding an open
     // page, tray or menu (trap T1).
     applyLayoutMode();
-    // ⚑ "Data lives in this browser's local storage" is TRUE of the web build
-    // and false in a wrapper, twice over: W2 mirrors every write to native
-    // storage (Preferences/Filesystem) precisely so the browser's copy is not
-    // where the data lives, and once Dropbox is connected it is not even the
-    // only device holding it. Author's ruling (2026-08-01): remove it from the
-    // wrapper entirely rather than reword it — an installed app has no browser
-    // to name, and there is nothing the line would usefully say instead.
-    // Removed, not hidden: the sentence is static markup, so there is no state
-    // that could bring it back. The plain browser tab keeps it, where it is
-    // still the honest description of where a visitor's data sits.
-    if (Sync.isNativeWrapper()){
-      const footerNote = qs("#footer-note");
-      if (footerNote) footerNote.remove();
-    }
+    applyFooterNote();
     const deskMQ = window.matchMedia("(min-width:" + DESKTOP_MIN_PX + "px)");
     if (deskMQ.addEventListener) deskMQ.addEventListener("change", applyLayoutMode);
     else if (deskMQ.addListener) deskMQ.addListener(applyLayoutMode);   // older Safari

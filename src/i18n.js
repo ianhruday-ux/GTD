@@ -216,6 +216,15 @@ const STRINGS = {
   "settings.build":      { en: "Build",      "zh-Hans": "版本" },
 
   // ---- chrome shared by every drafting page ----
+  // The line along the bottom of the app. It was the last user-facing string in
+  // the whole product still hard-coded in English — it lives in index.html's
+  // markup rather than in a JS string, which is exactly why the i18n sweep and
+  // checks/i18n_no_hardcoded.py (which reads JS) both walked past it. A reader
+  // of 简体中文 got one English sentence, in the web build, which is the build
+  // the testers are given. (In a wrapper the line is removed outright instead —
+  // see applyFooterNote: an installed app has no browser to name.)
+  "chrome.footerNote": { en: "Data lives in this browser's local storage.",
+                         "zh-Hans": "数据保存在此浏览器的本地存储中。" },
   "chrome.saveBack": { en: "Save and go back", "zh-Hans": "保存并返回" },
   "chrome.back":     { en: "Back",             "zh-Hans": "返回" },
   "chrome.cancel":   { en: "Cancel",           "zh-Hans": "取消" },
@@ -973,6 +982,8 @@ function applyLocale(){
   if (typeof renderShell === "function") renderShell();
   if (typeof renderTabLabels === "function") renderTabLabels();
   if (typeof renderSwUpdateBannerLabels === "function") renderSwUpdateBannerLabels();
+  // The footer line lives in index.html's markup, so nothing else repaints it.
+  if (typeof applyFooterNote === "function") applyFooterNote();
   // Desktop round: the header's Language/Background dropdowns carry their own
   // labels in their own language, and setLocale knows nothing about them
   // otherwise (trap T12).

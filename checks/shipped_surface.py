@@ -196,6 +196,23 @@ with serve(DIST) as url, sync_playwright() as p:
     ctx3, pg3, errs3 = boot(b, url)
     check((footer_text(pg3) or "").startswith("Data lives in this browser"),
           f"a plain browser tab keeps the storage line, where it is true ({footer_text(pg3)})")
+
+    # ⚠ AND IT IS TRANSLATED NOW. The line lives in index.html's MARKUP, not in a
+    # JS string, which is why the i18n sweep and checks/i18n_no_hardcoded.py
+    # (which reads JS) both walked straight past it — a reader of 简体中文 met one
+    # English sentence, in the web build, which is the build the testers get.
+    # Switching language is the real control here: a hard-coded string passes
+    # "is it English?" perfectly.
+    pg3.click('[data-action="open-overflow"]'); pg3.wait_for_timeout(400)
+    pg3.click('[data-action="settings-language"]'); pg3.wait_for_timeout(300)
+    pg3.click('[data-action="settings-pick-lang"][data-lang="zh-Hans"]'); pg3.wait_for_timeout(600)
+    close_settings(pg3)
+    zh = footer_text(pg3)
+    check(zh == "数据保存在此浏览器的本地存储中。",
+          f"switching to 简体中文 translates the footer line — it was the last user-facing string "
+          f"in the app still hard-coded in English ({zh})")
+    check("browser" not in (zh or ""), f"with no English left in it ({zh})")
+    check(not errs3, f"no JS errors switching language ({errs3[:3]})")
     ctx3.close()
 
     # The Electron shell's own signal (preload.js exposes this bridge). An init
