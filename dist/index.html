@@ -2518,7 +2518,7 @@ body.screen-open #tray-handle{ display:none; }
 (function(){
 "use strict";
 
-const BUILD_STAMP = "01 Aug 02:50";  // replaced by build.py
+const BUILD_STAMP = "01 Aug 03:51";  // replaced by build.py
 
 // =========================================================
 // STORAGE ADAPTER (spec.md §3, known issue 4)
@@ -10597,14 +10597,23 @@ function injectChunkMap(){
   // items reached sideways, and destroying one from inside a project draft you
   // might still ✕ out of is not what "open" should offer. Fields stay editable.
   //
-  // A staged create is deliberately NOT covered: its row carries no ✕ of its
-  // own, so Delete is the only way to take back a mis-added action, and
-  // withholding it would strand the row until you discarded the whole page.
-  // Once saved it becomes an ordinary linked item and loses Delete on the next
-  // open, which is the direction the ruling wants.
-  function openedAsProjectMember(s){
+  // A staged create is deliberately NOT covered by the DELETE half: its row
+  // carries no ✕ of its own, so Delete is the only way to take back a mis-added
+  // action, and withholding it would strand the row until you discarded the
+  // whole page. Once saved it becomes an ordinary linked item and loses Delete
+  // on the next open, which is the direction the ruling wants.
+  //
+  // ⚑ The exemption is DELETE-ONLY (author: "it also has a complete button
+  // which shouldn't be there"). One predicate used to gate both, so a staged
+  // create got Delete *and* Complete. Nothing reached through a project's
+  // linked list is completable — staged or live — so the two gates ask
+  // different questions and are two functions now.
+  function openedFromProjectList(s){
     if (!s || !s.staging || !s.draft) return false;
-    if (s.draft.linkedProjectId !== s.staging.projectId) return false;
+    return s.draft.linkedProjectId === s.staging.projectId;
+  }
+  function openedAsProjectMember(s){
+    if (!openedFromProjectList(s)) return false;
     return !stagedCreate(s.staging.parent, s.taskId);
   }
   function stagedLinkedEventIds(s){
@@ -12746,7 +12755,7 @@ function injectChunkMap(){
     // W7: no Complete either, for the same reason and by the same ruling --
     // an item reached sideways through a project draft should not be
     // completable from inside a page you might still ✕ out of.
-    if ((kind === "next" || kind === "waiting" || isProjectKind(kind)) && s.taskId && !openedAsProjectMember(s)){
+    if ((kind === "next" || kind === "waiting" || isProjectKind(kind)) && s.taskId && !openedFromProjectList(s)){
       // STRICT UNIFORMITY (user ruling): Complete here is draft-only too.
       // It no longer archives-and-closes on tap; it ARMS the completion,
       // the page stays open, Save carries it out (archive + close) and ✕
@@ -15624,10 +15633,14 @@ function injectChunkMap(){
         // click routing is unchanged, still data-action/data-key/data-id.
         // A button that resolves/edits in place (Completed) stays plain.
         menuHtml =
+          // Author: ABOVE the make-something-new buttons, because attaching what
+          // already exists is the first thing to try. ⚑ Its own band, not the
+          // first child of band 1 — a band is a flex row, so sharing one put it
+          // beside them ("it's on the same row"), not above.
           reviewBandHtml(
-            // Author: above the make-something-new buttons, because attaching
-            // what already exists is the first thing to try.
-            reviewMenuBtn("review-form-start", t("project.linkExisting"), ' data-key="' + l.key + '" data-type="link"') +
+            reviewMenuBtn("review-form-start", t("project.linkExisting"), ' data-key="' + l.key + '" data-type="link"')
+          ) +
+          reviewBandHtml(
             reviewMenuBtn("review-form-start", t("review.addNextAction"), ' data-key="' + l.key + '" data-type="text" data-target="next"') +
             reviewMenuBtn("review-form-start", t("review.addWaitingAction"), ' data-key="' + l.key + '" data-type="waiting" data-target="waiting"') +
             // ⚑ The third one the user asked for originally, parked until a project

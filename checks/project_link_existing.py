@@ -231,6 +231,12 @@ with serve(DIST) as url, sync_playwright() as p:
     pg6.locator('.linked-action-item:has-text("JUST MADE THIS")').first.click(); pg6.wait_for_timeout(600)
     check(pg6.locator('[data-action="screen-delete"]').count() == 1,
           "a STAGED CREATE keeps Delete -- its row has no ✕, so this is the only way to take it back")
+    # ⚑ Author: "it also has a complete button which shouldn't be there." The
+    # exemption is Delete-ONLY. One predicate used to gate both, so the staged
+    # create inherited Complete along with Delete; nothing reached through a
+    # project's linked list is completable, staged or live.
+    check(pg6.locator('[data-action="screen-complete"]').count() == 0,
+          "but NOT Complete -- the staged-create exemption is Delete-only")
     check(not errs6, f"no JS errors in group 6 ({errs6[:3]})")
     ctx6.close()
 
@@ -274,13 +280,35 @@ with serve(DIST) as url, sync_playwright() as p:
 
         btn = pgr.locator('[data-action="review-form-start"][data-type="link"]')
         check(btn.count() >= 1, f"[{layout}] the stalled card offers Link existing")
-        # "Above the new action and event buttons" -- first in its band.
-        order = pgr.evaluate("""() => [...document.querySelectorAll('.review-menu-row button, .review-band button')]
-            .map(e => e.getAttribute('data-type') || e.getAttribute('data-action'))""")
-        li = next((i for i, x in enumerate(order) if x == "link"), -1)
-        ti = next((i for i, x in enumerate(order) if x == "text"), -1)
-        check(li != -1 and ti != -1 and li < ti,
-              f"[{layout}] and it sits ABOVE the make-something-new buttons ({order[:5]})")
+        # "Above the new action and event buttons" -- meaning its OWN ROW.
+        # ⚠ This used to assert DOM order across a flat button list, which
+        # same-row placement satisfies: the bug ("it's on the same row") passed
+        # the check. A band is a flex row, so the question is which BAND each
+        # button is in, not which index.
+        bands = pgr.evaluate("""() => {
+            const all = [...document.querySelectorAll('.review-band')];
+            const bandOf = sel => {
+                const el = document.querySelector(sel);
+                if (!el) return -1;
+                return all.indexOf(el.closest('.review-band'));
+            };
+            return {
+                link: bandOf('[data-action="review-form-start"][data-type="link"]'),
+                text: bandOf('[data-action="review-form-start"][data-type="text"]'),
+                linkSiblings: (() => {
+                    const el = document.querySelector('[data-action="review-form-start"][data-type="link"]');
+                    const band = el && el.closest('.review-band');
+                    return band ? band.querySelectorAll('button').length : -1;
+                })()
+            };
+        }""")
+        check(bands["link"] != -1 and bands["text"] != -1 and bands["link"] != bands["text"],
+              f"[{layout}] Link existing is in a DIFFERENT band from the make-something-new "
+              f"buttons -- a row of its own, not beside them ({bands})")
+        check(bands["link"] != -1 and bands["text"] != -1 and bands["link"] < bands["text"],
+              f"[{layout}] and that band comes ABOVE them ({bands})")
+        check(bands["linkSiblings"] == 1,
+              f"[{layout}] alone in its row ({bands['linkSiblings']} buttons in the band)")
 
         btn.first.click(); pgr.wait_for_timeout(500)
         picked = pgr.locator('[data-action="review-link-pick"][data-id="free-1"]')
