@@ -5095,6 +5095,17 @@
   // (makeKindBtnHtml renders "✓ Converting to X on save" instead), which is why
   // the destination branch's own wording never leaks through.
   function screenConvertBtnHtml(s, partner, label, arrow, disabled, disabledTitle){
+    // ⚑ NOT on a child page opened from a project (W7's "reached sideways"
+    // ruling, which already withholds Complete and Delete there). This button
+    // was ALREADY inert on those pages -- saveScreen hands a staging page to
+    // stageChildSave, which returns long before the convert branch, so arming
+    // one and saving did nothing at all. Under the page swap an inert control
+    // stops being harmless: the page would swap, invite a condition, and stage
+    // it onto a record whose kind never changed -- a Next Action carrying a
+    // condition, which §4.2 forbids. Removing the control is the simplest
+    // option and the one the spec's silence points at; the item's own page,
+    // opened from its lane, still converts it.
+    if (s.staging) return "";
     const armed = !!(s.draft && s.draft.convertTo);
     return makeKindBtnHtml(armed ? s.draft.convertTo : partner, label, arrow, armed,
       !armed && !!disabled, disabledTitle);
@@ -9799,7 +9810,11 @@
       const result = await Promise.race([
         activeSyncTransport().syncNow(),
         new Promise(function(_, reject){
-          setTimeout(function(){ reject(new Error("Sync timed out — will try again")); }, SYNC_ATTEMPT_TIMEOUT_MS);
+          // ⚑ A KEY, not a sentence: lastError goes through t() in
+          // dropboxSyncStatusLabel, so an authored reason gets translated and
+          // anything else falls through. This was the last surfaced sync error
+          // still written in raw English.
+          setTimeout(function(){ reject(new Error("err.sync.timedOut")); }, SYNC_ATTEMPT_TIMEOUT_MS);
         })
       ]);
       Storage.set(DROPBOX_LAST_SYNC_KEY, String(Date.now()));

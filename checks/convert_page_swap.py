@@ -509,6 +509,29 @@ with serve(DIST) as url, sync_playwright() as p:
     check(not errs16, f"no JS errors in group 16 ({errs16[:3]})")
     ctx16.close()
 
+    # ============================================================
+    # Group 17 -- no convert on a page opened from a project's list
+    # ============================================================
+    # W7's "reached sideways" ruling already withholds Complete and Delete
+    # there. Convert was rendered but INERT -- saveScreen hands a staging page
+    # to stageChildSave, which returns before the convert branch ever runs, so
+    # arming one and saving did nothing. Under the page swap that stops being
+    # harmless: the page would swap, invite a condition, and stage it onto a
+    # record whose kind never changed -- a Next Action carrying a condition,
+    # which §4.2 forbids.
+    ctx17, pg17, errs17 = boot(b, url)
+    open_item(pg17, "current", "p1")
+    check(pg17.locator('.linked-action-item[data-id="a1"]').count() == 1,
+          "fixture: the project lists its linked action")
+    pg17.locator('.linked-action-item[data-id="a1"]').first.click(); pg17.wait_for_timeout(600)
+    check(pg17.locator('[data-field="title"]').count() >= 1,
+          "opening it from the project's list still gives an editable page")
+    check(pg17.locator('[data-action="make-kind"]').count() == 0,
+          "and NO convert button -- it could never have worked from here, and under the page "
+          "swap an inert one would invite a condition onto an item that stays a Next Action")
+    check(not errs17, f"no JS errors in group 17 ({errs17[:3]})")
+    ctx17.close()
+
     b.close()
 
 for line in notes + fails:

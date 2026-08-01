@@ -2,12 +2,12 @@
 
 **OELA — the Over-Engineered List App.** A GTD-inspired task manager: five lanes (Next Actions, Waiting On, Current
 Projects, Future/Someday, Habits), with Notes and a Calendar arriving later in the sprint. Vanilla
-JS, no framework. *(There is no points layer — it is deleted in chunk 0a; see `docs/spec.md` §2.)*
+JS, no framework. *(There is no points layer — it is deleted in chunk 0a; see `spec.md` §2.)*
 Source lives in `src/`, is stapled into a single self-contained `dist/index.html`, and runs
 entirely in the browser on `localStorage`. **Local-first is not negotiable:** the app must be
 fully functional with zero setup, zero server, zero account.
 
-**We are in a one-month sprint** (see `docs/spec.md` §2). The goal is the best usable
+**We are in a one-month sprint** (see `spec.md` §2). The goal is the best usable
 productivity app in the time available, installable on the author's phone and shareable with a
 handful of friends. Scope discipline matters more than completeness. Do not add features that
 are not in the current chunk.
@@ -17,13 +17,13 @@ test data; the author begins real use only once the base product is finished, an
 programmers who receive the finished product at the same time. So: **schema migrations are
 optional** — if a data-model change is cleaner without one, skip it and let Reset seed fresh data in
 the new shape. Flag the choice; don't ask. This changes the day export/import (chunk 8) ships — see
-`docs/spec.md` §1.
+`spec.md` §1.
 
 **Do not add a service worker before chunk 9.** It is scheduled last on purpose: caching during
 active development means hours lost debugging stale builds. The web manifest (which makes the app
 installable) is fine and ships in 0b.
 
-**The date model changed (calendar round) and `docs/spec.md` §4.13 is the authority.** An **event is
+**The date model changed (calendar round) and `spec.md` §4.13 is the authority.** An **event is
 a calendar entity that never lives in a lane**; **Waiting actions have no dates**; **recurrence is a
 property of events only**. If any code, test, or older document implies otherwise, it is stale.
 
@@ -92,18 +92,31 @@ explicit confirm dialog (`openConfirmDialog`). Native `alert`/`confirm`/`prompt`
 app-wide — they fail silently in sandboxed contexts.
 
 **WHERE THE SPEC IS SILENT, choose the simplest option and flag it** in your handoff summary.
-Don't redesign. Don't invent answers to questions `docs/spec.md` §10 explicitly marks as open.
+Don't redesign. Don't invent answers to questions `spec.md` §10 explicitly marks as open.
 
 ---
 
 ## Commands
 
 ```bash
-python3 build.py              # staple src/ into dist/index.html
-python3 build.py --watch      # rebuild on file change (optional convenience)
-node --check dist/index.html  # syntax check — run before every handoff
-python3 -m pytest tests/      # Playwright end-to-end suites (real Chromium)
+python build.py               # staple src/ into dist/index.html
+python build.py --watch       # rebuild on file change (optional convenience)
+node --check src/app.js       # syntax check — run before every handoff
+python checks/<name>.py       # one Playwright end-to-end suite (real Chromium)
 ```
+
+**Verified on this machine, and each of these has cost a session real time:**
+- **`python`, not `python3`.** `python3` is not on PATH here; it opens the Microsoft Store shim.
+- **`node --check` rejects `.html`** (ERR_UNKNOWN_FILE_EXTENSION), so check `src/*.js` instead.
+  The bundle is generated from them; there is nothing in it to check separately.
+- **The suites are in `checks/`, are NOT pytest, and run one file at a time.** There is no
+  `tests/` directory. ~64 suites.
+- **`export PYTHONIOENCODING=utf-8` first.** The console is cp1252 and several suites print
+  rendered UI containing `⏸ ✓ ↻`; without it a suite dies in its own final print loop *after*
+  every check has run, discarding all the results.
+- **Prove a new check fails on the pre-change build** (`checks/README.md`): `git stash push src/`,
+  rebuild, run, `git stash pop`, rebuild. Guard any selector the old build lacks, or the file
+  aborts on a 30-second locator timeout instead of reporting.
 
 `dist/index.html` is the product: one self-contained file, opened directly in a browser or
 served from GitHub Pages. Never hand-edit it — it is generated. Edit `src/` and rebuild.
@@ -113,7 +126,7 @@ served from GitHub Pages. Never hand-edit it — it is generated. Edit `src/` an
 - **Storage keys** are prefixed `gtd_` (app data) or `gtddev_` (dev tools, must survive Reset).
   Every write goes through `src/storage.js` — never call `localStorage` directly from feature
   code. A schema version lives at `gtd_schema_version`. **Migrations are OPTIONAL until real use
-  begins** (see above, and `docs/spec.md` §1) — from that day forward, every data-shape change ships
+  begins** (see above, and `spec.md` §1) — from that day forward, every data-shape change ships
   with one. *(Corrected: this line used to require a migration for any data-shape change, flatly
   contradicting the paragraph three above it and the chunk 0a / chunk 3 rows in the spec.)*
 - **No field labels.** Placeholder text inside empty boxes carries the teaching; tooltips carry
@@ -122,7 +135,7 @@ served from GitHub Pages. Never hand-edit it — it is generated. Edit `src/` an
 - **Every chunk ends by injecting a QA checklist into Next Actions** (`injectQAChecklist`,
   spec.md §8.1) — replace the previous chunk's content *and* its flag key; never accumulate.
 - **Every chunk also refreshes the chunk map** — one Current Project per chunk, seeded with a
-  plain-language description of what that chunk changes (`docs/spec.md` §8.2). Same
+  plain-language description of what that chunk changes (`spec.md` §8.2). Same
   replace-don't-accumulate discipline as the QA checklist, its own flag key, and it must survive
   Reset the same way.
 - **Commit as you go**, with real messages. The repo is the safety net that makes autonomous
@@ -132,8 +145,11 @@ served from GitHub Pages. Never hand-edit it — it is generated. Edit `src/` an
 ## Reading order for a build session
 
 1. This file.
-2. `docs/spec.md` §2 (what we're building and in what order) and the section for your chunk.
+2. `spec.md` §2 (what we're building and in what order) and the section for your chunk.
 3. Only the `src/` modules your chunk touches.
 
-`docs/changelog.md` is history — read it only if you need to know *why* something is the way it
-is. Do not read it by default; it is long and it is not the spec.
+**There is no changelog.** This line used to point at `docs/changelog.md`, and `docs/` has never
+existed — the spec is `spec.md`, at the repo root, where every path above now points. The nearest
+thing to a history is the commit log and the round notes at the root (`ROUND-NOTES.md`, the
+`*-plan.md` files). Read those only if you need to know *why* something is the way it is; none of
+them is the spec.

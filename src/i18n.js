@@ -891,6 +891,10 @@ const STRINGS = {
   "err.sync.tooManyWrites":   { en: "Too many conflicting writes in a row — try again shortly", "zh-Hans": "连续出现过多写入冲突——请稍后重试" },
   "err.sync.downloadFailed":  { en: "Couldn’t read the sync file from Dropbox", "zh-Hans": "无法从 Dropbox 读取同步文件" },
   "err.sync.uploadFailed":    { en: "Couldn’t write the sync file to Dropbox",  "zh-Hans": "无法向 Dropbox 写入同步文件" },
+  // The attempt watchdog. Thrown in app.js rather than a transport (it is what
+  // guards against a transport that never answers at all), which is how it got
+  // missed when the rest of these became keys.
+  "err.sync.timedOut":        { en: "Sync timed out — will try again",  "zh-Hans": "同步超时——稍后会重试" },
   "sync.connect":            { en: "Connect Dropbox",                "zh-Hans": "连接 Dropbox" },
   "sync.disconnect":         { en: "Disconnect",                     "zh-Hans": "断开连接" },
   "sync.now":                { en: "Sync now",                       "zh-Hans": "立即同步" },

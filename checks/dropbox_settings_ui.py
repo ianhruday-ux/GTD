@@ -205,6 +205,40 @@ with serve(DIST) as url, sync_playwright() as p:
     pg.click('[data-action="settings-root"]')
     pg.wait_for_timeout(150)
 
+    # ---- the RESURRECTION shape of the panel ----
+    # The panel has two branches and only one of them was covered here. A
+    # resurrection (restore a backup on device A, the item comes back on device
+    # B which had deleted it) renders different markup: one "kept" line and the
+    # explanation, no "replaced" line, because nothing was replaced.
+    # checks/restore_x_sync.py group 4 proves the MERGE reports it; this proves
+    # the report survives the trip to the screen. Written straight into the log
+    # rather than driven through a second fake device: the merge half is already
+    # tested, and this is a render-branch check.
+    #
+    # Context: the author reported "I don't see the report on either device"
+    # after a night of disconnecting, resetting and emptying the cloud file --
+    # all three of which legitimately empty this log. This closes the one
+    # untested link in that chain.
+    pg.evaluate("""() => {
+        localStorage.setItem('gtd_dropbox_conflict_log', JSON.stringify([
+          { at: Date.now(), key: 'gtd_tasks_next:party-1', resurrection: true,
+            keptText: 'THE RESTORED PARTY', lostText: null }
+        ]));
+    }""")
+    pg.click(".menu-scrim", position={"x": 5, "y": 5}); pg.wait_for_timeout(150)
+    open_settings(pg); pg.wait_for_timeout(200)
+    check(pg.locator('[data-action="settings-dropbox-conflicts"]').count() == 1,
+          "a resurrection alone puts the conflict row in the root panel")
+    pg.click('[data-action="settings-dropbox-conflicts"]'); pg.wait_for_timeout(200)
+    res_text = pg.locator(".settings-menu").inner_text()
+    check("THE RESTORED PARTY" in res_text,
+          f"the resurrection branch names the record that came back ({res_text[:120]!r})")
+    check("deleted on one device" in res_text or "删除" in res_text,
+          f"and explains why it is back, rather than rendering a bare i18n key ({res_text[:200]!r})")
+    check("kept:" not in res_text.lower().replace("kept: “the restored party”", ""),
+          "and does not claim something was replaced -- nothing was")
+    pg.click('[data-action="settings-root"]'); pg.wait_for_timeout(150)
+
     # ---- disconnect actually clears what it should ----
     pg.click('[data-action="dropbox-disconnect"]')
     pg.wait_for_timeout(300)

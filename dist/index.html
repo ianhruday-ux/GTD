@@ -2518,7 +2518,7 @@ body.screen-open #tray-handle{ display:none; }
 (function(){
 "use strict";
 
-const BUILD_STAMP = "01 Aug 04:23";  // replaced by build.py
+const BUILD_STAMP = "01 Aug 04:28";  // replaced by build.py
 
 // =========================================================
 // STORAGE ADAPTER (spec.md §3, known issue 4)
@@ -4870,6 +4870,10 @@ const STRINGS = {
   "err.sync.tooManyWrites":   { en: "Too many conflicting writes in a row — try again shortly", "zh-Hans": "连续出现过多写入冲突——请稍后重试" },
   "err.sync.downloadFailed":  { en: "Couldn’t read the sync file from Dropbox", "zh-Hans": "无法从 Dropbox 读取同步文件" },
   "err.sync.uploadFailed":    { en: "Couldn’t write the sync file to Dropbox",  "zh-Hans": "无法向 Dropbox 写入同步文件" },
+  // The attempt watchdog. Thrown in app.js rather than a transport (it is what
+  // guards against a transport that never answers at all), which is how it got
+  // missed when the rest of these became keys.
+  "err.sync.timedOut":        { en: "Sync timed out — will try again",  "zh-Hans": "同步超时——稍后会重试" },
   "sync.connect":            { en: "Connect Dropbox",                "zh-Hans": "连接 Dropbox" },
   "sync.disconnect":         { en: "Disconnect",                     "zh-Hans": "断开连接" },
   "sync.now":                { en: "Sync now",                       "zh-Hans": "立即同步" },
@@ -12684,6 +12688,17 @@ function injectChunkMap(){
   // (makeKindBtnHtml renders "✓ Converting to X on save" instead), which is why
   // the destination branch's own wording never leaks through.
   function screenConvertBtnHtml(s, partner, label, arrow, disabled, disabledTitle){
+    // ⚑ NOT on a child page opened from a project (W7's "reached sideways"
+    // ruling, which already withholds Complete and Delete there). This button
+    // was ALREADY inert on those pages -- saveScreen hands a staging page to
+    // stageChildSave, which returns long before the convert branch, so arming
+    // one and saving did nothing at all. Under the page swap an inert control
+    // stops being harmless: the page would swap, invite a condition, and stage
+    // it onto a record whose kind never changed -- a Next Action carrying a
+    // condition, which §4.2 forbids. Removing the control is the simplest
+    // option and the one the spec's silence points at; the item's own page,
+    // opened from its lane, still converts it.
+    if (s.staging) return "";
     const armed = !!(s.draft && s.draft.convertTo);
     return makeKindBtnHtml(armed ? s.draft.convertTo : partner, label, arrow, armed,
       !armed && !!disabled, disabledTitle);
@@ -17388,7 +17403,11 @@ function injectChunkMap(){
       const result = await Promise.race([
         activeSyncTransport().syncNow(),
         new Promise(function(_, reject){
-          setTimeout(function(){ reject(new Error("Sync timed out — will try again")); }, SYNC_ATTEMPT_TIMEOUT_MS);
+          // ⚑ A KEY, not a sentence: lastError goes through t() in
+          // dropboxSyncStatusLabel, so an authored reason gets translated and
+          // anything else falls through. This was the last surfaced sync error
+          // still written in raw English.
+          setTimeout(function(){ reject(new Error("err.sync.timedOut")); }, SYNC_ATTEMPT_TIMEOUT_MS);
         })
       ]);
       Storage.set(DROPBOX_LAST_SYNC_KEY, String(Date.now()));
