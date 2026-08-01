@@ -1087,6 +1087,9 @@ so the last chunk is not mistaken for "just build an APK":
 3. **Then the packaging itself.** A sideloadable APK and an unsigned desktop build, plus the
    plain-language note on how to install each. Personal sideloading only — Play Store and Gatekeeper
    are recurring overhead and `spec.md` §2 already rules them out for now.
+   *(Done 2026-08-01 — `tools_package.py` and `INSTALL.md`; see the W7 progress notes below. The APK
+   turned out to want its own release signing key rather than the debug one, which is the single
+   consequential decision in the chunk.)*
 
 ⚑ Sequencing note: 1 and 2 are both *finding* work — they exist to surface what is still wrong. 3 is
 *finishing* work. Doing 3 first would mean handing someone an installer for a build whose backup
@@ -1210,8 +1213,78 @@ so un-completing brings the actions back and leaves the events archived. Chunk A
 design (an event that stopped happening should not silently restart) is the author's call — the
 question is what un-completing a project is supposed to mean, not how to wire a function up.
 
-**What remains of W7: item 3 only — the packaging.** A sideloadable APK and an unsigned desktop
-build, plus the plain-language note on how to install each.
+**W7 item 3 — the packaging — is BUILT, 2026-08-01. W7 is closed, and so is the wrapper round.**
+
+`tools_package.py` produces `release/` in one command: the standalone HTML file, a signed release
+APK, a packaged Windows desktop build, `INSTALL.md`, and `CHECKSUMS.txt`. `release/` and
+`build-tmp/` are gitignored — they are build output regenerated from `dist/`, and one of them is
+138 MB.
+
+- **The APK is release-signed now, not debug-signed.** `wrapper/android/release.keystore` +
+  `keystore.properties`, both gitignored, wired into `app/build.gradle` by the same
+  missing-file-is-not-a-build-failure pattern `secrets.properties` already used — a fresh checkout
+  still builds, `assembleDebug` is untouched, and only `assembleRelease` needs the key.
+  ⚠ **The consequence, which is the one thing in this chunk that can cost real data:** Android
+  identifies an app by its signing certificate, so this APK **cannot install over the debug build
+  currently on the author's phone.** That is a one-time migration (export, uninstall, install,
+  import — or let Dropbox repopulate), and it is the last time it happens, because every build from
+  here is signed with this key. Losing `release.keystore` re-imposes it on everyone.
+  `keystore.properties` says so in its own header; INSTALL.md says so where a friend would hit it.
+- **The Dropbox App Key ships inside the APK** (author's ruling this round, reversing W5's
+  "gitignored anyway"): sync works out of the box for anyone who installs it, and everyone who
+  connects links their own Dropbox to the one registration. Dropbox allows 500 linked accounts on an
+  app in development status and gives you two weeks to apply for production once **50** have linked
+  — nowhere near a handful of friends, but a number that has to be watched rather than discovered,
+  so INSTALL.md asks people to say if they'll use sync. **The key is still not in the public repo**
+  and this document has not put it there: baking it into a binary you hand someone is reversible
+  (revoke the app), committing it to a public GitHub history is not.
+- **Packaging verifies the artifact, not the build.** `tools_pushphone.py` exists because trap 9 is
+  silent; a stale APK handed to somebody else is the same failure with no way for either party to
+  notice. So the staging check is kept *and* the finished APK is opened as a zip and its
+  `assets/public/index.html` compared to `dist/index.html` byte for byte — a Gradle cache can defeat
+  the first check and cannot defeat the second. Three more assertions ride along: signed by the
+  release key and not `CN=Android Debug`, `application-debuggable` absent, and the App Key actually
+  present in `classes.dex` (an APK whose Connect Dropbox rejects every attempt is the same
+  silent-failure shape as a stale one). The desktop build is checked the same way — it *copies* the
+  payload rather than referencing it, so it can go stale identically.
+- **The Electron shell resolves its payload from either layout.** `main.js` loaded
+  `../../dist/index.html`, which does not exist once packaged; it now takes whichever of
+  `./dist` and `../../dist` is really there. ⚑ **Builder's call:** `--asar=false`, so the shipped
+  app stays a plain folder — the payload is one self-contained HTML file whose whole premise is that
+  you can open and read it, and a verification that requires unpacking an archive is one that
+  quietly stops being performed.
+- ⚠ **The staged `package.json` must keep `"name": "oela-electron"` and no `productName`.** Electron
+  derives `userData` — where localStorage, and therefore every list, actually lives — from
+  `app.getName()`. `productName: "OELA"` would have pointed the packaged build at `%APPDATA%/OELA`
+  while `npm start` reads `%APPDATA%/oela-electron`: two installs of one app unable to see each
+  other's data, the packaged one silently starting empty on a machine that already had lists.
+  Verified by launching the packaged `.exe` and confirming no second folder appeared. Nothing
+  user-visible pays for it — the exe is still `OELA.exe`, the window still says OELA.
+- ⚑ `minifyEnabled` stays `false` in release. R8 would shrink an APK whose bulk is an HTML asset it
+  cannot touch, while adding release-only reflection breakage (AppAuth, Capacitor plugin lookup) to
+  the one build nobody can debug remotely.
+- **Two things `shutil` and `electron-packager` needed and this document did not anticipate:** some
+  files in an Electron distribution carry epoch-0 mtimes, which `make_archive` cannot represent and
+  dies on halfway through (hand-rolled zip, timestamps clamped to 1980), and the packager requires
+  an `author` field, which becomes the CompanyName Windows shows in the SmartScreen dialog.
+
+**`INSTALL.md`** (repo root, copied into `release/`) covers all three installs click by click,
+including the two warnings that will frighten people and deserve a straight answer rather than a
+reassurance — Play Protect's "unsafe app" on any non-Play APK, and SmartScreen's "unknown
+publisher" on an unsigned `.exe` (a code-signing certificate costs hundreds a year; `spec.md` §2
+already rules out that class of recurring overhead). It says plainly, in both cases, that the
+one-file version asks nothing of you if that isn't good enough. It also documents where data lives
+per platform, that Windows sync needs the Dropbox desktop client running while Android does not, and
+what the checksums are for.
+
+⚑ **Found while writing the doc, unfixed, and small:** `wrapper/electron/main.js` hardcodes the
+Dropbox app-folder parent as `"Apps"`, which Dropbox **localizes** — a friend with a non-English
+Dropbox account would auto-detect a root and then read and write a path that does not exist. Android
+is unaffected (the API scopes the token to the app folder transparently, §6 trap 10). It fails
+loudly rather than silently, which is why it is flagged rather than rushed: the desktop transport
+would find no file and create the English-named folder, so the two devices would diverge visibly
+rather than quietly. INSTALL.md's troubleshooting names it. The fix is to glob the Dropbox root for
+`*/OELA_sync_ianhruday` instead of assuming the parent's name.
 
 ~~The in-app chunk map and QA checklist are still due when W7 actually ships.~~ **Struck, 2026-08-01
 (author).** Both conventions are retired: *"the dev tools should be hidden and inaccessible in the

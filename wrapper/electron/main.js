@@ -11,11 +11,30 @@
 const { app, BrowserWindow, ipcMain, dialog, Menu } = require("electron");
 const fs = require("fs/promises");
 const fsWatch = require("fs").watch;
+const fsExists = require("fs").existsSync;
 const path = require("path");
 const os = require("os");
 
-const DIST_INDEX = path.join(__dirname, "..", "..", "dist", "index.html");
-const ICON_PATH = path.join(__dirname, "..", "..", "dist", "icon-512.png");
+// W7 item 3: two layouts, resolved at load rather than assumed.
+//
+// Running from the repo (`npm start`, and every W6 test) this file sits in
+// wrapper/electron/ and the payload is two levels up in dist/ -- deliberately
+// NOT copied, so the shell always runs the actual product rather than a stale
+// duplicate, the same reasoning that points Capacitor's webDir at ../dist.
+//
+// Packaged, there is no repo above it: tools_package.py stages main.js,
+// preload.js and a copy of dist/ side by side and @electron/packager drops
+// that whole folder into resources/app/. So the payload is BELOW this file
+// instead of above it. Checking which one exists costs one stat and means the
+// packaged build and the dev build are the same code path -- an "am I
+// packaged" flag would be a second thing that can be wrong.
+const DIST_DIR = [
+  path.join(__dirname, "dist"),
+  path.join(__dirname, "..", "..", "dist")
+].find((p) => fsExists(path.join(p, "index.html"))) || path.join(__dirname, "..", "..", "dist");
+
+const DIST_INDEX = path.join(DIST_DIR, "index.html");
+const ICON_PATH = path.join(DIST_DIR, "icon-512.png");
 
 // The App-Folder-scoped path W5's Dropbox API already writes to (see
 // dropboxTransport.js's DROPBOX_SYNC_PATH). This MUST match exactly, since

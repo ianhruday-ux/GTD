@@ -4,6 +4,14 @@ __pycache__/
 dist/index.baseline.html
 drag log*.txt
 
+# W7 item 3 — what tools_package.py produces, and its scratch space. Build
+# outputs, not source: an APK and a ~100 MB Electron bundle regenerated from
+# dist/ by one command, which is exactly the sort of thing dist/index.html
+# itself is (and dist/ IS committed, because that one file is the product and
+# has to be servable from Pages). These are not servable and are not small.
+release/
+build-tmp/
+
 # Source texture packs (Poly Haven .blend + 4K PBR maps). ~187 MB, and git
 # history cannot be trimmed afterwards — for a product whose whole build output
 # is under a megabyte, that is a permanent tax for files the app never loads.
