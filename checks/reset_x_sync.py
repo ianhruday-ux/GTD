@@ -137,6 +137,16 @@ with serve(DIST) as url, sync_playwright() as p:
     make_connected(pg2)
     device_before = ls(pg2, "gtd_device_id")
     check(bool(device_before), f"fixture: this device has an identity ({device_before})")
+    # Stand in for a W6 desktop, whose Dropbox folder path lives under a gtd_
+    # key -- the one piece of connection state a reset can actually reach.
+    # gtd_sync_connected is set explicitly too: the rest of this file leans on
+    # __oelaSyncForceEnabled, which bypasses that flag entirely, so without
+    # this the "still connected" assertion would be checking a key the fixture
+    # never wrote and would pass or fail for the wrong reason.
+    pg2.evaluate("""() => {
+        localStorage.setItem('gtd_desktop_sync_folder', '/fake/Dropbox');
+        localStorage.setItem('gtd_sync_connected', '1');
+    }""")
 
     # Driven through the REAL settings row and the REAL confirm dialog -- the
     # propagating option only renders when the roster shows another device, so
@@ -179,6 +189,14 @@ with serve(DIST) as url, sync_playwright() as p:
     check(ls(pg2, "gtd_sync_baseline") is not None,
           "and the baseline survived -- without it the next sync is a rejoin, stripSeededRecords "
           "fires, and the fresh defaults never reach the other devices")
+    check(ls(pg2, "gtd_sync_connected") == "1",
+          f"the device is still connected, so it can publish the erase it just performed "
+          f"({ls(pg2, 'gtd_sync_connected')})")
+    check(ls(pg2, "gtd_desktop_sync_folder") == "/fake/Dropbox",
+          "⚑ AND IT STILL KNOWS WHERE TO WRITE. Found live: the reset kept the connected flag but "
+          "wiped the desktop's folder path, so the desktop was permanently 'connected' with "
+          "nowhere to publish, every push threw 'No Dropbox folder connected', and the erase never "
+          f"reached the phone ({ls(pg2, 'gtd_desktop_sync_folder')})")
 
     # Now publish, and read what the OTHER device would receive.
     published = pg2.evaluate("() => window.__oelaSync.exportBundle()")

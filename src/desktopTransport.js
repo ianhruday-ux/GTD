@@ -73,7 +73,20 @@ async function desktopDisconnect(){
 async function desktopSyncNow(){
   const bridge = desktopBridge();
   if (!bridge) throw new Error("Dropbox sync is only available in the installed app");
-  const folder = desktopFolder();
+  // ⚑ SELF-HEAL (W7). A device that believes it is connected but has lost its
+  // folder path used to be stuck for good: every sync threw here, and the only
+  // way out was noticing the message and manually disconnecting/reconnecting.
+  // That state was reachable -- a restore-to-defaults wiped the path while
+  // leaving the connected flag set -- and while the restore no longer does
+  // that, "connected with nowhere to write" is worth recovering from rather
+  // than merely not causing. Auto-detect is the same call connect() makes, so
+  // this re-runs the step that produced the path in the first place; if it
+  // comes back empty we are genuinely stuck and the error still stands.
+  let folder = desktopFolder();
+  if (!folder){
+    folder = await bridge.detectDropboxFolder();
+    if (folder) Storage.set(DESKTOP_SYNC_FOLDER_KEY, folder);
+  }
   if (!folder) throw new Error("No Dropbox folder connected");
   // Re-arm the freshness watch on every attempt -- idempotent in main.js if
   // already watching this folder, and this is also what re-arms it after a

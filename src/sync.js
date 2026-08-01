@@ -681,9 +681,30 @@ function canSweepAccumulated(sinceMs){
 //
 // gtd_sync_connected stays local too: a backup saying "connected" does not
 // make a fresh machine connected -- it has no token.
-const SYNC_MACHINERY_KEYS = [SYNC_DEVICE_ID_KEY, SYNC_BASELINE_KEY, SYNC_CONNECTED_KEY,
-                             SYNC_TOMBSTONE_KEY, SYNC_ROSTER_KEY];
-function isSyncMachineryKey(k){ return SYNC_MACHINERY_KEYS.indexOf(k) !== -1; }
+// ⚑ ONE LIST, TWO VERBS. There used to be two hand-written lists -- what an
+// import must refuse, and what a restore-to-defaults must keep -- and they
+// were nearly identical because they mean the SAME thing: "this is not the
+// user's data, it is this device's place in the sync system." Keeping them
+// separate meant keeping them in step by hand, and that failed the first time
+// it was tested: gtd_desktop_sync_folder was in neither, so a restore wiped
+// the desktop's Dropbox folder path while leaving gtd_sync_connected set. The
+// desktop was then permanently "connected" with nowhere to write, every push
+// threw "No Dropbox folder connected", and the erase never reached the phone.
+// (The phone could not hit it -- its credentials live in native storage, which
+// no localStorage operation touches. Only the desktop keeps a connection
+// detail under a gtd_ key.)
+//
+// So: one list. Import REFUSES these and export omits them; a restore KEEPS
+// them. Anything device-local and sync-related belongs here and nowhere else.
+const SYNC_DEVICE_LOCAL_KEYS = [
+  SYNC_DEVICE_ID_KEY,      // who this device is
+  SYNC_BASELINE_KEY,       // what it last agreed with the cloud
+  SYNC_CONNECTED_KEY,      // whether it is connected
+  SYNC_TOMBSTONE_KEY,      // what it knows was deleted
+  SYNC_ROSTER_KEY,         // who else it has seen
+  "gtd_desktop_sync_folder" // WHERE it syncs (W6 desktop; a path means nothing on another machine)
+];
+function isSyncMachineryKey(k){ return SYNC_DEVICE_LOCAL_KEYS.indexOf(k) !== -1; }
 
 // (a). Only the stores the merge engine actually reasons about; everything
 // else in a backup is settings, which no device contests.
@@ -740,16 +761,15 @@ function rosterDeviceCount(){
   return roster && typeof roster === "object" ? Object.keys(roster).length : 0;
 }
 
-// Keys a RESTORE-TO-DEFAULTS must not wipe. Device identity above all: reset
-// used to clear it, so every reset minted a new id and abandoned the old one
-// in the roster -- the same defect class as the import bug, arrived at from
-// the other direction. The baseline survives for a subtler reason, see
-// app.js's eraseAllData: without it the next sync is a baseline-less rejoin,
-// stripSeededRecords fires, and the freshly seeded defaults are withheld from
-// the push -- so the other devices would be emptied and never reseeded.
-const SYNC_RESTORE_SURVIVOR_KEYS = [SYNC_DEVICE_ID_KEY, SYNC_CONNECTED_KEY,
-                                    SYNC_BASELINE_KEY, SYNC_TOMBSTONE_KEY];
-function isRestoreSurvivorKey(k){ return SYNC_RESTORE_SURVIVOR_KEYS.indexOf(k) !== -1; }
+// What a RESTORE-TO-DEFAULTS must not wipe: the same list, because it is the
+// same idea. Device identity, so a reset stops minting a new id and abandoning
+// the old one in the roster. The connection AND the folder path, so the device
+// can still reach the cloud to publish the erase it just performed. The
+// baseline for a subtler reason (app.js's tombstoneEverySyncedRecord): without
+// one the next sync is a rejoin, stripSeededRecords fires, and the freshly
+// seeded defaults are withheld from the push, so the other devices are emptied
+// and never reseeded. And the tombstones, which ARE the erase.
+function isRestoreSurvivorKey(k){ return isSyncMachineryKey(k); }
 
 const Sync = {
   getDeviceId: getDeviceId,
