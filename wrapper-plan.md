@@ -1145,6 +1145,36 @@ as possible before moving on to the wrapper"):
 
 ---
 
+### W7 progress, 2026-07-31 — the habit half is built, the import half is not
+
+Item 1 of W7 split in two once the author ruled on it. **What the ruling turned out to need first**
+was the *habit* half, and that shipped this round (commits `373e562`, `d888cc8`):
+
+- **Day outcomes are assertions.** Un-ticking used to delete the `habitDone` record, making a
+  correction into an absence — the one form the merge discards — so done-wins resurrected the
+  fat-finger permanently once either device promoted the day. Tick and un-tick are now both stamped
+  assertions, a contested day goes to the later one, and `assertedAt` rides into history so the rule
+  still holds after the 4am boundary. Done-beats-miss is unchanged; it is now *written* as
+  assertion-beats-inference, which is what it always said.
+- **Pause is a dated range**, `[from, to)`, with `run.paused` derived. Dating it makes the protection
+  retroactive: a stale device's misses inside the range are filtered at replay rather than needing
+  to be prevented.
+- **Two defects found while tracing.** `reloadSyncedStateFromStorage` never reloaded
+  `habitRuns`/`habitDone` (so the chunk-B merge reached storage and never memory, and the §4.3 gate
+  was protecting nothing for habits); and `canSweepAccumulated` keyed on a session-scoped flag, so a
+  resident app that pulled at 9am finalized the 4am boundary on stale data.
+
+39 new checks in `checks/sync_w7_assertions.py`, 16 of which fail on the pre-change build. All 54
+existing suites pass.
+
+**Still open, and it is §11 below verbatim:** the export/import half. The author has ruled that a
+restore propagates — option (a) — but the builder's floor question is unanswered: whether (b)'s "never
+import sync identity" (device id, baseline, connection state) is included, which it must be for the
+roster and tombstone GC to survive a restore-onto-a-new-machine. Nothing in this round touched
+`importAllData`.
+
+---
+
 ## 11. Export/import × sync — an open ruling, raised by the author 2026-07-31
 
 **The question:** delete something on device 1; the tombstone reaches the cloud but device 2 has not
