@@ -1189,9 +1189,37 @@ Electron build all night to drive the sync, restore and reset testing above. It 
 "connected with nowhere to write" defect, the duplicated conflict entries and the silent
 resurrection, which is exactly the argument for insisting on a device pass.
 
+**W7 item 1 is now DONE in both halves**, 2026-08-01. The staleness half — the one the in-app chunk
+map had flagged as TO DO since chunk 8 and which `restore_x_sync.py` never covered — is
+`checks/backup_fields.py`, 59 checks. A real system goes out through the real Export download and
+back through the real file chooser, with localStorage wiped in between *and the wipe asserted*, so
+nothing in it can pass because the data never left. It holds every field the app has grown:
+`setAt`/`pushCount`, `missedOcc`, the renamed surfaces, and chunks A and B's four reshaped stores,
+each asserted twice over (the value out of storage, and the thing that renders — the ↻1 chip, the
+paused pill, the lacquer frame, the missed repeat in the review, the archived waiting action coming
+back). A second group restores a genuinely LEGACY backup — keyed maps, the bare `paused` boolean, a
+`gtd_habit_done` of date strings — because those files are on disk now and every loader's tolerance
+of the old shape is what stands between them and a lost restore. Proven to fail twice, once per
+sabotage, per protocol 2.
+
+⚑ **Found while writing it, unfixed, and it needs a ruling rather than a patch:**
+`restoreEventsForProject` (`app.js`) is called from nowhere. Completing a project archives its linked
+events (`archiveEventsForProject`) and `restoreTask()` restores only the archived *waiting* actions,
+so un-completing brings the actions back and leaves the events archived. Chunk A made the store
+*sync*; nothing made the local un-complete read it. Whether that is a bug (restore both) or the
+design (an event that stopped happening should not silently restart) is the author's call — the
+question is what un-completing a project is supposed to mean, not how to wire a function up.
+
 **What remains of W7: item 3 only — the packaging.** A sideloadable APK and an unsigned desktop
-build, plus the plain-language note on how to install each. The in-app chunk map and QA checklist
-are still due when W7 actually ships, per §7's note above.
+build, plus the plain-language note on how to install each.
+
+~~The in-app chunk map and QA checklist are still due when W7 actually ships.~~ **Struck, 2026-08-01
+(author).** Both conventions are retired: *"the dev tools should be hidden and inaccessible in the
+final product. Leave them in just in case I want to come back to this, but for now, they've served
+their purpose."* `DEV_TOOLS_BUILT_IN` (`app.js`) is false, which closes the ⋯ → Debugging row and
+makes `applyQaScaffolding()` sweep both out of the lanes rather than inject them. Nothing is
+deleted — flip the constant and rebuild. Recorded in CLAUDE.md, held by
+`checks/shipped_surface.py` in both directions.
 
 ---
 
