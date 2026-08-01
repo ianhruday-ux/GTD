@@ -4,11 +4,17 @@ __pycache__/
 dist/index.baseline.html
 drag log*.txt
 
-# W7 item 3 — what tools_package.py produces, and its scratch space. Build
-# outputs, not source: an APK and a ~100 MB Electron bundle regenerated from
-# dist/ by one command, which is exactly the sort of thing dist/index.html
-# itself is (and dist/ IS committed, because that one file is the product and
-# has to be servable from Pages). These are not servable and are not small.
+# W7 item 3 — what tools_package.py produces. Build outputs, not source: an APK
+# and a 138 MB Electron bundle regenerated from dist/ by one command, which is
+# exactly the sort of thing dist/index.html itself is (and dist/ IS committed,
+# because that one file is the product and has to be servable from Pages).
+# These are not servable and are not small.
+#
+# The scratch space is NOT here: it lives outside the repo, at
+# %LOCALAPPDATA%/oela-build, because unpacking Electron inside a OneDrive
+# folder made OneDrive fight Gradle for file handles. build-tmp/ stays listed
+# only so an older checkout, or an OELA_BUILD_TMP pointed back in here, cannot
+# accidentally commit 300 MB.
 release/
 build-tmp/
 

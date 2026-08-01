@@ -2534,7 +2534,7 @@ body.screen-open #tray-handle{ display:none; }
 (function(){
 "use strict";
 
-const BUILD_STAMP = "01 Aug 16:20";  // replaced by build.py
+const BUILD_STAMP = "01 Aug 17:01";  // replaced by build.py
 
 // =========================================================
 // STORAGE ADAPTER (spec.md §3, known issue 4)
@@ -3858,12 +3858,15 @@ window.__oelaDropbox = DropboxTransport; // parallels window.__oelaSync — the 
 // API — reached here by reading/writing the local disk copy the Dropbox
 // desktop client already keeps in sync, instead of the API. No OAuth, no
 // network call: "three lines of fs" is the whole reason this chunk exists
-// (wrapper-plan.md §7 W6). wrapper/electron/main.js's DROPBOX_APP_SUBPATH
-// must agree with this file's layout; that agreement, not a shared
-// constant, is what makes one file readable by both shells. ⚠ The Dropbox
-// App Folder's real on-disk name is NOT assumed to be "OELA" — see
-// wrapper-plan.md §6 trap 10, found live: it's whatever the Dropbox App
-// Console actually has registered, verified against the real account.
+// (wrapper-plan.md §7 W6). This module never constructs the path: it hands
+// the Dropbox ROOT across the bridge and wrapper/electron/syncPath.js works
+// out the rest, which is what makes one file readable by both shells. ⚠ Two
+// halves of that path have each bitten once. The app folder's real on-disk
+// name is NOT "OELA" (wrapper-plan.md §6 trap 10, found live against the
+// real account), and its PARENT is not reliably "Apps" either — Dropbox
+// localizes that one, so syncPath.js looks for the app folder rather than
+// assuming where it sits. Both failures were silent: a wrong path means the
+// two devices sync happily with different files and never say so.
 //
 // In a browser (no window.__oelaDesktopBridge — GitHub Pages, a plain
 // desktop Chrome tab): every exported function is unreachable, matching

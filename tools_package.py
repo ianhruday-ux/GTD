@@ -41,6 +41,7 @@ import shutil
 import struct
 import subprocess
 import sys
+import tempfile
 import time
 import zipfile
 from pathlib import Path
@@ -52,7 +53,19 @@ ELECTRON = WRAPPER / "electron"
 DIST = REPO / "dist"
 DIST_INDEX = DIST / "index.html"
 RELEASE = REPO / "release"
-BUILD_TMP = REPO / "build-tmp"
+
+# Scratch space, deliberately OUTSIDE the repo -- which is to say outside
+# OneDrive. Staging the desktop build unpacks ~300 MB of Electron, and the
+# first version of this script put that inside the synced folder: OneDrive
+# immediately began uploading it, took handles on thousands of files, and
+# Gradle then failed to delete its own intermediates ("Unable to delete
+# directory", "EBUSY") on the very next run. That is the W2 collision again,
+# except this script was CAUSING it rather than merely suffering it. Nothing
+# here is worth syncing, backing up, or keeping between runs.
+BUILD_TMP = Path(
+    os.environ.get("OELA_BUILD_TMP")
+    or (Path(os.environ.get("LOCALAPPDATA") or tempfile.gettempdir()) / "oela-build")
+)
 
 SYNCED_INDEX = ANDROID / "app" / "src" / "main" / "assets" / "public" / "index.html"
 RELEASE_APK = ANDROID / "app" / "build" / "outputs" / "apk" / "release" / "app-release.apk"
@@ -62,6 +75,10 @@ INSTALL_DOC = REPO / "INSTALL.md"
 
 # The APK's own copy of the payload. Capacitor puts webDir under assets/public/.
 APK_PAYLOAD_ENTRY = "assets/public/index.html"
+
+# The Electron shell's own source. main.js require()s the others, so a missing
+# one is a crash at launch that nothing before launch would notice.
+SHELL_FILES = ["main.js", "preload.js", "syncPath.js"]
 
 
 # ---------------------------------------------------------------- environment
@@ -203,7 +220,8 @@ def build_apk(version, java_home, android_home, allow_missing_key):
 
     npx = "npx.cmd" if os.name == "nt" else "npx"
     print("  syncing web assets into the Android project...")
-    run([npx, "cap", "sync", "android"], cwd=WRAPPER)
+    run_resilient([npx, "cap", "sync", "android"], WRAPPER, None, "npx cap sync android",
+                  clear=[WRAPPER / "android" / "capacitor-cordova-android-plugins" / "build"])
 
     if not SYNCED_INDEX.exists():
         sys.exit(f"tools_package: {SYNCED_INDEX} missing after cap sync -- sync copied nothing.")
@@ -214,7 +232,7 @@ def build_apk(version, java_home, android_home, allow_missing_key):
     env = dict(os.environ, JAVA_HOME=java_home, ANDROID_HOME=android_home)
     gradlew = str(ANDROID / ("gradlew.bat" if os.name == "nt" else "gradlew"))
     print("  building the signed release APK (this takes a minute)...")
-    run([gradlew, "assembleRelease"], cwd=ANDROID, env=env)
+    gradle_release(gradlew, env)
 
     if not RELEASE_APK.exists():
         sys.exit(f"tools_package: expected an APK at {RELEASE_APK} and there is none.")
@@ -225,6 +243,64 @@ def build_apk(version, java_home, android_home, allow_missing_key):
     shutil.copy2(RELEASE_APK, out)
     print(f"  android  {out.name}  ({out.stat().st_size / 1_048_576:.2f} MB)")
     return out
+
+
+# The ways Windows says "somebody else has this file open". This repo lives in
+# a OneDrive-synced folder, and OneDrive holds handles on files it is uploading
+# -- which, right after a build, is thousands of freshly written intermediates.
+# Both Gradle and `cap sync` delete and recreate those directories, so both can
+# lose the race. wrapper-plan.md's W2 entry hit the first of these during
+# resource merge and set org.gradle.vfs.watch=false, which reduced it without
+# removing it, and noted that deleting the build directory clears the rest.
+ONEDRIVE_LOCK_SIGNATURES = (
+    "Unable to delete directory",
+    "EBUSY",
+    "resource busy or locked",
+    "Access is denied",
+    "EPERM",
+)
+
+
+def run_resilient(cmd, cwd, env, label, clear=()):
+    """Run a build command, retrying ONCE past a OneDrive file lock.
+
+    Deliberately not a general retry. The retry fires only when the output
+    carries one of the signatures above, and it does the documented remedy --
+    delete the intermediates that are stuck -- before trying again, rather than
+    running the same command a second time and hoping. Every other failure
+    exits on the first attempt with its own output intact.
+
+    That distinction is the whole point: a packaging script that quietly
+    retries real compile errors is worse than one that never retries, because
+    it turns a clear failure into an intermittent one.
+    """
+    def attempt():
+        return subprocess.run(cmd, cwd=str(cwd), env=env, capture_output=True, text=True)
+
+    r = attempt()
+    if r.returncode == 0:
+        return r.stdout
+    combined = (r.stdout or "") + (r.stderr or "")
+    if not any(sig in combined for sig in ONEDRIVE_LOCK_SIGNATURES):
+        sys.stdout.write(combined[-4000:])
+        sys.exit(f"\ntools_package: FAILED -> {label}")
+
+    print("    OneDrive was holding build files open; clearing and retrying once")
+    for path in clear:
+        force_rmtree(path)
+    r = attempt()
+    if r.returncode != 0:
+        sys.stdout.write(((r.stdout or "") + (r.stderr or ""))[-4000:])
+        sys.exit(f"\ntools_package: FAILED -> {label} (after clearing build directories)\n"
+                 "  Pause OneDrive syncing and run this again. If it still fails,\n"
+                 "  delete wrapper/android/app/build and\n"
+                 "  wrapper/android/capacitor-cordova-android-plugins/build entirely.")
+    return r.stdout
+
+
+def gradle_release(gradlew, env):
+    run_resilient([gradlew, "assembleRelease"], ANDROID, env, "gradlew assembleRelease",
+                  clear=[ANDROID / "app" / "build"])
 
 
 def verify_apk(apk, android_home, env, expect_key):
@@ -313,12 +389,16 @@ def stage_desktop(version):
     which the packager supplies.
     """
     stage = BUILD_TMP / "electron-app"
-    if stage.exists():
-        shutil.rmtree(stage)
+    force_rmtree(stage)
     (stage / "dist").mkdir(parents=True)
 
-    shutil.copy2(ELECTRON / "main.js", stage / "main.js")
-    shutil.copy2(ELECTRON / "preload.js", stage / "preload.js")
+    # Every .js the shell is made of. Enumerated rather than globbed on
+    # purpose -- a glob would silently start shipping anything that lands in
+    # this folder -- but that means a NEW module has to be added here, and
+    # forgetting is a crash on require() that only the packaged build shows.
+    # verify_desktop() below opens the built app and checks each one arrived.
+    for name in SHELL_FILES:
+        shutil.copy2(ELECTRON / name, stage / name)
     shutil.copy2(DIST_INDEX, stage / "dist" / "index.html")
     shutil.copy2(DIST / "icon-512.png", stage / "dist" / "icon-512.png")
 
@@ -348,6 +428,41 @@ def stage_desktop(version):
         "dependencies": {}
     }, indent=2) + "\n", encoding="utf-8")
     return stage
+
+
+def force_rmtree(folder):
+    """shutil.rmtree, but survives this repo living inside a OneDrive folder.
+
+    Same environment interaction wrapper-plan.md already records against Gradle
+    (W2's "Unable to delete directory"): OneDrive's sync client opens handles on
+    files it is uploading, and a directory cannot be removed while one is held,
+    so a plain rmtree fails with WinError 5 at random depending on what OneDrive
+    happened to be doing. It is transient -- the handle is released in well under
+    a second -- so a few retries turn a hard failure into a pause nobody notices.
+    The chmod is for the other cause of the same errno: read-only bits, which
+    Electron distributions carry on some files.
+    """
+    if not folder.exists():
+        return
+    def on_error(func, path, exc_info):
+        try:
+            os.chmod(path, 0o700)
+            func(path)
+        except Exception:
+            pass
+    for attempt in range(5):
+        try:
+            shutil.rmtree(folder, onexc=on_error)
+        except TypeError:  # onexc is 3.12+; onerror on older interpreters
+            shutil.rmtree(folder, onerror=lambda f, p, e: on_error(f, p, e))
+        except Exception:
+            pass
+        if not folder.exists():
+            return
+        time.sleep(0.5 * (attempt + 1))
+    sys.exit(f"tools_package: could not delete {folder}.\n"
+             "  Something is holding a file open in it -- OneDrive syncing, or a\n"
+             "  packaged OELA still running. Close it and run this again.")
 
 
 def zip_dir(folder, out):
@@ -405,8 +520,7 @@ def build_desktop(version):
         icon = None
 
     out_dir = BUILD_TMP / "packaged"
-    if out_dir.exists():
-        shutil.rmtree(out_dir)
+    force_rmtree(out_dir)
 
     npx = "npx.cmd" if os.name == "nt" else "npx"
     cmd = [npx, "electron-packager", str(stage), "OELA",
@@ -442,12 +556,22 @@ def build_desktop(version):
     # Verify the payload the same way the APK is verified -- the desktop build
     # copies dist/index.html rather than referencing it, so it can go stale in
     # exactly the same silent way.
-    shipped = built / "resources" / "app" / "dist" / "index.html"
+    app_dir = built / "resources" / "app"
+    shipped = app_dir / "dist" / "index.html"
     if not shipped.exists():
         sys.exit(f"tools_package: no payload at {shipped} -- the app was not staged correctly.")
     if sha(shipped) != sha(DIST_INDEX):
         sys.exit("tools_package: the app inside the desktop build is NOT dist/index.html.")
     print("    verified: the app inside the desktop build is byte-identical to dist/index.html")
+
+    # Every module main.js require()s, present in the build. A missing one does
+    # not fail the package step -- it fails at launch, on the user's machine,
+    # with a dialog they cannot act on.
+    missing = [n for n in SHELL_FILES if not (app_dir / n).exists()]
+    if missing:
+        sys.exit(f"tools_package: the desktop build is missing {', '.join(missing)}.\n"
+                 "  Add it to SHELL_FILES -- the packaged app would crash on launch.")
+    print(f"    verified: all {len(SHELL_FILES)} shell modules shipped ({', '.join(SHELL_FILES)})")
 
     out = RELEASE / f"OELA-{version}-windows-x64.zip"
     zip_dir(built, out)
@@ -495,7 +619,7 @@ def main():
         java_home, android_home = preflight_android()
 
     RELEASE.mkdir(exist_ok=True)
-    BUILD_TMP.mkdir(exist_ok=True)
+    BUILD_TMP.mkdir(parents=True, exist_ok=True)
 
     if "--no-build" not in args:
         build_web()

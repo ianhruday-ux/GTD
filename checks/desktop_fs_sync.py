@@ -104,9 +104,13 @@ def check(cond, msg):
 class FakeDisk:
     """The one shared file, as a real filesystem would track it: content plus
     an mtime that changes on every write -- desktopTransport.js's own stand-in
-    for Dropbox's CAS revision. `root` mirrors main.js's DROPBOX_APP_SUBPATH
-    layout (<root>/Apps/OELA/oela-sync.json), exercised for real here rather
-    than assumed. Shared across MULTIPLE browser contexts (group 2) the same
+    for Dropbox's CAS revision. The literal path below is arbitrary and is NOT
+    a claim about where the real file lives: this fake stands in for the main
+    process, which is the side that resolves the path (wrapper/electron/
+    syncPath.js, covered by checks/desktop_sync_path.py). What this file
+    exercises is the renderer's read/merge/write cycle, which only requires
+    that the same key comes back for the same root. Shared across MULTIPLE
+    browser contexts (group 2) the same
     way dropbox_transport.py's FakeCloud is, since a real disk doesn't belong
     to any one browser context either."""
     def __init__(self):

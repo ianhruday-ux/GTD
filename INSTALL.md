@@ -214,9 +214,11 @@ old news.
 **There's a folder in my Dropbox called `Apps/OELA_sync_ianhruday`.** That's the sync file. The odd
 name is the app's registered name and not a mistake. Don't delete it while you're using sync.
 
-**My Dropbox isn't in English and there's no folder called `Apps`.** Dropbox translates that folder
-name, and the Windows build currently looks for the English one. Tell me and I'll fix it — the
-Android build is unaffected.
+**My Dropbox isn't in English — the folder is called `Aplicaciones`, or `Applications`.** That's
+fine; OELA looks for the sync folder rather than assuming what its parent is called. One wrinkle: if
+you set up the **Windows** side first, before ever connecting on a phone, it creates the folder
+using the English name `Apps`, which is not the one Dropbox would have used. **Connect on the phone
+first if you use both.** If you only use Windows, it doesn't matter at all.
 
 **Something else.** Tell me what you tapped and what happened. There is no crash reporting in this
 app and no telemetry of any kind, so if you don't tell me, I don't know.

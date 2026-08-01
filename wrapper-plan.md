@@ -1277,14 +1277,50 @@ one-file version asks nothing of you if that isn't good enough. It also document
 per platform, that Windows sync needs the Dropbox desktop client running while Android does not, and
 what the checksums are for.
 
-⚑ **Found while writing the doc, unfixed, and small:** `wrapper/electron/main.js` hardcodes the
-Dropbox app-folder parent as `"Apps"`, which Dropbox **localizes** — a friend with a non-English
-Dropbox account would auto-detect a root and then read and write a path that does not exist. Android
-is unaffected (the API scopes the token to the app folder transparently, §6 trap 10). It fails
-loudly rather than silently, which is why it is flagged rather than rushed: the desktop transport
-would find no file and create the English-named folder, so the two devices would diverge visibly
-rather than quietly. INSTALL.md's troubleshooting names it. The fix is to glob the Dropbox root for
-`*/OELA_sync_ianhruday` instead of assuming the parent's name.
+**The localized-`Apps` bug, found while writing the doc, is FIXED the same round** (author: "if it
+can be fixed with 0 cost now, why not do it?"). `wrapper/electron/main.js` hardcoded the Dropbox
+app-folder parent as `"Apps"`, which Dropbox **localizes** — "Aplicaciones", "Applications". This is
+trap 10 a second time, one path segment to the left: the registered *child* name was caught live in
+W6 and fixed by knowing the value; the *parent* went unexamined beside it.
+
+`wrapper/electron/syncPath.js` (new, plain CommonJS, no Electron import so it can be tested) scans
+the Dropbox root's immediate subdirectories for one containing `OELA_sync_ianhruday` — the half
+Dropbox does **not** translate, because it comes from the app registration — and uses whatever that
+parent turns out to be called. The English name is preferred when it really exists, so an account
+already syncing does not switch underneath itself, and the scan is sorted so two devices cannot
+resolve differently.
+
+⚑ **The residual case, pinned rather than closed:** if *nothing* is linked anywhere yet, no app
+folder exists to find, and this still falls back to creating the English `Apps`. Closing it means
+either refusing to create the folder and telling the user to connect a phone first (new UI, new copy
+in two languages) or shipping a table of Dropbox's translations (no authoritative source, rots
+quietly). Neither is free, and the fallback is strictly better than what it replaced — the realistic
+route to desktop sync is having connected the phone, which creates the folder and makes the scan
+succeed. `checks/desktop_sync_path.py` asserts the fallback explicitly so a later fix has to change
+that line deliberately. INSTALL.md tells a non-English user to connect the phone first.
+
+**`checks/desktop_sync_path.py`, new — 8 checks, and the first file in `checks/` that is not
+Playwright.** Every other check drives `dist/index.html` in a browser because that is where the app
+is; this code is in the Electron *main* process, which has no DOM to assert on, so protocol 1 has
+nothing to bind to. What it has instead is a real filesystem: the file drives the real module via
+`node` against real temp directories, rather than reimplementing the logic in Python, which protocol
+2 would not accept. **Proven to fail by sabotage** (protocol 2): restoring the hardcoded join gives
+6 passed, 2 failed, both localized cases, failing with the wrong parent rather than an exception.
+The other six pass either way on purpose — they pin what must not change.
+
+`src/desktopTransport.js` and `checks/desktop_fs_sync.py` both carried comments citing the deleted
+`DROPBOX_APP_SUBPATH`; corrected (protocol 2b). `desktop_fs_sync.py`'s fake path is now labelled as
+arbitrary, because it is — that file mocks the bridge and never reaches the resolver.
+
+**Two OneDrive collisions, one of them this script's own fault.** W2 recorded Gradle failing with
+"Unable to delete directory" in a OneDrive-synced repo and set `org.gradle.vfs.watch=false`. It came
+back harder here, and the reason is worth recording: the first version of `tools_package.py` staged
+the desktop build *inside the repo*, unpacking ~300 MB of Electron into a synced folder. OneDrive
+began uploading it, held handles on thousands of files, and the next `assembleRelease` and
+`cap sync` both lost the race. **Scratch space now lives outside OneDrive** (`%LOCALAPPDATA%/oela-build`,
+overridable with `OELA_BUILD_TMP`), which removes the cause; `run_resilient()` retries once past the
+remaining lock signatures, but only those, and does the documented remedy first — a packaging script
+that quietly retried real compile errors would be worse than one that never retried.
 
 ~~The in-app chunk map and QA checklist are still due when W7 actually ships.~~ **Struck, 2026-08-01
 (author).** Both conventions are retired: *"the dev tools should be hidden and inaccessible in the

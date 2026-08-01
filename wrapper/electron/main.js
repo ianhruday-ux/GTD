@@ -36,20 +36,12 @@ const DIST_DIR = [
 const DIST_INDEX = path.join(DIST_DIR, "index.html");
 const ICON_PATH = path.join(DIST_DIR, "icon-512.png");
 
-// The App-Folder-scoped path W5's Dropbox API already writes to (see
-// dropboxTransport.js's DROPBOX_SYNC_PATH). This MUST match exactly, since
-// the whole point of file-based sync is that every device's transport reads
-// and writes the one shared file. A local Dropbox client mirrors an
-// API-scoped app folder at "<Dropbox root>/Apps/<app name>/", where
-// <app name> is whatever the Dropbox App Console has it registered as —
-// NOT necessarily the app's display name. wrapper-plan.md's own prose says
-// "Apps/OELA," which turned out to be shorthand, not the literal folder
-// name: checked directly against the real account (2026-07-30 desktop
-// test session) and the registered folder is "OELA_sync_ianhruday". Getting
-// this wrong is silent and dangerous — the desktop transport would read and
-// write a DIFFERENT file than the phone, each side merging happily with
-// itself and never seeing the other's data, no error anywhere.
-const DROPBOX_APP_SUBPATH = ["Apps", "OELA_sync_ianhruday", "oela-sync.json"];
+// Where the sync file lives inside a Dropbox folder — its own module, because
+// it is the piece most worth testing and main.js cannot be require()d outside
+// Electron. It resolves the app-folder parent by looking for the app folder
+// rather than assuming "Apps", which Dropbox localizes. See syncPath.js for
+// the full reasoning and the one case it deliberately does not close.
+const { resolveSyncFile } = require("./syncPath");
 
 // Best-effort auto-detect of the local Dropbox root. Dropbox's desktop
 // client has written info.json to a well-known, OS-specific location since
@@ -102,15 +94,16 @@ ipcMain.handle("desktop-pick-folder", async () => {
 });
 
 // `root` is whatever folder connect() resolved (auto-detected or picked) —
-// always the Dropbox ROOT, never Apps/OELA itself; that subpath is appended
-// here, in the one place that needs to agree with dropboxTransport.js's own
-// DROPBOX_SYNC_PATH, rather than trusting the renderer to construct it.
+// always the Dropbox ROOT, never the app folder itself; the rest of the path
+// is worked out here, in the one place that needs to agree with
+// dropboxTransport.js's own DROPBOX_SYNC_PATH, rather than trusting the
+// renderer to construct it. Async now, because resolving it reads the disk.
 function syncFilePath(root) {
-  return path.join(root, ...DROPBOX_APP_SUBPATH);
+  return resolveSyncFile(root, fs);
 }
 
 ipcMain.handle("desktop-read-sync-file", async (_event, root) => {
-  const filePath = syncFilePath(root);
+  const filePath = await syncFilePath(root);
   try {
     const [content, stat] = await Promise.all([
       fs.readFile(filePath, "utf8"),
@@ -137,7 +130,7 @@ ipcMain.handle("desktop-read-sync-file", async (_event, root) => {
 let lastWrittenMtimeMs = null; // set by OUR OWN writes below, so the watcher can tell "Dropbox delivered something" from "I just wrote this"
 
 ipcMain.handle("desktop-write-sync-file", async (_event, root, content) => {
-  const filePath = syncFilePath(root);
+  const filePath = await syncFilePath(root);
   await fs.mkdir(path.dirname(filePath), { recursive: true });
   await fs.writeFile(filePath, content, "utf8");
   const stat = await fs.stat(filePath);
@@ -162,8 +155,12 @@ function stopWatching() {
 // Watches the DIRECTORY, not the file directly -- fs.watch on a file that
 // doesn't exist yet throws, and the very first sync (which creates
 // Apps/<folder>/) hasn't run when connect() first calls this.
-ipcMain.handle("desktop-watch-sync-file", (event, root) => {
-  const filePath = syncFilePath(root);
+ipcMain.handle("desktop-watch-sync-file", async (event, root) => {
+  // Re-resolved on every call, not cached: this is re-armed at the start of
+  // every desktopSyncNow(), so a folder that did not exist when the app opened
+  // (nothing had ever synced) is picked up on the attempt that creates it,
+  // under whatever name it really has.
+  const filePath = await syncFilePath(root);
   const dir = path.dirname(filePath);
   const fileName = path.basename(filePath);
   if (watchedDir === dir && watcher) { watchedSender = event.sender; return true; }
