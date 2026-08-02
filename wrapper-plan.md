@@ -201,8 +201,10 @@ Per the author's step 2, sorted into the three buckets agreed in conversation.
   did not: first paint on a cold cache with no connection fell back to system fonts, in a file that
   was otherwise genuinely self-contained. Fixed in the browser build ahead of the wrapper, since it
   was independent of everything else here. Verified from both a served origin and `file:`.
-- **`spec.md` §3 known issue 1 is stale.** The screen stack landed. Mark it resolved so the next
-  session doesn't design around a limitation that no longer exists. *(Still outstanding.)*
+- ~~**`spec.md` §3 known issue 1 is stale.**~~ **DONE 2026-08-01.** The entry now reads "RESOLVED
+  (chunk 1, confirmed 2026-08-01)" and records *why* it was kept as a struck entry rather than
+  deleted: this line sat here flagged-and-unacted for a fortnight, and an open issue that is not
+  open costs a session the moment somebody designs around it.
 
 **Fix in its wrapper chunk:** B1, B3, B4, S1–S4.
 
@@ -1043,12 +1045,17 @@ generalization of the W5 orchestration code is exercised by both `dropbox_transp
 `dropbox_settings_ui.py` (Capacitor branch) and `desktop_fs_sync.py` (Electron branch), which is the
 whole point of resolving it in one place rather than two.
 
-**Not yet device-verified.** Every prior wrapper chunk that touched a real environment (W0, W2, W5) 
-found something the plan or the code didn't anticipate — a racing long-press timer, a mirror-on-write
-gap, a CORS/header trap, a stale APK, a missing USB driver. This chunk has not yet been run as an
-installed Electron app against a real Dropbox folder on the author's own computer; treat it as
-tested-but-unverified until that pass happens, the same caveat W1 carried between being built and being
-run on the phone.
+~~**Not yet device-verified.**~~ **VERIFIED 2026-08-01**, and it held to the pattern: every prior
+chunk that touched a real environment (W0, W2, W5) found something the plan didn't anticipate — a
+racing long-press timer, a mirror-on-write gap, a CORS/header trap, a stale APK, a missing USB
+driver — and so did this one. The author drove the Electron build all night against a real Dropbox
+folder and it surfaced the "connected with nowhere to write" defect, duplicated conflict entries,
+the silent resurrection, and the app folder's real on-disk name (§6, trap 10). See W7 item 2.
+
+⚠ **Still unverified, and it is a different claim:** nobody has installed the *packaged* desktop
+build the way a recipient would — download the zip, extract it, meet SmartScreen, run `OELA.exe`
+from wherever it landed. Running it out of `build-tmp/` (which is all that has happened) skips every
+step INSTALL.md actually describes. See §12.
 
 *In a browser:* desktop Chrome remains a first-class way to run the app, unwrapped — `window.__oelaDesktopBridge`
 does not exist there, so `DesktopTransport.isAvailable()` is false and `activeSyncTransport()` falls
@@ -1205,13 +1212,14 @@ back). A second group restores a genuinely LEGACY backup — keyed maps, the bar
 of the old shape is what stands between them and a lost restore. Proven to fail twice, once per
 sabotage, per protocol 2.
 
-⚑ **Found while writing it, unfixed, and it needs a ruling rather than a patch:**
-`restoreEventsForProject` (`app.js`) is called from nowhere. Completing a project archives its linked
-events (`archiveEventsForProject`) and `restoreTask()` restores only the archived *waiting* actions,
-so un-completing brings the actions back and leaves the events archived. Chunk A made the store
-*sync*; nothing made the local un-complete read it. Whether that is a bug (restore both) or the
-design (an event that stopped happening should not silently restart) is the author's call — the
-question is what un-completing a project is supposed to mean, not how to wire a function up.
+~~⚑ **Found while writing it, unfixed, and it needs a ruling rather than a patch:**
+`restoreEventsForProject` (`app.js`) is called from nowhere.~~ **RULED AND BUILT** (commit
+`b620cc5`, "Un-completing a project brings its events back, stamped to survive"). Completing a
+project archived its linked events and `restoreTask()` restored only the archived *waiting* actions,
+so un-completing brought the actions back and left the events archived. The ruling was that
+un-completing means undo — restore both — and the restored events are stamped so the merge carries
+them rather than letting another device's stale copy re-archive them. Covered by
+`checks/project_uncomplete_events.py`.
 
 **W7 item 3 — the packaging — is BUILT, 2026-08-01. W7 is closed, and so is the wrapper round.**
 
@@ -1388,3 +1396,77 @@ exist — and it is a design question, not a technical one:
 ⚑ The builder's view, recorded but NOT decided: **(b) is the floor and is not really optional** —
 copying a device identity is a straightforward defect whichever way the ruling goes. **(a) is the
 part that needs the author**, because it changes what a restore does to the *other* device.
+
+---
+
+## 12. What is left — two open tasks (author, 2026-08-01)
+
+The wrapper round is built. These two are what remains, and neither is code.
+
+### 12.1 ⏳ OPEN — Live with it on both devices, and watch for divergence
+
+**The task:** use the app normally on the phone and the computer over the next couple of days, and
+watch for the two systems disagreeing.
+
+**What specifically to watch for**, because "look for divergence" is not a test:
+
+1. **New Dropbox conflicted copies** in `Dropbox/Apps/OELA_sync_ianhruday/`. The folder was cleared
+   to make this legible — 33 files from the 2026-07-31 testing night were moved to
+   `Dropbox/Apps/Archive/oela-sync conflicted copies 2026-08-01/`. **The folder now holds nothing
+   but `oela-sync.json`, so any new one is a signal rather than noise.**
+2. **An item that exists on one device and not the other**, after both have synced.
+3. **A habit day whose outcome differs** between devices — the sharpest case in the whole design
+   (§4.3), because a wrong answer there is written into history and does not self-correct.
+
+**Why the previous evidence could not settle it, recorded so this isn't re-litigated.** A forensic
+pass over those 33 files found 205 records present in a conflicted copy and absent from the live
+bundle with no tombstone — which sounds decisive and is not. 155 of them are the same seed data
+reseeded about ten times (ten distinct ids for "1 CLICK HERE TO START THE TUTORIAL"), and the ~15
+one-offs are hand-typed fixtures named *Delete after Export*, *Keep after export*, *Made after
+export*. **Reset and Restore both destroy records without writing tombstones** — §11's ruling has a
+restore *clear* the tombstone log outright, which is also why the live bundle holds zero — so the
+exact fingerprint the check looked for is what a night of reset testing produces anyway. The test
+was not decisive and was reported as such. It becomes decisive from a clean folder under ordinary
+use, where deletions *do* tombstone.
+
+⚑ **The structural question underneath, open either way.** The desktop transport writes into a
+folder Dropbox's own daemon also writes, using the file's mtime as its compare-and-swap. Two
+writers, one file: that *can* fork by construction, and a conflicted copy is never named
+`oela-sync.json`, so no device will ever read one. Anything whose only home is a conflicted copy is
+out of sync from that moment. Whether this happens in practice is what the watch answers — and
+per the golden rule, **classify before diagnosing**: is the fix technical (make the desktop write
+in a way Dropbox won't fork), or is the finding that a file-based desktop transport writing into a
+daemon-synced folder was the wrong shape and it should go through the API like the phone does?
+
+### 12.2 ⏳ OPEN — The project review document
+
+**The task:** a review of the project as a whole, in two portions, **both written and kept
+separate** — not merged into one voice.
+
+- **The AI-written portion.** What was built, what it cost, where the design held and where it
+  bent, which decisions turned out wrong and what the evidence was. The material is unusually
+  complete: `spec.md`, this file, `ROUND-NOTES.md`, the `*-plan.md` files, ~65 suites in `checks/`,
+  and a commit log written in whole sentences.
+- **The human-written portion.** The author's own account. Whether the thing is good to use,
+  whether the process was worth it, what it was like to work this way.
+
+⚑ Keeping them separate is the point rather than a formatting preference: the two are evidence
+about different things, and a blended document would let the confident one launder the uncertain
+one. Where they disagree, that disagreement is the most interesting content in the file.
+
+### Also outstanding, smaller, and not scheduled
+
+Named here so "we are basically done" is a statement someone can check rather than take on trust.
+
+| | What | Bites when |
+|---|---|---|
+| **A** | **Nobody has installed the packaged Windows build as a recipient would** — download, extract, SmartScreen, run. It has only been launched out of `build-tmp/`, which skips every step INSTALL.md describes. This is the same shape as the Play Protect error the author found by standing in front of the dialog | A friend on Windows follows the doc |
+| **B** | **`syncPath.js`'s residual case:** a non-English Dropbox with nothing linked yet still creates the English `Apps`. Pinned by `checks/desktop_sync_path.py` rather than closed | A non-English friend sets up desktop *before* phone |
+| **C** | **`EncryptedSharedPreferences` is `@Deprecated`** (W5) with no successor shipped in that library version | AndroidX ships a replacement |
+| **D** | **zh-Hans for the sync/settings/packaging strings is the builder's own pass**, not the native-speaker review the tutorial and info copy got | A Chinese-reading friend uses it |
+| **E** | **No macOS or Linux desktop build.** "Windows first, Linux after" (§0) — the "after" never came | A friend isn't on Windows |
+| **F** | **`spec.md` §3 known issue 4** — unbounded growth against the storage ceiling. Mitigated (quota errors surface) but not solved | Months of real use |
+| **G** | **`tools_pushphone.py`'s install path is untested** — rewritten to build release, verified only as far as the device check | First time the phone is plugged in |
+
+None of these blocks using the app. **A** is the one worth doing before handing anything to anyone,
+because it is the only item on this list that a recipient hits on their first minute.
