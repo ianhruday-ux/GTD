@@ -6,7 +6,7 @@
 
 WHY THIS EXISTS AS A SCRIPT rather than four commands in a session:
 
-`assembleDebug` packages whatever is already sitting in
+`assembleRelease` packages whatever is already sitting in
 android/app/src/main/assets/public/, which ONLY updates on an explicit
 `npx cap sync android`. It does not happen automatically and does not know
 dist/index.html was rebuilt since the last one. A build can succeed, install
@@ -14,53 +14,39 @@ cleanly, and launch fine while silently running app code from hours earlier --
 which cost a full round of confused troubleshooting during W5
 (wrapper-plan.md §6, trap 9).
 
-So this script does the whole chain in the right order, every time, and then
-VERIFIES it rather than trusting it: after the sync it compares the bytes
-Capacitor copied against dist/index.html, and refuses to build an APK if they
-differ. The trap is not "someone forgets a command" -- it is "the failure is
-silent", so the fix has to be a check, not a reminder.
+WHAT CHANGED IN W7 ITEM 3, and why this file got shorter: it used to build a
+DEBUG APK and carry its own copy of the sync-then-verify chain. Both are now
+wrong.
 
-Also pins down JAVA_HOME / ANDROID_HOME, which Gradle needs and which are not
-set globally on this machine.
+  * Wrong build. Android identifies an app by its signing certificate, and the
+    shipping APK is signed with the real release key (wrapper/android/
+    keystore.properties). A debug APK is signed with the universal Android
+    debug key, so the two cannot replace each other -- `adb install` fails with
+    INSTALL_FAILED_UPDATE_INCOMPATIBLE and the only way through is uninstalling,
+    which takes the phone's local data with it. The author's phone runs the
+    release build, the same one their friends run. This script has to produce
+    THAT.
+
+  * Wrong copy. tools_package.py already builds and verifies exactly that APK --
+    cap sync, byte-compare the staged assets, assembleRelease with the OneDrive
+    retry, then four assertions against the finished artifact (payload matches
+    dist/, signed by the release key, not debuggable, App Key compiled in). A
+    second implementation of the same chain is a second thing to keep correct,
+    and the half that drifts is the half nobody is looking at.
+
+So this script is now what it always should have been: the packaging chain,
+plus the one thing packaging does not do -- put it on the phone in front of you.
 """
-import hashlib
 import os
-import shutil
 import subprocess
+import shutil
 import sys
 from pathlib import Path
 
+import tools_package as pkg
+
 REPO = Path(__file__).resolve().parent
-WRAPPER = REPO / "wrapper"
-ANDROID = WRAPPER / "android"
-DIST_INDEX = REPO / "dist" / "index.html"
-SYNCED_INDEX = ANDROID / "app" / "src" / "main" / "assets" / "public" / "index.html"
-APK = ANDROID / "app" / "build" / "outputs" / "apk" / "debug" / "app-debug.apk"
 PACKAGE = "com.ianhruday.oela"
-
-
-def first_existing(paths):
-    for p in paths:
-        if p and Path(p).exists():
-            return str(p)
-    return None
-
-
-def find_java_home():
-    """Android Studio ships a JDK (jbr). Nothing sets JAVA_HOME globally here."""
-    return os.environ.get("JAVA_HOME") or first_existing([
-        Path(os.environ.get("ProgramFiles", "C:/Program Files")) / "Android/Android Studio/jbr",
-        Path(os.environ.get("LOCALAPPDATA", "")) / "Programs/Android Studio/jbr",
-        "/Applications/Android Studio.app/Contents/jbr/Contents/Home",
-    ])
-
-
-def find_android_home():
-    return os.environ.get("ANDROID_HOME") or first_existing([
-        Path(os.environ.get("LOCALAPPDATA", "")) / "Android/Sdk",
-        Path.home() / "Android/Sdk",
-        Path.home() / "Library/Android/sdk",
-    ])
 
 
 def find_adb(android_home):
@@ -71,34 +57,48 @@ def find_adb(android_home):
     return str(p) if p.exists() else shutil.which("adb")
 
 
-def run(cmd, cwd, env=None, shell=False):
-    r = subprocess.run(cmd, cwd=str(cwd), env=env, shell=shell,
+def install(adb, apk):
+    r = subprocess.run([adb, "install", "-r", str(apk)],
                        capture_output=True, text=True)
-    if r.returncode != 0:
-        sys.stdout.write(r.stdout[-3000:])
-        sys.stderr.write(r.stderr[-3000:])
-        sys.exit(f"\ntools_pushphone: FAILED -> {cmd if isinstance(cmd, str) else ' '.join(map(str, cmd))}")
-    return r.stdout
+    out = (r.stdout or "") + (r.stderr or "")
 
+    if "INSTALL_FAILED_UPDATE_INCOMPATIBLE" in out or "signatures do not match" in out:
+        sys.exit(
+            "\ntools_pushphone: the phone already has an OELA signed with a DIFFERENT key.\n"
+            "  Almost certainly an old debug build from before W7 item 3.\n"
+            "  Android will not let one replace the other, on purpose -- a matching\n"
+            "  signature is how it knows an update came from the same author.\n"
+            "\n"
+            "  To move across, ON THE PHONE:\n"
+            "    1. Open OELA -> the ... menu -> Export a backup, and keep the file.\n"
+            "       (Or just confirm the phone has synced, if Dropbox is connected --\n"
+            "       a fresh install rejoins additive-only and pulls everything back.)\n"
+            "    2. Uninstall OELA. Android deletes its data with it.\n"
+            "    3. Run this script again.\n"
+            "  This is a one-time move. Every build after it installs straight over."
+        )
 
-def sha(path):
-    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+    if r.returncode != 0 or "Success" not in out:
+        sys.stdout.write(out[-3000:])
+        sys.exit("\ntools_pushphone: FAILED -> adb install")
+
+    print("installed")
 
 
 def main():
-    java_home = find_java_home()
-    android_home = find_android_home()
-    adb = find_adb(android_home)
+    args = set(sys.argv[1:])
+    unknown = args - {"--no-build"}
+    if unknown:
+        sys.exit(f"tools_pushphone: unknown option(s): {' '.join(sorted(unknown))}")
 
-    if not java_home:
-        sys.exit("tools_pushphone: no JDK found. Install Android Studio, or set JAVA_HOME.")
-    if not android_home:
-        sys.exit("tools_pushphone: no Android SDK found. Set ANDROID_HOME.")
+    # Preconditions before any work: the toolchain, the signing key, and the
+    # phone. Everything below is minutes, and discovering the phone is unplugged
+    # at the end of it is the wrong order.
+    java_home, android_home = pkg.preflight_android()
+    adb = find_adb(android_home)
     if not adb:
         sys.exit("tools_pushphone: adb not found.")
 
-    # Device check FIRST -- everything below is minutes of work, and doing it
-    # only to discover the phone is unplugged is the wrong order.
     devices = subprocess.run([adb, "devices"], capture_output=True, text=True).stdout
     attached = [l.split("\t")[0] for l in devices.splitlines()[1:] if "\tdevice" in l]
     if not attached:
@@ -108,30 +108,20 @@ def main():
                  "  https://developer.samsung.com/android-usb-driver")
     print(f"phone: {attached[0]}")
 
-    if "--no-build" not in sys.argv:
-        print(run([sys.executable, "build.py"], cwd=REPO).strip())
+    if "--no-build" not in args:
+        pkg.build_web()
+    elif not pkg.DIST_INDEX.exists():
+        sys.exit("tools_pushphone: --no-build, but dist/index.html does not exist.")
 
-    npx = "npx.cmd" if os.name == "nt" else "npx"
-    print("syncing web assets into the Android project...")
-    run([npx, "cap", "sync", "android"], cwd=WRAPPER)
-
-    # THE CHECK THIS SCRIPT EXISTS FOR. If these differ, the APK would ship
-    # code that is not what dist/ holds -- silently, and it would launch fine.
-    if not SYNCED_INDEX.exists():
-        sys.exit(f"tools_pushphone: {SYNCED_INDEX} missing after cap sync — sync did not copy anything.")
-    if sha(SYNCED_INDEX) != sha(DIST_INDEX):
-        sys.exit("tools_pushphone: the synced assets do NOT match dist/index.html.\n"
-                 "  Refusing to build a stale APK (wrapper-plan.md §6, trap 9).")
-    print("verified: packaged assets are byte-identical to dist/index.html")
-
-    env = dict(os.environ, JAVA_HOME=java_home, ANDROID_HOME=android_home)
-    gradlew = str(ANDROID / ("gradlew.bat" if os.name == "nt" else "gradlew"))
-    print("building the APK...")
-    run([gradlew, "assembleDebug"], cwd=ANDROID, env=env)
+    # build_apk() drops a copy in release/ as a side effect, which is wanted:
+    # the APK on the phone and the one you would hand somebody are then the
+    # same file, not two builds that merely came from the same source.
+    pkg.RELEASE.mkdir(exist_ok=True)
+    version = pkg.version_name()
+    apk = pkg.build_apk(version, java_home, android_home, allow_missing_key=False)
 
     print("installing...")
-    out = run([adb, "install", "-r", str(APK)], cwd=REPO)
-    print(out.strip().splitlines()[-1] if out.strip() else "installed")
+    install(adb, apk)
     print("\nthe phone is now running the current build.")
 
 

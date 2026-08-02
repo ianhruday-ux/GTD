@@ -1230,6 +1230,17 @@ APK, a packaged Windows desktop build, `INSTALL.md`, and `CHECKSUMS.txt`. `relea
   import — or let Dropbox repopulate), and it is the last time it happens, because every build from
   here is signed with this key. Losing `release.keystore` re-imposes it on everyone.
   `keystore.properties` says so in its own header; INSTALL.md says so where a friend would hit it.
+  **`tools_pushphone.py` follows, 2026-08-01:** it built a debug APK and carried its own copy of the
+  sync-then-verify chain, and after this both were wrong — the build the phone can no longer accept,
+  and a second implementation of a chain `tools_package.py` already does better (four assertions
+  against the finished artifact, not just the staged assets). It now calls that chain and adds the
+  one thing packaging does not do: `adb install`. The APK on the phone and the one you would hand
+  somebody are the same file rather than two builds from the same source. A signature clash is
+  caught by name (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`) and answered with the export-uninstall-
+  reinstall sequence in plain words, since that error otherwise reads as a broken script. ⚑ The
+  `--debug` escape hatch this document briefly proposed was **dropped before being built** —
+  speculative capacity for a need that has not arisen, which is what CLAUDE.md's scope rule exists
+  to prevent.
 - **The Dropbox App Key ships inside the APK** (author's ruling this round, reversing W5's
   "gitignored anyway"): sync works out of the box for anyone who installs it, and everyone who
   connects links their own Dropbox to the one registration. Dropbox allows 500 linked accounts on an
