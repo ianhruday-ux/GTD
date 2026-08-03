@@ -1661,7 +1661,32 @@
     // that is gone. Deliberately NOT deleting the events: a meeting can outlive
     // the project it was booked for, and silently deleting calendar entries as
     // a side effect of deleting a project would be a nasty surprise.
+    // ⚑ ...and it leaves its ACTIONS pointing at nothing too, which — unlike the
+    // events the note above describes — did NOT behave correctly (author,
+    // reported): the card kept a 🔗 pill
+    // that had lost its name and rendered the "linked project" fallback, and
+    // linkTargetsFor() skips anything carrying a linkedProjectId, so the orphan
+    // could never be offered to another project again. Invisible in the picker,
+    // tethered to a project that is gone.
+    //
+    // Author's ruling, asked before any of this was diagnosed: THE ACTIONS
+    // SURVIVE, UNLINKED. Deleting a project deletes the project. That is the
+    // same answer the Convert flow's unlink branch already gives
+    // (applyDemoteChoice), and the same one sanitizeRestoredParentage gives a
+    // completed action restored into a world where its project has gone; this
+    // was the one path that never asked. Only the LIVE lanes need sweeping —
+    // an archived action's dead link is severed on the way back out, and the
+    // completed page just omits the row.
     if (isProjectKind(kind)){
+      let touchedTasks = false;
+      ["next", "waiting"].forEach(function(k){
+        let dirty = false;
+        state.tasks[k].forEach(function(t){
+          if (t.linkedProjectId === taskId){ t.linkedProjectId = null; dirty = true; }
+        });
+        if (dirty){ saveTasksLocal(k); touchedTasks = true; }
+      });
+      if (touchedTasks) renderLane("next"); // "waiting" is re-rendered below either way
       let touched = false;
       (state.events || []).forEach(function(ev){
         if (ev.linkedProjectId === taskId){ ev.linkedProjectId = null; touched = true; }
