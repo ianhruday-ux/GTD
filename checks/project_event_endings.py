@@ -183,17 +183,31 @@ with serve(DIST) as url, sync_playwright() as p:
     check(st["link"] is None, f"but it is no longer tied to the project ({st})")
     check(not st["projectStillCurrent"], f"and the project moved to Someday ({st})")
 
-    # ---------- DELETE the project: the entry survives, unlinked ----------
+    # ---------- DELETE the project: you are ASKED, and unlinked is an answer ----------
+    # ⚑ SUPERSEDED, not broken (author, 2026-08-03). This case used to click the
+    # first button reading "Delete" and assert that the calendar entry survived
+    # unconditionally. Deleting a project now asks a three-way question -- only
+    # the project · delete them too · cancel -- so "Delete" first-matches the
+    # destructive option, and the old assertion was testing a choice the user
+    # had not made. The surviving-unlinked outcome is still the DEFAULT reading
+    # and still asserted; it is now the first button rather than the only
+    # behaviour. Full coverage of the dialog lives in checks/project_delete_unlinks.py.
     seed()
     open_project()
     pg.locator('[data-action="screen-delete"]').first.click()
     pg.wait_for_timeout(400)
-    dlg = pg.locator('.choice-dialog button:has-text("Delete")')
-    if dlg.count():
-        dlg.first.click(); pg.wait_for_timeout(800)
+    labels = pg.evaluate("""() => [...document.querySelectorAll('.choice-dialog-btns button')]
+        .map(b => b.textContent.trim())""")
+    check(len(labels) == 3,
+          f"deleting a project with a linked entry ASKS what to do with it ({labels})")
+    msg = dialog_text()
+    check(msg is not None and "calendar" in msg.lower(),
+          f"and names the calendar entry in the question ({msg})")
+    pg.locator('.choice-dialog button:has-text("Only the project")').first.click()
+    pg.wait_for_timeout(800)
     st = state()
     check(st["live"] == 1,
-          f"deleting a project does NOT delete its calendar entries ({st})")
+          f"answering 'only the project' does NOT delete the calendar entry ({st})")
     check(st["link"] is None,
           f"and the dangling project link is cleared ({st})")
 

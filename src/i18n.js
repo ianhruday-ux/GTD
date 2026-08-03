@@ -764,6 +764,12 @@ const STRINGS = {
   "confirm.linkedWaitingMany": { en: "{n} linked waiting items",        "zh-Hans": "{n} 个关联的等待事项" },
   "confirm.linkedEventOne":    { en: "1 linked calendar entry",         "zh-Hans": "1 个关联的日历条目" },
   "confirm.linkedEventMany":   { en: "{n} linked calendar entries",     "zh-Hans": "{n} 个关联的日历条目" },
+  // Next and Waiting together (linkedActionsForProject spans both), for the
+  // delete-a-project dialog. The completeProject dialog counts only WAITING
+  // items above because that is the only kind it puts aside — the difference
+  // is real, not an oversight.
+  "confirm.linkedActionOne":   { en: "1 linked action",                 "zh-Hans": "1 个关联的行动" },
+  "confirm.linkedActionMany":  { en: "{n} linked actions",              "zh-Hans": "{n} 个关联的行动" },
   "confirm.joinAnd":           { en: " and ",                           "zh-Hans": "和" },
   "confirm.joinOr":            { en: " or ",                            "zh-Hans": "或" },
   "confirm.completeProjectOne": {
@@ -790,6 +796,20 @@ const STRINGS = {
     "zh-Hans": "无论选择哪一项，关联的笔记都会保留——全部 {n} 条笔记仍会留在项目里。"
   },
   "confirm.unlink":            { en: "Unlink",                          "zh-Hans": "解除关联" },
+  // 🗑 on a project that has linked actions or calendar entries. "Where it is"
+  // rather than "in its lane": an unlinked calendar entry stays on the
+  // calendar, not in a lane, and one sentence has to cover both.
+  "confirm.deleteProjectLinkedOne": {
+    en: "Delete this project? It has {what}. Deleting only the project leaves it where it is, unlinked.",
+    "zh-Hans": "删除这个项目？它有{what}。如果只删除项目，它会留在原处，只是不再关联。"
+  },
+  "confirm.deleteProjectLinkedMany": {
+    en: "Delete this project? It has {what}. Deleting only the project leaves them where they are, unlinked.",
+    "zh-Hans": "删除这个项目？它有{what}。如果只删除项目，它们会留在原处，只是不再关联。"
+  },
+  "confirm.deleteProjectOnly": { en: "Only the project",                "zh-Hans": "只删除项目" },
+  "confirm.deleteLinkedTooOne": { en: "Delete it too",                  "zh-Hans": "连它一起删除" },
+  "confirm.deleteLinkedTooMany": { en: "Delete them too",               "zh-Hans": "连它们一起删除" },
   "confirm.thisList":          { en: "this list",                       "zh-Hans": "这个列表" },
   "confirm.thisContext":       { en: "this context",                    "zh-Hans": "这个情境" },
   "confirm.deleteListEmpty":   { en: "Delete the “{name}” list?",       "zh-Hans": "删除“{name}”列表？" },

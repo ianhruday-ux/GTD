@@ -4143,6 +4143,63 @@
       ]);
       return;
     }
+    // ⚑ A PROJECT WITH LINKED THINGS ASKS A THREE-WAY QUESTION (author). The
+    // fix above made deleting a project leave its actions behind, unlinked —
+    // right, but invisible from a dialog that only ever said "Delete this for
+    // good?". The outcome was discoverable only by going to look at the lane
+    // afterwards, which is the same complaint as the bug: a consequence
+    // nothing on screen names. So the dialog names the linked set and offers
+    // both readings — take them with it, or leave them standing.
+    //
+    // ⚑ EVENTS COUNT TOO, not just actions. The author asked for actions; the
+    // dialog covers linked calendar entries by the same sentence because the
+    // alternative is a "delete everything linked" that silently spares the
+    // calendar (and, for a project whose only links ARE events, no dialog at
+    // all — back to the invisible outcome). completeProject and
+    // askDemoteChoice already name both in one breath; a third dialog that
+    // counted differently would be the odd one out.
+    //
+    // ⚑ ORDER AND STYLE follow askDemoteChoice, the existing three-way twin of
+    // this dialog: the SURVIVING option first and primary, destruction second
+    // and danger-styled, Cancel last. (The author listed delete-both first;
+    // matching the twin matters more than matching the order of the sentence
+    // it was asked in — two near-identical dialogs that disagree about which
+    // button is where is how a stray tap becomes data loss.)
+    //
+    // The linked set is recomputed BY ID inside the action, never the snapshot
+    // the dialog counted — same reason applyDemoteChoice does (§9 zombie trap).
+    if (isProjectKind(s.kind)){
+      const pid = s.taskId, pkind = s.kind;
+      const linkedCount = linkedActionsForProject(pid).length;
+      const eventCount = (state.events || []).filter(function(ev){ return ev.linkedProjectId === pid; }).length;
+      if (linkedCount || eventCount){
+        const parts = [];
+        if (linkedCount) parts.push(linkedCount === 1 ? t("confirm.linkedActionOne")
+          : t("confirm.linkedActionMany").replace("{n}", linkedCount));
+        if (eventCount) parts.push(eventCount === 1 ? t("confirm.linkedEventOne")
+          : t("confirm.linkedEventMany").replace("{n}", eventCount));
+        const many = (linkedCount + eventCount) > 1;
+        openConfirmDialog(
+          (many ? t("confirm.deleteProjectLinkedMany") : t("confirm.deleteProjectLinkedOne"))
+            .replace("{what}", parts.join(t("confirm.joinAnd"))),
+          [
+            { label: t("confirm.deleteProjectOnly"), style: "primary", action: function(){
+                deleteTask(pkind, pid); closeScreen();
+              } },
+            { label: many ? t("confirm.deleteLinkedTooMany") : t("confirm.deleteLinkedTooOne"), style: "danger",
+              action: function(){
+                linkedActionsForProject(pid).forEach(function(l){ deleteTask(l.kind, l.task.id); });
+                (state.events || []).filter(function(ev){ return ev.linkedProjectId === pid; })
+                  .forEach(function(ev){ deleteEventEntirely(ev); });
+                deleteTask(pkind, pid);
+                closeScreen();
+              } },
+            { label: t("chrome.cancel"), action: function(){} }
+          ]
+        );
+        return;
+      }
+    }
     openConfirmDialog(t("confirm.deleteForGood"), [
       { label: t("chrome.delete"), style: "danger", action: function(){ deleteTask(s.kind, s.taskId); closeScreen(); } },
       { label: t("chrome.cancel"), action: function(){} }
