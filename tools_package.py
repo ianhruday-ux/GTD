@@ -258,6 +258,17 @@ ONEDRIVE_LOCK_SIGNATURES = (
     "resource busy or locked",
     "Access is denied",
     "EPERM",
+    # ⚑ The same problem wearing different words. When OneDrive has turned an
+    # intermediate into a cloud placeholder rather than merely holding it open,
+    # Gradle does not report a lock at all -- it reports that it cannot
+    # fingerprint the file:
+    #   Cannot snapshot ...\aapt\AndroidManifest.xml: not a regular file
+    # Without these two the run exits on the first attempt with no retry, which
+    # is exactly the state it is best equipped to recover from. Neither string
+    # can come out of a real compile error (they are filesystem-snapshot
+    # failures), so admitting them does not blunt the docstring's rule.
+    "Cannot snapshot",
+    "not a regular file",
 )
 
 
@@ -299,8 +310,16 @@ def run_resilient(cmd, cwd, env, label, clear=()):
 
 
 def gradle_release(gradlew, env):
+    # ⚑ BOTH directories, and the second one is not optional: the failure that
+    # prompted this cleared app/build and then died in
+    # capacitor-cordova-android-plugins/build, which the retry had never
+    # touched. The exit message below has always named both as the manual
+    # remedy -- the automatic recovery was one directory short of its own
+    # advice, so the retry could only ever fix half the failures it fired on.
+    # Keep this list and that message in step.
     run_resilient([gradlew, "assembleRelease"], ANDROID, env, "gradlew assembleRelease",
-                  clear=[ANDROID / "app" / "build"])
+                  clear=[ANDROID / "app" / "build",
+                         ANDROID / "capacitor-cordova-android-plugins" / "build"])
 
 
 def verify_apk(apk, android_home, env, expect_key):
