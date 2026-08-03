@@ -4027,7 +4027,16 @@
     const projectId = stagingProjectId(s);
     function commit(){
       if (!s.taskId){
-        const proj = Object.assign({ id: projectId, isGroup: false, parent: null, createdAt: nowMs() }, projData);
+        // ⚑ BUG FIX (author): `parent: null` was hard-coded here, so a project
+        // drafted from a list's + landed loose at the top of the lane instead
+        // of in the list — the + worked on contexts and appeared to do nothing
+        // on lists. The project page builds its record from an explicit
+        // whitelist (projData) rather than passing `data` through, which is
+        // what dropped the field; the action lanes never hit this path, so
+        // checks/list_and_context_add.py passed on a Next-Actions list.
+        // Create only, matching saveScreen's own rule — an edit never moves a
+        // project between lists from the page (data.parent is undefined then).
+        const proj = Object.assign({ id: projectId, isGroup: false, parent: data.parent || null, createdAt: nowMs() }, projData);
         state.tasks[s.kind].unshift(proj);
         saveTasksLocal(s.kind);
       } else {
