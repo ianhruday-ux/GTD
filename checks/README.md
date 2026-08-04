@@ -5,7 +5,9 @@ Playwright — clicking through it the way a person would and asserting what act
 
 They are **not** `pytest` files and are deliberately not named `test_*.py`: each one is a plain
 script that runs top to bottom and exits non-zero on failure, so pytest's collector must not import
-them. The repo's `test_parity.py` / `test_0b_deltas.py` are a separate, chunk-0b-specific thing.
+them. (A separate chunk-0b certification suite — `test_parity.py`, `test_0b_deltas.py`, `_app.py`,
+`conftest.py` — used to sit at the repo root. It was pytest, it was dead for months, and it was
+deleted on 2026-08-04; `git log -- test_parity.py` if you ever need it back.)
 
 ## Running them
 
