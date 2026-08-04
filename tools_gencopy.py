@@ -1,7 +1,12 @@
 """Build the human-reviewable copy file from src/."""
 import re, pathlib, datetime, collections
 
-REPO = pathlib.Path(r"C:\Users\ianhr\OneDrive\Desktop\GTD")
+# ⚑ DERIVED, not hardcoded (2026-08-03). This used to spell out
+# C:\Users\ianhr\OneDrive\Desktop\GTD, which was the one file in the repo that
+# broke when the project left OneDrive — and it would have broken again on the
+# next move. The script lives at the repo root, so the root is simply its own
+# folder; every checks/*.py already resolves its paths this way.
+REPO = pathlib.Path(__file__).resolve().parent
 SRC = REPO / "src"
 OUT = REPO / "COPY.txt"
 
