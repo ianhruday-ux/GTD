@@ -72,13 +72,11 @@
 :root{
   /* Warm "desk" palette — unchanged. */
   --desk:#171513;
-  --desk-grain:#1D1A17;
   --paper:#262420;
   --paper-2:#302D27;
   --text-primary:#EDE7DA;
   --text-soft:#A79E8C;
   --brass:#C68A3E;
-  --brass-dark:#9C6B2C;
   --red:#C24A3D;
   --yellow:#D9A62C;
   --moss:#6B9E6B;
@@ -98,7 +96,6 @@
      chip, the paused pill) that are about green-ness and blue-ness, not lanes. */
   --forest:#4C9155;
   --royal:#5B7FE8;
-  --bezel:#0F0E0C;
   --dark-on-accent:#1a1408;
   --paper-shadow: 0 6px 14px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.03) inset;
   --font-display:'Space Grotesk', sans-serif;
@@ -106,11 +103,12 @@
   --font-mono:'IBM Plex Mono', monospace;
 
   /* ▲ CHUNK 2 — the viewport gradient (§4.7b). Warm family, darkest at the
-     top, a touch lighter and warmer at the bottom edge. Restrained on purpose
-     so it never fights the semi-transparent white overlays (pills, quick-add
-     rows, condition badges) that are tuned against the dark tone. */
+     top. Restrained on purpose so it never fights the semi-transparent white
+     overlays (pills, condition badges) tuned against the dark tone. The warmer
+     bottom stop is written literally at the one place that draws it, so
+     --bg-bottom went unread; --desk-grain, --brass-dark and --bezel were the
+     same story and went with it. */
   --bg-top:#141210;
-  --bg-bottom:#221E19;
 
   /* ▲ CHUNK 2 — fixed-chrome heights, used both to draw the chrome and to
      reserve the exact space beneath it (§4.10b: content below fixed chrome
@@ -375,15 +373,15 @@ body.screen-open #dev-toolbar:not([hidden]) ~ .sw-update-banner{
 }
 body.drag-active .tabbar{ transition:none; }
 
-/* No horizontal scroll: three panels share the row equally. Two are pairs
-   of related lanes split top/bottom into independently-tappable halves
-   (Next/Waiting, Projects/Someday); Habits stands alone until Notes gives
-   it a partner (chunk 6). */
+/* No horizontal scroll: the panels share the row equally, each a pair of
+   related lanes split top/bottom into independently-tappable halves
+   (Next/Waiting, Projects/Someday, Habits/Notes). (.tab-solo styled the odd
+   one out while Habits stood alone; chunk 6 gave it Notes, and nothing has
+   rendered the class since.) */
 .tab-pair{
   flex:1 1 0; min-width:0; display:flex; flex-direction:column; gap:3px;
 }
 .tab-pair .tab{ flex:1 1 0; }
-.tab.tab-solo{ flex:1 1 0; }
 
 /* Letter sits to the left of the icon (user round). */
 .tab{
@@ -441,15 +439,10 @@ body.tabs-collapsed .tabbar{
   align-items:flex-start;
   padding-top:2px;
 }
-body.tabs-collapsed .tab-pair,
-body.tabs-collapsed .tab.tab-solo{ display:none; }
+body.tabs-collapsed .tab-pair{ display:none; }
 body.tabs-collapsed .tab-pair:has(.tab.active){ display:flex; flex:0 0 auto; }
 body.tabs-collapsed .tab-pair .tab{ display:none; }          /* hide the inactive half … */
-/* Explicit override (not a specificity tie-break) so the solo Habits button
-   still shows when it's the active tab, even though the blanket rule above
-   hides every .tab-solo by default. */
-body.tabs-collapsed .tab.tab-solo.active{ display:flex; }
-body.tabs-collapsed .tab.active{                              /* … show only the active one, as a pill */
+body.tabs-collapsed .tab.active{                             /* … show only the active one, as a pill */
   display:flex; flex-direction:row; flex:0 0 auto; gap:7px;
   border-radius:20px;
   padding:7px 16px 7px 14px;
@@ -529,11 +522,12 @@ body.has-frame #fab-create{
      <div class="lane-label">
        <span class="lane-label-title">Next Actions</span>
        <span class="lane-label-right">
-         <span class="lane-count">4</span>
          <button class="info-btn" data-action="toggle-info" aria-label="About this lane">i</button>
        </span>
      </div>
-   It floats over the gradient; it does not cap anything. */
+   It floats over the gradient; it does not cap anything. (The sketch used to
+   show a .lane-count pill beside the title; no lane has rendered one for a
+   long time, and its rule went with this line.) */
 .lane-label{
   align-self:flex-start;
   display:inline-flex; align-items:center; gap:10px;
@@ -542,10 +536,6 @@ body.has-frame #fab-create{
   padding:7px 14px; border-radius:9px;
   box-shadow:0 3px 10px rgba(0,0,0,0.35);
   margin:6px 0 10px 0;
-}
-.lane-count{
-  font-family:var(--font-mono); font-weight:600; font-size:11.5px;
-  background:rgba(0,0,0,0.18); padding:2px 7px; border-radius:10px;
 }
 .lane-label-right{ display:inline-flex; align-items:center; gap:7px; }
 .info-btn{
@@ -574,8 +564,9 @@ body.has-frame #fab-create{
    because it is a separate idea, not a continuation of the sentence above. */
 .lane-info-more{ display:block; margin-top:9px; }
 
-/* The lane body is now a single flow of items — one padding, generous gap. */
-.lane-body{ display:flex; flex-direction:column; gap:14px; }
+/* The lane body is now a single flow of items — one padding, generous gap.
+   (.lane-body was the wrapper that flow used to sit in; .cards-root is the
+   whole of it now.) */
 .cards-root{ display:flex; flex-direction:column; gap:14px; min-height:12px; }
 .empty-note{ font-size:13px; color:var(--text-soft); font-style:italic; padding:8px 2px; }
 
@@ -632,9 +623,9 @@ body.has-frame #fab-create{
 .card-title.done{ text-decoration:line-through; color:var(--text-soft); }
 
 /* The list-view "×" delete is REMOVED (§4.7b): items are deleted from their own
-   page. `.card-actions` stays only for surviving affordances (e.g. none by
-   default on a plain card). The promote ← arrow stays. */
-.card-actions{ display:flex; gap:4px; flex:0 0 auto; }
+   page. `.card-actions` was kept for "surviving affordances" and there turned
+   out to be none — no card has rendered the wrapper since. The promote ←
+   arrow stays; it is .promote-arrow, in the card-top row. */
 .icon-btn{
   border:none; background:transparent; color:var(--text-soft); font-size:13px;
   padding:2px 5px; border-radius:4px;
@@ -1082,7 +1073,6 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
    The real fix, if this isn't enough on the device, is a custom picker — see
    the handoff. */
 .screen-time{ color-scheme:dark; accent-color:var(--brass); }
-.screen-boxed-row .screen-recurrence{ flex:1.3; }
 .screen-clear-x{ border:none; background:transparent; color:var(--text-soft); font-size:13px; padding:2px 2px 2px 4px; flex:0 0 auto; }
 .screen-clear-x:hover{ color:var(--text-primary); }
 .screen-icon-toggle{
@@ -1093,13 +1083,6 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 .screen-icon-toggle[disabled]{ opacity:0.35; cursor:not-allowed; border-style:dashed; }
 .screen-overlay[data-kind="habit"] .screen-when-field-row .screen-icon-toggle{
   border-color:var(--lane-accent); background:rgba(142,111,176,0.12); color:var(--lane-accent);
-}
-.suggestion-bubble{
-  display:flex; align-items:center; gap:8px; background:rgba(198,138,62,0.14);
-  border:1px solid rgba(198,138,62,0.35); border-radius:8px; padding:9px 11px; font-size:12.5px;
-}
-.suggestion-bubble button{
-  border:none; background:var(--brass); color:var(--dark-on-accent); font-weight:700; font-size:11.5px; padding:5px 10px; border-radius:6px; flex:0 0 auto;
 }
 .screen-project-flag{ font-size:12px; color:var(--yellow); background:rgba(217,166,44,0.12); border:1px solid rgba(217,166,44,0.3); border-radius:7px; padding:8px 10px; }
 .screen-make-kind-btn{
@@ -1144,20 +1127,11 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 .screen-complete-pill.paused{ background:var(--desk); border:1px solid var(--paper-2); color:var(--text-soft); cursor:default; box-shadow:none; }
 .screen-complete-pill.paused:hover{ filter:none; }
 
-/* Project-page quick-add + linked-actions list (= carried over =) */
-.quick-add-row{ display:flex; gap:6px; align-items:center; }
-.quick-add-row input{
-  flex:1; font-size:12.5px; padding:7px 9px; border-radius:6px; min-width:0;
-  border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.06); color:var(--text-primary);
-}
-.quick-add-row button{
-  flex:0 0 auto; width:30px; height:30px; border-radius:6px; border:1px solid rgba(255,255,255,0.25);
-  background:transparent; color:var(--text-primary); font-size:15px; padding:0;
-}
-.quick-add-row button:hover{ background:rgba(255,255,255,0.1); }
-/* §12.1b: the Waiting-row hook reads as greyed until a title is typed. Pure
-   CSS — :placeholder-shown is true exactly when the input is empty. */
-.quick-add-row input[data-quickadd="waiting"]:placeholder-shown ~ .qa-hook{ opacity:0.4; }
+/* Project-page linked-actions list (= carried over =).
+   (The .quick-add-row block and its .qa-hook greying rule lived here. The rows
+   themselves went when the + beside a list's count started opening the real
+   drafting page — "they just clutter things up" — and nothing has rendered
+   either class since.) */
 .linked-actions-list{ display:flex; flex-direction:column; gap:5px; }
 .linked-action-item{
   text-align:left; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1);
@@ -1171,7 +1145,6 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
    to open until the project save makes it real. */
 .linked-action-staged{ border-style:dashed; cursor:default; }
 .linked-action-staged:hover{ background:rgba(255,255,255,0.04); }
-.linked-action-kind{ font-size:10px; font-family:var(--font-mono); color:var(--text-soft); flex:0 0 auto; }
 /* Coloured kind bullets (user tweak): red next, yellow waiting, cream event. */
 .kind-dot{ display:inline-block; width:8px; height:8px; border-radius:50%; flex:0 0 auto; }
 .kind-dot.kind-next{ background:var(--red); }
@@ -1217,7 +1190,6 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
   margin-top:8px; padding-top:12px; border-top:1px solid rgba(255,255,255,0.10);
 }
 .pick-intro{ font-size:12.5px; color:var(--text-soft); line-height:1.4; }
-.screen-hook-pick-section:first-child{ margin-top:0; }
 .habit-day-row{ display:flex; gap:6px; }
 .habit-day-row.field-invalid{ outline:1.5px dashed var(--red); outline-offset:4px; border-radius:8px; }
 .habit-day-chip{ width:32px; height:32px; border-radius:50%; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.04); color:var(--text-soft); font-family:var(--font-mono); font-size:12px; }
@@ -1235,8 +1207,6 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 .habit-celebration-restart{ background:rgba(255,255,255,0.05); color:var(--text-soft); border:1px solid rgba(255,255,255,0.12); font-weight:500; }
 @keyframes habitCelebrate{ from{ transform:scale(0.94); opacity:0; } to{ transform:scale(1); opacity:1; } }
 .habit-offday{ background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:10px 12px; font-size:12.5px; color:var(--text-soft); text-align:center; }
-.habit-create-panel{ margin-top:2px; }
-.habit-panel-inner{ display:flex; flex-direction:column; gap:9px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:12px; }
 
 /* Advanced options dialog (= carried over =) */
 .adv-dialog{ text-align:left; max-width:420px; }
@@ -1246,7 +1216,6 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 .adv-tab.active{ border-color:var(--lane-accent, var(--moss)); color:var(--text-primary); }
 .adv-note{ font-size:12px; color:var(--text-soft); line-height:1.5; margin:0 0 10px; }
 .adv-textarea{ width:100%; min-height:64px; resize:vertical; border-radius:6px; background:var(--paper-2); border:1px solid rgba(255,255,255,0.12); color:var(--text-primary); font-size:13px; padding:8px; }
-.adv-hook-row{ display:flex; align-items:center; justify-content:space-between; font-size:12.5px; padding:4px 0; }
 .adv-content{ margin-bottom:10px; }
 /* §8 (review-surface-plan.md, RULED): grey fill for contrast, same neutral
    raised fill as .cal-advanced-btn — .btn-ghost's transparent background is
@@ -2534,7 +2503,7 @@ body.screen-open #tray-handle{ display:none; }
 (function(){
 "use strict";
 
-const BUILD_STAMP = "03 Aug 17:31";  // replaced by build.py
+const BUILD_STAMP = "03 Aug 18:09";  // replaced by build.py
 
 // =========================================================
 // STORAGE ADAPTER (spec.md §3, known issue 4)
@@ -4065,10 +4034,8 @@ const STRINGS = {
   "badge.habit":    { en: "Habit",          "zh-Hans": "习惯" },
   "badge.notes":    { en: "Note",           "zh-Hans": "笔记" },
   "badge.tags":     { en: "Tags",           "zh-Hans": "标签" },
-  "badge.review":   { en: "Review",         "zh-Hans": "回顾" },
   "badge.event":    { en: "Event",          "zh-Hans": "事件" },
   "badge.appointment": { en: "Appointment", "zh-Hans": "约会" },
-  "badge.calendar": { en: "Calendar",       "zh-Hans": "日历" },
 
   // ---- the floating + menu ----
   "fab.newAction":    { en: "New action",         "zh-Hans": "新建行动" },
@@ -4088,7 +4055,6 @@ const STRINGS = {
   "placeholder.title.future":  { en: "Project title…",         "zh-Hans": "项目标题…" },
   "placeholder.title.habit":   { en: "Habit title…",           "zh-Hans": "习惯标题…" },
   "placeholder.title.notes":   { en: "Note title…",            "zh-Hans": "笔记标题…" },
-  "placeholder.desc":          { en: "Description (optional)…", "zh-Hans": "描述（可选）…" },
 
   // ---- the lane info buttons: THE USER'S OWN COPY (INFO-TEXT.txt) ----
   // ⚠ The English here is authored prose, transcribed verbatim. It is not to be
@@ -4151,7 +4117,6 @@ const STRINGS = {
     "zh-Hans": "收件箱用于集中存放所有需要处理的事项。停滞的项目、已过截止日期的事项，以及失去等待条件的等待行动，都会出现在这里。如果一时来不及把想法或提醒整理到合适的列表，可以先用输入框快速记下来。之后再通过收件箱的“回顾”功能，逐项整理并处理。"
   },
   "tray.empty":   { en: "Empty for now — nothing slipping through the cracks.", "zh-Hans": "暂时是空的——没有任何事情被遗漏。" },
-  "tray.review":  { en: "Review",  "zh-Hans": "回顾" },
   "tray.reveal":  { en: "Reveal",  "zh-Hans": "显示" },
   "tray.hide":    { en: "Hide",    "zh-Hans": "隐藏" },
   "tray.discard": { en: "Discard", "zh-Hans": "丢弃" },
@@ -4211,7 +4176,6 @@ const STRINGS = {
   "settings.importBackup": { en: "Import a backup", "zh-Hans": "导入备份" },
   "settings.background": { en: "Background", "zh-Hans": "背景" },
   "settings.language":   { en: "Language",   "zh-Hans": "语言" },
-  "settings.debugging":  { en: "Debugging",  "zh-Hans": "调试" },
   "settings.build":      { en: "Build",      "zh-Hans": "版本" },
 
   // ---- chrome shared by every drafting page ----
@@ -4374,7 +4338,6 @@ const STRINGS = {
   "field.noContextsYet":     { en: "No contexts yet — create them with + on the lane.", "zh-Hans": "还没有情境——在列表上用“+”创建。" },
   "field.clearDeadline":     { en: "Clear deadline",            "zh-Hans": "清除期限" },
   "field.clearTime":         { en: "Clear time",                "zh-Hans": "清除时间" },
-  "field.optional":          { en: "Optional",                  "zh-Hans": "可选" },
   "field.pickDate":          { en: "Pick a date",                "zh-Hans": "选择日期" },
 
   // ---- the waiting-for row + condition hook ----
@@ -4385,7 +4348,6 @@ const STRINGS = {
   "waiting.after":           { en: "After",                     "zh-Hans": "在…之后" },
   "waiting.anotherItem":     { en: "another item",              "zh-Hans": "另一个项目" },
   "waiting.waitingForLabel": { en: "Waiting for",               "zh-Hans": "在等待" },
-  "waiting.blockedByDeadline": { en: "A waiting action can’t hold a date — clear the deadline first", "zh-Hans": "等待项不能带有日期——请先清除期限" },
 
   // ---- convert / complete pill group ----
   "outcome.makeWaiting":     { en: "Make Waiting Action",        "zh-Hans": "转为等待项" },
@@ -4510,7 +4472,6 @@ const STRINGS = {
   "card.tapToView":          { en: "Tap to view",                    "zh-Hans": "点击查看" },
   "group.tapToExpandReorder": { en: "Tap to expand/collapse — press and hold to reorder", "zh-Hans": "点击展开/收起——按住可重新排序" },
   "group.addToList":         { en: "Add to this list",               "zh-Hans": "添加到此列表" },
-  "group.tapToExpand":       { en: "Tap to expand/collapse",         "zh-Hans": "点击展开/收起" },
   "group.addToContext":      { en: "Add to this context",            "zh-Hans": "添加到此情境" },
   "group.deleteContext":     { en: "Delete context",                 "zh-Hans": "删除情境" },
   "group.dropHint":          { en: "Drag items here",                "zh-Hans": "把项目拖到这里" },
@@ -4552,8 +4513,6 @@ const STRINGS = {
   // ---- the daily review ----
   "review.badge":            { en: "Review",                        "zh-Hans": "回顾" },
   "review.toReview":         { en: "to review",                     "zh-Hans": "项待回顾" },
-  "review.showAll":          { en: "Show all",                      "zh-Hans": "全部显示" },
-  "review.oneAtATime":       { en: "One at a time",                 "zh-Hans": "一次一个" },
   "review.allClear":         { en: "All clear.",                    "zh-Hans": "全部清空。" },
   "review.nothingSlipping":  { en: "Nothing slipping through the cracks.", "zh-Hans": "没有什么被遗漏。" },
   "review.deferredSuffix":   { en: " deferred.",                    "zh-Hans": " 项已推迟。" },
@@ -4668,13 +4627,10 @@ const STRINGS = {
   "confirm.importAlsoSyncs": { en: "Your other devices will get the restored items too, including anything you deleted there.", "zh-Hans": "你的其他设备也会收到恢复的内容，包括你在那里删除过的项目。" },
   "confirm.replaceEverything": { en: "Replace everything",          "zh-Hans": "替换全部" },
   "confirm.ok":               { en: "OK",                           "zh-Hans": "好" },
-  "confirm.deleteTitleForGood": { en: "Delete “{title}” for good?", "zh-Hans": "永久删除“{title}”吗？" },
-  "confirm.deleteThisItem":   { en: "this",                         "zh-Hans": "这个" },
   "confirm.saveAnyway":       { en: "Save anyway",                  "zh-Hans": "仍要保存" },
   "confirm.goBack":           { en: "Go back",                      "zh-Hans": "返回" },
   "confirm.strandedOne":      { en: "1 calendar entry is scheduled after this new deadline. You can keep it — nothing will be moved or deleted.", "zh-Hans": "有 1 项日历安排在这个新期限之后。你可以保留——不会有任何东西被移动或删除。" },
   "confirm.strandedMany":     { en: "{n} calendar entries are scheduled after this new deadline. You can keep them — nothing will be moved or deleted.", "zh-Hans": "有 {n} 项日历安排在这个新期限之后。你可以保留——不会有任何东西被移动或删除。" },
-  "confirm.cancel":           { en: "Cancel",                       "zh-Hans": "取消" },
 
   // ---- the calendar ----
   "cal.back":                { en: "Back",                          "zh-Hans": "返回" },
@@ -4810,7 +4766,6 @@ const STRINGS = {
   "confirm.deleteLinkedTooOne": { en: "Delete it too",                  "zh-Hans": "连它一起删除" },
   "confirm.deleteLinkedTooMany": { en: "Delete them too",               "zh-Hans": "连它们一起删除" },
   "confirm.thisList":          { en: "this list",                       "zh-Hans": "这个列表" },
-  "confirm.thisContext":       { en: "this context",                    "zh-Hans": "这个情境" },
   "confirm.deleteListEmpty":   { en: "Delete the “{name}” list?",       "zh-Hans": "删除“{name}”列表？" },
   "confirm.deleteListOne": {
     en: "Delete the “{name}” list? Its 1 item will stay — ungrouped, at the top of the lane.",
@@ -4965,13 +4920,9 @@ function t(key){
   if (!entry) return key;
   return entry[currentLocale()] || entry.en || key;
 }
-// Same lookup for a specific locale — used by the language picker, which has to
-// show each language in its OWN language rather than in the current one.
-function tIn(key, locale){
-  const entry = STRINGS[key];
-  if (!entry) return key;
-  return entry[locale] || entry.en || key;
-}
+// (tIn — the same lookup against a named locale — lived here. Its comment
+// claimed the language picker used it; the picker renders each language from
+// LOCALES' own `native` label instead, so it never had a caller.)
 function setLocale(id){
   if (!LOCALES.some(function(l){ return l.id === id; })) return;
   state.locale = id;
@@ -10719,14 +10670,6 @@ function injectChunkMap(){
     if (s.completedView || s.eventView || s.noteView || s.tagsView) return s.kind;
     return (s.draft && s.draft.convertTo) || s.kind;
   }
-  // The other half of the pair -- for next↔waiting and current↔future, the kind
-  // this page's single convert button points AT. On a swapped page that is the
-  // origin, which is why the destination's own outgoing button doubles as the
-  // "undo the conversion" control without any special case.
-  function convertPartnerOf(kind){
-    return kind === "next" ? "waiting" : kind === "waiting" ? "next"
-         : kind === "current" ? "future" : kind === "future" ? "current" : null;
-  }
 
   function openScreen(kind, taskId, prefill){
     let draft;
@@ -13737,12 +13680,10 @@ function injectChunkMap(){
     // window.prompt for "+ New list": both native mechanisms are silently
     // blocked in sandboxed/embedded contexts (which is why the buttons
     // appeared dead), and the inline versions work everywhere.
-    // Dashed-outline feedback, cleared on next input (CLAUDE.md validation rule).
-    function markInvalid(input){
-      input.classList.add("field-invalid");
-      input.addEventListener("input", function h(){ input.classList.remove("field-invalid"); input.removeEventListener("input", h); });
-    }
-    // (submitAddMini lived here. The quick-add rows it served are gone — the +
+    // (submitAddMini lived here, and markInvalid with it — the dashed-outline
+    // helper had no other caller once the rows went. The validation rule it
+    // served is unchanged and still enforced, by the render-time `field-invalid`
+    // class the drafting pages set from s.invalidField. The quick-add rows it served are gone — the +
     // beside a list's or context's count opens the real drafting page instead
     // (user: "they just clutter things up"). Deleted rather than left dormant:
     // it was the only caller of addTask's parent/context arguments, and a dead
@@ -18035,7 +17976,6 @@ function loadEvents(){ return Storage.getJSON("gtd_events", null); }
 function saveEvents(){ Storage.setJSON("gtd_events", state.events); }
 function findEvent(id){ return (state.events || []).find(function(e){ return e.id === id; }) || null; }
 function findEventByTaskId(taskId){ return (state.events || []).find(function(e){ return e.taskId === taskId; }) || null; }
-function eventIsAppointment(ev){ return !!(ev && ev.time); }
 
 // The clock, matching deadlineBarState() — real time plus the dev QA offset.
 function nowInstant(){ return nowMs(); }

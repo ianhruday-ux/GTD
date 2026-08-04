@@ -34,13 +34,11 @@
 :root{
   /* Warm "desk" palette — unchanged. */
   --desk:#171513;
-  --desk-grain:#1D1A17;
   --paper:#262420;
   --paper-2:#302D27;
   --text-primary:#EDE7DA;
   --text-soft:#A79E8C;
   --brass:#C68A3E;
-  --brass-dark:#9C6B2C;
   --red:#C24A3D;
   --yellow:#D9A62C;
   --moss:#6B9E6B;
@@ -60,7 +58,6 @@
      chip, the paused pill) that are about green-ness and blue-ness, not lanes. */
   --forest:#4C9155;
   --royal:#5B7FE8;
-  --bezel:#0F0E0C;
   --dark-on-accent:#1a1408;
   --paper-shadow: 0 6px 14px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.03) inset;
   --font-display:'Space Grotesk', sans-serif;
@@ -68,11 +65,12 @@
   --font-mono:'IBM Plex Mono', monospace;
 
   /* ▲ CHUNK 2 — the viewport gradient (§4.7b). Warm family, darkest at the
-     top, a touch lighter and warmer at the bottom edge. Restrained on purpose
-     so it never fights the semi-transparent white overlays (pills, quick-add
-     rows, condition badges) that are tuned against the dark tone. */
+     top. Restrained on purpose so it never fights the semi-transparent white
+     overlays (pills, condition badges) tuned against the dark tone. The warmer
+     bottom stop is written literally at the one place that draws it, so
+     --bg-bottom went unread; --desk-grain, --brass-dark and --bezel were the
+     same story and went with it. */
   --bg-top:#141210;
-  --bg-bottom:#221E19;
 
   /* ▲ CHUNK 2 — fixed-chrome heights, used both to draw the chrome and to
      reserve the exact space beneath it (§4.10b: content below fixed chrome
@@ -337,15 +335,15 @@ body.screen-open #dev-toolbar:not([hidden]) ~ .sw-update-banner{
 }
 body.drag-active .tabbar{ transition:none; }
 
-/* No horizontal scroll: three panels share the row equally. Two are pairs
-   of related lanes split top/bottom into independently-tappable halves
-   (Next/Waiting, Projects/Someday); Habits stands alone until Notes gives
-   it a partner (chunk 6). */
+/* No horizontal scroll: the panels share the row equally, each a pair of
+   related lanes split top/bottom into independently-tappable halves
+   (Next/Waiting, Projects/Someday, Habits/Notes). (.tab-solo styled the odd
+   one out while Habits stood alone; chunk 6 gave it Notes, and nothing has
+   rendered the class since.) */
 .tab-pair{
   flex:1 1 0; min-width:0; display:flex; flex-direction:column; gap:3px;
 }
 .tab-pair .tab{ flex:1 1 0; }
-.tab.tab-solo{ flex:1 1 0; }
 
 /* Letter sits to the left of the icon (user round). */
 .tab{
@@ -403,15 +401,10 @@ body.tabs-collapsed .tabbar{
   align-items:flex-start;
   padding-top:2px;
 }
-body.tabs-collapsed .tab-pair,
-body.tabs-collapsed .tab.tab-solo{ display:none; }
+body.tabs-collapsed .tab-pair{ display:none; }
 body.tabs-collapsed .tab-pair:has(.tab.active){ display:flex; flex:0 0 auto; }
 body.tabs-collapsed .tab-pair .tab{ display:none; }          /* hide the inactive half … */
-/* Explicit override (not a specificity tie-break) so the solo Habits button
-   still shows when it's the active tab, even though the blanket rule above
-   hides every .tab-solo by default. */
-body.tabs-collapsed .tab.tab-solo.active{ display:flex; }
-body.tabs-collapsed .tab.active{                              /* … show only the active one, as a pill */
+body.tabs-collapsed .tab.active{                             /* … show only the active one, as a pill */
   display:flex; flex-direction:row; flex:0 0 auto; gap:7px;
   border-radius:20px;
   padding:7px 16px 7px 14px;
@@ -491,11 +484,12 @@ body.has-frame #fab-create{
      <div class="lane-label">
        <span class="lane-label-title">Next Actions</span>
        <span class="lane-label-right">
-         <span class="lane-count">4</span>
          <button class="info-btn" data-action="toggle-info" aria-label="About this lane">i</button>
        </span>
      </div>
-   It floats over the gradient; it does not cap anything. */
+   It floats over the gradient; it does not cap anything. (The sketch used to
+   show a .lane-count pill beside the title; no lane has rendered one for a
+   long time, and its rule went with this line.) */
 .lane-label{
   align-self:flex-start;
   display:inline-flex; align-items:center; gap:10px;
@@ -504,10 +498,6 @@ body.has-frame #fab-create{
   padding:7px 14px; border-radius:9px;
   box-shadow:0 3px 10px rgba(0,0,0,0.35);
   margin:6px 0 10px 0;
-}
-.lane-count{
-  font-family:var(--font-mono); font-weight:600; font-size:11.5px;
-  background:rgba(0,0,0,0.18); padding:2px 7px; border-radius:10px;
 }
 .lane-label-right{ display:inline-flex; align-items:center; gap:7px; }
 .info-btn{
@@ -536,8 +526,9 @@ body.has-frame #fab-create{
    because it is a separate idea, not a continuation of the sentence above. */
 .lane-info-more{ display:block; margin-top:9px; }
 
-/* The lane body is now a single flow of items — one padding, generous gap. */
-.lane-body{ display:flex; flex-direction:column; gap:14px; }
+/* The lane body is now a single flow of items — one padding, generous gap.
+   (.lane-body was the wrapper that flow used to sit in; .cards-root is the
+   whole of it now.) */
 .cards-root{ display:flex; flex-direction:column; gap:14px; min-height:12px; }
 .empty-note{ font-size:13px; color:var(--text-soft); font-style:italic; padding:8px 2px; }
 
@@ -594,9 +585,9 @@ body.has-frame #fab-create{
 .card-title.done{ text-decoration:line-through; color:var(--text-soft); }
 
 /* The list-view "×" delete is REMOVED (§4.7b): items are deleted from their own
-   page. `.card-actions` stays only for surviving affordances (e.g. none by
-   default on a plain card). The promote ← arrow stays. */
-.card-actions{ display:flex; gap:4px; flex:0 0 auto; }
+   page. `.card-actions` was kept for "surviving affordances" and there turned
+   out to be none — no card has rendered the wrapper since. The promote ←
+   arrow stays; it is .promote-arrow, in the card-top row. */
 .icon-btn{
   border:none; background:transparent; color:var(--text-soft); font-size:13px;
   padding:2px 5px; border-radius:4px;
@@ -1044,7 +1035,6 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
    The real fix, if this isn't enough on the device, is a custom picker — see
    the handoff. */
 .screen-time{ color-scheme:dark; accent-color:var(--brass); }
-.screen-boxed-row .screen-recurrence{ flex:1.3; }
 .screen-clear-x{ border:none; background:transparent; color:var(--text-soft); font-size:13px; padding:2px 2px 2px 4px; flex:0 0 auto; }
 .screen-clear-x:hover{ color:var(--text-primary); }
 .screen-icon-toggle{
@@ -1055,13 +1045,6 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 .screen-icon-toggle[disabled]{ opacity:0.35; cursor:not-allowed; border-style:dashed; }
 .screen-overlay[data-kind="habit"] .screen-when-field-row .screen-icon-toggle{
   border-color:var(--lane-accent); background:rgba(142,111,176,0.12); color:var(--lane-accent);
-}
-.suggestion-bubble{
-  display:flex; align-items:center; gap:8px; background:rgba(198,138,62,0.14);
-  border:1px solid rgba(198,138,62,0.35); border-radius:8px; padding:9px 11px; font-size:12.5px;
-}
-.suggestion-bubble button{
-  border:none; background:var(--brass); color:var(--dark-on-accent); font-weight:700; font-size:11.5px; padding:5px 10px; border-radius:6px; flex:0 0 auto;
 }
 .screen-project-flag{ font-size:12px; color:var(--yellow); background:rgba(217,166,44,0.12); border:1px solid rgba(217,166,44,0.3); border-radius:7px; padding:8px 10px; }
 .screen-make-kind-btn{
@@ -1106,20 +1089,11 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 .screen-complete-pill.paused{ background:var(--desk); border:1px solid var(--paper-2); color:var(--text-soft); cursor:default; box-shadow:none; }
 .screen-complete-pill.paused:hover{ filter:none; }
 
-/* Project-page quick-add + linked-actions list (= carried over =) */
-.quick-add-row{ display:flex; gap:6px; align-items:center; }
-.quick-add-row input{
-  flex:1; font-size:12.5px; padding:7px 9px; border-radius:6px; min-width:0;
-  border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.06); color:var(--text-primary);
-}
-.quick-add-row button{
-  flex:0 0 auto; width:30px; height:30px; border-radius:6px; border:1px solid rgba(255,255,255,0.25);
-  background:transparent; color:var(--text-primary); font-size:15px; padding:0;
-}
-.quick-add-row button:hover{ background:rgba(255,255,255,0.1); }
-/* §12.1b: the Waiting-row hook reads as greyed until a title is typed. Pure
-   CSS — :placeholder-shown is true exactly when the input is empty. */
-.quick-add-row input[data-quickadd="waiting"]:placeholder-shown ~ .qa-hook{ opacity:0.4; }
+/* Project-page linked-actions list (= carried over =).
+   (The .quick-add-row block and its .qa-hook greying rule lived here. The rows
+   themselves went when the + beside a list's count started opening the real
+   drafting page — "they just clutter things up" — and nothing has rendered
+   either class since.) */
 .linked-actions-list{ display:flex; flex-direction:column; gap:5px; }
 .linked-action-item{
   text-align:left; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1);
@@ -1133,7 +1107,6 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
    to open until the project save makes it real. */
 .linked-action-staged{ border-style:dashed; cursor:default; }
 .linked-action-staged:hover{ background:rgba(255,255,255,0.04); }
-.linked-action-kind{ font-size:10px; font-family:var(--font-mono); color:var(--text-soft); flex:0 0 auto; }
 /* Coloured kind bullets (user tweak): red next, yellow waiting, cream event. */
 .kind-dot{ display:inline-block; width:8px; height:8px; border-radius:50%; flex:0 0 auto; }
 .kind-dot.kind-next{ background:var(--red); }
@@ -1179,7 +1152,6 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
   margin-top:8px; padding-top:12px; border-top:1px solid rgba(255,255,255,0.10);
 }
 .pick-intro{ font-size:12.5px; color:var(--text-soft); line-height:1.4; }
-.screen-hook-pick-section:first-child{ margin-top:0; }
 .habit-day-row{ display:flex; gap:6px; }
 .habit-day-row.field-invalid{ outline:1.5px dashed var(--red); outline-offset:4px; border-radius:8px; }
 .habit-day-chip{ width:32px; height:32px; border-radius:50%; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.04); color:var(--text-soft); font-family:var(--font-mono); font-size:12px; }
@@ -1197,8 +1169,6 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 .habit-celebration-restart{ background:rgba(255,255,255,0.05); color:var(--text-soft); border:1px solid rgba(255,255,255,0.12); font-weight:500; }
 @keyframes habitCelebrate{ from{ transform:scale(0.94); opacity:0; } to{ transform:scale(1); opacity:1; } }
 .habit-offday{ background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:10px 12px; font-size:12.5px; color:var(--text-soft); text-align:center; }
-.habit-create-panel{ margin-top:2px; }
-.habit-panel-inner{ display:flex; flex-direction:column; gap:9px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:12px; }
 
 /* Advanced options dialog (= carried over =) */
 .adv-dialog{ text-align:left; max-width:420px; }
@@ -1208,7 +1178,6 @@ body.screen-open{ position:fixed; left:0; right:0; overflow:hidden; width:100%; 
 .adv-tab.active{ border-color:var(--lane-accent, var(--moss)); color:var(--text-primary); }
 .adv-note{ font-size:12px; color:var(--text-soft); line-height:1.5; margin:0 0 10px; }
 .adv-textarea{ width:100%; min-height:64px; resize:vertical; border-radius:6px; background:var(--paper-2); border:1px solid rgba(255,255,255,0.12); color:var(--text-primary); font-size:13px; padding:8px; }
-.adv-hook-row{ display:flex; align-items:center; justify-content:space-between; font-size:12.5px; padding:4px 0; }
 .adv-content{ margin-bottom:10px; }
 /* §8 (review-surface-plan.md, RULED): grey fill for contrast, same neutral
    raised fill as .cal-advanced-btn — .btn-ghost's transparent background is

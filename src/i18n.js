@@ -66,10 +66,8 @@ const STRINGS = {
   "badge.habit":    { en: "Habit",          "zh-Hans": "习惯" },
   "badge.notes":    { en: "Note",           "zh-Hans": "笔记" },
   "badge.tags":     { en: "Tags",           "zh-Hans": "标签" },
-  "badge.review":   { en: "Review",         "zh-Hans": "回顾" },
   "badge.event":    { en: "Event",          "zh-Hans": "事件" },
   "badge.appointment": { en: "Appointment", "zh-Hans": "约会" },
-  "badge.calendar": { en: "Calendar",       "zh-Hans": "日历" },
 
   // ---- the floating + menu ----
   "fab.newAction":    { en: "New action",         "zh-Hans": "新建行动" },
@@ -89,7 +87,6 @@ const STRINGS = {
   "placeholder.title.future":  { en: "Project title…",         "zh-Hans": "项目标题…" },
   "placeholder.title.habit":   { en: "Habit title…",           "zh-Hans": "习惯标题…" },
   "placeholder.title.notes":   { en: "Note title…",            "zh-Hans": "笔记标题…" },
-  "placeholder.desc":          { en: "Description (optional)…", "zh-Hans": "描述（可选）…" },
 
   // ---- the lane info buttons: THE USER'S OWN COPY (INFO-TEXT.txt) ----
   // ⚠ The English here is authored prose, transcribed verbatim. It is not to be
@@ -152,7 +149,6 @@ const STRINGS = {
     "zh-Hans": "收件箱用于集中存放所有需要处理的事项。停滞的项目、已过截止日期的事项，以及失去等待条件的等待行动，都会出现在这里。如果一时来不及把想法或提醒整理到合适的列表，可以先用输入框快速记下来。之后再通过收件箱的“回顾”功能，逐项整理并处理。"
   },
   "tray.empty":   { en: "Empty for now — nothing slipping through the cracks.", "zh-Hans": "暂时是空的——没有任何事情被遗漏。" },
-  "tray.review":  { en: "Review",  "zh-Hans": "回顾" },
   "tray.reveal":  { en: "Reveal",  "zh-Hans": "显示" },
   "tray.hide":    { en: "Hide",    "zh-Hans": "隐藏" },
   "tray.discard": { en: "Discard", "zh-Hans": "丢弃" },
@@ -212,7 +208,6 @@ const STRINGS = {
   "settings.importBackup": { en: "Import a backup", "zh-Hans": "导入备份" },
   "settings.background": { en: "Background", "zh-Hans": "背景" },
   "settings.language":   { en: "Language",   "zh-Hans": "语言" },
-  "settings.debugging":  { en: "Debugging",  "zh-Hans": "调试" },
   "settings.build":      { en: "Build",      "zh-Hans": "版本" },
 
   // ---- chrome shared by every drafting page ----
@@ -375,7 +370,6 @@ const STRINGS = {
   "field.noContextsYet":     { en: "No contexts yet — create them with + on the lane.", "zh-Hans": "还没有情境——在列表上用“+”创建。" },
   "field.clearDeadline":     { en: "Clear deadline",            "zh-Hans": "清除期限" },
   "field.clearTime":         { en: "Clear time",                "zh-Hans": "清除时间" },
-  "field.optional":          { en: "Optional",                  "zh-Hans": "可选" },
   "field.pickDate":          { en: "Pick a date",                "zh-Hans": "选择日期" },
 
   // ---- the waiting-for row + condition hook ----
@@ -386,7 +380,6 @@ const STRINGS = {
   "waiting.after":           { en: "After",                     "zh-Hans": "在…之后" },
   "waiting.anotherItem":     { en: "another item",              "zh-Hans": "另一个项目" },
   "waiting.waitingForLabel": { en: "Waiting for",               "zh-Hans": "在等待" },
-  "waiting.blockedByDeadline": { en: "A waiting action can’t hold a date — clear the deadline first", "zh-Hans": "等待项不能带有日期——请先清除期限" },
 
   // ---- convert / complete pill group ----
   "outcome.makeWaiting":     { en: "Make Waiting Action",        "zh-Hans": "转为等待项" },
@@ -511,7 +504,6 @@ const STRINGS = {
   "card.tapToView":          { en: "Tap to view",                    "zh-Hans": "点击查看" },
   "group.tapToExpandReorder": { en: "Tap to expand/collapse — press and hold to reorder", "zh-Hans": "点击展开/收起——按住可重新排序" },
   "group.addToList":         { en: "Add to this list",               "zh-Hans": "添加到此列表" },
-  "group.tapToExpand":       { en: "Tap to expand/collapse",         "zh-Hans": "点击展开/收起" },
   "group.addToContext":      { en: "Add to this context",            "zh-Hans": "添加到此情境" },
   "group.deleteContext":     { en: "Delete context",                 "zh-Hans": "删除情境" },
   "group.dropHint":          { en: "Drag items here",                "zh-Hans": "把项目拖到这里" },
@@ -553,8 +545,6 @@ const STRINGS = {
   // ---- the daily review ----
   "review.badge":            { en: "Review",                        "zh-Hans": "回顾" },
   "review.toReview":         { en: "to review",                     "zh-Hans": "项待回顾" },
-  "review.showAll":          { en: "Show all",                      "zh-Hans": "全部显示" },
-  "review.oneAtATime":       { en: "One at a time",                 "zh-Hans": "一次一个" },
   "review.allClear":         { en: "All clear.",                    "zh-Hans": "全部清空。" },
   "review.nothingSlipping":  { en: "Nothing slipping through the cracks.", "zh-Hans": "没有什么被遗漏。" },
   "review.deferredSuffix":   { en: " deferred.",                    "zh-Hans": " 项已推迟。" },
@@ -669,13 +659,10 @@ const STRINGS = {
   "confirm.importAlsoSyncs": { en: "Your other devices will get the restored items too, including anything you deleted there.", "zh-Hans": "你的其他设备也会收到恢复的内容，包括你在那里删除过的项目。" },
   "confirm.replaceEverything": { en: "Replace everything",          "zh-Hans": "替换全部" },
   "confirm.ok":               { en: "OK",                           "zh-Hans": "好" },
-  "confirm.deleteTitleForGood": { en: "Delete “{title}” for good?", "zh-Hans": "永久删除“{title}”吗？" },
-  "confirm.deleteThisItem":   { en: "this",                         "zh-Hans": "这个" },
   "confirm.saveAnyway":       { en: "Save anyway",                  "zh-Hans": "仍要保存" },
   "confirm.goBack":           { en: "Go back",                      "zh-Hans": "返回" },
   "confirm.strandedOne":      { en: "1 calendar entry is scheduled after this new deadline. You can keep it — nothing will be moved or deleted.", "zh-Hans": "有 1 项日历安排在这个新期限之后。你可以保留——不会有任何东西被移动或删除。" },
   "confirm.strandedMany":     { en: "{n} calendar entries are scheduled after this new deadline. You can keep them — nothing will be moved or deleted.", "zh-Hans": "有 {n} 项日历安排在这个新期限之后。你可以保留——不会有任何东西被移动或删除。" },
-  "confirm.cancel":           { en: "Cancel",                       "zh-Hans": "取消" },
 
   // ---- the calendar ----
   "cal.back":                { en: "Back",                          "zh-Hans": "返回" },
@@ -811,7 +798,6 @@ const STRINGS = {
   "confirm.deleteLinkedTooOne": { en: "Delete it too",                  "zh-Hans": "连它一起删除" },
   "confirm.deleteLinkedTooMany": { en: "Delete them too",               "zh-Hans": "连它们一起删除" },
   "confirm.thisList":          { en: "this list",                       "zh-Hans": "这个列表" },
-  "confirm.thisContext":       { en: "this context",                    "zh-Hans": "这个情境" },
   "confirm.deleteListEmpty":   { en: "Delete the “{name}” list?",       "zh-Hans": "删除“{name}”列表？" },
   "confirm.deleteListOne": {
     en: "Delete the “{name}” list? Its 1 item will stay — ungrouped, at the top of the lane.",
@@ -966,13 +952,9 @@ function t(key){
   if (!entry) return key;
   return entry[currentLocale()] || entry.en || key;
 }
-// Same lookup for a specific locale — used by the language picker, which has to
-// show each language in its OWN language rather than in the current one.
-function tIn(key, locale){
-  const entry = STRINGS[key];
-  if (!entry) return key;
-  return entry[locale] || entry.en || key;
-}
+// (tIn — the same lookup against a named locale — lived here. Its comment
+// claimed the language picker used it; the picker renders each language from
+// LOCALES' own `native` label instead, so it never had a caller.)
 function setLocale(id){
   if (!LOCALES.some(function(l){ return l.id === id; })) return;
   state.locale = id;

@@ -45,7 +45,6 @@ function loadEvents(){ return Storage.getJSON("gtd_events", null); }
 function saveEvents(){ Storage.setJSON("gtd_events", state.events); }
 function findEvent(id){ return (state.events || []).find(function(e){ return e.id === id; }) || null; }
 function findEventByTaskId(taskId){ return (state.events || []).find(function(e){ return e.taskId === taskId; }) || null; }
-function eventIsAppointment(ev){ return !!(ev && ev.time); }
 
 // The clock, matching deadlineBarState() — real time plus the dev QA offset.
 function nowInstant(){ return nowMs(); }

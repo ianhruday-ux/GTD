@@ -3071,14 +3071,6 @@
     if (s.completedView || s.eventView || s.noteView || s.tagsView) return s.kind;
     return (s.draft && s.draft.convertTo) || s.kind;
   }
-  // The other half of the pair -- for next↔waiting and current↔future, the kind
-  // this page's single convert button points AT. On a swapped page that is the
-  // origin, which is why the destination's own outgoing button doubles as the
-  // "undo the conversion" control without any special case.
-  function convertPartnerOf(kind){
-    return kind === "next" ? "waiting" : kind === "waiting" ? "next"
-         : kind === "current" ? "future" : kind === "future" ? "current" : null;
-  }
 
   function openScreen(kind, taskId, prefill){
     let draft;
@@ -6089,12 +6081,10 @@
     // window.prompt for "+ New list": both native mechanisms are silently
     // blocked in sandboxed/embedded contexts (which is why the buttons
     // appeared dead), and the inline versions work everywhere.
-    // Dashed-outline feedback, cleared on next input (CLAUDE.md validation rule).
-    function markInvalid(input){
-      input.classList.add("field-invalid");
-      input.addEventListener("input", function h(){ input.classList.remove("field-invalid"); input.removeEventListener("input", h); });
-    }
-    // (submitAddMini lived here. The quick-add rows it served are gone — the +
+    // (submitAddMini lived here, and markInvalid with it — the dashed-outline
+    // helper had no other caller once the rows went. The validation rule it
+    // served is unchanged and still enforced, by the render-time `field-invalid`
+    // class the drafting pages set from s.invalidField. The quick-add rows it served are gone — the +
     // beside a list's or context's count opens the real drafting page instead
     // (user: "they just clutter things up"). Deleted rather than left dormant:
     // it was the only caller of addTask's parent/context arguments, and a dead
