@@ -29,7 +29,7 @@
         the app's own runtime injections are still covered. Move this tag to
         the top of <head> and the bridge dies with it: no Dropbox auth, no
         native storage, and the failure reads as a blank app. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-Ifo9P2dgH5EJ9oXWl/q7kGq6Qdor/BJ78zDC9vMYVy4='; style-src 'unsafe-inline'; img-src 'self' data: blob:; font-src data:; connect-src 'self' https://content.dropboxapi.com; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-rbY2MIJFSdv9ecvlCM7uIHc6pLs8SFVK1GMiP4UNy4o='; style-src 'unsafe-inline'; img-src 'self' data: blob:; font-src data:; connect-src 'self' https://content.dropboxapi.com; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
 <!-- interactive-widget=resizes-content: the on-screen keyboard shrinks the
      LAYOUT viewport rather than only the visual one, so a fixed inset:0 overlay
      is simply correct and the browser never has to scroll the page to reveal the
@@ -2550,7 +2550,7 @@ body.screen-open #tray-handle{ display:none; }
 (function(){
 "use strict";
 
-const BUILD_STAMP = "04 Aug 01:19";  // replaced by build.py
+const BUILD_STAMP = "04 Aug 01:25";  // replaced by build.py
 
 // =========================================================
 // STORAGE ADAPTER (spec.md §3, known issue 4)
