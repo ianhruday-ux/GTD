@@ -436,10 +436,19 @@ def stage_desktop(version):
         "name": "oela-electron",
         "version": version,
         "description": "Over-Engineered List App",
-        # electron-packager requires author -- it becomes the CompanyName in
-        # the .exe's file properties, which is what Windows shows in the
-        # SmartScreen "unknown publisher" dialog INSTALL.md warns about. Better
-        # a name there than a blank.
+        # electron-packager requires author -- it becomes the CompanyName in the
+        # .exe's file properties (right-click -> Properties -> Details). Better a
+        # name there than a blank.
+        #
+        # ⚑ CORRECTED (Windows install test, 2026-08-03). This used to claim
+        # CompanyName was "what Windows shows in the SmartScreen 'unknown
+        # publisher' dialog". It is not, and the test proved it: the shipped exe
+        # carries CompanyName "Ian Hruday" and SmartScreen still says Unknown
+        # publisher. That dialog reads the AUTHENTICODE SIGNATURE, and an
+        # unsigned binary has no publisher identity to show, whatever the version
+        # resource says. Nothing here can change it -- only code signing can,
+        # which is the certificate INSTALL.md tells testers about. (INSTALL.md
+        # itself was right all along; this comment was the wrong one.)
         "author": "Ian Hruday",
         "main": "main.js",
         # No dependencies by design: the shell requires nothing but electron,
