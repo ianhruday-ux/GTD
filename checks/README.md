@@ -27,6 +27,7 @@ Each prints one line per check and a `N passed, M failed` summary.
 | `calendar_round.py` | Calendar creation row stays fully visible (never collapsed), the removed jargon lines, a completed one-shot event not re-minting itself, the appointment bar's fill, and the intray drawer's finger-follow swipe |
 | `boundary_4am.py` | The 4 AM turnover for all four dated shapes — appointment, untimed event, recurring series roll, untimed deadline — stepping 03:55 → 04:05 across each relevant day on a faked clock |
 | `settings_surface.py` | The settings dropdown (rows, order, disabled Language, outside-tap dismiss), the background picker, persistence across reload, and a `gtd_` clear resetting the surface |
+| `csp.py` | The Content-Security-Policy: that it is present and not weakened, that its script hash is RIGHT (asserted by rendering a created action — a wrong hash blanks the app on every platform at once), that a normal lacquer boot blocks nothing legitimate, and that an injected `<img onerror>` stays inert |
 
 ## Why these exist
 

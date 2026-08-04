@@ -143,6 +143,71 @@ def build_sw(out_html, asset_bytes):
     return version
 
 
+# The CSP, minus the script hash, which only exists once the bundle is stapled.
+#
+# Every directive here is either the security point or a thing the app provably
+# needs; `default-src 'none'` denies the rest, so anything added to the app that
+# fetches a new KIND of resource fails closed and lands here deliberately.
+#
+#   script-src   the whole point — one hash, no 'self', no 'unsafe-inline'.
+#                CSP3 ignores 'unsafe-inline' when a hash is present, so the two
+#                cannot be combined as a hedge even by accident.
+#   style-src    'unsafe-inline' is unavoidable and not a hedge: the two <style>
+#                blocks are inline by design (one self-contained file) and the
+#                markup carries 23 inline style= attributes. Hashing them is not
+#                possible for the ones JS writes at runtime.
+#   img-src      'self' for the icons, data: for the fonts' sibling — the desk
+#                textures are canvas-generated data: JPEGs used as CSS
+#                backgrounds, which CSP counts as images — blob: for exports.
+#   font-src     data: only: build_fonts() inlines all three families as base64.
+#   connect-src  the two Dropbox Content API calls in dropboxTransport.js. OAuth
+#                is native (DropboxAuthPlugin), so no auth host is needed here.
+#   worker-src   sw.js. Registration is skipped on native (swClient.js:33), so
+#                this matters on the web build only.
+#   manifest-src manifest.webmanifest, the thing that makes the app installable.
+#
+# ⚠ 'self' matches an ORIGIN, and a file: page's origin is opaque, so the two
+# 'self' entries buy nothing when dist/index.html is opened straight from disk.
+# That mode was verified under this policy anyway: the app boots, all four font
+# faces load, and nothing is reported blocked — because everything that matters
+# offline is inline or a data: URI. At most the favicon and the manifest go
+# unresolved there, which is cosmetic and already true of file: for the manifest.
+# The served builds (Pages, Android's local server, the checks' http server) all
+# match 'self' normally.
+CSP_DIRECTIVES = [
+    "default-src 'none'",
+    "script-src '{script_hash}'",
+    "style-src 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "font-src data:",
+    "connect-src 'self' https://content.dropboxapi.com",
+    "worker-src 'self'",
+    "manifest-src 'self'",
+    "base-uri 'none'",
+    "form-action 'none'",
+]
+
+
+def csp_meta(out_html):
+    """The CSP <meta>, with script-src naming the sha256 of the stapled script.
+
+    The hash is taken from the FINAL html rather than from the `script` string
+    build() assembled, and that is the entire reason this function reads the
+    output back instead of being handed the bundle. What a browser hashes is the
+    script element's text content exactly as parsed — including the newlines the
+    template puts either side of <!--BUILD:SCRIPT--> . Hashing the bundle would
+    be right up until someone edits the whitespace in src/index.html, and the
+    symptom of being one newline out is a blank app, on every platform at once.
+    """
+    if out_html.count("<script>") != 1:
+        sys.exit("build.py: expected exactly one inline <script> to hash — "
+                 "the CSP names one hash and cannot cover a second script")
+    body = out_html.split("<script>", 1)[1].rsplit("</script>", 1)[0]
+    digest = base64.b64encode(hashlib.sha256(body.encode("utf-8")).digest()).decode("ascii")
+    policy = "; ".join(CSP_DIRECTIVES).format(script_hash="sha256-" + digest)
+    return '<meta http-equiv="Content-Security-Policy" content="%s">' % policy
+
+
 def build():
     template = (SRC / "index.html").read_text(encoding="utf-8")
     styles = (SRC / "styles.css").read_text(encoding="utf-8")
@@ -163,10 +228,18 @@ def build():
         sys.exit("build.py: src/index.html is missing the <!--BUILD:STYLES--> marker")
     if "<!--BUILD:SCRIPT-->" not in template:
         sys.exit("build.py: src/index.html is missing the <!--BUILD:SCRIPT--> marker")
+    if "<!--BUILD:CSP-->" not in template:
+        sys.exit("build.py: src/index.html is missing the <!--BUILD:CSP--> marker")
 
     out = template.replace("<!--BUILD:FONTS-->", build_fonts())
     out = out.replace("<!--BUILD:STYLES-->", styles.rstrip("\n"))
     out = out.replace("<!--BUILD:SCRIPT-->", script.rstrip("\n"))
+
+    # LAST, and after the script is in place: the policy names a hash of the
+    # stapled script, so it cannot be computed before the stapling. Substituting
+    # the meta afterwards is safe in the other direction too — it changes the
+    # <head>, never the script element the hash covers.
+    out = out.replace("<!--BUILD:CSP-->", csp_meta(out))
 
     DIST.mkdir(exist_ok=True)
     (DIST / "index.html").write_text(out, encoding="utf-8", newline="\n")

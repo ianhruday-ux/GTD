@@ -9,6 +9,27 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<!-- The Content-Security-Policy, written by build.py (it has to name the sha256
+     of the stapled script, which only exists after stapling). The security value
+     is `script-src` naming ONE hash: the app emits no inline event handlers and
+     no javascript: URIs, so anything that manages to reach the DOM as markup —
+     the classic <img src=q onerror=…> from an imported note or a synced record —
+     is inert even at a sink nobody has escaped yet. It backstops the escaping
+     fix (ae8a99f), it does not replace it.
+
+     ⚠ POSITION IS LOAD-BEARING, in two directions.
+     1. It must sit AFTER <meta charset> (which has to land in the first 1024
+        bytes) and BEFORE every resource it governs — the fonts, styles, icons
+        and the script are all below it.
+     2. On Android, Capacitor injects its native bridge as an INLINE script
+        element immediately after `<head>` (JSInjector.java:98) — ABOVE this tag.
+        (Written as prose, not markup: build.py counts script tags to be sure it
+        is hashing the only one, and a literal in a comment breaks that count.)
+        A policy only governs what is parsed after it, so the bridge runs and
+        the app's own runtime injections are still covered. Move this tag to
+        the top of <head> and the bridge dies with it: no Dropbox auth, no
+        native storage, and the failure reads as a blank app. -->
+<!--BUILD:CSP-->
 <!-- interactive-widget=resizes-content: the on-screen keyboard shrinks the
      LAYOUT viewport rather than only the visual one, so a fixed inset:0 overlay
      is simply correct and the browser never has to scroll the page to reveal the
