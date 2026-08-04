@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Re-download the vendored webfonts into src/assets/fonts/.
 
-    python3 tools_getfonts.py
+    python tools_getfonts.py
 
 Run this by hand, only when a font needs updating. It is NOT part of the build —
 build.py just inlines whatever is already sitting in src/assets/fonts/, guided by

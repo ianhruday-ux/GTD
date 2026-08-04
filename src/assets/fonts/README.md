@@ -3,7 +3,7 @@
 These are **not** hand-maintained. Regenerate with:
 
 ```bash
-python3 tools_getfonts.py
+python tools_getfonts.py
 ```
 
 `build.py` reads `fonts.json` and inlines each `.woff2` into `dist/index.html` as a base64 data

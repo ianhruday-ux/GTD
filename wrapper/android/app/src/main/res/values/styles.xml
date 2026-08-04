@@ -9,10 +9,21 @@
         <item name="colorAccent">@color/colorAccent</item>
     </style>
 
+    <!-- BridgeActivity.onCreate() calls setTheme(AppTheme_NoActionBar), so this
+         is the theme that is live once the splash is gone. windowBackground is
+         set for THE KEYBOARD GAP (see .screen-overlay::after in styles.css):
+         when Android resizes the WebView for the on-screen keyboard, it does so
+         before the keyboard is drawn, and for a few frames the strip the WebView
+         vacated is window, not page. Left at the default it renders light grey
+         against a dark app. @color/oela_window_gap cannot track the chosen
+         surface (see that file for why) but reads as the keyboard's own shadow
+         rather than a flash of grey.
+         The launch theme is untouched — the splash still owns startup. -->
     <style name="AppTheme.NoActionBar" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
+        <item name="android:windowBackground">@color/oela_window_gap</item>
     </style>
 
 

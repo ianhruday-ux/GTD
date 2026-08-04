@@ -106,7 +106,13 @@ python checks/<name>.py       # one Playwright end-to-end suite (real Chromium)
 ```
 
 **Verified on this machine, and each of these has cost a session real time:**
-- **`python`, not `python3`.** `python3` is not on PATH here; it opens the Microsoft Store shim.
+- **`python`, not `python3`** — still the spelling to write, but no longer a trap. `python3` used
+  to reach the Microsoft Store app-execution-alias stub, which prints "Python was not found" and
+  exits; on 2026-08-04 a copy of `python.exe` was placed beside it as `python3.exe` in
+  `AppData\Local\Programs\Python\Python312\`, which the PATH reaches before `WindowsApps`, so both
+  spellings now run 3.12.10. ⚑ That copy is MACHINE-LOCAL and not in the repo: a fresh machine, or
+  a Python upgrade that installs to a new directory, gets the stub back. Write `python` and the
+  question never arises.
 - **`node --check` rejects `.html`** (ERR_UNKNOWN_FILE_EXTENSION), so check `src/*.js` instead.
   The bundle is generated from them; there is nothing in it to check separately.
 - **The suites are in `checks/`, are NOT pytest, and run one file at a time.** There is no

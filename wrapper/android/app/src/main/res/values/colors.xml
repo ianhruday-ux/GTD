@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- The colour of the strip Android exposes for a few frames when it resizes
+         the WebView for the on-screen keyboard, before the keyboard is drawn.
+         See AppTheme.NoActionBar in styles.xml and the screen-overlay filler in
+         src/styles.css, which covers the other half of the same gap.
+
+         ⚑ THIS DELIBERATELY DOES NOT MATCH THE SURFACE, BECAUSE IT CANNOT.
+         The app sets its base colour per surface at runtime (surface.js: black
+         lacquer 0a0908, dark wood 2c160d, rosewood 6d3210, slate 15161A), and a
+         theme resource is fixed at build time. Making the window follow the
+         surface would need a native call on every surface change — real work for
+         a strip visible for about 60ms.
+
+         So this is the near-black of Black lacquer, chosen because the thing
+         ADJACENT to the strip during the flash is the keyboard, which is itself
+         near-black. It reads as the keyboard's own shadow on every surface,
+         which the previous value (a light grey inherited from the platform
+         default) did not on any of them. -->
+    <color name="oela_window_gap">#0A0908</color>
+
+</resources>

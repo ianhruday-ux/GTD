@@ -26,7 +26,7 @@
 //      because it calls skipWaiting()/clients.claim() itself, unlike the real
 //      sw.js — takes over immediately, no update banner, no second reload.
 //   3. Once every client is confirmed clean (or after enough time has
-//      passed), run `python3 build.py` normally and deploy the real sw.js
+//      passed), run `python build.py` normally and deploy the real sw.js
 //      again — a fresh content hash, so it's treated as a normal update.
 //
 // NON-TECHNICAL RECOVERY (per the user-non-technical memory, for the author

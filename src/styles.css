@@ -965,6 +965,32 @@ footer{ text-align:center; color:var(--text-soft); font-size:11.5px; padding:30p
   transform:translateX(100%); transition:transform .22s ease;
 }
 .screen-overlay.open{ transform:translateX(0); }
+/* ⚑ THE KEYBOARD GAP (device round, 2026-08-04). Android resizes the layout
+   viewport for the on-screen keyboard BEFORE the keyboard is composited, so for
+   roughly 60ms the overlay has already shrunk to --vv-height and NOTHING has yet
+   covered the strip it vacated. Filmed on a Galaxy S25 and reproduced at 10x
+   slow motion: the lanes behind show through and the drafting page reads as
+   half-disappeared. That ordering belongs to the OS and cannot be fixed here;
+   what shows in the gap can be.
+
+   This filler hangs off the bottom of the overlay, so it is OUTSIDE the visible
+   area whenever the overlay is full height and costs nothing the rest of the
+   time. It inherits the overlay's surface and is painted as part of it, so it
+   travels with the .open slide instead of appearing as a separate panel — and
+   the negative background-position keeps the 260px wood tile in phase across
+   the seam rather than restarting it.
+
+   It is deliberately NOT pointer-events:none. A drafting page is modal, so a tap
+   landing in the gap should hit the page, never a lane card behind it.
+
+   Note this only covers the gap INSIDE the WebView. Once Android resizes the
+   WebView itself, the strip below belongs to the window, which is why
+   AppTheme.NoActionBar sets android:windowBackground to the same colour. */
+.screen-overlay::after{
+  content:""; position:absolute; left:0; right:0; top:100%; height:100vh;
+  background:inherit;
+  background-position:0 calc(0px - var(--vv-height, 100dvh));
+}
 .screen-header{
   display:flex; align-items:center; justify-content:space-between; gap:10px;
   padding:12px 18px; padding-top:calc(12px + env(safe-area-inset-top));

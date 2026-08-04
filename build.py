@@ -2,8 +2,8 @@
 """Staples src/ into the single self-contained dist/index.html (chunk 0b).
 
 Usage:
-    python3 build.py              # one-shot build
-    python3 build.py --watch      # rebuild whenever a src/ file changes
+    python build.py               # one-shot build
+    python build.py --watch       # rebuild whenever a src/ file changes
 
 Vanilla JS, one IIFE, no framework, no npm (spec.md §3) — so "stapling" is
 just template substitution: src/index.html holds two markers,

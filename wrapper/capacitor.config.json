@@ -2,6 +2,7 @@
   "appId": "com.ianhruday.oela",
   "appName": "OELA",
   "webDir": "../dist",
+  "backgroundColor": "#0A0908",
   "plugins": {
     "CapacitorHttp": {
       "enabled": true
