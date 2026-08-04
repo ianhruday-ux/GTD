@@ -2346,7 +2346,7 @@
       state.tasks.current.filter(function(t){
         return !t.isGroup && (!isDevScaffold(t) || t.id === selectedId);
       }).forEach(function(t){
-        html += '<option value="' + t.id + '"' + (t.id === selectedId ? " selected" : "") + '>' + escapeHtml(t.title) + '</option>';
+        html += '<option value="' + escapeHtml(t.id) + '"' + (t.id === selectedId ? " selected" : "") + '>' + escapeHtml(t.title) + '</option>';
       });
       html += '</optgroup>';
     }
@@ -2478,11 +2478,11 @@
         const pKind = findProjectKind(task.linkedProjectId);
         const pTitle = findProjectTitle(task.linkedProjectId);
         if (pKind){
-          linkBlock = '<button class="project-jump" data-action="open-edit" data-kind="' + pKind + '" data-id="' + task.linkedProjectId + '" title="' + escapeHtml(t("project.openProject").replace("{title}", pTitle || "")) + '">&#128279;</button>';
+          linkBlock = '<button class="project-jump" data-action="open-edit" data-kind="' + pKind + '" data-id="' + escapeHtml(task.linkedProjectId) + '" title="' + escapeHtml(t("project.openProject").replace("{title}", pTitle || "")) + '">&#128279;</button>';
         }
       } else {
         const title = findProjectTitle(task.linkedProjectId);
-        linkBlock = '<button class="link-pill" data-action="open-edit" data-kind="' + kind + '" data-id="' + task.id + '">&#128279; ' + escapeHtml(title || "linked project") + '</button>';
+        linkBlock = '<button class="link-pill" data-action="open-edit" data-kind="' + kind + '" data-id="' + escapeHtml(task.id) + '">&#128279; ' + escapeHtml(title || "linked project") + '</button>';
       }
     }
     let cueBlock = "";
@@ -2512,20 +2512,20 @@
             // linked" — consistency is the whole point — with the context
             // name standing in for the hook target.
             const ctx = findContext(hk.id);
-            cueBlock += '<button class="link-pill" data-action="open-edit" data-kind="habit" data-id="' + task.id + '">&#128279; ' + escapeHtml(ctx.name) + '</button>';
+            cueBlock += '<button class="link-pill" data-action="open-edit" data-kind="habit" data-id="' + escapeHtml(task.id) + '">&#128279; ' + escapeHtml(ctx.name) + '</button>';
           } else {
             const target = state.tasks.habit.find(function(h){ return h.id === hk.id && !h.isGroup; });
-            cueBlock += '<button class="link-pill" data-action="open-edit" data-kind="habit" data-id="' + task.id + '">&#128279; After ' + escapeHtml(target.title) + '</button>';
+            cueBlock += '<button class="link-pill" data-action="open-edit" data-kind="habit" data-id="' + escapeHtml(task.id) + '">&#128279; After ' + escapeHtml(target.title) + '</button>';
           }
         });
       } else if (whens.length){
         whens.forEach(function(w){
-          cueBlock += '<button class="link-pill" data-action="open-edit" data-kind="habit" data-id="' + task.id + '">&#128337; ' + escapeHtml(w) + '</button>';
+          cueBlock += '<button class="link-pill" data-action="open-edit" data-kind="habit" data-id="' + escapeHtml(task.id) + '">&#128337; ' + escapeHtml(w) + '</button>';
         });
       } else if (hooks.length){
-        cueBlock += '<button class="link-pill cue-orphaned" data-action="open-edit" data-kind="habit" data-id="' + task.id + '">&#128279; No cue today</button>';
+        cueBlock += '<button class="link-pill cue-orphaned" data-action="open-edit" data-kind="habit" data-id="' + escapeHtml(task.id) + '">&#128279; No cue today</button>';
       } else {
-        cueBlock += '<button class="link-pill cue-empty" data-action="open-edit" data-kind="habit" data-id="' + task.id + '">+ add plan</button>';
+        cueBlock += '<button class="link-pill cue-empty" data-action="open-edit" data-kind="habit" data-id="' + escapeHtml(task.id) + '">+ add plan</button>';
       }
       if (habitRun.badge) cueBlock += '<span class="link-pill" style="border-color:var(--red); color:var(--red);">&#9679; New result</span>';
     }
@@ -2551,17 +2551,17 @@
         // against gtd_events so it shows as a valid pending condition.
         const pendingEv = liveTarget ? null : findEventByTaskId(task.conditionId);
         if (liveTarget){
-          cueBlock = '<button class="link-pill" data-action="open-edit" data-kind="waiting" data-id="' + task.id + '">&#129693; ' + escapeHtml(t("waiting.after")) + ' <span class="pill-target">' + escapeHtml(liveTarget.title) + '</span></button>';
+          cueBlock = '<button class="link-pill" data-action="open-edit" data-kind="waiting" data-id="' + escapeHtml(task.id) + '">&#129693; ' + escapeHtml(t("waiting.after")) + ' <span class="pill-target">' + escapeHtml(liveTarget.title) + '</span></button>';
         } else if (pendingEv && !pendingEv.paused){
           const eff = effDate(pendingEv, pendingEv.date);
           const dd = dateStrToDate(eff);
           const when = dd.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-          cueBlock = '<button class="link-pill" data-action="open-edit" data-kind="waiting" data-id="' + task.id + '">&#129693; ' + escapeHtml(t("waiting.after")) + ' <span class="pill-target">' + escapeHtml(effTitle(pendingEv, pendingEv.date)) + '</span> · ' + escapeHtml(when) + '</button>';
+          cueBlock = '<button class="link-pill" data-action="open-edit" data-kind="waiting" data-id="' + escapeHtml(task.id) + '">&#129693; ' + escapeHtml(t("waiting.after")) + ' <span class="pill-target">' + escapeHtml(effTitle(pendingEv, pendingEv.date)) + '</span> · ' + escapeHtml(when) + '</button>';
         } else {
-          cueBlock = '<button class="link-pill cue-orphaned" data-action="open-edit" data-kind="waiting" data-id="' + task.id + '">&#129693; ' + escapeHtml(t("waiting.after")) + ' ' + escapeHtml(task.conditionLabel || t("picker.deletedItem")) + '</button>';
+          cueBlock = '<button class="link-pill cue-orphaned" data-action="open-edit" data-kind="waiting" data-id="' + escapeHtml(task.id) + '">&#129693; ' + escapeHtml(t("waiting.after")) + ' ' + escapeHtml(task.conditionLabel || t("picker.deletedItem")) + '</button>';
         }
       } else if (task.whenText){
-        cueBlock = '<button class="link-pill" data-action="open-edit" data-kind="waiting" data-id="' + task.id + '">&#128337; ' + escapeHtml(t("waiting.waitingForLabel")) + ' <span class="pill-target">' + escapeHtml(task.whenText) + '</span></button>';
+        cueBlock = '<button class="link-pill" data-action="open-edit" data-kind="waiting" data-id="' + escapeHtml(task.id) + '">&#128337; ' + escapeHtml(t("waiting.waitingForLabel")) + ' <span class="pill-target">' + escapeHtml(task.whenText) + '</span></button>';
       }
       // (The date-pill fallback was removed in chunk 3 -- Waiting actions no
       // longer hold dates, §4.13a.)
@@ -2577,17 +2577,17 @@
     if (moveDest){
       // Waiting On / Future items get a move arrow in place of a checkbox —
       // there's nothing to "complete" here, only to promote to the next stage.
-      checkboxHtml = '<button class="promote-arrow" data-action="move" data-id="' + task.id + '" data-is-group="0" title="Move to ' + escapeHtml(LIST_TITLES[moveDest]) + '">&#8592;</button>';
+      checkboxHtml = '<button class="promote-arrow" data-action="move" data-id="' + escapeHtml(task.id) + '" data-is-group="0" title="Move to ' + escapeHtml(LIST_TITLES[moveDest]) + '">&#8592;</button>';
     } else if (isHabit){
       // Paused habits get an inert checkbox (design ruling: pausing
       // disables completion). A ✓ earned before pausing stays visible —
       // frozen, not erased — but can't be toggled until unpause.
       const pausedNow = isRunPaused(habitRun);
       checkboxHtml = '<button class="check' + (done ? " checked" : "") + (pausedNow ? " check-paused" : "") +
-        '" data-action="toggle-habit" data-id="' + task.id +
+        '" data-action="toggle-habit" data-id="' + escapeHtml(task.id) +
         '" title="' + escapeHtml(pausedNow ? t("habit.pausedUnpause") : t("habit.markDoneToday")) + '">' + (done ? "&#10003;" : "") + '</button>';
     } else {
-      checkboxHtml = '<button class="check" data-action="complete" data-id="' + task.id + '" title="' + escapeHtml(t("card.markComplete")) + '"></button>';
+      checkboxHtml = '<button class="check" data-action="complete" data-id="' + escapeHtml(task.id) + '" title="' + escapeHtml(t("card.markComplete")) + '"></button>';
     }
     // \u00a74.7b: the list-view "\u00d7" delete is gone \u2014 items are deletable from
     // their own page only (screen-delete). Next/Current cards that carry a
@@ -2599,13 +2599,13 @@
     // appointment progress bar (\u00a74.14c), not a deadline bar.
     const isPseudo = kind === "next" && isPseudoAction(task);
     const titleOpen = isPseudo
-      ? 'data-action="open-event" data-id="' + task.eventId + '" data-date="' + (task.occCanon || task.occDate || "") + '"'
-      : 'data-action="open-edit" data-kind="' + kind + '" data-id="' + task.id + '"';
+      ? 'data-action="open-event" data-id="' + escapeHtml(task.eventId) + '" data-date="' + (task.occCanon || task.occDate || "") + '"'
+      : 'data-action="open-edit" data-kind="' + kind + '" data-id="' + escapeHtml(task.id) + '"';
     const titleHtml = '<div class="card-title' + (done ? " done" : "") + '" ' + titleOpen + ' title="' + escapeHtml(t("card.tapToOpenReorder")) + '">' + escapeHtml(task.title) + '</div>';
     const deadlineBarBlock = isPseudo ? pseudoBarHtml(task) : (kind === "next" || kind === "current") ? deadlineBarHtml(task) : "";
     const titleBlock = deadlineBarBlock ? ('<div style="flex:1">' + titleHtml + deadlineBarBlock + '</div>') : titleHtml;
     return (
-      '<div class="card" draggable="true" data-drag-id="' + task.id + '" data-drag-parent="' + (task.parent || "") + '" data-drag-group="0">' +
+      '<div class="card" draggable="true" data-drag-id="' + escapeHtml(task.id) + '" data-drag-parent="' + (task.parent || "") + '" data-drag-group="0">' +
         '<div class="card-top">' + checkboxHtml + titleBlock + '</div>' +
         (kind === "waiting" ? cueBlock + linkBlock : linkBlock + cueBlock) + projectFlagBlock +
       '</div>'
@@ -2648,8 +2648,8 @@
     const badge = (count && count > 1) ? ' <span class="completed-series-count">×' + count + '</span>' : "";
     return (
       '<div class="completed-item">' +
-        '<button type="button" class="check checked" data-action="restore" data-kind="' + kind + '" data-id="' + task.id + '" title="' + escapeHtml(t("outcome.restoreToActive")) + '">&#10003;</button>' +
-        '<span class="completed-item-title" data-action="open-completed" data-kind="' + kind + '" data-id="' + task.id + '" title="' + escapeHtml(t("card.tapToView")) + '">' + escapeHtml(task.title) + badge + '</span>' +
+        '<button type="button" class="check checked" data-action="restore" data-kind="' + kind + '" data-id="' + escapeHtml(task.id) + '" title="' + escapeHtml(t("outcome.restoreToActive")) + '">&#10003;</button>' +
+        '<span class="completed-item-title" data-action="open-completed" data-kind="' + kind + '" data-id="' + escapeHtml(task.id) + '" title="' + escapeHtml(t("card.tapToView")) + '">' + escapeHtml(task.title) + badge + '</span>' +
       '</div>'
     );
   }
@@ -2669,7 +2669,7 @@
     const collapsed = isCollapsed(kind, group.id);
     const moveDest = MOVE_MAP[kind];
     const moveBtn = moveDest
-      ? '<button class="icon-btn" data-action="move" data-id="' + group.id + '" data-is-group="1" title="' + escapeHtml(t("lane.moveTo").replace("{lane}", LIST_TITLES[moveDest])) + '">&#8592;</button>'
+      ? '<button class="icon-btn" data-action="move" data-id="' + escapeHtml(group.id) + '" data-is-group="1" title="' + escapeHtml(t("lane.moveTo").replace("{lane}", LIST_TITLES[moveDest])) + '">&#8592;</button>'
       : "";
     // Deleting a list no longer requires emptying it first (user ruling): it
     // mirrors context deletion — the items survive, landing ungrouped at the
@@ -2683,8 +2683,8 @@
     // per-chunk title text (spec.md §8.1/§8.2 groups differ every chunk).
     const contextAttr = group.devContext ? ' data-context="' + escapeHtml(group.devContext) + '"' : '';
     return (
-      '<div class="group"' + contextAttr + ' draggable="true" data-drag-id="' + group.id + '" data-drag-parent="" data-drag-group="1">' +
-        '<div class="group-header" data-action="toggle-group" data-id="' + group.id + '">' +
+      '<div class="group"' + contextAttr + ' draggable="true" data-drag-id="' + escapeHtml(group.id) + '" data-drag-parent="" data-drag-group="1">' +
+        '<div class="group-header" data-action="toggle-group" data-id="' + escapeHtml(group.id) + '">' +
           '<span class="chevron">' + (collapsed ? "&#9656;" : "&#9662;") + '</span>' +
           '<span class="group-title" title="' + escapeHtml(t("group.tapToExpandReorder")) + '">' + escapeHtml(group.title) + '</span>' +
           '<span class="count">' + children.length + '</span>' +
@@ -2694,13 +2694,13 @@
           // already chosen, so a new item gets the same page \u2014 and the same
           // fields \u2014 as every other way of creating one. It also works while the
           // list is COLLAPSED, which the old row could not.
-          '<button class="group-add" data-action="add-to-list" data-kind="' + kind + '" data-id="' + group.id + '" title="' + escapeHtml(t("group.addToList")) + '">+</button>' +
+          '<button class="group-add" data-action="add-to-list" data-kind="' + kind + '" data-id="' + escapeHtml(group.id) + '" title="' + escapeHtml(t("group.addToList")) + '">+</button>' +
           '<span class="group-actions">' + moveBtn +
-            '<button class="icon-btn" data-action="delete-group" data-id="' + group.id + '" title="' + deleteTitle + '">&times;</button>' +
+            '<button class="icon-btn" data-action="delete-group" data-id="' + escapeHtml(group.id) + '" title="' + deleteTitle + '">&times;</button>' +
           '</span>' +
         '</div>' +
         (collapsed ? "" :
-          '<div class="group-body" data-dropzone-parent="' + group.id + '">' + childrenHtml + '</div>'
+          '<div class="group-body" data-dropzone-parent="' + escapeHtml(group.id) + '">' + childrenHtml + '</div>'
         ) +
       '</div>'
     );
@@ -2719,9 +2719,9 @@
       // (see groupHtml): applyLiveMove already pins anything flagged as a group
       // to the cards-root, which is exactly where a context group lives.
       // data-context-group stays as the discriminator commitLiveMove branches on.
-      '<div class="group" draggable="true" data-context-group="' + ctx.id + '"' +
-      ' data-drag-id="' + ctx.id + '" data-drag-parent="" data-drag-group="1">' +
-        '<div class="group-header" data-action="toggle-group" data-id="' + ctx.id + '">' +
+      '<div class="group" draggable="true" data-context-group="' + escapeHtml(ctx.id) + '"' +
+      ' data-drag-id="' + escapeHtml(ctx.id) + '" data-drag-parent="" data-drag-group="1">' +
+        '<div class="group-header" data-action="toggle-group" data-id="' + escapeHtml(ctx.id) + '">' +
           '<span class="chevron">' + (collapsed ? "&#9656;" : "&#9662;") + '</span>' +
           // Same tooltip the list groups carry now that this one reorders too —
           // press-and-hold is not discoverable, and the tooltip is where the
@@ -2729,13 +2729,13 @@
           // teaching, there are no field labels).
           '<span class="group-title" title="' + escapeHtml(t("group.tapToExpandReorder")) + '">' + escapeHtml(ctx.name) + '</span>' +
           '<span class="count">' + members.length + '</span>' +
-          '<button class="group-add" data-action="add-to-context" data-kind="' + kind + '" data-id="' + ctx.id + '" title="' + escapeHtml(t("group.addToContext")) + '">+</button>' +
+          '<button class="group-add" data-action="add-to-context" data-kind="' + kind + '" data-id="' + escapeHtml(ctx.id) + '" title="' + escapeHtml(t("group.addToContext")) + '">+</button>' +
           '<span class="group-actions">' +
-            '<button class="icon-btn" data-action="delete-context" data-id="' + ctx.id + '" title="' + escapeHtml(t("group.deleteContext")) + '">&times;</button>' +
+            '<button class="icon-btn" data-action="delete-context" data-id="' + escapeHtml(ctx.id) + '" title="' + escapeHtml(t("group.deleteContext")) + '">&times;</button>' +
           '</span>' +
         '</div>' +
         (collapsed ? "" :
-          '<div class="group-body" data-dropzone-parent="' + ctx.id + '">' + childrenHtml + '</div>'
+          '<div class="group-body" data-dropzone-parent="' + escapeHtml(ctx.id) + '">' + childrenHtml + '</div>'
         ) +
       '</div>'
     );
@@ -3005,8 +3005,8 @@
   }
   function headerDropHtml(id, icon, label, value){
     return (
-      '<div class="header-drop" data-drop="' + id + '">' +
-        '<button type="button" class="header-drop-btn" data-action="hdr-drop" data-drop="' + id + '" title="' + escapeHtml(label) + '">' +
+      '<div class="header-drop" data-drop="' + escapeHtml(id) + '">' +
+        '<button type="button" class="header-drop-btn" data-action="hdr-drop" data-drop="' + escapeHtml(id) + '" title="' + escapeHtml(label) + '">' +
           '<span class="hdr-drop-icon" aria-hidden="true">' + icon + '</span>' +
           '<span class="hdr-drop-value">' + escapeHtml(value) + '</span>' +
           '<span class="hdr-drop-caret" aria-hidden="true">&#9662;</span>' +
@@ -4612,8 +4612,8 @@
       if (rendered[l.task.id]) return;
       rendered[l.task.id] = true;
       const open = l.external
-        ? 'data-action="open-edit" data-kind="waiting" data-id="' + l.task.id + '"'
-        : 'data-action="open-linked-action" data-kind="' + l.kind + '" data-id="' + l.task.id + '"';
+        ? 'data-action="open-edit" data-kind="waiting" data-id="' + escapeHtml(l.task.id) + '"'
+        : 'data-action="open-linked-action" data-kind="' + l.kind + '" data-id="' + escapeHtml(l.task.id) + '"';
       const rowBtn = '<button type="button" class="linked-action-item' + (depth > 0 ? " indented" : "") + '" ' + open + (depth > 1 ? ' style="margin-left:' + (depth * 22) + 'px;"' : '') + '>' +
         kindDot(l.kind) + escapeHtml(l.task.title) +
       '</button>';
@@ -4630,7 +4630,7 @@
       const isStagedCreate = !!stagedCreate(s, l.task.id);
       html += (l.stagedLink || (!isStagedCreate && !l.external))
         ? '<div class="linked-action-row">' + rowBtn +
-            '<button type="button" class="chip-x" data-action="' + (l.stagedLink ? "unstage-link" : "unlink-linked") + '" data-id="' + l.task.id + '" title="' + escapeHtml(t("project.removeFromProject")) + '">&times;</button>' +
+            '<button type="button" class="chip-x" data-action="' + (l.stagedLink ? "unstage-link" : "unlink-linked") + '" data-id="' + escapeHtml(l.task.id) + '" title="' + escapeHtml(t("project.removeFromProject")) + '">&times;</button>' +
           '</div>'
         : rowBtn;
       (dependents[l.task.id] || []).forEach(function(dep){ itemHtml(dep, Math.min(depth + 1, 4)); });
@@ -4673,7 +4673,7 @@
               kindDot("notes") + escapeHtml(n.title || t("project.untitled")) +
               ' <span class="cal-agenda-kind">' + escapeHtml(t("project.savesWithProject")) + '</span></div>';
           }
-          return '<button type="button" class="linked-action-item" data-action="open-linked-note" data-id="' + n.id + '">' +
+          return '<button type="button" class="linked-action-item" data-action="open-linked-note" data-id="' + escapeHtml(n.id) + '">' +
             kindDot("notes") + escapeHtml(n.title || t("project.untitled")) +
           '</button>';
         }).join("") + '</div>'
@@ -4769,7 +4769,7 @@
   function contextOptionsHtml(selectedId){
     let html = '<option value="">' + escapeHtml(t("field.noContext")) + '</option>';
     sortedContexts().forEach(function(c){
-      html += '<option value="' + c.id + '"' + (c.id === selectedId ? " selected" : "") + '>' + escapeHtml(c.name) + '</option>';
+      html += '<option value="' + escapeHtml(c.id) + '"' + (c.id === selectedId ? " selected" : "") + '>' + escapeHtml(c.name) + '</option>';
     });
     return html;
   }
@@ -4913,13 +4913,13 @@
     if (targets.length){
       sections += '<div class="screen-hook-pick-label">' + escapeHtml(t("habit.hookPickHabits")) + '</div>' +
         '<div class="screen-hook-pick-list">' +
-        targets.map(function(hk){ return '<button type="button" class="screen-hook-pick-item" data-action="screen-pick-hook" data-id="' + hk.id + '">' + escapeHtml(hk.title) + '</button>'; }).join("") +
+        targets.map(function(hk){ return '<button type="button" class="screen-hook-pick-item" data-action="screen-pick-hook" data-id="' + escapeHtml(hk.id) + '">' + escapeHtml(hk.title) + '</button>'; }).join("") +
         '</div>';
     }
     if (ctxTargets.length){
       sections += '<div class="screen-hook-pick-label">' + escapeHtml(t("habit.hookPickContexts")) + '</div>' +
         '<div class="screen-hook-pick-list">' +
-        ctxTargets.map(function(c){ return '<button type="button" class="screen-hook-pick-item" data-action="screen-pick-hook" data-ctx="1" data-id="' + c.id + '">' + escapeHtml(c.name) + '</button>'; }).join("") +
+        ctxTargets.map(function(c){ return '<button type="button" class="screen-hook-pick-item" data-action="screen-pick-hook" data-ctx="1" data-id="' + escapeHtml(c.id) + '">' + escapeHtml(c.name) + '</button>'; }).join("") +
         '</div>';
     }
     // Empty state names the way out, per the empty-picker-teaches rule
@@ -5228,7 +5228,7 @@
       // "next" (data-kind), so resolution/promotion never learn events exist.
       const dot = t.isEvent ? kindDot("event") : kindDot(t.kind);
       const hint = t.isEvent && t.dateHint ? ' <span class="cal-agenda-kind">' + escapeHtml(t.dateHint) + '</span>' : "";
-      return '<button type="button" class="screen-hook-pick-item" data-action="screen-pick-condition" data-id="' + t.id + '" data-kind="' + t.kind + '">' +
+      return '<button type="button" class="screen-hook-pick-item" data-action="screen-pick-condition" data-id="' + escapeHtml(t.id) + '" data-kind="' + t.kind + '">' +
         dot + escapeHtml(t.title) + hint + '</button>';
     }
     function group(label, arr){ return arr.length ? '<div class="screen-hook-pick-label">' + label + '</div><div class="screen-hook-pick-list">' + arr.map(itemBtn).join("") + '</div>' : ""; }
@@ -5905,7 +5905,7 @@
     DEV_GROUPS.forEach(function(g){
       const on = devGroupOn(g);
       if (on && !g.noBar) any = true;
-      const el = qs('[data-dev-group="' + g.id + '"]');
+      const el = qs('[data-dev-group="' + escapeHtml(g.id) + '"]');
       if (el) el.hidden = !on;
     });
     const bar = qs("#dev-toolbar");
@@ -7770,7 +7770,7 @@
     if (!revealed) return '<div class="tray-card tray-card-redacted"><span class="tray-card-redaction" aria-hidden="true"></span></div>';
     return '<div class="tray-card">' +
       '<span class="tray-card-text">' + escapeHtml(item.text) + '</span>' +
-      '<button type="button" class="icon-btn" data-action="tray-delete" data-id="' + item.id + '" title="' + escapeHtml(t("tray.discard")) + '">&times;</button>' +
+      '<button type="button" class="icon-btn" data-action="tray-delete" data-id="' + escapeHtml(item.id) + '" title="' + escapeHtml(t("tray.discard")) + '">&times;</button>' +
     '</div>';
   }
   // The drawer's Review button (chunk 6b, §4.8b) — the entry point to the
@@ -8320,7 +8320,7 @@
   // forward). Draft isolation is intact: nothing is written until that page saves.
   function reviewFullPageBtn(kind, projectId){
     return '<button type="button" class="review-menu-btn review-form-full" ' +
-      'data-action="review-form-full" data-kind="' + kind + '" data-project="' + projectId + '" ' +
+      'data-action="review-form-full" data-kind="' + kind + '" data-project="' + escapeHtml(projectId) + '" ' +
       'title="' + escapeHtml(t("review.fullPageTooltip")) + '">' + escapeHtml(t("review.fullPage")) + '</button>';
   }
   function reviewInlineFormHtml(placeholder, type, saveAction, saveLabel, value, invalid, fullKind, projectId){
@@ -8350,7 +8350,7 @@
     const f = s.reviewForm || {};
     const bad = f.key === key ? (f.invalidField || null) : null;
     function box(id, ph, val, name){
-      return '<input type="text" id="' + id + '" class="review-form-input' +
+      return '<input type="text" id="' + escapeHtml(id) + '" class="review-form-input' +
         (bad === name ? " field-invalid" : "") + '" placeholder="' + escapeHtml(ph) +
         '" value="' + escapeHtml(val || "") + '" autocomplete="off">';
     }
@@ -8398,16 +8398,16 @@
       // stays uncolored, like Not now / Delete below it.
       menuHtml =
         '<div class="review-sort-chips">' +
-          reviewMenuBtn("review-sort", t("review.next"), ' data-target="next" data-key="' + l.key + '"') +
-          reviewMenuBtn("review-sort", t("review.waiting"), ' data-target="waiting" data-key="' + l.key + '"') +
-          reviewMenuBtn("review-sort", t("review.project"), ' data-target="current" data-key="' + l.key + '"') +
-          reviewMenuBtn("review-sort", t("review.future"), ' data-target="future" data-key="' + l.key + '"') +
-          reviewMenuBtn("review-sort", t("review.habit"), ' data-target="habit" data-key="' + l.key + '"') +
-          reviewMenuBtn("review-sort", t("review.note"), ' data-target="notes" data-key="' + l.key + '"') +
-          reviewMenuBtn("review-sort", t("review.calendar"), ' data-target="calendar" data-key="' + l.key + '"') + // chunk 7 (§4.8b): the sixth chip
-          reviewMenuBtn("review-quickdone", t("review.twoMin"), ' data-target="quickdone" data-key="' + l.key + '"') +
+          reviewMenuBtn("review-sort", t("review.next"), ' data-target="next" data-key="' + escapeHtml(l.key) + '"') +
+          reviewMenuBtn("review-sort", t("review.waiting"), ' data-target="waiting" data-key="' + escapeHtml(l.key) + '"') +
+          reviewMenuBtn("review-sort", t("review.project"), ' data-target="current" data-key="' + escapeHtml(l.key) + '"') +
+          reviewMenuBtn("review-sort", t("review.future"), ' data-target="future" data-key="' + escapeHtml(l.key) + '"') +
+          reviewMenuBtn("review-sort", t("review.habit"), ' data-target="habit" data-key="' + escapeHtml(l.key) + '"') +
+          reviewMenuBtn("review-sort", t("review.note"), ' data-target="notes" data-key="' + escapeHtml(l.key) + '"') +
+          reviewMenuBtn("review-sort", t("review.calendar"), ' data-target="calendar" data-key="' + escapeHtml(l.key) + '"') + // chunk 7 (§4.8b): the sixth chip
+          reviewMenuBtn("review-quickdone", t("review.twoMin"), ' data-target="quickdone" data-key="' + escapeHtml(l.key) + '"') +
         '</div>' +
-        '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewMenuBtn("review-delete-capture", t("review.delete"), ' data-key="' + l.key + '"', true) + '</div>';
+        '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewMenuBtn("review-delete-capture", t("review.delete"), ' data-key="' + escapeHtml(l.key) + '"', true) + '</div>';
       return '<div class="review-card review-card-capture">' + bodyHtml + menuHtml + '</div>';
     }
     // A rolled-past repeating occurrence (user ruling). Handled before the shared
@@ -8423,7 +8423,7 @@
       const when = dateStrToDate(l.occ).toLocaleDateString(undefined,
         { weekday: "long", day: "numeric", month: "long" });
       bodyHtml =
-        '<button type="button" class="review-card-open" data-action="review-open-event" data-id="' + l.id + '">' +
+        '<button type="button" class="review-card-open" data-action="review-open-event" data-id="' + escapeHtml(l.id) + '">' +
           '<span class="review-card-title">' + escapeHtml(effTitle(l.ev, l.occ)) + '</span>' +
           '<span class="review-card-note">⚠ ' + escapeHtml(t("review.wentByOn")) + ' ' + escapeHtml(when) + ' ' + escapeHtml(t("review.withoutTicking")) + '</span>' +
         '</button>';
@@ -8436,18 +8436,18 @@
       // id since a missed card has no lane row to hang a task id off.
       menuHtml =
         reviewBandHtml(
-          '<button type="button" class="review-menu-btn" data-action="review-missed-done" data-id="' + l.id + '">&#10003; ' + escapeHtml(t("review.completed")) + '</button>' +
-          '<button type="button" class="review-menu-btn" data-action="review-missed-clear" data-id="' + l.id + '">' + escapeHtml(t("review.skipped")) + '</button>'
+          '<button type="button" class="review-menu-btn" data-action="review-missed-done" data-id="' + escapeHtml(l.id) + '">&#10003; ' + escapeHtml(t("review.completed")) + '</button>' +
+          '<button type="button" class="review-menu-btn" data-action="review-missed-clear" data-id="' + escapeHtml(l.id) + '">' + escapeHtml(t("review.skipped")) + '</button>'
         ) +
-        '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewMenuBtn("review-delete-event-missed", "&#128465; " + escapeHtml(t("review.delete")), ' data-id="' + l.id + '"', true) + '</div>';
+        '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewMenuBtn("review-delete-event-missed", "&#128465; " + escapeHtml(t("review.delete")), ' data-id="' + escapeHtml(l.id) + '"', true) + '</div>';
       return '<div class="review-card">' + bodyHtml + '<div class="review-menu">' + menuHtml + '</div></div>';
     }
     // Derived kinds share a tap-through title (opens the real page) + a
     // context line, then a per-kind decision menu. A pseudo-action taps
     // through to its EVENT page (§4.14/§4.15), not an action page.
     const openAttr = (l.pseudo)
-      ? ' data-action="review-open-event" data-id="' + l.task.eventId + '"'
-      : ' data-action="review-open" data-lane="' + l.laneKind + '" data-id="' + l.id + '"';
+      ? ' data-action="review-open-event" data-id="' + escapeHtml(l.task.eventId) + '"'
+      : ' data-action="review-open" data-lane="' + l.laneKind + '" data-id="' + escapeHtml(l.id) + '"';
     bodyHtml = '<button type="button" class="review-card-open"' + openAttr + '>' +
       '<span class="review-card-title">' + escapeHtml(l.task.title || "") + '</span>';
     if (l.kind === "pastdue"){
@@ -8485,12 +8485,12 @@
       const pastdueEv = findEvent(l.task.eventId);
       menuHtml =
         reviewBandHtml(
-          '<button type="button" class="review-menu-btn" data-action="review-complete" data-lane="' + l.laneKind + '" data-id="' + l.id + '">&#10003; ' + escapeHtml(t("review.completed")) + '</button>' +
+          '<button type="button" class="review-menu-btn" data-action="review-complete" data-lane="' + l.laneKind + '" data-id="' + escapeHtml(l.id) + '">&#10003; ' + escapeHtml(t("review.completed")) + '</button>' +
           (pastdueEv && isRecurring(pastdueEv)
-            ? '<button type="button" class="review-menu-btn" data-action="review-skip-live" data-id="' + l.id + '">' + escapeHtml(t("review.skipped")) + '</button>'
+            ? '<button type="button" class="review-menu-btn" data-action="review-skip-live" data-id="' + escapeHtml(l.id) + '">' + escapeHtml(t("review.skipped")) + '</button>'
             : "")
         ) +
-        '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewMenuBtn("review-delete-event", "&#128465; " + escapeHtml(t("review.delete")), ' data-id="' + l.id + '"', true) + '</div>';
+        '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewMenuBtn("review-delete-event", "&#128465; " + escapeHtml(t("review.delete")), ' data-id="' + escapeHtml(l.id) + '"', true) + '</div>';
     } else if (l.kind === "pastdue"){
       if (form && form.type === "date"){
         menuHtml = reviewInlineFormHtml("", "date", "review-pushdate-save", t("review.save"), (l.task.deadline && l.task.deadline.date) || "", invalid);
@@ -8499,9 +8499,9 @@
         // target, same family as stalled's "give it a next step". Band 2
         // (take it off the list): Completed.
         menuHtml =
-          reviewBandHtml(reviewMenuBtn("review-form-start", t("review.pushTheDate"), ' data-key="' + l.key + '" data-type="date"')) +
-          reviewBandHtml(reviewMenuBtn("review-complete", t("review.completed"), ' data-lane="' + l.laneKind + '" data-id="' + l.id + '"')) +
-          '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewMenuBtn("review-delete", t("review.delete"), ' data-lane="' + l.laneKind + '" data-id="' + l.id + '"', true) + '</div>';
+          reviewBandHtml(reviewMenuBtn("review-form-start", t("review.pushTheDate"), ' data-key="' + escapeHtml(l.key) + '" data-type="date"')) +
+          reviewBandHtml(reviewMenuBtn("review-complete", t("review.completed"), ' data-lane="' + l.laneKind + '" data-id="' + escapeHtml(l.id) + '"')) +
+          '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewMenuBtn("review-delete", t("review.delete"), ' data-lane="' + l.laneKind + '" data-id="' + escapeHtml(l.id) + '"', true) + '</div>';
       }
     } else if (l.kind === "stalled"){
       if (form && form.type === "text"){
@@ -8519,7 +8519,7 @@
         // routing differs.
         menuHtml =
           '<div class="pick-body">' +
-            linkPickListHtml(linkTargetsFor(l.id, []), "review-link-pick", ' data-project="' + l.id + '"') +
+            linkPickListHtml(linkTargetsFor(l.id, []), "review-link-pick", ' data-project="' + escapeHtml(l.id) + '"') +
             '<div class="review-menu-row">' + reviewMenuBtn("review-form-cancel", t("picker.back"), "") + '</div>' +
           '</div>';
       } else if (form && form.type === "waiting"){
@@ -8546,23 +8546,23 @@
           // first child of band 1 — a band is a flex row, so sharing one put it
           // beside them ("it's on the same row"), not above.
           reviewBandHtml(
-            reviewMenuBtn("review-form-start", t("project.linkExisting"), ' data-key="' + l.key + '" data-type="link"')
+            reviewMenuBtn("review-form-start", t("project.linkExisting"), ' data-key="' + escapeHtml(l.key) + '" data-type="link"')
           ) +
           reviewBandHtml(
-            reviewMenuBtn("review-form-start", t("review.addNextAction"), ' data-key="' + l.key + '" data-type="text" data-target="next"') +
-            reviewMenuBtn("review-form-start", t("review.addWaitingAction"), ' data-key="' + l.key + '" data-type="waiting" data-target="waiting"') +
+            reviewMenuBtn("review-form-start", t("review.addNextAction"), ' data-key="' + escapeHtml(l.key) + '" data-type="text" data-target="next"') +
+            reviewMenuBtn("review-form-start", t("review.addWaitingAction"), ' data-key="' + escapeHtml(l.key) + '" data-type="waiting" data-target="waiting"') +
             // ⚑ The third one the user asked for originally, parked until a project
             // could see the calendar. It can now: this opens the calendar for this
             // project, capped by its deadline, and returns HERE rather than to the
             // project page -- the review pushed the stack, so closeScreen lands back
             // in the queue where you left off.
-            reviewMenuBtn("review-add-event", t("review.addAnEvent"), ' data-id="' + l.id + '" data-target="calendar"')
+            reviewMenuBtn("review-add-event", t("review.addAnEvent"), ' data-id="' + escapeHtml(l.id) + '" data-target="calendar"')
           ) +
           reviewBandHtml(
-            reviewMenuBtn("review-someday", t("review.moveToSomeday"), ' data-id="' + l.id + '" data-target="future"') +
-            reviewMenuBtn("review-complete", t("review.completed"), ' data-lane="current" data-id="' + l.id + '"')
+            reviewMenuBtn("review-someday", t("review.moveToSomeday"), ' data-id="' + escapeHtml(l.id) + '" data-target="future"') +
+            reviewMenuBtn("review-complete", t("review.completed"), ' data-lane="current" data-id="' + escapeHtml(l.id) + '"')
           ) +
-          '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewMenuBtn("review-delete", t("review.delete"), ' data-lane="current" data-id="' + l.id + '"', true) + '</div>';
+          '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewMenuBtn("review-delete", t("review.delete"), ' data-lane="current" data-id="' + escapeHtml(l.id) + '"', true) + '</div>';
       }
     } else if (l.kind === "orphaned"){
       // Simplified (author, fifth QA round): "Re-point the condition" and
@@ -8584,7 +8584,7 @@
       menuHtml =
         '<div class="review-band review-quickadd-row">' +
           '<input type="text" id="review-form-input" data-field="reviewForm" class="review-form-input' + (curForm.invalid ? " field-invalid" : "") + '" placeholder="' + escapeHtml(t("review.waitingForDots")) + '" value="' + escapeHtml(curForm.value || "") + '" autocomplete="off">' +
-          '<button type="button" class="review-hook-btn" data-action="review-open" data-lane="waiting" data-id="' + l.id + '" title="' + escapeHtml(t("waiting.hookToTarget")) + '">&#129693;</button>' +
+          '<button type="button" class="review-hook-btn" data-action="review-open" data-lane="waiting" data-id="' + escapeHtml(l.id) + '" title="' + escapeHtml(t("waiting.hookToTarget")) + '">&#129693;</button>' +
           '<button type="button" class="review-menu-btn review-form-primary" data-action="review-freetext-save">' + escapeHtml(t("review.add")) + '</button>' +
         '</div>' +
         // ⚑ Deliberately NOT a colored "+Next" chip (author, sixth QA round:
@@ -8600,9 +8600,9 @@
         // the lane card's bare .promote-arrow icon — both tried and both
         // wrong (author, seventh QA round). Click still fires immediately
         // via review-promote, same as every other review decision.
-        reviewBandHtml('<button type="button" class="btn screen-make-kind-btn" data-action="review-promote" data-id="' + l.id + '" style="border-color:var(--red);color:var(--red);">&#8592; ' + escapeHtml(t("outcome.makeNext")) + '</button>') +
-        reviewBandHtml(reviewMenuBtn("review-complete", t("review.completed"), ' data-lane="waiting" data-id="' + l.id + '"')) +
-        '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewMenuBtn("review-delete", t("review.delete"), ' data-lane="waiting" data-id="' + l.id + '"', true) + '</div>';
+        reviewBandHtml('<button type="button" class="btn screen-make-kind-btn" data-action="review-promote" data-id="' + escapeHtml(l.id) + '" style="border-color:var(--red);color:var(--red);">&#8592; ' + escapeHtml(t("outcome.makeNext")) + '</button>') +
+        reviewBandHtml(reviewMenuBtn("review-complete", t("review.completed"), ' data-lane="waiting" data-id="' + escapeHtml(l.id) + '"')) +
+        '<div class="review-menu-row">' + reviewNotNowBtn(l.key) + reviewMenuBtn("review-delete", t("review.delete"), ' data-lane="waiting" data-id="' + escapeHtml(l.id) + '"', true) + '</div>';
     }
     return '<div class="review-card review-card-' + l.kind + '">' + bodyHtml + '<div class="review-menu">' + menuHtml + '</div></div>';
   }
@@ -9083,7 +9083,7 @@
     DEV_GROUPS.forEach(function(g){
       const on = devGroupOn(g);
       out +=
-        '<button type="button" class="settings-item" data-action="settings-toggle-dev" data-dev="' + g.id + '">' +
+        '<button type="button" class="settings-item" data-action="settings-toggle-dev" data-dev="' + escapeHtml(g.id) + '">' +
           '<span class="settings-switch' + (on ? " on" : "") + '" aria-hidden="true"></span>' +
           '<span class="si-label">' + escapeHtml(g.label) + '<span class="si-note">' + escapeHtml(g.note) + '</span></span>' +
         '</button>';
@@ -9101,7 +9101,7 @@
       '<div class="settings-sep"></div>';
     Object.keys(SURFACES).forEach(function(id){
       out +=
-        '<button type="button" class="settings-item" data-action="settings-pick-bg" data-bg="' + id + '">' +
+        '<button type="button" class="settings-item" data-action="settings-pick-bg" data-bg="' + escapeHtml(id) + '">' +
           '<span class="settings-swatch" style="' + surfaceSwatchStyle(id) + '"></span>' +
           '<span class="si-label">' + escapeHtml(surfaceLabel(id)) + '</span>' +
           (id === cur ? '<span class="settings-check">&#10003;</span>' : "") +
@@ -9120,7 +9120,7 @@
       '<div class="settings-sep"></div>';
     LOCALES.forEach(function(l){
       out +=
-        '<button type="button" class="settings-item" data-action="settings-pick-lang" data-lang="' + l.id + '">' +
+        '<button type="button" class="settings-item" data-action="settings-pick-lang" data-lang="' + escapeHtml(l.id) + '">' +
           '<span class="si-label">' + escapeHtml(l.native) + '</span>' +
           (l.id === cur ? '<span class="settings-check">&#10003;</span>' : "") +
         '</button>';
@@ -9277,13 +9277,18 @@
   function importError(msg){ openConfirmDialog(msg, [{ label: t("confirm.ok"), style: "primary", action: function(){} }]); }
   // ⚑ A BACKUP FILE IS UNTRUSTED INPUT (security audit, 2026-08-03).
   //
-  // Record ids are spliced into HTML attributes UNESCAPED in ~60 places —
-  // `data-id="' + task.id + '"` and friends — because an id has always been
-  // something this app minted itself. genId() only ever produces
-  // "local-<base36>-<base36>", so that assumption held right up until import
-  // let a file supply one. An id of `x"><img src=q onerror=…>` breaks out of
-  // the attribute and runs, with the whole origin's localStorage in reach; in
-  // the installed wrapper that is script execution beside the Capacitor bridge.
+  // Record ids used to be spliced into HTML attributes unescaped in 100 places,
+  // because an id had always been something this app minted itself. genId()
+  // only ever produces "local-<base36>-<base36>", so that assumption held right
+  // up until import let a FILE supply one. An id of `x"><img src=q onerror=…>`
+  // broke out of the attribute and ran, with the whole origin's localStorage in
+  // reach; in the installed wrapper, beside the Capacitor bridge.
+  //
+  // Those 100 sinks are escaped now (checks/attribute_escaping.py keeps them
+  // that way), so this validator is the second of two independent defences
+  // rather than the only one. It stays because it is the honest place to say
+  // no: an id this app could not have written means the file was not written
+  // by this app, whatever the render layer would survive.
   //
   // REFUSE THE FILE, don't repair it. Rewriting the offending ids would orphan
   // every linkedProjectId / conditionId / parent / tagId pointing at them, and
@@ -9415,10 +9420,10 @@
     const st = noteLinkState(link);
     const f = st !== "deleted" ? findProjectAnywhere(link.id) : null;
     const name = f ? f.task.title : (link.name || "a deleted project"); // live name refreshes; tombstone uses the frozen one
-    const filterAttr = (!removable && st !== "deleted") ? ' data-action="filter-notes" data-id="' + link.id + '"' : '';
+    const filterAttr = (!removable && st !== "deleted") ? ' data-action="filter-notes" data-id="' + escapeHtml(link.id) + '"' : '';
     return '<span class="note-chip note-chip-' + st + '"' + filterAttr + '>' +
       escapeHtml(name) +
-      (removable ? '<button type="button" class="chip-x" data-action="note-unlink" data-id="' + link.id + '" title="' + escapeHtml(t("tags.remove")) + '">&times;</button>' : "") +
+      (removable ? '<button type="button" class="chip-x" data-action="note-unlink" data-id="' + escapeHtml(link.id) + '" title="' + escapeHtml(t("tags.remove")) + '">&times;</button>' : "") +
     '</span>';
   }
   // Tag chips for a note (§4.9b). One flat visual — tags never carry the
@@ -9429,9 +9434,9 @@
     return ((noteLike && noteLike.tagIds) || []).map(function(id){
       const t = findTag(id);
       if (!t) return null;
-      const filterAttr = (!removable) ? ' data-action="filter-notes" data-id="' + id + '"' : '';
+      const filterAttr = (!removable) ? ' data-action="filter-notes" data-id="' + escapeHtml(id) + '"' : '';
       return '<span class="note-chip note-chip-tag"' + filterAttr + '>#' + escapeHtml(t.name) +
-        (removable ? '<button type="button" class="chip-x" data-action="note-untag" data-id="' + id + '" title="' + escapeHtml(t("tags.remove")) + '">&times;</button>' : "") +
+        (removable ? '<button type="button" class="chip-x" data-action="note-untag" data-id="' + escapeHtml(id) + '" title="' + escapeHtml(t("tags.remove")) + '">&times;</button>' : "") +
       '</span>';
     }).filter(Boolean);
   }
@@ -9520,8 +9525,8 @@
     }
     return (
       '<div class="card note-card">' +
-        '<div class="card-top"><div class="card-title" data-action="open-note" data-id="' + note.id + '">' + escapeHtml(note.title || "Untitled") + '</div></div>' +
-        (preview ? '<div class="note-preview" data-action="open-note" data-id="' + note.id + '">' + escapeHtml(preview) + '</div>' : "") +
+        '<div class="card-top"><div class="card-title" data-action="open-note" data-id="' + escapeHtml(note.id) + '">' + escapeHtml(note.title || "Untitled") + '</div></div>' +
+        (preview ? '<div class="note-preview" data-action="open-note" data-id="' + escapeHtml(note.id) + '">' + escapeHtml(preview) + '</div>' : "") +
         chips +
       '</div>'
     );
@@ -9572,7 +9577,7 @@
     let menu = "";
     if (state.notesFilterMenuOpen){
       const pickItem = function(o){
-        return '<button type="button" class="notes-filter-item' + (o.id === state.notesFilter ? " current" : "") + '" data-action="notes-filter-pick" data-id="' + o.id + '">' + escapeHtml(o.kind === "tag" ? "#" + o.name : o.name) + '</button>';
+        return '<button type="button" class="notes-filter-item' + (o.id === state.notesFilter ? " current" : "") + '" data-action="notes-filter-pick" data-id="' + escapeHtml(o.id) + '">' + escapeHtml(o.kind === "tag" ? "#" + o.name : o.name) + '</button>';
       };
       let items = ['<button type="button" class="notes-filter-item' + (state.notesFilter ? "" : " current") + '" data-action="notes-filter-pick" data-id="">' + escapeHtml(t("note.allNotes")) + '</button>'];
       if (opts.projects.length) items = items.concat('<div class="notes-filter-section">' + escapeHtml(t("note.filterProjects")) + '</div>', opts.projects.map(pickItem));
@@ -9757,7 +9762,7 @@
     // this is the one place that flattened them.
     function pickList(items, empty){
       return items.length
-        ? items.map(function(p){ return '<button type="button" class="screen-hook-pick-item" data-action="note-pick-project" data-id="' + p.id + '">' + escapeHtml(p.title) + '</button>'; }).join("")
+        ? items.map(function(p){ return '<button type="button" class="screen-hook-pick-item" data-action="note-pick-project" data-id="' + escapeHtml(p.id) + '">' + escapeHtml(p.title) + '</button>'; }).join("")
         : '<div class="empty-note">' + empty + '</div>';
     }
     // ⚑ Dev scaffolding is excluded. The chunk map injects ~26 rows into Current
@@ -9774,7 +9779,7 @@
     const tags = (state.tags || []).filter(function(t){ return !tagged.has(t.id); })
       .slice().sort(function(a, b){ return a.name.localeCompare(b.name); });
     const tagItems = tags.length
-      ? tags.map(function(t){ return '<button type="button" class="screen-hook-pick-item" data-action="note-pick-tag" data-id="' + t.id + '">#' + escapeHtml(t.name) + '</button>'; }).join("")
+      ? tags.map(function(t){ return '<button type="button" class="screen-hook-pick-item" data-action="note-pick-tag" data-id="' + escapeHtml(t.id) + '">#' + escapeHtml(t.name) + '</button>'; }).join("")
       : '<div class="empty-note">' + escapeHtml(t("note.noTagsYet")) + '</div>';
 
     return '<div class="screen-body pick-body">' +

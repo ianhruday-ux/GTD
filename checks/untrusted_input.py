@@ -134,10 +134,13 @@ with serve(DIST) as url, sync_playwright() as p:
         check(state["scripts"] == 0, f"and no <script> ({state})")
 
     # ============================================================
-    # Group 2 -- a hostile id already in storage still renders inertly
+    # Group 2 -- a hostile id already in storage injects NOTHING
     # ============================================================
-    # Storage is not itself a trust boundary (the import path below is), but the
-    # id sinks are unescaped, so this records exactly what such an id does.
+    # ⚑ REVERSED (later the same day). This group used to assert the opposite --
+    # that an id reaching storage by some route other than import still injected,
+    # because the ~100 `data-id="' + id + '"` sinks were unescaped and escaping
+    # them was deferred. They are escaped now, so the second defence exists and
+    # this asserts it. checks/attribute_escaping.py keeps them that way.
     with fresh() as pg:
         pg.evaluate("""(evil) => {
             localStorage.setItem('gtd_tasks_next', JSON.stringify([
@@ -147,10 +150,19 @@ with serve(DIST) as url, sync_playwright() as p:
         }""", EVIL_ID)
         pg.reload(); pg.wait_for_timeout(1200)
         injected = pg.evaluate("() => document.querySelectorAll('img').length")
-        check(pwned(pg) > 0 and injected > 0,
-              f"DOCUMENTED, NOT FIXED: an id that reaches storage by some other route still injects "
-              f"— the ~60 unescaped `data-id=\"' + id + '\"` sinks are unchanged, which is why the "
-              f"IMPORT boundary below has to hold (__pwned={pwned(pg)}, imgs={injected})")
+        check(pwned(pg) == 0 and injected == 0,
+              f"DEFENCE IN DEPTH: a hostile id sitting in storage injects nothing — the attribute "
+              f"sinks escape it now, so the import boundary is no longer the only thing standing "
+              f"between a file and script execution (__pwned={pwned(pg)}, imgs={injected})")
+        rendered = pg.evaluate("""() => {
+            const c = document.querySelector('.card[data-drag-id]');
+            return c ? c.getAttribute('data-drag-id') : null;
+        }""")
+        check(rendered is not None and rendered.startswith('x">'),
+              f"and the id is still carried FAITHFULLY as an attribute value — escaped, not "
+              f"mangled or dropped, so the card is still addressable ({rendered!r})")
+        check(pg.evaluate("() => document.body.innerText.includes('ordinary looking task')"),
+              "the task itself still renders normally")
 
     # ============================================================
     # Group 3 -- import REFUSES a file carrying such an id

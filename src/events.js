@@ -577,14 +577,14 @@ function projectLinkedEventRowsHtml(projectId, stagedEvents, alsoLinkIds, unlink
       ? '<span class="linked-action-item linked-action-staged" title="' + escapeHtml(t("project.savesWithProject")) + '">' +
           '<span class="kind-dot kind-event" aria-hidden="true"></span>' + escapeHtml(effTitle(ev, ev.date)) +
           ' <span class="cal-agenda-kind">' + escapeHtml(when) + '</span></span>'
-      : '<button type="button" class="linked-action-item" data-action="open-event" data-id="' + ev.id + '">' +
+      : '<button type="button" class="linked-action-item" data-action="open-event" data-id="' + escapeHtml(ev.id) + '">' +
           '<span class="kind-dot kind-event" aria-hidden="true"></span>' + escapeHtml(effTitle(ev, ev.date)) +
           ' <span class="cal-agenda-kind">' + escapeHtml(when) + '</span></button>';
     // §4.15d: a Waiting action hooked to this linked event nests beneath it,
     // the same as one hooked to a linked action (chunk 8 event-conditioning).
     state.tasks.waiting.forEach(function(t){
       if (t.isGroup || t.conditionId !== ev.taskId) return;
-      row += '<button type="button" class="linked-action-item indented" data-action="open-edit" data-kind="waiting" data-id="' + t.id + '">' +
+      row += '<button type="button" class="linked-action-item indented" data-action="open-edit" data-kind="waiting" data-id="' + escapeHtml(t.id) + '">' +
         '<span class="kind-dot kind-waiting" aria-hidden="true"></span>' + escapeHtml(t.title) + '</button>';
     });
     return row;
@@ -739,7 +739,7 @@ function calDayAgendaHtml(dateStr){
       const moved = effDate(ev, canon) !== canon;
       rows.push({
         sort: (evTime ? "1" + evTime : "0"), timed: !!evTime,
-        html: '<button type="button" class="cal-agenda-row' + (done ? " cal-agenda-done" : "") + '" data-action="cal-open-event" data-id="' + ev.id + '" data-date="' + canon + '">' +
+        html: '<button type="button" class="cal-agenda-row' + (done ? " cal-agenda-done" : "") + '" data-action="cal-open-event" data-id="' + escapeHtml(ev.id) + '" data-date="' + canon + '">' +
           '<span class="cal-agenda-dot ' + (evTime ? "cal-mark-appt" : "cal-mark-event") + '"></span>' +
           '<span class="cal-agenda-when">' + (evTime ? escapeHtml(evTime) : escapeHtml(t("cal.allDay"))) + '</span>' +
           '<span class="cal-agenda-title">' + escapeHtml(title) +
@@ -753,7 +753,7 @@ function calDayAgendaHtml(dateStr){
     if (!(task.deadline && task.deadline.date === dateStr) || task.isGroup || task.eventId) return;
     rows.push({
       sort: (task.deadline.time ? "1" + task.deadline.time : "0"), timed: !!task.deadline.time,
-      html: '<button type="button" class="cal-agenda-row" data-action="cal-open-task" data-lane="' + laneKind + '" data-id="' + task.id + '">' +
+      html: '<button type="button" class="cal-agenda-row" data-action="cal-open-task" data-lane="' + laneKind + '" data-id="' + escapeHtml(task.id) + '">' +
         '<span class="cal-agenda-dot cal-mark-dl-' + (laneKind === "current" ? "current" : "next") + '"></span>' +
         '<span class="cal-agenda-when">' + (task.deadline.time ? escapeHtml(task.deadline.time) : escapeHtml(t("cal.due"))) + '</span>' +
         '<span class="cal-agenda-title">' + escapeHtml(task.title) + ' <span class="cal-agenda-kind">' + escapeHtml(laneKind === "current" ? t("cal.projectDeadline") : t("cal.actionDeadline")) + '</span></span>' +
@@ -808,7 +808,7 @@ function calPastDueRows(){
         const when = dateStrToDate(task.occDate).toLocaleDateString(undefined, { day: "numeric", month: "short" });
         rows.push({
           date: task.occDate, sort: (task.occTime ? "1" + task.occTime : "0"),
-          html: '<button type="button" class="cal-agenda-row cal-agenda-overdue" data-action="cal-open-event" data-id="' + task.eventId + '" data-date="' + task.occDate + '">' +
+          html: '<button type="button" class="cal-agenda-row cal-agenda-overdue" data-action="cal-open-event" data-id="' + escapeHtml(task.eventId) + '" data-date="' + task.occDate + '">' +
             '<span class="cal-agenda-dot ' + (task.occTime ? "cal-mark-appt" : "cal-mark-event") + '"></span>' +
             '<span class="cal-agenda-when">' + escapeHtml(when + (task.occTime ? " " + task.occTime : "")) + '</span>' +
             '<span class="cal-agenda-title">' + escapeHtml(task.title) + '</span>' +
@@ -821,7 +821,7 @@ function calPastDueRows(){
       const when = dateStrToDate(task.deadline.date).toLocaleDateString(undefined, { day: "numeric", month: "short" });
       rows.push({
         date: task.deadline.date, sort: (task.deadline.time ? "1" + task.deadline.time : "0"),
-        html: '<button type="button" class="cal-agenda-row cal-agenda-overdue" data-action="cal-open-task" data-lane="' + k + '" data-id="' + task.id + '">' +
+        html: '<button type="button" class="cal-agenda-row cal-agenda-overdue" data-action="cal-open-task" data-lane="' + k + '" data-id="' + escapeHtml(task.id) + '">' +
           '<span class="cal-agenda-dot cal-mark-dl-' + (k === "current" ? "current" : "next") + '"></span>' +
           '<span class="cal-agenda-when">' + escapeHtml(when + (task.deadline.time ? " " + task.deadline.time : "")) + '</span>' +
           '<span class="cal-agenda-title">' + escapeHtml(task.title) + ' <span class="cal-agenda-kind">' + escapeHtml(k === "current" ? t("cal.projectDeadline") : t("cal.actionDeadline")) + '</span></span>' +
@@ -864,7 +864,7 @@ function calListRows(){
       (ev.tickler ? ' <span class="cal-tickler-tag">' + escapeHtml(t("cal.hidden")) + '</span>' : "");
     rows.push({
       date: date, sort: (evTime ? "1" + evTime : "0"),
-      html: '<button type="button" class="cal-agenda-row" data-action="cal-open-event" data-id="' + ev.id + '" data-date="' + canon + '">' +
+      html: '<button type="button" class="cal-agenda-row" data-action="cal-open-event" data-id="' + escapeHtml(ev.id) + '" data-date="' + canon + '">' +
         '<span class="cal-agenda-dot ' + (evTime ? "cal-mark-appt" : "cal-mark-event") + '"></span>' +
         '<span class="cal-agenda-when">' + (evTime ? escapeHtml(evTime) : escapeHtml(t("cal.allDay"))) + '</span>' +
         '<span class="cal-agenda-title">' + escapeHtml(title) + tags + '</span>' +
@@ -879,7 +879,7 @@ function calListRows(){
     if (task.deadline.date < today) return;
     rows.push({
       date: task.deadline.date, sort: (task.deadline.time ? "1" + task.deadline.time : "0"),
-      html: '<button type="button" class="cal-agenda-row" data-action="cal-open-task" data-lane="' + laneKind + '" data-id="' + task.id + '">' +
+      html: '<button type="button" class="cal-agenda-row" data-action="cal-open-task" data-lane="' + laneKind + '" data-id="' + escapeHtml(task.id) + '">' +
         '<span class="cal-agenda-dot cal-mark-dl-' + (laneKind === "current" ? "current" : "next") + '"></span>' +
         '<span class="cal-agenda-when">' + (task.deadline.time ? escapeHtml(task.deadline.time) : escapeHtml(t("cal.due"))) + '</span>' +
         '<span class="cal-agenda-title">' + escapeHtml(task.title) + ' <span class="cal-agenda-kind">' + escapeHtml(laneKind === "current" ? t("cal.projectDeadline") : t("cal.actionDeadline")) + '</span></span>' +
