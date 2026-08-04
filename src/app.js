@@ -9275,6 +9275,47 @@
     setTimeout(function(){ URL.revokeObjectURL(url); }, 1500);
   }
   function importError(msg){ openConfirmDialog(msg, [{ label: t("confirm.ok"), style: "primary", action: function(){} }]); }
+  // ⚑ A BACKUP FILE IS UNTRUSTED INPUT (security audit, 2026-08-03).
+  //
+  // Record ids are spliced into HTML attributes UNESCAPED in ~60 places —
+  // `data-id="' + task.id + '"` and friends — because an id has always been
+  // something this app minted itself. genId() only ever produces
+  // "local-<base36>-<base36>", so that assumption held right up until import
+  // let a file supply one. An id of `x"><img src=q onerror=…>` breaks out of
+  // the attribute and runs, with the whole origin's localStorage in reach; in
+  // the installed wrapper that is script execution beside the Capacitor bridge.
+  //
+  // REFUSE THE FILE, don't repair it. Rewriting the offending ids would orphan
+  // every linkedProjectId / conditionId / parent / tagId pointing at them, and
+  // dropping the records silently is worse than saying no — a restore that
+  // quietly loses items is the failure this whole path exists to prevent.
+  //
+  // Checked on the id-shaped keys only. Titles and note bodies legitimately
+  // contain quotes and angle brackets; they are escaped (titles) or sanitised
+  // (bodies) at render, and rejecting a backup for containing the word <b> in
+  // a title would make the validator useless.
+  const SAFE_ID_RE = /^[A-Za-z0-9_.:-]+$/;
+  function idShapedKey(k){ return k === "id" || k === "parent" || /Id$/.test(k); }
+  function idsAreSafe(v, depth){
+    if (v == null || typeof v !== "object" || depth > 8) return true;
+    if (Array.isArray(v)) return v.every(function(x){ return idsAreSafe(x, depth + 1); });
+    return Object.keys(v).every(function(k){
+      const val = v[k];
+      if (typeof val === "string" && idShapedKey(k)) return SAFE_ID_RE.test(val);
+      if (Array.isArray(val) && /Ids$/.test(k)){
+        return val.every(function(x){ return typeof x !== "string" || SAFE_ID_RE.test(x); });
+      }
+      return idsAreSafe(val, depth + 1);
+    });
+  }
+  function backupIdsAreSafe(data){
+    return Object.keys(data).every(function(k){
+      if (k.indexOf("gtd_") !== 0 || typeof data[k] !== "string") return true;
+      let rows;
+      try { rows = JSON.parse(data[k]); } catch (e){ return true; } // a plain string setting — holds no ids
+      return idsAreSafe(rows, 0);
+    });
+  }
   function importAllData(){
     // A hidden file input — native <input type=file> is the one native dialog
     // that works in sandboxed contexts (unlike alert/confirm/prompt).
@@ -9290,6 +9331,7 @@
         try { payload = JSON.parse(reader.result); } catch (e){ importError(t("confirm.importInvalidJson")); return; }
         const data = payload && payload.data;
         if (!data || typeof data !== "object"){ importError(t("confirm.importNotBackup")); return; }
+        if (!backupIdsAreSafe(data)){ importError(t("confirm.importUnsafeIds")); return; }
         closeDialog();
         // The sync sentence only appears on a device that actually syncs --
         // on a plain browser tab it would describe consequences that cannot
@@ -9402,9 +9444,22 @@
   // backup (chunk 8) — is stripped. This is the ONE untrusted-input surface in
   // a local app, so sanitise on every save and defensively on render.
   const NOTE_ALLOWED_TAGS = { B:1, STRONG:1, I:1, EM:1, U:1, H2:1, UL:1, OL:1, LI:1, BR:1, P:1, DIV:1 };
+  // ⚑ PARSED INERT, and that is the security-relevant half (audit, 2026-08-03).
+  // Both readers below used to do `document.createElement("div").innerHTML =
+  // html`, which parses into the LIVE document. A detached node is not an inert
+  // one: an <img src=q onerror="…"> in an imported note still gets created,
+  // still fails to load, and still runs its handler — so the payload executed
+  // during the very pass whose job was to remove it. The OUTPUT was always
+  // clean, which is why it looked fine; the parse was the vulnerability.
+  //
+  // DOMParser builds a genuinely inert document — no script execution, no
+  // resource fetches, no event handlers — so nothing runs before the allowlist
+  // gets its say. Proven both ways by checks/untrusted_input.py.
+  function parseNoteHtmlInert(html){
+    return new DOMParser().parseFromString(String(html == null ? "" : html), "text/html").body;
+  }
   function sanitizeNoteHtml(html){
-    const root = document.createElement("div");
-    root.innerHTML = html || "";
+    const root = parseNoteHtmlInert(html);
     (function clean(node){
       let child = node.firstChild;
       while (child){
@@ -9444,9 +9499,10 @@
   }
   // One-line plain-text reduction for the card preview.
   function noteBodyToText(html){
-    const d = document.createElement("div");
-    d.innerHTML = html || "";
-    return (d.textContent || "").replace(/\s+/g, " ").trim();
+    // Inert for the same reason (see parseNoteHtmlInert). This one is the
+    // hotter path of the two: the lane renders a preview of every note's body
+    // on load, so a hostile body used to fire before the note was ever opened.
+    return (parseNoteHtmlInert(html).textContent || "").replace(/\s+/g, " ").trim();
   }
   function noteCardHtml(note){
     const preview = noteBodyToText(note.body || "").slice(0, 120);

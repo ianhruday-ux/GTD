@@ -652,6 +652,13 @@ const STRINGS = {
   "confirm.disconnectAndRestore": { en: "Disconnect & erase here only", "zh-Hans": "断开连接，仅清除本设备" },
   "confirm.importInvalidJson": { en: "That file isn’t valid backup JSON.", "zh-Hans": "该文件不是有效的备份 JSON。" },
   "confirm.importNotBackup": { en: "That file doesn’t look like an OELA backup.", "zh-Hans": "该文件看起来不是 OELA 的备份文件。" },
+  // Deliberately says the file was left alone rather than explaining attribute
+  // injection: what the reader needs is "nothing happened, this file is not
+  // safe to restore", and a backup this app wrote can never trip it.
+  "confirm.importUnsafeIds": {
+    en: "Some items in that file have identifiers OELA didn’t write, so nothing was restored.",
+    "zh-Hans": "该文件中有些条目的标识符不是 OELA 生成的，因此没有恢复任何内容。"
+  },
   "confirm.importReplaceWarning": { en: "This will replace everything currently in the app.", "zh-Hans": "这将替换应用中当前的所有内容。" },
   // W7: shown only when this device syncs. A restore propagates (author's
   // ruling), so it can bring back something deleted on the other device --
