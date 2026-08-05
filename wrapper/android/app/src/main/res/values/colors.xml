@@ -15,9 +15,28 @@
 
          So this is the near-black of Black lacquer, chosen because the thing
          ADJACENT to the strip during the flash is the keyboard, which is itself
-         near-black. It reads as the keyboard's own shadow on every surface,
-         which the previous value (a light grey inherited from the platform
-         default) did not on any of them. -->
+         near-black — a far better compromise than the previous value (a light
+         grey inherited from the platform default), which was wrong on every
+         surface.
+
+         ⚑ MEASURED 2026-08-05, and the original justification for this value
+         did NOT survive the measurement. It used to claim the gap "reads as the
+         keyboard's own shadow on every surface." Filmed on ROSEWOOD at 10x
+         (`animator_duration_scale 10`), on a project drafting page: the region
+         is flat #0A0908 across rows 1431-2195 of a 2340px screen — about a
+         THIRD of the display, not a strip — and against rosewood's #6d3210 it
+         reads as a dark band, not a shadow. Author's ruling: not a shadow, but
+         good enough; the value stays.
+
+         Two things follow for whoever reads this next. (1) Do not verify this
+         on Black lacquer. Lacquer's desk IS #0A0908, so the native layer and
+         the CSS filler are the same colour there and the check cannot fail —
+         the same trap `checks/keyboard_gap.py` documents at its own line 58.
+         Rosewood is the surface that discriminates. (2) The only thing that
+         would remove this region entirely is stopping the WebView from being
+         resized at all (Capacitor Keyboard `resize: 'none'` / Android
+         `adjustNothing`), which hands every keyboard-avoidance behaviour to the
+         app. Considered, not done. -->
     <color name="oela_window_gap">#0A0908</color>
 
 </resources>
