@@ -6,12 +6,34 @@
 // wood has figure — knots, medullary rays, the mirrored bookmatch in a veneer —
 // that a ring function does not produce and should not pretend to.
 //
-// PROVENANCE. Poly Haven 4K PBR sets, supplied by the user. Only the DIFFUSE
-// map is used; the displacement, normal and roughness maps in those packs are
-// for 3D rendering and have no meaning on a flat CSS background. The source
-// packs are ~187 MB and are deliberately NOT in the repo (.gitignore:
-// *.blend.zip) — git history cannot be trimmed afterwards, and the app never
-// loads them. What ships is only what you see here.
+// PROVENANCE. Poly Haven 4K PBR sets (https://polyhaven.com), supplied by the
+// user, released under CC0. Only the DIFFUSE map is used; the displacement,
+// normal and roughness maps in those packs are for 3D rendering and have no
+// meaning on a flat CSS background. The source packs are ~187 MB and are
+// deliberately NOT in the repo (.gitignore: *.blend.zip) — git history cannot
+// be trimmed afterwards, and the app never loads them. What ships is only what
+// you see here.
+//
+// CREDITS, by surface. CC0 requires no attribution whatsoever; these are here
+// because the work deserves naming, not because it is owed. Only the roles that
+// produced the DIFFUSE are listed, since that is the only map that ships —
+// "baking" builds the normal/displacement maps we throw away, so it is not a
+// contribution to this product.
+//
+//   Dark wood — Poly Haven "Dark Wood"
+//     Dimitrios Savva — photography
+//     Rico Cilliers  — tiling  (⚑ credited deliberately: the seamlessness this
+//       file relies on for CSS repeat IS his work, and it is in every shipped
+//       pixel. Drop him only if you want the strictest photographer-only read.)
+//
+//   Rosewood — Poly Haven "Rosewood Veneer1"
+//     Jenelle van Heerden — all roles
+//
+// The other three surfaces (Slate, Plain, Black lacquer) are drawn by
+// surface.js and owe nobody anything. "Stained Pine" (Dario Barresi, Jenelle
+// van Heerden) was supplied but is NOT shipped — see the note below — so it is
+// deliberately uncredited: crediting it would advertise an asset that is not in
+// the product.
 //
 // PIPELINE, so this can be redone rather than reverse-engineered: 4096px
 // diffuse -> Chromium canvas, high-quality downscale to 512 -> per-pixel
