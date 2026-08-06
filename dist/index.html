@@ -29,7 +29,7 @@
         the app's own runtime injections are still covered. Move this tag to
         the top of <head> and the bridge dies with it: no Dropbox auth, no
         native storage, and the failure reads as a blank app. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-KEEDbZb27q+usiCalrtiNEeWp+qbYtRpGzNRljfT1rk='; style-src 'unsafe-inline'; img-src 'self' data: blob:; font-src data:; connect-src 'self' https://content.dropboxapi.com; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ewhWbdLCHz5McCM+zwTRWhTWg4xxOPjOYE99fwKwX8U='; style-src 'unsafe-inline'; img-src 'self' data: blob:; font-src data:; connect-src 'self' https://content.dropboxapi.com; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
 <!-- interactive-widget=resizes-content: the on-screen keyboard shrinks the
      LAYOUT viewport rather than only the visual one, so a fixed inset:0 overlay
      is simply correct and the browser never has to scroll the page to reveal the
@@ -2661,7 +2661,7 @@ body.screen-open #tray-handle{ display:none; }
 (function(){
 "use strict";
 
-const BUILD_STAMP = "05 Aug 18:06";  // replaced by build.py
+const BUILD_STAMP = "05 Aug 18:59";  // replaced by build.py
 
 // =========================================================
 // STORAGE ADAPTER (spec.md §3, known issue 4)
@@ -12884,7 +12884,23 @@ function injectChunkMap(){
     // together were the same information twice, in two visual languages.
     // Nothing about the engine changed; only this readout was removed.
     let celebration = "";
-    if (draft.pendingResult){
+    // ⚑ `&& !draft.done` is the whole point of this line — do not simplify it
+    // away. The runner (habitRunnerState, "3 / 12 / 8") gates its celebration
+    // scenes on `pendingResult && !doneToday`, and this banner used to gate on
+    // pendingResult alone. Arming Complete flips draft.done and nothing ever
+    // clears draft.pendingResult, so the runner moved on to the new lap while
+    // the banner went on announcing the run that had just ended — two readouts
+    // of the same draft, on one screen, disagreeing. The comment above
+    // habitRunnerState claimed they "can never disagree"; it was describing an
+    // invariant that only half the code implemented.
+    //
+    // It also made this the one element in a block whose own header says it
+    // renders the DRAFT ("the track shows today as done the moment the badge is
+    // tapped, and reverts on ✕") that ignored a draft control. Complete is
+    // draft-only on a habit page: arming hides the banner, disarming brings it
+    // back, ✕ discards, Save commits. checks/habit_celebration_draft.py holds
+    // both directions.
+    if (draft.pendingResult && !draft.done){
       const r = draft.pendingResult;
       if (r.type === "record"){
         celebration = '<div class="habit-celebration habit-celebration-record">New personal best \u2014 ' + r.length + (r.length === 1 ? " day" : " days") + '!</div>';

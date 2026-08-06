@@ -5098,7 +5098,23 @@
     // together were the same information twice, in two visual languages.
     // Nothing about the engine changed; only this readout was removed.
     let celebration = "";
-    if (draft.pendingResult){
+    // ⚑ `&& !draft.done` is the whole point of this line — do not simplify it
+    // away. The runner (habitRunnerState, "3 / 12 / 8") gates its celebration
+    // scenes on `pendingResult && !doneToday`, and this banner used to gate on
+    // pendingResult alone. Arming Complete flips draft.done and nothing ever
+    // clears draft.pendingResult, so the runner moved on to the new lap while
+    // the banner went on announcing the run that had just ended — two readouts
+    // of the same draft, on one screen, disagreeing. The comment above
+    // habitRunnerState claimed they "can never disagree"; it was describing an
+    // invariant that only half the code implemented.
+    //
+    // It also made this the one element in a block whose own header says it
+    // renders the DRAFT ("the track shows today as done the moment the badge is
+    // tapped, and reverts on ✕") that ignored a draft control. Complete is
+    // draft-only on a habit page: arming hides the banner, disarming brings it
+    // back, ✕ discards, Save commits. checks/habit_celebration_draft.py holds
+    // both directions.
+    if (draft.pendingResult && !draft.done){
       const r = draft.pendingResult;
       if (r.type === "record"){
         celebration = '<div class="habit-celebration habit-celebration-record">New personal best \u2014 ' + r.length + (r.length === 1 ? " day" : " days") + '!</div>';
