@@ -15,9 +15,9 @@ bottom before you rely on it. There is a backup button and you should use it.
 
 | You have | Take | Size | What it gives you |
 |---|---|---|---|
-| Any computer, any phone, five seconds | `OELA-1.0.html` | 1 MB | The whole app in one file. Open it, use it. |
-| An Android phone | `OELA-1.0.apk` | 5 MB | A real installed app with an icon, plus sync. |
-| A Windows PC | `OELA-1.0-windows-x64.zip` | 138 MB | A real desktop app, plus sync. |
+| Any computer, any phone, five seconds | `OELA-1.0.1.html` | 1 MB | The whole app in one file. Open it, use it. |
+| An Android phone | `OELA-1.0.1.apk` | 5 MB | A real installed app with an icon, plus sync. |
+| A Windows PC | `OELA-1.0.1-windows-x64.zip` | 138 MB | A real desktop app, plus sync. |
 
 Yes, the Windows download really is that much bigger than the app. Roughly 1 MB of it is OELA; the
 rest is Chromium, which a desktop app has to bring along and a browser already has. That is also why
@@ -34,7 +34,7 @@ built — ask me if you want one.
 
 ## The one-file version (start here)
 
-1. Download `OELA-1.0.html`.
+1. Download `OELA-1.0.1.html`.
 2. Open it. Double-click it, or drag it into a browser window.
 
 That is the entire installation. Everything the app needs — the code, the fonts, the icons — is
@@ -60,7 +60,7 @@ normal, supported thing to do — but Android has been making it steadily less p
 current phone it is more than a couple of confirmations. Step 4 is the awkward one. Read it before
 you start rather than in the middle.
 
-1. **Get `OELA-1.0.apk` onto the phone.** Email it to yourself, put it in Dropbox, or plug the phone
+1. **Get `OELA-1.0.1.apk` onto the phone.** Email it to yourself, put it in Dropbox, or plug the phone
    into a computer and copy it across. Downloading it in Chrome on the phone is easiest.
 2. **Tap the file.** In Chrome, pull down the notification shade and tap the finished download; or
    open **Files** → **Downloads** and tap it there.
@@ -89,7 +89,7 @@ you start rather than in the middle.
 only works because every build I hand out is signed with the same key. If you ever *uninstall* OELA,
 Android deletes its data with it, so export a backup first.
 
-**If you have `adb`, skip all of the above.** `adb install -r OELA-1.0.apk` over USB goes around
+**If you have `adb`, skip all of the above.** `adb install -r OELA-1.0.1.apk` over USB goes around
 both step 3 and step 4 entirely — no source permission, no Play Protect dialog, nothing to switch
 off and remember to switch back on. It is by far the least annoying route if you already have the
 Android platform tools, and the only reason it isn't the main instruction is that most people
@@ -104,7 +104,7 @@ the permission to be declared up front whether or not you ever turn sync on.
 
 ## Windows
 
-1. Download `OELA-1.0-windows-x64.zip`.
+1. Download `OELA-1.0.1-windows-x64.zip`.
 2. **Right-click it → Extract All.** Put the folder wherever you keep programs — it is not an
    installer and it will run happily from anywhere, including a USB stick.
 3. Open the folder and run **OELA.exe**.
@@ -206,8 +206,8 @@ asks first.
 matches what I actually built:
 
 ```
-Windows:      certutil -hashfile OELA-1.0.apk SHA256
-Mac / Linux:  shasum -a 256 OELA-1.0.apk
+Windows:      certutil -hashfile OELA-1.0.1.apk SHA256
+Mac / Linux:  shasum -a 256 OELA-1.0.1.apk
 ```
 
 The number it prints should match the line in `CHECKSUMS.txt`. If it doesn't, the download was

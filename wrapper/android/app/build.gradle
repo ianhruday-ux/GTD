@@ -35,8 +35,11 @@ android {
         applicationId "com.ianhruday.oela"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        // versionCode MUST increase for Android to accept an in-place update;
+        // versionName is what humans see and what tools_package.py reads as the
+        // single source of truth for every artifact filename.
+        versionCode 2
+        versionName "1.0.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField "String", "DROPBOX_APP_KEY", "\"${secrets.getProperty('dropboxAppKey', '')}\""
         // AppAuth's own manifest (merged in from the net.openid:appauth AAR)
