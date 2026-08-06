@@ -1,0 +1,56 @@
+OELA — third-party notices
+==========================
+
+OELA itself is one self-contained HTML file with no third-party JavaScript in
+it. This file exists for the two things that ARE bundled and whose licences
+require their notice to travel with each copy.
+
+Where each notice lives, and why:
+
+  * Fonts (Inter, Space Grotesk, IBM Plex Mono) are base64-embedded directly
+    inside index.html, so their SIL Open Font License 1.1 notice is embedded
+    there too, in full, at the top of the first <style> block. That is the copy
+    the licence attaches to.
+
+  * Capacitor is compiled into the Android build only. Its MIT notice is below.
+    The plain HTML file and the Windows build contain no Capacitor code.
+
+  * The two photographic desk surfaces (Dark wood, Rosewood) come from Poly
+    Haven (https://polyhaven.com) and are CC0 — public domain, no attribution
+    required. They are credited anyway, in the source, because the work
+    deserves naming: Dark Wood by Dimitrios Savva (photography) and Rico
+    Cilliers (tiling); Rosewood Veneer1 by Jenelle van Heerden. The other desk
+    surfaces are drawn by the app and are original to it.
+
+  * The Windows build bundles Electron and Chromium, which ship their own
+    LICENSE and LICENSES.chromium.html files alongside the executable.
+
+
+--------------------------------------------------------------------------
+Capacitor
+--------------------------------------------------------------------------
+
+Covers @capacitor/core, @capacitor/android, @capacitor/filesystem and
+@capacitor/preferences, which share one copyright holder.
+
+MIT License
+
+Copyright (c) 2017-present Drifty Co.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

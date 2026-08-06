@@ -12,12 +12,12 @@
 // =========================================================
 "use strict";
 
-const SW_VERSION = "c6e05cf02134";
+const SW_VERSION = "a9c67eb16ed3";
 const CACHE_NAME = "oela-" + SW_VERSION;
 // Relative paths only — GitHub Pages serves this from a project subpath
 // (…/GTD/), and an absolute "/index.html" would point at the domain root
 // instead (service-worker-plan.md §9.1).
-const PRECACHE_URLS = ["index.html", "manifest.webmanifest", "icon.svg", "icon-192.png", "icon-512.png"];
+const PRECACHE_URLS = ["index.html", "manifest.webmanifest", "icon.svg", "icon-192.png", "icon-512.png", "THIRD-PARTY-NOTICES.txt"];
 
 self.addEventListener("install", function(event){
   event.waitUntil(
