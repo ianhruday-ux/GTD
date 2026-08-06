@@ -113,12 +113,28 @@ def main():
     elif not pkg.DIST_INDEX.exists():
         sys.exit("tools_pushphone: --no-build, but dist/index.html does not exist.")
 
-    # build_apk() drops a copy in release/ as a side effect, which is wanted:
-    # the APK on the phone and the one you would hand somebody are then the
-    # same file, not two builds that merely came from the same source.
-    pkg.RELEASE.mkdir(exist_ok=True)
+    # ⚑ THIS NO LONGER WRITES INTO release/, and the old reasoning for doing so
+    # is worth recording because it was not silly. It said: dropping the copy in
+    # release/ means "the APK on the phone and the one you would hand somebody
+    # are the same file, not two builds that merely came from the same source."
+    #
+    # What that missed is that release/ is the PUBLICATION staging area.
+    # CHECKSUMS.txt describes it and RELEASE-NOTES publishes those hashes, but a
+    # phone build carries the same versionName and therefore the same filename.
+    # So every routine "put the current build on my phone" silently replaced a
+    # published artifact's local copy with a different build wearing its name --
+    # hit on 2026-08-05, when release/OELA-1.0.apk stopped matching both
+    # CHECKSUMS.txt and the asset on GitHub.
+    #
+    # The intent survives where it was actually true: tools_package.py is the
+    # deliberate act of packaging, it still writes release/, and it is the one
+    # that produces the handout. A push-to-phone build is a throwaway, so it
+    # goes to scratch space outside the repo. tools_package --verify-only now
+    # catches this class of drift regardless of what caused it.
     version = pkg.version_name()
-    apk = pkg.build_apk(version, java_home, android_home, allow_missing_key=False)
+    staging = pkg.BUILD_TMP / "phone"
+    apk = pkg.build_apk(version, java_home, android_home, allow_missing_key=False,
+                        dest_dir=staging)
 
     print("installing...")
     install(adb, apk)

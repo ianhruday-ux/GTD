@@ -206,7 +206,20 @@ def dropbox_app_key():
     return ""
 
 
-def build_apk(version, java_home, android_home, allow_missing_key):
+def build_apk(version, java_home, android_home, allow_missing_key, dest_dir=RELEASE):
+    """dest_dir exists so that NOT every APK build lands in release/.
+
+    ⚑ release/ is the publication staging area: CHECKSUMS.txt describes it, and
+    RELEASE-NOTES publishes those hashes for people to verify against. A build
+    that is merely on its way to the phone is not a release artifact, but it
+    carries the same versionName and therefore the same filename -- so writing
+    it here silently replaced the local copy of a PUBLISHED artifact with a
+    different build wearing its name. Hit on 2026-08-05: release/OELA-1.0.apk
+    stopped matching both CHECKSUMS.txt and the asset on GitHub, and the folder
+    became a mix of published and not, with nothing on its face to say which was
+    which. Only tools_package.py -- the deliberate act of packaging -- passes
+    the default now.
+    """
     key = dropbox_app_key()
     if not key and not allow_missing_key:
         sys.exit(
@@ -239,7 +252,8 @@ def build_apk(version, java_home, android_home, allow_missing_key):
 
     verify_apk(RELEASE_APK, android_home, env, expect_key=bool(key))
 
-    out = RELEASE / f"OELA-{version}.apk"
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    out = dest_dir / f"OELA-{version}.apk"
     shutil.copy2(RELEASE_APK, out)
     print(f"  android  {out.name}  ({out.stat().st_size / 1_048_576:.2f} MB)")
     return out
@@ -628,11 +642,88 @@ def write_manifest(version, artifacts):
     (RELEASE / "CHECKSUMS.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def read_checksums():
+    """{filename: sha256} as recorded in release/CHECKSUMS.txt. {} if absent."""
+    path = RELEASE / "CHECKSUMS.txt"
+    if not path.exists():
+        return {}
+    recorded = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        parts = line.split()
+        if len(parts) == 2 and len(parts[0]) == 64:
+            try:
+                int(parts[0], 16)
+            except ValueError:
+                continue
+            recorded[parts[1]] = parts[0]
+    return recorded
+
+
+def verify_release_integrity(allow_dirty):
+    """Refuse to package on top of a release/ that no longer matches its own sums.
+
+    ⚑ THIS IS THE GUARD, not a diagnostic. RELEASE-NOTES publishes the hashes in
+    CHECKSUMS.txt and INSTALL.md tells people to check their download against
+    them, so a release/ that has silently drifted is a set that cannot be
+    published without making the author's own published numbers wrong. The drift
+    is invisible: same filenames, plausible sizes, a folder that looks finished.
+
+    A MISMATCH is fatal -- a file wearing a published name with different bytes
+    is the dangerous case, and it is exactly what a stray build leaves behind.
+    A MISSING file only warns: it cannot be mistaken for something it is not,
+    and deleting a stale artifact is a legitimate way to clean this up.
+    """
+    recorded = read_checksums()
+    if not recorded:
+        return
+    mismatched, missing = [], []
+    for name, want in sorted(recorded.items()):
+        path = RELEASE / name
+        if not path.exists():
+            missing.append(name)
+        elif sha(path) != want:
+            mismatched.append((name, want, sha(path)))
+
+    for name in missing:
+        print(f"  ⚠ release/{name} is listed in CHECKSUMS.txt but is not here")
+
+    if not mismatched:
+        return
+    lines = ["tools_package: release/ does not match its own CHECKSUMS.txt.\n"]
+    for name, want, got in mismatched:
+        lines.append(f"  {name}\n    recorded {want}\n    actual   {got}")
+    lines.append(
+        "\n  Something replaced a file that CHECKSUMS.txt already describes, so this\n"
+        "  folder is now a mix of published and not. Publishing it would make the\n"
+        "  hashes in RELEASE-NOTES wrong, and INSTALL.md tells people to check them.\n"
+        "\n"
+        "  Most likely cause: a build that was only ever meant for the phone. Delete\n"
+        "  the offending file (GitHub still has the published one) or re-cut the whole\n"
+        "  set under a new version.\n"
+        "\n"
+        "  --allow-dirty-release proceeds anyway, if you know why it differs."
+    )
+    if allow_dirty:
+        print("\n".join(lines))
+        print("\n  --allow-dirty-release given; continuing.\n")
+        return
+    sys.exit("\n".join(lines))
+
+
 def main():
     args = set(sys.argv[1:])
-    unknown = args - {"--no-build", "--android", "--desktop", "--web", "--allow-missing-key"}
+    unknown = args - {"--no-build", "--android", "--desktop", "--web", "--allow-missing-key",
+                      "--allow-dirty-release", "--verify-only"}
     if unknown:
         sys.exit(f"tools_package: unknown option(s): {' '.join(sorted(unknown))}")
+
+    # Cheapest precondition of the lot, so it goes first -- ahead of even the
+    # keystore check, because it needs nothing but the files already on disk.
+    if "--verify-only" in args:
+        verify_release_integrity(False)
+        print("release/ matches CHECKSUMS.txt")
+        return
+    verify_release_integrity("--allow-dirty-release" in args)
 
     targets = {a for a in args if a in {"--android", "--desktop", "--web"}}
     want_android = not targets or "--android" in targets
